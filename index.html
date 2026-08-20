@@ -75,8 +75,12 @@
           <h2 id="fighter-name">Ton boxeur</h2>
           <p>Montréal, QC <span class="dot">•</span> Bilan : 0–0–0</p>
         </div>
+        <div class="money-spotlight">
+          <span>Disponible</span>
+          <strong id="money-spotlight">0 $</strong>
+        </div>
         <div class="actions-counter">
-          <span>Actions restantes</span>
+          <span>Plan de la semaine</span>
           <div id="action-pips" class="pips" aria-label="3 actions restantes"></div>
         </div>
       </section>
@@ -124,11 +128,23 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">Planifier la semaine</p>
-            <h2 id="actions-title">Choisis ta prochaine action</h2>
+            <h2 id="actions-title">Compose ton programme</h2>
           </div>
           <p>Chaque choix compte. La semaine se termine après trois actions.</p>
         </div>
         <div id="action-grid" class="action-grid"></div>
+      </section>
+
+      <section class="plan-panel" aria-labelledby="plan-title">
+        <div class="plan-heading">
+          <div><p class="eyebrow">Aperçu avant confirmation</p><h2 id="plan-title">Plan hebdomadaire</h2></div>
+          <span id="plan-count" class="plan-count">0 / 3 actions</span>
+        </div>
+        <div id="plan-content"></div>
+        <div class="plan-footer">
+          <p id="plan-help">Sélectionne au moins une action pour continuer.</p>
+          <button id="advance-week" class="primary-button advance-button" type="button" disabled>Passer à la semaine suivante</button>
+        </div>
       </section>
     </main>
 
@@ -151,6 +167,16 @@
           <button id="private-confirm" class="primary-button" value="default">Confirmer la séance</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="summary-dialog" class="service-dialog summary-dialog">
+      <div class="service-card">
+        <div class="service-heading">
+          <div><p class="eyebrow">Semaine terminée</p><h2 id="summary-title">Bilan</h2></div>
+        </div>
+        <div id="summary-content" class="summary-content"></div>
+        <div class="service-actions"><button id="summary-close" class="primary-button" type="button">Continuer</button></div>
+      </div>
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

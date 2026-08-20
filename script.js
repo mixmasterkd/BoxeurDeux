@@ -55,6 +55,7 @@ const actions = [
 
 let state = structuredClone(INITIAL_STATE);
 let draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
+let weeklyPlan = [];
 let toastTimer;
 
 const clamp = (value, min = 0, max = 100) => Math.min(max, Math.max(min, value));
@@ -97,17 +98,26 @@ function renderFighter() {
   document.querySelector("#combat-stats").innerHTML = Object.entries(combatLabels).map(([key, label]) => `<div class="combat-stat"><span>${label}</span><strong>${state.combatStats[key]}</strong></div>`).join("");
 }
 
+function projectedMoney() {
+  return state.money + weeklyPlan.reduce((total, item) => {
+    const action = actions.find(candidate => candidate.id === item.actionId);
+    return total + (action?.changes?.money || (action?.private ? -PRIVATE_PRICE : 0));
+  }, 0);
+}
+
 function actionLock(action) {
   if (action.future) return "Bientôt disponible";
   if (action.requiresGym && state.gymWeeks === 0) return "Abonnement au gym requis";
-  if (action.cost && state.money < action.cost) return `Il manque ${action.cost - state.money} $`;
+  if (weeklyPlan.length >= 3) return "Plan complet — retire une action";
+  if (action.cost && projectedMoney() < action.cost) return `Il manque ${action.cost - projectedMoney()} $ au budget prévu`;
   return "";
 }
 
 function renderActions() {
   document.querySelector("#action-grid").innerHTML = actions.map(action => {
-    const lock = actionLock(action);
-    return `<button class="action-card${action.future ? " future" : ""}" type="button" data-action="${action.id}" ${lock ? "disabled" : ""}>
+    const selected = weeklyPlan.some(item => item.actionId === action.id);
+    const lock = selected ? "" : actionLock(action);
+    return `<button class="action-card${action.future ? " future" : ""}${selected ? " selected" : ""}" type="button" data-action="${action.id}" ${lock ? "disabled" : ""} aria-pressed="${selected}">
       <span class="action-icon" aria-hidden="true">${action.icon}</span><h3>${action.title}</h3><p>${action.detail}</p>
       ${lock ? `<span class="action-lock">${lock}</span>` : ""}
     </button>`;
@@ -118,9 +128,10 @@ function renderMembership() {
   const status = document.querySelector("#membership-status");
   const button = document.querySelector("#membership-button");
   if (state.gymWeeks > 0) {
-    status.className = "membership-status active";
-    status.innerHTML = `<strong>Abonnement actif</strong>${state.gymWeeks} semaine${state.gymWeeks > 1 ? "s" : ""} restante${state.gymWeeks > 1 ? "s" : ""}`;
-    button.textContent = "Accès inclus";
+    const expiring = state.gymWeeks === 1;
+    status.className = `membership-status active${expiring ? " warning" : ""}`;
+    status.innerHTML = `<strong>${expiring ? "Renouvellement bientôt nécessaire" : "Abonnement actif"}</strong>${state.gymWeeks} semaine${state.gymWeeks > 1 ? "s" : ""} restante${state.gymWeeks > 1 ? "s" : ""}`;
+    button.textContent = expiring ? "Dernière semaine d’accès" : "Accès inclus";
     button.disabled = true;
   } else {
     status.className = "membership-status";
@@ -131,6 +142,49 @@ function renderMembership() {
   }
 }
 
+function planEffects() {
+  const general = {};
+  const combat = {};
+  let earned = 0;
+  let spent = 0;
+  weeklyPlan.forEach(item => {
+    const action = actions.find(candidate => candidate.id === item.actionId);
+    const changes = action.private ? { money: -PRIVATE_PRICE, energy: -14, morale: 3 } : (action.changes || {});
+    Object.entries(changes).forEach(([key, value]) => {
+      general[key] = (general[key] || 0) + value;
+      if (key === "money") value >= 0 ? earned += value : spent += Math.abs(value);
+    });
+    const combatChanges = action.private ? { [item.target]: 6 } : (action.combatChanges || {});
+    Object.entries(combatChanges).forEach(([key, value]) => combat[key] = (combat[key] || 0) + value);
+  });
+  return { general, combat, earned, spent };
+}
+
+function signed(value, suffix = "") {
+  return `${value > 0 ? "+" : ""}${value}${suffix}`;
+}
+
+function renderPlan() {
+  const content = document.querySelector("#plan-content");
+  document.querySelector("#plan-count").textContent = `${weeklyPlan.length} / 3 action${weeklyPlan.length > 1 ? "s" : ""}`;
+  if (!weeklyPlan.length) {
+    content.innerHTML = '<div class="plan-empty">Ton programme est vide. Choisis jusqu’à trois actions ci-dessus.</div>';
+  } else {
+    const totals = planEffects();
+    const effectParts = Object.entries(totals.general).filter(([key]) => key !== "money").map(([key, value]) => `${generalStats.find(stat => stat.key === key)?.label || "Expérience"} ${signed(value, key === "experience" ? "" : "%")}`);
+    effectParts.push(...Object.entries(totals.combat).map(([key, value]) => `${combatLabels[key]} ${signed(value)}`));
+    content.innerHTML = `<div class="plan-list">${weeklyPlan.map((item, index) => {
+      const action = actions.find(candidate => candidate.id === item.actionId);
+      const target = item.target ? ` · Cible : ${combatLabels[item.target]}` : "";
+      return `<div class="plan-row"><span class="plan-order">${index + 1}</span><div class="plan-row-copy"><strong>${action.title}</strong><small>${action.detail}${target}</small></div>${item.target ? `<button class="plan-remove" type="button" data-edit="${action.id}">Modifier</button>` : ""}<button class="plan-remove" type="button" data-remove="${action.id}">Retirer</button></div>`;
+    }).join("")}</div><div class="plan-totals"><div class="plan-total-block"><span>Argent à la fin</span><strong class="${projectedMoney() >= state.money ? "positive" : "negative"}">${projectedMoney()} $</strong></div><div class="plan-total-block"><span>Gains / dépenses</span><strong><span class="positive">+${totals.earned} $</span> · <span class="negative">−${totals.spent} $</span></strong></div><div class="plan-total-block"><span>Effets prévus</span><div class="plan-effects">${effectParts.join(" · ") || "Aucun changement de jauge"}</div></div></div>`;
+  }
+  const valid = weeklyPlan.length > 0 && projectedMoney() >= 0;
+  const advance = document.querySelector("#advance-week");
+  advance.disabled = !valid;
+  document.querySelector("#plan-help").textContent = !weeklyPlan.length ? "Sélectionne au moins une action pour continuer." : projectedMoney() < 0 ? "Le plan dépasse ton budget. Retire une dépense ou ajoute du travail." : "Rien ne sera appliqué avant ta confirmation.";
+}
+
 function render() {
   const hasFighter = Boolean(state.profile);
   document.querySelector("#creation-screen").classList.toggle("hidden", hasFighter);
@@ -138,10 +192,11 @@ function render() {
   if (!hasFighter) return;
 
   renderFighter();
+  document.querySelector("#money-spotlight").textContent = `${state.money} $`;
   document.querySelector("#week").textContent = String(state.week).padStart(2, "0");
   const pips = document.querySelector("#action-pips");
-  pips.innerHTML = Array.from({ length: 3 }, (_, index) => `<span class="pip ${index < state.actionsLeft ? "active" : ""}"></span>`).join("");
-  pips.setAttribute("aria-label", `${state.actionsLeft} action${state.actionsLeft > 1 ? "s" : ""} restante${state.actionsLeft > 1 ? "s" : ""}`);
+  pips.innerHTML = Array.from({ length: 3 }, (_, index) => `<span class="pip ${index < weeklyPlan.length ? "active" : ""}"></span>`).join("");
+  pips.setAttribute("aria-label", `${weeklyPlan.length} action${weeklyPlan.length > 1 ? "s" : ""} planifiée${weeklyPlan.length > 1 ? "s" : ""}`);
 
   document.querySelector("#stats").innerHTML = generalStats.map(stat => {
     const display = `${state[stat.key]}${stat.suffix}`;
@@ -155,6 +210,7 @@ function render() {
   document.querySelector("#journal").innerHTML = state.journal.slice(0, 8).map(entry => `<li><span class="journal-week">Semaine ${entry.week}</span>${escapeHTML(entry.text)}</li>`).join("");
   renderMembership();
   renderActions();
+  renderPlan();
 }
 
 function applyChanges(changes = {}) {
@@ -169,37 +225,32 @@ function applyCombatChanges(changes = {}) {
   });
 }
 
-function finishAction(title, message) {
-  state.actionsLeft -= 1;
-  state.journal.unshift({ week: state.week, text: message });
-  showToast(title);
-  if (state.actionsLeft === 0) endWeek();
+function toggleAction(action) {
+  const existing = weeklyPlan.findIndex(item => item.actionId === action.id);
+  if (existing >= 0) {
+    weeklyPlan.splice(existing, 1);
+    render();
+    return;
+  }
+  const lock = actionLock(action);
+  if (lock) return showToast(lock);
+  if (action.private) return document.querySelector("#private-dialog").showModal();
+  weeklyPlan.push({ actionId: action.id });
   render();
 }
 
-function applyAction(action) {
-  const lock = actionLock(action);
-  if (lock) return showToast(lock);
-  if (!window.confirm(`${action.title}\n\nEffets : ${action.detail}\n\nConfirmer cette action ?`)) return;
-  applyChanges(action.changes);
-  applyCombatChanges(action.combatChanges);
-  finishAction(action.title, action.message);
-}
-
-function applyPrivateSession() {
-  if (state.money < PRIVATE_PRICE) return showToast("Pas assez d'argent pour cette séance.");
+function planPrivateSession() {
+  if (projectedMoney() < PRIVATE_PRICE) return showToast("Pas assez d'argent prévu pour cette séance.");
   const key = document.querySelector("#private-stat").value;
-  const label = combatLabels[key];
-  if (!window.confirm(`Séance privée — ${label}\n\nCoût : ${PRIVATE_PRICE} $\nEffets : +6 ${label.toLowerCase()}, −14 énergie et +3 moral\n\nConfirmer ?`)) return;
-  state.money -= PRIVATE_PRICE;
-  state.energy = clamp(state.energy - 14);
-  state.morale = clamp(state.morale + 3);
-  state.combatStats[key] = clamp(state.combatStats[key] + 6, 0, 99);
+  const existing = weeklyPlan.find(item => item.actionId === "private");
+  if (existing) existing.target = key;
+  else weeklyPlan.push({ actionId: "private", target: key });
   document.querySelector("#private-dialog").close();
-  finishAction("Séance privée", `La séance privée fait progresser ta ${label.toLowerCase()}.`);
+  render();
+  showToast("Séance privée ajoutée au plan");
 }
 
-function endWeek() {
+function endWeek(events) {
   const endingWeek = state.week;
   state.week += 1;
   state.actionsLeft = 3;
@@ -208,19 +259,60 @@ function endWeek() {
   const membershipWasActive = state.gymWeeks > 0;
   if (membershipWasActive) state.gymWeeks -= 1;
 
-  let summary = `Fin de la semaine ${endingWeek}. La nouvelle semaine commence avec un peu d'énergie retrouvée.`;
+  let summary = "La récupération naturelle te rend un peu d'énergie.";
   if (state.injury >= 45 && Math.random() < state.injury / 140) {
     state.fitness = clamp(state.fitness - 8);
     state.morale = clamp(state.morale - 7);
     summary = "Une douleur persistante te force à ralentir : ta forme et ton moral en souffrent.";
+    events.push(summary);
   } else if (state.energy < 20) {
     state.injury = clamp(state.injury + 6);
     summary = "La fatigue accumulée augmente ton risque de blessure. Il faudrait lever le pied.";
+    events.push(summary);
   } else {
     state.injury = clamp(state.injury - 2);
   }
-  state.journal.unshift({ week: state.week, text: summary });
-  if (membershipWasActive && state.gymWeeks === 0) state.journal.unshift({ week: state.week, text: "Ton abonnement au gym est expiré. Renouvelle-le pour reprendre l'entraînement et le sparring." });
+  state.journal.unshift({ week: endingWeek, text: `Bilan : ${summary}` });
+  if (membershipWasActive && state.gymWeeks === 0) {
+    const expiry = "Ton abonnement au gym est expiré. Renouvelle-le pour reprendre l'entraînement et le sparring.";
+    events.push(expiry);
+    state.journal.unshift({ week: endingWeek, text: expiry });
+  }
+}
+
+function executePlan() {
+  if (!weeklyPlan.length || projectedMoney() < 0) return;
+  const endingWeek = state.week;
+  const before = { ...Object.fromEntries(generalStats.map(stat => [stat.key, state[stat.key]])), experience: state.experience, combatStats: { ...state.combatStats } };
+  const totals = planEffects();
+  const events = [];
+  weeklyPlan.forEach(item => {
+    const action = actions.find(candidate => candidate.id === item.actionId);
+    if (action.private) {
+      applyChanges({ money: -PRIVATE_PRICE, energy: -14, morale: 3 });
+      applyCombatChanges({ [item.target]: 6 });
+      state.journal.unshift({ week: endingWeek, text: `La séance privée fait progresser ta ${combatLabels[item.target].toLowerCase()}.` });
+    } else {
+      applyChanges(action.changes);
+      applyCombatChanges(action.combatChanges);
+      state.journal.unshift({ week: endingWeek, text: action.message });
+    }
+  });
+  endWeek(events);
+  const changes = [];
+  [...generalStats.map(stat => [stat.key, stat.label, stat.key === "money" ? " $" : "%"]), ["experience", "Expérience", ""]].forEach(([key, label, suffix]) => {
+    const delta = state[key] - before[key];
+    if (delta) changes.push(`${label} : ${signed(delta, suffix)}`);
+  });
+  Object.entries(combatLabels).forEach(([key, label]) => {
+    const delta = state.combatStats[key] - before.combatStats[key];
+    if (delta) changes.push(`${label} : ${signed(delta)}`);
+  });
+  weeklyPlan = [];
+  render();
+  document.querySelector("#summary-title").textContent = `Bilan de la semaine ${endingWeek}`;
+  document.querySelector("#summary-content").innerHTML = `<div class="summary-money"><div><span>Argent gagné</span><strong class="earned">+${totals.earned} $</strong></div><div><span>Argent dépensé</span><strong class="spent">−${totals.spent} $</strong></div></div><div class="summary-section"><h3>Changements nets</h3><ul>${changes.map(change => `<li>${change}</li>`).join("") || "<li>Aucun changement</li>"}</ul></div><div class="summary-section"><h3>Événements</h3><ul>${events.map(event => `<li>${escapeHTML(event)}</li>`).join("") || "<li>Aucun imprévu cette semaine.</li>"}</ul></div>`;
+  document.querySelector("#summary-dialog").showModal();
 }
 
 function showToast(message) {
@@ -273,19 +365,32 @@ document.querySelector("#action-grid").addEventListener("click", event => {
   const button = event.target.closest(".action-card");
   if (!button) return;
   const action = actions.find(item => item.id === button.dataset.action);
-  if (action.private) {
-    if (state.money < PRIVATE_PRICE) return showToast("Pas assez d'argent pour cette séance.");
-    document.querySelector("#private-dialog").showModal();
-  } else {
-    applyAction(action);
-  }
+  toggleAction(action);
 });
 
 document.querySelector("#private-form").addEventListener("submit", event => {
   event.preventDefault();
-  if (event.submitter?.id === "private-confirm") applyPrivateSession();
+  if (event.submitter?.id === "private-confirm") planPrivateSession();
   else document.querySelector("#private-dialog").close();
 });
+
+document.querySelector("#plan-content").addEventListener("click", event => {
+  const remove = event.target.closest("[data-remove]");
+  if (remove) {
+    weeklyPlan = weeklyPlan.filter(item => item.actionId !== remove.dataset.remove);
+    render();
+    return;
+  }
+  const edit = event.target.closest("[data-edit]");
+  if (edit) {
+    const item = weeklyPlan.find(planItem => planItem.actionId === edit.dataset.edit);
+    if (item?.target) document.querySelector("#private-stat").value = item.target;
+    document.querySelector("#private-dialog").showModal();
+  }
+});
+
+document.querySelector("#advance-week").addEventListener("click", executePlan);
+document.querySelector("#summary-close").addEventListener("click", () => document.querySelector("#summary-dialog").close());
 
 document.querySelector("#membership-button").addEventListener("click", () => {
   if (state.gymWeeks > 0) return;
@@ -301,6 +406,7 @@ document.querySelector("#membership-button").addEventListener("click", () => {
 document.querySelector("#restart").addEventListener("click", () => {
   if (window.confirm("Recommencer la carrière et créer un nouveau boxeur ?")) {
     state = structuredClone(INITIAL_STATE);
+    weeklyPlan = [];
     draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
     document.querySelector("#creation-form").reset();
     renderCreation();
