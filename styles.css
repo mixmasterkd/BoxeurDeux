@@ -59,20 +59,22 @@ input, select { font: inherit; }
 .form-error { min-height: 20px; margin: 14px 0 6px; color: #ff7966; font-size: .78rem; }
 .primary-button, .secondary-button, .membership-button { min-height: 46px; padding: 11px 18px; border: 1px solid var(--red); color: #141514; background: var(--red); font-weight: 700; cursor: pointer; }
 .secondary-button { border-color: var(--line); color: var(--ink); background: transparent; }
-.primary-button:disabled, .membership-button:disabled { cursor: not-allowed; opacity: .42; }
+.primary-button:disabled, .secondary-button:disabled, .membership-button:disabled { cursor: not-allowed; opacity: .42; }
 
 .game-shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 30px 0 48px; }
 .topbar, .fighter-card, .panel-heading, .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.topbar { padding-bottom: 24px; border-bottom: 1px solid var(--line); }
-.brand { display: flex; align-items: center; gap: 14px; }
+.topbar { position: sticky; top: 0; z-index: 8; min-height: 64px; padding: 10px 0; border-bottom: 1px solid var(--line); background: rgba(16,18,16,.94); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.brand { display: flex; min-width: 0; align-items: center; gap: 14px; }
+.brand > div { min-width: 0; }
 .brand-mark { display: grid; place-items: center; width: 50px; height: 50px; border: 2px solid var(--red); color: var(--red); font-family: "Barlow Condensed"; font-weight: 800; transform: rotate(-3deg); }
 h1, h2, h3, p { margin: 0; }
 h1, h2, h3 { font-family: "Barlow Condensed", sans-serif; text-transform: uppercase; letter-spacing: .025em; }
 h1 { font-size: clamp(1.6rem, 4vw, 2.25rem); line-height: .9; }
 h2 { font-size: 1.65rem; }
 .eyebrow { margin-bottom: 5px; color: var(--red); font: 700 .72rem/1 Inter; letter-spacing: .14em; text-transform: uppercase; }
-.week-block { display: flex; align-items: baseline; gap: 12px; color: var(--muted); text-transform: uppercase; font-size: .75rem; letter-spacing: .12em; }
+.week-block { display: flex; flex: 0 0 auto; align-items: baseline; gap: 12px; color: var(--muted); text-transform: uppercase; font-size: .75rem; letter-spacing: .12em; }
 .week-block strong { color: var(--ink); font: 800 2.8rem/1 "Barlow Condensed"; }
+.top-energy { margin-left: 4px; color: var(--green); font: 800 1rem/1 "Barlow Condensed"; letter-spacing: .04em; white-space: nowrap; }
 
 .fighter-card { position: relative; margin: 26px 0; padding: 22px 22px 46px; border: 1px solid var(--line); border-left: 4px solid var(--red); background: linear-gradient(105deg, #242724, #191b1a); box-shadow: 0 16px 40px rgba(0,0,0,.2); }
 .portrait { display: grid; place-items: center; flex: 0 0 70px; height: 70px; border-radius: 50%; background: var(--red); color: #171817; font: 800 1.6rem "Barlow Condensed"; }
@@ -192,20 +194,50 @@ h2 { font-size: 1.65rem; }
 .opponent-corner .fight-portrait { border-color: #e3513d; }
 .corner strong { display: block; margin: 7px 0 3px; color: var(--green); font: 800 2rem "Barlow Condensed"; }
 .corner small, .score small { color: var(--muted); font-size: .67rem; }
+.fight-energy-track { width: min(120px, 100%); height: 6px; margin: 0 auto 4px; overflow: hidden; border-radius: 99px; background: #0d0f0d; }
+.fight-energy-track > span { display: block; height: 100%; border-radius: inherit; background: var(--green); transition: width .2s ease; }
+.opponent-corner .fight-energy-track > span { background: #e3513d; }
 .score { border-right: 1px solid var(--line); border-left: 1px solid var(--line); }
 .score strong { display: block; margin: 6px 0; font: 800 2.6rem/1 "Barlow Condensed"; }
+.fight-tactics { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; margin: 0 0 10px; }
+.fight-tactics > div { min-width: 0; padding: 10px 11px; border: 1px solid var(--line); background: #111311; }
+.fight-tactics span, .fight-tactics small { display: block; color: var(--muted); font-size: .6rem; line-height: 1.35; }
+.fight-tactics span { margin-bottom: 4px; letter-spacing: .08em; text-transform: uppercase; }
+.fight-tactics strong { display: block; overflow-wrap: anywhere; font: 800 .98rem/1.1 "Barlow Condensed"; text-transform: uppercase; }
+.fight-tactics small { margin-top: 4px; }
+.fight-tactics button { align-self: stretch; max-width: 175px; padding: 8px 12px; font-size: .68rem; line-height: 1.25; }
+.fight-tactics button[hidden] { display: none; }
+.fight-round-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0 12px; }
+.fight-round-track > span { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 34px; padding: 6px 9px; border: 1px solid var(--line); color: var(--muted); background: #111311; font-size: .62rem; font-weight: 700; text-transform: uppercase; }
+.fight-round-track > span strong { color: var(--ink); font: 800 .95rem "Barlow Condensed"; }
+.fight-round-track > span.current { border-color: var(--gold); color: var(--gold); }
+.fight-round-track > span.completed { border-color: var(--green); color: var(--green); }
 .fight-instruction { min-height: 50px; color: #d4d1ca; text-align: center; font-size: .82rem; }
+.fight-instruction .primary-button { display: block; width: min(280px, 100%); margin: 14px auto 0; }
+.fight-round-summary { display: inline-block; margin: 5px 0; color: var(--gold); font-size: .7rem; font-weight: 700; }
 .fight-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .fight-choices button { min-height: 86px; padding: 12px; border: 1px solid var(--line); color: var(--ink); background: var(--panel); cursor: pointer; text-align: left; }
 .fight-choices button:hover { border-color: var(--gold); }
+.fight-choices button.tactical-advantage { border-color: var(--green); background: linear-gradient(145deg, rgba(108,183,137,.12), var(--panel)); }
+.fight-choices button.tactical-danger { border-color: #a4473b; }
 .fight-choices strong { display: block; font-family: "Barlow Condensed"; font-size: 1.2rem; text-transform: uppercase; }
 .fight-choices span { display: block; margin-top: 5px; color: var(--muted); font-size: .69rem; line-height: 1.35; }
+.fight-choices em { display: block; margin-top: 7px; color: var(--gold); font-size: .62rem; font-style: normal; font-weight: 700; line-height: 1.3; text-transform: uppercase; }
+.fight-choices .tactical-advantage em { color: var(--green); }
+.fight-choices .tactical-danger em { color: #ff7966; }
+.fight-choices .next-round-button { grid-column: 1 / -1; min-height: 62px; border-color: var(--gold); text-align: center; }
 
 .actions-section { margin-top: 35px; }
 .section-heading { align-items: end; margin-bottom: 18px; }
 .section-heading > p { max-width: 370px; color: var(--muted); font-size: .8rem; text-align: right; }
+.action-groups { display: grid; gap: 18px; }
+.action-group { padding: 16px; border: 1px solid var(--line); background: rgba(18,20,18,.58); }
+.action-group-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.action-group-heading > span { display: grid; place-items: center; flex: 0 0 30px; height: 30px; border: 1px solid var(--red); color: var(--red); font: 800 .76rem "Barlow Condensed"; }
+.action-group-heading h3 { font-size: 1.2rem; }
+.action-group-heading p { margin-top: 2px; color: var(--muted); font-size: .7rem; }
 .action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.action-card { min-height: 150px; padding: 18px; border: 1px solid var(--line); color: var(--ink); background: var(--panel); text-align: left; cursor: pointer; transition: transform .16s, border-color .16s, background .16s; }
+.action-card { min-width: 0; min-height: 150px; padding: 18px; overflow-wrap: anywhere; border: 1px solid var(--line); color: var(--ink); background: var(--panel); text-align: left; cursor: pointer; transition: transform .16s, border-color .16s, background .16s; }
 .action-card:hover:not(:disabled) { transform: translateY(-3px); border-color: var(--red); background: var(--panel-2); }
 .action-card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .action-card:disabled { cursor: not-allowed; opacity: .38; }
@@ -216,6 +248,8 @@ h2 { font-size: 1.65rem; }
 .action-card h3 { margin-bottom: 7px; font-size: 1.25rem; }
 .action-card p { color: var(--muted); font-size: .75rem; line-height: 1.45; }
 .action-card .action-lock { display: block; margin-top: 10px; color: var(--gold); font-size: .66rem; font-weight: 700; text-transform: uppercase; }
+.action-recommendation { display: block; margin-top: 10px; color: var(--green); font-size: .62rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.action-card.recommended:not(.selected) { box-shadow: inset 0 0 0 1px rgba(108,183,137,.18); }
 .action-card.future { border-style: dashed; opacity: .62; }
 .action-card.future .action-icon { border-color: var(--gold); color: var(--gold); }
 .plan-panel { margin-top: 22px; padding: 24px; border: 1px solid var(--line); border-top: 3px solid var(--gold); background: var(--panel); }
@@ -242,6 +276,10 @@ h2 { font-size: 1.65rem; }
 .plan-effects { color: #d4d1ca; font-size: .75rem; line-height: 1.55; }
 .plan-footer { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
 .plan-footer p { color: var(--muted); font-size: .76rem; }
+.plan-footer-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.plan-fight-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.plan-fight-actions[hidden] { display: none; }
+.advance-button[hidden] { display: none; }
 .advance-button { min-width: 260px; }
 .summary-content { margin: 22px 0; }
 .summary-money { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
@@ -252,6 +290,14 @@ h2 { font-size: 1.65rem; }
 .summary-money .spent { color: #ff7966; }
 .summary-section { margin-top: 10px; }
 .summary-section ul { margin: 8px 0 0; padding-left: 18px; color: #d4d1ca; font-size: .78rem; line-height: 1.6; }
+.week-choice-list { display: grid; gap: 8px; margin-top: 10px; }
+.week-choice-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 66px; padding: 10px 12px; border: 1px solid var(--line); color: var(--ink); background: #111311; cursor: pointer; text-align: left; }
+.week-choice-card:hover:not(:disabled), .week-choice-card:focus-visible { border-color: var(--gold); }
+.week-choice-card:disabled { cursor: not-allowed; opacity: .45; }
+.week-choice-card strong, .week-choice-card small { display: block; }
+.week-choice-card strong { font-family: "Barlow Condensed"; font-size: 1.05rem; text-transform: uppercase; }
+.week-choice-card small { margin-top: 3px; color: var(--muted); font-size: .68rem; line-height: 1.35; }
+.week-choice-card em { max-width: 135px; color: var(--gold); font-size: .62rem; font-style: normal; font-weight: 700; line-height: 1.35; text-align: right; text-transform: uppercase; }
 .service-dialog { width: min(520px, calc(100% - 24px)); padding: 0; border: 0; color: var(--ink); background: transparent; }
 .service-dialog::backdrop { background: rgba(0,0,0,.76); backdrop-filter: blur(4px); }
 .service-card { padding: 26px; border: 1px solid var(--line); border-top: 4px solid var(--red); background: var(--panel); }
@@ -318,9 +364,10 @@ h2 { font-size: 1.65rem; }
   .brand { min-width: 0; gap: 8px; }
   .brand-mark { width: 38px; height: 38px; flex: 0 0 38px; }
   .brand h1 { overflow: hidden; font-size: 1.4rem; white-space: nowrap; text-overflow: ellipsis; }
-  .brand .eyebrow, .week-block span { display: none; }
-  .week-block { gap: 0; }
+  .brand .eyebrow, .week-label { display: none; }
+  .week-block { gap: 6px; }
   .week-block strong { font-size: 1.85rem; }
+  .top-energy { margin-left: 0; font-size: .9rem; }
   #restart-top { grid-column: auto; justify-self: end; min-height: 44px; padding: 6px; font-size: .6rem; }
   .fighter-card { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px 12px; margin: 12px 0; padding: 12px; box-shadow: none; }
   .portrait { width: 46px; height: 46px; flex: 0 0 46px; font-size: 1.25rem; }
@@ -377,11 +424,19 @@ h2 { font-size: 1.65rem; }
   .corner strong { font-size: 1.5rem; }
   .score { grid-column: 1 / -1; order: -1; border: 0; border-bottom: 1px solid var(--line); padding: 0 0 10px; }
   .score strong { font-size: 1.85rem; }
+  .fight-tactics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .fight-tactics > div { padding: 8px; }
+  .fight-tactics strong { font-size: .88rem; }
+  .fight-tactics button { grid-column: 1 / -1; width: 100%; max-width: none; min-height: 40px; }
+  .fight-round-track { gap: 4px; margin: 7px 0 9px; }
+  .fight-round-track > span { min-height: 30px; padding: 5px 7px; }
   .fight-instruction { min-height: 0; margin: 10px 0; font-size: .72rem; line-height: 1.4; }
   .fight-choices { grid-template-columns: 1fr; gap: 6px; }
   .fight-choices button { display: grid; grid-template-columns: minmax(95px, auto) 1fr; align-items: center; gap: 9px; min-height: 52px; padding: 8px 10px; }
   .fight-choices strong { font-size: 1rem; }
   .fight-choices span { margin: 0; font-size: .65rem; line-height: 1.3; }
+  .fight-choices button em { grid-column: 1 / -1; margin-top: 0; }
+  .fight-choices .next-round-button { display: block; text-align: center; }
   .tournament-grid { grid-template-columns: 1fr; }
   .tournament-heading, .pro-transition { align-items: flex-start; flex-direction: column; }
   .pro-transition button { width: 100%; }
@@ -391,12 +446,20 @@ h2 { font-size: 1.65rem; }
   .bracket-round { min-height: 132px; scroll-snap-align: start; }
   .actions-section { margin-top: 20px; }
   .section-heading { align-items: flex-start; margin-bottom: 11px; }
-  .section-heading > p { display: none; }
+  .section-heading > p:not(#action-limit-help) { display: none; }
+  .actions-section .section-heading { flex-wrap: wrap; }
+  #action-limit-help { flex: 0 0 100%; max-width: none; color: var(--gold); font-size: .64rem; line-height: 1.35; text-align: left; }
+  .action-groups { gap: 12px; }
+  .action-group { padding: 9px; }
+  .action-group-heading { gap: 8px; margin-bottom: 8px; }
+  .action-group-heading > span { flex-basis: 26px; height: 26px; }
+  .action-group-heading h3 { font-size: 1.05rem; }
+  .action-group-heading p { display: none; }
   .action-grid { gap: 8px; }
   .action-card { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-content: start; gap: 6px 7px; min-height: 118px; padding: 10px; }
   .action-icon { width: 26px; height: 26px; margin: 0; }
   .action-card h3 { align-self: center; margin: 0; font-size: 1.02rem; line-height: 1; }
-  .action-card p, .action-card .action-lock, .action-card.selected::after { grid-column: 1 / -1; }
+  .action-card p, .action-card .action-lock, .action-card .action-recommendation, .action-card.selected::after { grid-column: 1 / -1; }
   .action-card p { font-size: .7rem; line-height: 1.35; }
   .action-card .action-lock, .action-card.selected::after { margin-top: 1px; font-size: .6rem; line-height: 1.3; overflow-wrap: anywhere; }
   .action-card:disabled { opacity: .58; }
@@ -405,7 +468,7 @@ h2 { font-size: 1.65rem; }
   .plan-heading .eyebrow { display: none; }
   .plan-count { flex: 0 0 auto; font-size: 1.05rem; text-align: right; }
   .plan-list { gap: 6px; margin: 12px 0; }
-  .plan-list-empty { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .plan-list-empty { grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); }
   .plan-list-empty .plan-slot { justify-content: center; gap: 5px; padding-inline: 4px; }
   .plan-slot { min-height: 40px; padding: 7px 9px; }
   .plan-slot span, .plan-order { width: 24px; height: 24px; flex-basis: 24px; }
@@ -423,9 +486,15 @@ h2 { font-size: 1.65rem; }
   .plan-effects { font-size: .66rem; line-height: 1.4; }
   .plan-footer { align-items: stretch; gap: 9px; margin-top: 12px; padding-top: 12px; flex-direction: column; }
   .plan-footer p { font-size: .66rem; line-height: 1.35; }
+  .plan-footer-actions, .plan-fight-actions { width: 100%; }
+  .plan-footer-actions { flex-direction: column; }
+  .plan-fight-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-fight-actions button { width: 100%; min-width: 0; }
   .advance-button { width: 100%; min-width: 0; }
   .service-dialog { width: calc(100% - 16px); }
   .service-card { max-height: calc(100dvh - 16px); padding: 20px 16px; overflow-y: auto; }
+  .week-choice-card { grid-template-columns: minmax(0, 1fr) 92px; min-height: 64px; padding: 9px 10px; }
+  .week-choice-card em { max-width: 92px; }
   .service-effect { align-items: flex-start; flex-direction: column; }
   .service-actions { align-items: stretch; flex-direction: column-reverse; }
   .service-actions button { width: 100%; }

@@ -69,9 +69,10 @@
             <h1>Boxeur Deux</h1>
           </div>
         </div>
-        <div class="week-block">
-          <span>Semaine</span>
+        <div class="week-block" aria-label="État de la semaine">
+          <span class="week-label">Semaine</span>
           <strong id="week">01</strong>
+          <span id="top-energy" class="top-energy" aria-label="Énergie 72 %">E:72%</span>
         </div>
         <button id="restart-top" class="text-button" type="button">Réinitialiser</button>
       </header>
@@ -158,9 +159,9 @@
             <p class="eyebrow">Planifier la semaine</p>
             <h2 id="actions-title">Compose ton programme</h2>
           </div>
-          <p>Chaque choix compte. La semaine se termine après trois actions.</p>
+          <p id="action-limit-help">Chaque choix compte. La semaine se termine après trois actions.</p>
         </div>
-        <div id="action-grid" class="action-grid"></div>
+        <div id="action-grid" class="action-groups"></div>
       </section>
 
       <section class="plan-panel" aria-labelledby="plan-title">
@@ -171,7 +172,13 @@
         <div id="plan-content"></div>
         <div class="plan-footer">
           <p id="plan-help">Sélectionne au moins une action pour continuer.</p>
-          <button id="advance-week" class="primary-button advance-button" type="button" disabled>Passer à la semaine suivante</button>
+          <div class="plan-footer-actions">
+            <button id="advance-week" class="primary-button advance-button" type="button" disabled>Passer à la semaine suivante</button>
+            <div id="plan-fight-actions" class="plan-fight-actions" hidden>
+              <button id="plan-withdraw-fight" class="secondary-button withdraw-button" type="button">Se désister</button>
+              <button id="plan-start-fight" class="primary-button" type="button">Entrer dans le ring</button>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -207,6 +214,16 @@
       </div>
     </dialog>
 
+    <dialog id="week-event-dialog" class="service-dialog week-event-dialog">
+      <div class="service-card">
+        <div class="service-heading">
+          <div><p class="eyebrow">Entre deux semaines</p><h2 id="week-event-title">Une décision à prendre</h2></div>
+        </div>
+        <p id="week-event-lead" class="service-lead"></p>
+        <div id="week-event-choices" class="week-choice-list"></div>
+      </div>
+    </dialog>
+
     <dialog id="tournament-dialog" class="tournament-dialog">
       <div class="tournament-board-card">
         <div class="service-heading">
@@ -223,11 +240,17 @@
       <div class="fight-card">
         <div class="fight-topline"><span id="fight-week-label">Combat amateur</span><strong id="fight-round">Round 1 / 3</strong></div>
         <div class="ring-scoreboard">
-          <div class="corner player-corner"><img class="fight-portrait" src="assets/boxeur-coin-bleu.png" alt="Portrait illustré du boxeur du coin bleu"><span id="fight-player-name">Toi</span><small id="fight-player-meta">Coin bleu</small><strong id="fight-player-energy">100%</strong><small>Énergie</small></div>
+          <div class="corner player-corner"><img class="fight-portrait" src="assets/boxeur-coin-bleu.png" width="1024" height="1536" loading="lazy" decoding="async" alt="Portrait illustré du boxeur du coin bleu"><span id="fight-player-name">Toi</span><small id="fight-player-meta">Coin bleu</small><strong id="fight-player-energy">100%</strong><div class="fight-energy-track" aria-hidden="true"><span id="fight-player-energy-bar"></span></div><small>Énergie</small></div>
           <div class="score"><span>Score</span><strong id="fight-score">0 — 0</strong><small id="fight-status">Premier round</small></div>
-          <div class="corner opponent-corner"><img class="fight-portrait" src="assets/adversaire-coin-rouge.png" alt="Portrait illustré de l’adversaire du coin rouge"><span id="fight-opponent-name">Adversaire</span><small id="fight-opponent-meta">Coin rouge</small><strong id="fight-opponent-energy">100%</strong><small>Énergie</small></div>
+          <div class="corner opponent-corner"><img class="fight-portrait" src="assets/adversaire-coin-rouge.png" width="1024" height="1536" loading="lazy" decoding="async" alt="Portrait illustré de l’adversaire du coin rouge"><span id="fight-opponent-name">Adversaire</span><small id="fight-opponent-meta">Coin rouge</small><strong id="fight-opponent-energy">100%</strong><div class="fight-energy-track" aria-hidden="true"><span id="fight-opponent-energy-bar"></span></div><small>Énergie</small></div>
         </div>
-        <div id="fight-instruction" class="fight-instruction"><p>Choisis une consigne pour ce round.</p></div>
+        <div class="fight-tactics">
+          <div><span>Lecture adverse</span><strong id="fight-opponent-tell">Tendance inconnue</strong><small id="fight-tactical-hint">Observe son style avant de choisir.</small></div>
+          <div><span>Dynamique</span><strong id="fight-momentum">Combat équilibré</strong><small>Varie tes consignes pour rester imprévisible.</small></div>
+          <button id="fight-corner-boost" class="secondary-button" type="button" disabled>Souffler au coin · +8 E</button>
+        </div>
+        <div id="fight-round-track" class="fight-round-track" aria-label="Résultats des rounds"></div>
+        <div id="fight-instruction" class="fight-instruction" aria-live="polite"><p>Choisis une consigne pour ce round.</p></div>
         <div id="fight-choices" class="fight-choices">
           <button type="button" data-strategy="attack"><strong>Attaquer</strong><span>Puissance, technique · fatigue élevée</span></button>
           <button type="button" data-strategy="distance"><strong>Boxer à distance</strong><span>Technique, cardio · fatigue modérée</span></button>

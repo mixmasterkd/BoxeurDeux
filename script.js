@@ -18,6 +18,12 @@ const styles = {
   balanced: { label: "Équilibré", bonus: { technique: 2, power: 2, cardio: 2, defense: 2 }, hint: "+2 à chaque statistique" },
 };
 
+const fightStrategies = {
+  attack: { label: "Attaquer", short: "Pression", fatigue: 16, beats: "distance", detail: "Pression · puissance + technique", intent: "Il avance avec pression" },
+  distance: { label: "Boxer à distance", short: "Distance", fatigue: 10, beats: "defense", detail: "Technique + cardio", intent: "Il cherche à boxer à distance" },
+  defense: { label: "Jouer la défense", short: "Contre", fatigue: 7, beats: "attack", detail: "Contre · défense + technique", intent: "Il attend pour contrer" },
+};
+
 const opponents = [
   { id: "leclerc", name: "Thomas Leclerc", nickname: "BETON", style: "Technicien", record: "1 V · 1 D · 0 N", difficulty: 36, risk: "Accessible", dateLead: 3 },
   { id: "okafor", name: "Darnell Okafor", nickname: "Brick", style: "Puncheur", record: "2 V · 1 D · 0 N", difficulty: 40, risk: "Modéré", dateLead: 4 },
@@ -50,7 +56,6 @@ const INITIAL_STATE = {
   profile: null,
   combatStats: { technique: BASE_COMBAT_STAT, power: BASE_COMBAT_STAT, cardio: BASE_COMBAT_STAT, defense: BASE_COMBAT_STAT },
   week: 1,
-  actionsLeft: 3,
   money: 180,
   energy: 72,
   fitness: 25,
@@ -63,7 +68,6 @@ const INITIAL_STATE = {
   professionalRecord: { wins: 0, losses: 0, draws: 0 },
   careerStatus: "amateur",
   scheduledFight: null,
-  declinedFights: [],
   tournaments: { bronze: "pending", silver: "pending", golden: "pending", canadian: "locked", olympic: "locked" },
   activeTournament: null,
   medals: {
@@ -73,6 +77,7 @@ const INITIAL_STATE = {
   },
   goldenPlacement: null,
   olympicCompleted: false,
+  pendingWeekEvent: null,
   journal: [],
 };
 
@@ -85,15 +90,80 @@ const generalStats = [
   { key: "injury", label: "Risque de blessure", suffix: "%", className: "injury" },
 ];
 
+const actionCategories = [
+  { id: "training", label: "Préparation et technique", hint: "Développe les qualités qui feront la différence dans le ring." },
+  { id: "recovery", label: "Récupération", hint: "Protège ton énergie, ta forme et ton corps." },
+  { id: "career", label: "Carrière et finances", hint: "Finance le camp, développe ta réputation et garde le moral." },
+];
+
+const betweenWeekEvents = [
+  {
+    id: "local-radio",
+    title: "Le micro est ouvert",
+    lead: "Une radio du quartier veut parler de ta progression. Ta réponse changera le début de la nouvelle semaine.",
+    choices: [
+      { id: "interview", title: "Accepter l’entrevue", detail: "Tu racontes ton parcours avec calme.", effect: "+7 réputation · +2 moral · −6 énergie", changes: { reputation: 7, morale: 2, energy: -6 }, result: "L’entrevue locale fait connaître ton nom sans détourner complètement ton attention du camp." },
+      { id: "training", title: "Rester au camp", detail: "Tu laisses parler tes résultats.", effect: "+5 énergie · +2 forme", changes: { energy: 5, fitness: 2 }, result: "Tu déclines l’entrevue et profites du temps gagné pour consolider ta préparation." },
+      { id: "challenge", title: "Lancer un défi", detail: "Tu promets un spectacle au prochain combat.", effect: "+10 réputation · +4 moral · +3 risque", changes: { reputation: 10, morale: 4, injury: 3 }, result: "Ta déclaration attire l’attention, mais ajoute un peu de pression au camp." },
+    ],
+  },
+  {
+    id: "sore-morning",
+    title: "Un réveil difficile",
+    lead: "Une douleur tenace apparaît au lendemain de la semaine. Tu dois décider comment commencer la suivante.",
+    choices: [
+      { id: "physio", title: "Consultation express", detail: "Un traitement rapide, moins complet que la physiothérapie hebdomadaire.", effect: "45 $ · −14 risque · +5 énergie", changes: { money: -45, injury: -14, energy: 5 }, result: "Le traitement rapide calme la douleur avant qu’elle devienne un problème." },
+      { id: "slow-down", title: "Lever le pied", detail: "Tu acceptes de perdre un peu de rythme.", effect: "+12 énergie · −6 risque · −2 forme", changes: { energy: 12, injury: -6, fitness: -2 }, result: "Une journée plus douce protège ton corps, au prix d’un peu de forme." },
+      { id: "push-through", title: "Maintenir le rythme", detail: "Tu refuses de modifier le programme.", effect: "+6 forme · −10 énergie · +7 risque", changes: { fitness: 6, energy: -10, injury: 7 }, result: "Tu gagnes du rythme, mais la douleur reste dans un coin de ta tête." },
+    ],
+  },
+  {
+    id: "community-night",
+    title: "Le quartier t’appelle",
+    lead: "Le centre communautaire te propose une soirée avec les jeunes boxeurs avant le début de la semaine.",
+    choices: [
+      { id: "workshop", title: "Donner un atelier", detail: "Tu partages tes premiers apprentissages.", effect: "+7 réputation · +6 moral · −8 énergie", changes: { reputation: 7, morale: 6, energy: -8 }, result: "L’atelier crée un vrai lien avec le quartier et te rappelle pourquoi tu boxes." },
+      { id: "extra-shift", title: "Prendre un quart de travail", detail: "Tu profites plutôt de la soirée pour travailler.", effect: "+55 $ · −15 énergie · −3 moral", changes: { money: 55, energy: -15, morale: -3 }, result: "Le compte en banque respire, même si la soirée laisse des traces." },
+      { id: "quiet-night", title: "Garder la soirée libre", detail: "Tu coupes le téléphone et récupères.", effect: "+10 énergie · +2 moral", changes: { energy: 10, morale: 2 }, result: "Une soirée calme te permet d’attaquer la semaine avec plus de fraîcheur." },
+    ],
+  },
+  {
+    id: "open-sparring",
+    title: "Une invitation imprévue",
+    lead: "Un autre club ouvre ses portes pour une séance de sparring informelle. Tu peux participer, observer ou récupérer.",
+    choices: [
+      { id: "join", title: "Monter sur le ring", detail: "De l’expérience réelle, avec les risques qui viennent avec.", effect: "+10 expérience · −12 énergie · +7 risque", changes: { experience: 10, energy: -12, injury: 7 }, result: "Les rounds improvisés donnent de nouveaux repères, mais le corps encaisse." },
+      { id: "observe", title: "Observer les rounds", detail: "Tu étudies les réactions sans prendre de coups.", effect: "+6 expérience · +1 technique · +1 défense · −3 énergie", changes: { experience: 6, energy: -3 }, combatChanges: { technique: 1, defense: 1 }, result: "L’observation attentive ajoute deux détails utiles à ton arsenal." },
+      { id: "recover", title: "Rester au repos", detail: "Tu privilégies la prochaine semaine.", effect: "+10 énergie · −3 risque", changes: { energy: 10, injury: -3 }, result: "Tu refuses poliment et gardes du carburant pour ton propre programme." },
+    ],
+  },
+  {
+    id: "tactical-choice",
+    title: "Une idée à travailler",
+    lead: "En revoyant tes dernières séances, trois pistes de progression ressortent pour la semaine qui commence.",
+    choices: [
+      { id: "film", title: "Étudier les angles", detail: "Tu privilégies la lecture et le placement.", effect: "+2 technique · +2 défense · −5 énergie", changes: { energy: -5 }, combatChanges: { technique: 2, defense: 2 }, result: "Le travail d’angles rend tes décisions plus propres et ta garde plus intelligente." },
+      { id: "power", title: "Chercher plus d’impact", detail: "Tu mets l’accent sur l’explosivité.", effect: "+3 puissance · −8 énergie · +3 risque", changes: { energy: -8, injury: 3 }, combatChanges: { power: 3 }, result: "La séance explosive ajoute du poids à tes frappes, avec un peu de tension musculaire." },
+      { id: "visualize", title: "Faire de la visualisation", detail: "Tu travailles la confiance et le calme.", effect: "+8 moral · +3 énergie", changes: { morale: 8, energy: 3 }, result: "Quelques minutes de visualisation clarifient ton objectif pour la semaine." },
+    ],
+  },
+];
+
 const actions = [
-  { id: "work", icon: "$", title: "Travailler", detail: "+70 $ · −22 énergie · −4 moral", changes: { money: 70, energy: -22, morale: -4 }, message: "Un quart de travail paie les factures, mais laisse les jambes lourdes." },
-  { id: "gym", icon: "G", title: "Entraînement au gym", detail: "+10 forme · +2 cardio · +1 technique · −18 énergie · +3 risque", requiresGym: true, changes: { fitness: 10, energy: -18, injury: 3 }, combatChanges: { cardio: 2, technique: 1 }, message: "Une séance solide au gym améliore ta condition et affine ta technique." },
-  { id: "private", icon: "P", title: "Séance privée", detail: "90 $ · +6 à une statistique · −14 énergie · +3 moral", cost: PRIVATE_PRICE, private: true },
-  { id: "rest", icon: "Z", title: "Repos", detail: "+30 énergie · −10 risque · +5 moral", changes: { energy: 30, injury: -10, morale: 5 }, message: "Une vraie journée de repos remet le corps d'aplomb." },
-  { id: "eat", icon: "+", title: "Bien manger", detail: "35 $ · +14 énergie · +6 forme · +2 moral", cost: 35, changes: { money: -35, energy: 14, fitness: 6, morale: 2 }, message: "Un bon repas nourrit la récupération autant que le moral." },
-  { id: "sparring", icon: "S", title: "Sparring", detail: "+12 expérience · +2 technique · +2 défense · −24 énergie · +12 risque", requiresGym: true, changes: { experience: 12, energy: -24, injury: 12, reputation: 2 }, combatChanges: { technique: 2, defense: 2 }, message: "Les rounds de sparring donnent de l'expérience et de vrais réflexes de combat." },
-  { id: "spa", icon: "R", title: "Spa et récupération", detail: "65 $ · +38 énergie · −20 risque · +6 moral", cost: 65, changes: { money: -65, energy: 38, injury: -20, morale: 6 }, message: "Le protocole de récupération remet le corps et la tête en état." },
-  { id: "coach", icon: "C", title: "Meilleur coach", detail: "Amélioration de carrière à venir", future: true },
+  { id: "gym", category: "training", icon: "G", title: "Entraînement au gym", detail: "+10 forme · +2 cardio · +1 technique · −18 énergie · +3 risque", requiresGym: true, changes: { fitness: 10, energy: -18, injury: 3 }, combatChanges: { cardio: 2, technique: 1 }, message: "Une séance solide au gym améliore ta condition et affine ta technique." },
+  { id: "private", category: "training", icon: "P", title: "Séance privée", detail: "90 $ · +6 à une statistique · −14 énergie · +3 moral", cost: PRIVATE_PRICE, private: true },
+  { id: "sparring", category: "training", icon: "S", title: "Sparring", detail: "+12 expérience · +2 technique · +2 défense · −24 énergie · +12 risque", requiresGym: true, changes: { experience: 12, energy: -24, injury: 12, reputation: 2 }, combatChanges: { technique: 2, defense: 2 }, message: "Les rounds de sparring donnent de l'expérience et de vrais réflexes de combat." },
+  { id: "roadwork", category: "training", icon: "C", title: "Course matinale", detail: "+7 forme · +2 cardio · −16 énergie · +2 risque", changes: { fitness: 7, energy: -16, injury: 2 }, combatChanges: { cardio: 2 }, message: "La course matinale bâtit un moteur plus solide pour les longs échanges." },
+  { id: "heavybag", category: "training", icon: "B", title: "Travail au sac", detail: "+3 puissance · +1 technique · +3 forme · −17 énergie · +4 risque", requiresGym: true, changes: { fitness: 3, energy: -17, injury: 4 }, combatChanges: { power: 3, technique: 1 }, message: "Le travail au sac rend tes frappes plus lourdes et plus propres." },
+  { id: "video", category: "training", icon: "V", title: "Étude vidéo", detail: "+7 expérience · +1 technique · +1 défense · −7 énergie · +1 moral", changes: { experience: 7, energy: -7, morale: 1 }, combatChanges: { technique: 1, defense: 1 }, message: "Une soirée d'étude révèle des habitudes que tu pourras exploiter en combat." },
+  { id: "rest", category: "recovery", icon: "Z", title: "Repos", detail: "+30 énergie · −10 risque · +5 moral", changes: { energy: 30, injury: -10, morale: 5 }, message: "Une vraie journée de repos remet le corps d'aplomb." },
+  { id: "eat", category: "recovery", icon: "+", title: "Bien manger", detail: "35 $ · +14 énergie · +6 forme · +2 moral", cost: 35, changes: { money: -35, energy: 14, fitness: 6, morale: 2 }, message: "Un bon repas nourrit la récupération autant que le moral." },
+  { id: "physio", category: "recovery", icon: "T", title: "Physiothérapie", detail: "55 $ · −16 risque · +8 énergie · +2 forme", cost: 55, changes: { money: -55, injury: -16, energy: 8, fitness: 2 }, message: "Le traitement du physiothérapeute calme les douleurs avant qu'elles ne s'installent." },
+  { id: "spa", category: "recovery", icon: "R", title: "Spa et récupération", detail: "65 $ · +38 énergie · −20 risque · +6 moral", cost: 65, changes: { money: -65, energy: 38, injury: -20, morale: 6 }, message: "Le protocole de récupération remet le corps et la tête en état." },
+  { id: "work", category: "career", icon: "$", title: "Travailler", detail: "+70 $ · −22 énergie · −4 moral", changes: { money: 70, energy: -22, morale: -4 }, message: "Un quart de travail paie les factures, mais laisse les jambes lourdes." },
+  { id: "promotion", category: "career", icon: "M", title: "Promotion locale", detail: "20 $ · +8 réputation · +3 moral · −10 énergie", cost: 20, changes: { money: -20, reputation: 8, morale: 3, energy: -10 }, message: "Quelques apparitions locales font circuler ton nom dans le quartier." },
+  { id: "family", category: "career", icon: "F", title: "Temps avec les proches", detail: "+12 moral · +8 énergie", changes: { morale: 12, energy: 8 }, message: "Une soirée avec les proches remet la carrière en perspective." },
+  { id: "sponsor", category: "career", icon: "$+", title: "Petite commandite", detail: "+95 $ · +2 réputation · −12 énergie · −2 moral", requiresReputation: 30, changes: { money: 95, reputation: 2, morale: -2, energy: -12 }, message: "Une entreprise locale finance une partie du camp en échange d'une apparition promotionnelle." },
 ];
 
 let state = structuredClone(INITIAL_STATE);
@@ -155,13 +225,13 @@ function amateurFightCount() {
   return record.wins + record.losses + record.draws;
 }
 
+function weeklyActionLimit() {
+  return amateurFightCount() >= 10 ? 4 : 3;
+}
+
 function weeklyOpponentOffers() {
   const start = ((state.week - 1) * 2) % opponents.length;
   return [start, (start + 1) % opponents.length, (start + 4) % opponents.length].map(index => opponents[index]);
-}
-
-function offerKey(opponentId) {
-  return `${state.week}:${opponentId}`;
 }
 
 function offeredFightWeek(opponent) {
@@ -257,7 +327,7 @@ function resolveTournamentRound(fight, result) {
   if (!fight.tournamentId || !active || active.id !== fight.tournamentId) return "";
   const tournament = tournamentDefs.find(item => item.id === active.id);
   const roundIndex = active.currentRound;
-  active.results.push({ round: roundIndex, opponent: fight.opponent.name, result, score: `${fight.playerPoints}–${fight.opponentPoints}` });
+  active.results.push({ round: roundIndex, opponent: fight.opponent.name, result, score: `${fight.playerPoints}–${fight.opponentPoints}${fight.tiebreak ? " · départage" : ""}` });
   if (result !== "Victoire") return completeTournament(tournamentMedalForLoss(tournament, roundIndex));
   active.currentRound += 1;
   if (active.currentRound >= tournament.rounds) return completeTournament("gold");
@@ -316,12 +386,11 @@ function renderFights() {
     scheduled.innerHTML = "";
   }
   opponentsContainer.innerHTML = weeklyOpponentOffers().map(opponent => {
-    const declinedThisWeek = state.declinedFights.includes(offerKey(opponent.id));
     const offeredWeek = offeredFightWeek(opponent);
     const clashesWithTournament = Boolean(state.activeTournament && offeredWeek >= state.activeTournament.startWeek);
-    const unavailable = state.scheduledFight || declinedThisWeek || clashesWithTournament;
-    const status = declinedThisWeek ? "Proposition refusée cette semaine" : state.scheduledFight ? "Un combat est déjà programmé" : clashesWithTournament ? "Date incompatible avec le tournoi" : "";
-    return `<article class="opponent-card"><p class="eyebrow">Proposé : semaine ${offeredWeek}</p><h3>${opponent.name} « ${opponent.nickname} »</h3><p>${state.profile.weightClass} · ${opponent.style}</p><p>Bilan amateur : ${opponent.record}</p><div class="opponent-meta"><span>Risque : ${opponent.risk}</span><span>Difficulté ${opponent.difficulty}</span></div><button class="secondary-button" type="button" data-accept="${opponent.id}" ${unavailable ? "disabled" : ""}>${status || "Accepter le combat"}</button>${!unavailable ? `<button class="plan-remove" type="button" data-decline="${opponent.id}">Refuser</button>` : ""}</article>`;
+    const unavailable = state.scheduledFight || clashesWithTournament;
+    const status = state.scheduledFight ? "Un combat est déjà programmé" : clashesWithTournament ? "Date incompatible avec le tournoi" : "";
+    return `<article class="opponent-card"><p class="eyebrow">Proposé : semaine ${offeredWeek}</p><h3>${opponent.name} « ${opponent.nickname} »</h3><p>${state.profile.weightClass} · ${opponent.style}</p><p>Bilan amateur : ${opponent.record}</p><div class="opponent-meta"><span>Risque : ${opponent.risk}</span><span>Difficulté ${opponent.difficulty}</span></div><button class="secondary-button" type="button" data-accept="${opponent.id}" ${unavailable ? "disabled" : ""}>${status || "Accepter le combat"}</button></article>`;
   }).join("");
 
   if (fightCount > 5 && state.tournaments.bronze === "pending") state.tournaments.bronze = "missed";
@@ -360,22 +429,63 @@ function projectedMoney() {
   }, 0);
 }
 
-function actionLock(action) {
+function actionRequirementLock(action) {
   if (action.future) return "Bientôt disponible";
   if (action.requiresGym && state.gymWeeks === 0) return "Abonnement au gym requis";
-  if (weeklyPlan.length >= 3) return "Plan complet — retire une action";
+  if (action.requiresReputation && state.reputation < action.requiresReputation) return `Réputation ${action.requiresReputation} requise`;
+  return "";
+}
+
+function actionLock(action) {
+  const requirement = actionRequirementLock(action);
+  if (requirement) return requirement;
+  if (weeklyPlan.length >= weeklyActionLimit()) return "Plan complet — retire une action";
   if (action.cost && projectedMoney() < action.cost) return `Il manque ${action.cost - projectedMoney()} $ au budget prévu`;
   return "";
 }
 
+function recommendedActionIds() {
+  const recommendations = [];
+  const add = id => {
+    if (!recommendations.includes(id)) recommendations.push(id);
+  };
+  const fightDistance = state.scheduledFight ? state.scheduledFight.week - state.week : Infinity;
+  const weakestStat = Object.entries(state.combatStats).sort(([, first], [, second]) => first - second)[0]?.[0];
+
+  if (state.energy <= 45) add("rest");
+  if (state.injury >= 30) add(state.money >= 55 ? "physio" : "rest");
+  if (state.money < GYM_PRICE) add("work");
+  if (fightDistance <= 2) add("video");
+  if (recommendations.length < 2 && state.energy > 35) {
+    if (weakestStat === "power") add(state.gymWeeks > 0 ? "heavybag" : state.money >= PRIVATE_PRICE ? "private" : "roadwork");
+    else if (weakestStat === "cardio") add("roadwork");
+    else add("video");
+  }
+  [state.gymWeeks > 0 ? "gym" : "roadwork", "video", "family"].forEach(id => {
+    if (recommendations.length < 2) add(id);
+  });
+  return new Set(recommendations.slice(0, 2));
+}
+
 function renderActions() {
-  document.querySelector("#action-grid").innerHTML = actions.map(action => {
-    const selected = weeklyPlan.some(item => item.actionId === action.id);
-    const lock = selected ? "" : actionLock(action);
-    return `<button class="action-card${action.future ? " future" : ""}${selected ? " selected" : ""}" type="button" data-action="${action.id}" ${lock ? "disabled" : ""} aria-pressed="${selected}">
-      <span class="action-icon" aria-hidden="true">${action.icon}</span><h3>${action.title}</h3><p>${action.detail}</p>
-      ${lock ? `<span class="action-lock">${lock}</span>` : ""}
-    </button>`;
+  const recommended = recommendedActionIds();
+  document.querySelector("#action-grid").innerHTML = actionCategories.map((category, index) => {
+    const categoryActions = actions.filter(action => action.category === category.id).map((action, originalIndex) => ({
+      action,
+      originalIndex,
+      priority: recommended.has(action.id) ? 0 : actionRequirementLock(action) ? 2 : 1,
+    })).sort((first, second) => first.priority - second.priority || first.originalIndex - second.originalIndex);
+    const cards = categoryActions.map(({ action }) => {
+      const selected = weeklyPlan.some(item => item.actionId === action.id);
+      const lock = selected ? "" : actionLock(action);
+      const isRecommended = recommended.has(action.id) && !action.future;
+      return `<button class="action-card${action.future ? " future" : ""}${selected ? " selected" : ""}${isRecommended ? " recommended" : ""}" type="button" data-action="${action.id}" ${lock ? "disabled" : ""} aria-pressed="${selected}">
+        <span class="action-icon" aria-hidden="true">${action.icon}</span><h3>${action.title}</h3><p>${action.detail}</p>
+        ${isRecommended ? `<span class="action-recommendation">Conseillé cette semaine</span>` : ""}
+        ${lock ? `<span class="action-lock">${lock}</span>` : ""}
+      </button>`;
+    }).join("");
+    return `<section class="action-group" aria-labelledby="action-group-${category.id}"><div class="action-group-heading"><span>0${index + 1}</span><div><h3 id="action-group-${category.id}">${category.label}</h3><p>${category.hint}</p></div></div><div class="action-grid">${cards}</div></section>`;
   }).join("");
 }
 
@@ -397,22 +507,34 @@ function renderMembership() {
   }
 }
 
+function planItemEffects(item) {
+  const action = actions.find(candidate => candidate.id === item.actionId);
+  return {
+    action,
+    general: action.private ? { money: -PRIVATE_PRICE, energy: -14, morale: 3 } : (action.changes || {}),
+    combat: action.private ? { [item.target]: 6 } : (action.combatChanges || {}),
+  };
+}
+
 function planEffects() {
-  const general = {};
-  const combat = {};
+  const rawGeneral = {};
+  const rawCombat = {};
   let earned = 0;
   let spent = 0;
   weeklyPlan.forEach(item => {
-    const action = actions.find(candidate => candidate.id === item.actionId);
-    const changes = action.private ? { money: -PRIVATE_PRICE, energy: -14, morale: 3 } : (action.changes || {});
-    Object.entries(changes).forEach(([key, value]) => {
-      general[key] = (general[key] || 0) + value;
+    const effects = planItemEffects(item);
+    Object.entries(effects.general).forEach(([key, value]) => {
+      rawGeneral[key] = (rawGeneral[key] || 0) + value;
       if (key === "money") value >= 0 ? earned += value : spent += Math.abs(value);
     });
-    const combatChanges = action.private ? { [item.target]: 6 } : (action.combatChanges || {});
-    Object.entries(combatChanges).forEach(([key, value]) => combat[key] = (combat[key] || 0) + value);
+    Object.entries(effects.combat).forEach(([key, value]) => rawCombat[key] = (rawCombat[key] || 0) + value);
   });
-  return { general, combat, earned, spent };
+  const general = Object.fromEntries(Object.entries(rawGeneral).map(([key, value]) => {
+    const finalValue = key === "money" ? Math.max(0, state[key] + value) : clamp(state[key] + value);
+    return [key, finalValue - state[key]];
+  }));
+  const combat = Object.fromEntries(Object.entries(rawCombat).map(([key, value]) => [key, clamp(state.combatStats[key] + value, 0, 99) - state.combatStats[key]]));
+  return { general, combat, rawGeneral, rawCombat, earned, spent };
 }
 
 function signed(value, suffix = "") {
@@ -421,27 +543,32 @@ function signed(value, suffix = "") {
 
 function renderPlan() {
   const content = document.querySelector("#plan-content");
-  document.querySelector("#plan-count").textContent = `${weeklyPlan.length} / 3 action${weeklyPlan.length > 1 ? "s" : ""}`;
+  const actionLimit = weeklyActionLimit();
+  document.querySelector("#plan-count").textContent = `${weeklyPlan.length} / ${actionLimit} action${actionLimit > 1 ? "s" : ""}`;
   if (!weeklyPlan.length) {
-    content.innerHTML = `<div class="plan-list plan-list-empty">${Array.from({ length: 3 }, (_, index) => `<div class="plan-slot"><span>${index + 1}</span><em>Libre</em></div>`).join("")}</div><div class="plan-empty">Ton programme est vide. Choisis jusqu’à trois actions ci-dessus.</div>`;
+    content.innerHTML = `<div class="plan-list plan-list-empty">${Array.from({ length: actionLimit }, (_, index) => `<div class="plan-slot"><span>${index + 1}</span><em>Libre</em></div>`).join("")}</div><div class="plan-empty">Ton programme est vide. Choisis jusqu’à ${actionLimit} actions ci-dessus.</div>`;
   } else {
     const totals = planEffects();
-    const effectParts = Object.entries(totals.general).filter(([key]) => key !== "money").map(([key, value]) => `${generalStats.find(stat => stat.key === key)?.label || "Expérience"} ${signed(value, key === "experience" ? "" : "%")}`);
-    effectParts.push(...Object.entries(totals.combat).map(([key, value]) => `${combatLabels[key]} ${signed(value)}`));
+    const effectParts = Object.entries(totals.general).filter(([key, value]) => key !== "money" && value).map(([key, value]) => `${generalStats.find(stat => stat.key === key)?.label || "Expérience"} ${signed(value, key === "experience" ? "" : "%")}`);
+    effectParts.push(...Object.entries(totals.combat).filter(([, value]) => value).map(([key, value]) => `${combatLabels[key]} ${signed(value)}`));
     const plannedRows = weeklyPlan.map((item, index) => {
       const action = actions.find(candidate => candidate.id === item.actionId);
       const target = item.target ? ` · Cible : ${combatLabels[item.target]}` : "";
       return `<div class="plan-row"><span class="plan-order">${index + 1}</span><div class="plan-row-copy"><strong>${action.title}</strong><small>${action.detail}${target}</small></div><div class="plan-row-actions">${item.target ? `<button class="plan-remove" type="button" data-edit="${action.id}">Modifier</button>` : ""}<button class="plan-remove" type="button" data-remove="${action.id}">Retirer</button></div></div>`;
     }).join("");
-    const emptyRows = Array.from({ length: 3 - weeklyPlan.length }, (_, index) => `<div class="plan-slot"><span>${weeklyPlan.length + index + 1}</span><em>Libre</em></div>`).join("");
+    const emptyRows = Array.from({ length: actionLimit - weeklyPlan.length }, (_, index) => `<div class="plan-slot"><span>${weeklyPlan.length + index + 1}</span><em>Libre</em></div>`).join("");
     content.innerHTML = `<div class="plan-list">${plannedRows}${emptyRows}</div><div class="plan-totals"><div class="plan-total-block"><span>Argent à la fin</span><strong class="${projectedMoney() >= state.money ? "positive" : "negative"}">${projectedMoney()} $</strong></div><div class="plan-total-block"><span>Gains / dépenses</span><strong><span class="positive">+${totals.earned} $</span> · <span class="negative">−${totals.spent} $</span></strong></div><div class="plan-total-block"><span>Effets prévus</span><div class="plan-effects">${effectParts.join(" · ") || "Aucun changement de jauge"}</div></div></div>`;
   }
   const tournamentDue = Boolean(state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek);
-  const fightDue = Boolean((state.scheduledFight && state.week >= state.scheduledFight.week) || tournamentDue);
+  const localFightDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
+  const fightDue = Boolean(localFightDue || tournamentDue || (state.scheduledFight && state.week >= state.scheduledFight.week));
   const valid = weeklyPlan.length > 0 && projectedMoney() >= 0 && !fightDue;
   const advance = document.querySelector("#advance-week");
+  const fightActions = document.querySelector("#plan-fight-actions");
   advance.disabled = !valid;
-  document.querySelector("#plan-help").textContent = tournamentDue ? "Le tournoi a commencé : termine ton parcours avant de passer à la semaine suivante." : fightDue ? "Le combat est arrivé : entre dans le ring ou désiste-toi avant de passer à la semaine suivante." : !weeklyPlan.length ? "Sélectionne au moins une action pour continuer." : projectedMoney() < 0 ? "Le plan dépasse ton budget. Retire une dépense ou ajoute du travail." : "Rien ne sera appliqué avant ta confirmation.";
+  advance.hidden = localFightDue;
+  fightActions.hidden = !localFightDue;
+  document.querySelector("#plan-help").textContent = tournamentDue ? "Le tournoi a commencé : ouvre le tableau pour disputer le prochain combat." : localFightDue ? "Le combat est arrivé : choisis ton entrée dans le ring ou ton désistement." : !weeklyPlan.length ? "Sélectionne au moins une action pour continuer." : projectedMoney() < 0 ? "Le plan dépasse ton budget. Retire une dépense ou ajoute du travail." : "Rien ne sera appliqué avant ta confirmation.";
 }
 
 function render() {
@@ -453,9 +580,14 @@ function render() {
   renderFighter();
   document.querySelector("#money-spotlight").textContent = `${state.money} $`;
   document.querySelector("#week").textContent = String(state.week).padStart(2, "0");
+  const topEnergy = document.querySelector("#top-energy");
+  topEnergy.textContent = `E:${state.energy}%`;
+  topEnergy.setAttribute("aria-label", `Énergie ${state.energy} %`);
+  const actionLimit = weeklyActionLimit();
+  document.querySelector("#action-limit-help").textContent = actionLimit === 4 ? "Expérience acquise : compose maintenant un programme de quatre actions." : `Trois actions par semaine · la quatrième se débloque après ${10 - amateurFightCount()} combat${10 - amateurFightCount() > 1 ? "s" : ""}.`;
   const pips = document.querySelector("#action-pips");
-  pips.innerHTML = Array.from({ length: 3 }, (_, index) => `<span class="pip ${index < weeklyPlan.length ? "active" : ""}"></span>`).join("");
-  pips.setAttribute("aria-label", `${weeklyPlan.length} action${weeklyPlan.length > 1 ? "s" : ""} planifiée${weeklyPlan.length > 1 ? "s" : ""}`);
+  pips.innerHTML = Array.from({ length: actionLimit }, (_, index) => `<span class="pip ${index < weeklyPlan.length ? "active" : ""}"></span>`).join("");
+  pips.setAttribute("aria-label", `${weeklyPlan.length} action${weeklyPlan.length > 1 ? "s" : ""} planifiée${weeklyPlan.length > 1 ? "s" : ""} sur ${actionLimit}`);
 
   document.querySelector("#stats").innerHTML = generalStats.map(stat => {
     const display = `${state[stat.key]}${stat.suffix}`;
@@ -500,9 +632,9 @@ function toggleAction(action) {
 }
 
 function planPrivateSession() {
-  if (projectedMoney() < PRIVATE_PRICE) return showToast("Pas assez d'argent prévu pour cette séance.");
   const key = document.querySelector("#private-stat").value;
   const existing = weeklyPlan.find(item => item.actionId === "private");
+  if (!existing && projectedMoney() < PRIVATE_PRICE) return showToast("Pas assez d'argent prévu pour cette séance.");
   if (existing) existing.target = key;
   else weeklyPlan.push({ actionId: "private", target: key });
   document.querySelector("#private-dialog").close();
@@ -513,7 +645,7 @@ function planPrivateSession() {
 function endWeek(events) {
   const endingWeek = state.week;
   state.week += 1;
-  state.actionsLeft = 3;
+  state.pendingWeekEvent = betweenWeekEvents[(state.week - 2) % betweenWeekEvents.length].id;
   state.energy = clamp(state.energy + 8);
   state.morale = clamp(state.morale - 2);
   const membershipWasActive = state.gymWeeks > 0;
@@ -547,17 +679,15 @@ function executePlan() {
   const totals = planEffects();
   const events = [];
   weeklyPlan.forEach(item => {
-    const action = actions.find(candidate => candidate.id === item.actionId);
+    const { action } = planItemEffects(item);
     if (action.private) {
-      applyChanges({ money: -PRIVATE_PRICE, energy: -14, morale: 3 });
-      applyCombatChanges({ [item.target]: 6 });
       state.journal.unshift({ week: endingWeek, text: `La séance privée fait progresser ta ${combatLabels[item.target].toLowerCase()}.` });
     } else {
-      applyChanges(action.changes);
-      applyCombatChanges(action.combatChanges);
       state.journal.unshift({ week: endingWeek, text: action.message });
     }
   });
+  applyChanges(totals.rawGeneral);
+  applyCombatChanges(totals.rawCombat);
   endWeek(events);
   const changes = [];
   [...generalStats.map(stat => [stat.key, stat.label, stat.key === "money" ? " $" : "%"]), ["experience", "Expérience", ""]].forEach(([key, label, suffix]) => {
@@ -575,11 +705,57 @@ function executePlan() {
   document.querySelector("#summary-dialog").showModal();
 }
 
+function continueAfterWeekTransition() {
+  if (state.activeTournament && state.week >= state.activeTournament.startWeek && state.activeTournament.status !== "completed") openTournamentBoard();
+}
+
+function showBetweenWeekEvent() {
+  const event = betweenWeekEvents.find(item => item.id === state.pendingWeekEvent);
+  if (!event) return continueAfterWeekTransition();
+  document.querySelector("#week-event-title").textContent = event.title;
+  document.querySelector("#week-event-lead").textContent = event.lead;
+  document.querySelector("#week-event-choices").innerHTML = event.choices.map(choice => {
+    const cost = Math.max(0, -(choice.changes?.money || 0));
+    const unavailable = cost > state.money;
+    return `<button class="week-choice-card" type="button" data-week-choice="${choice.id}" ${unavailable ? "disabled" : ""}><span><strong>${choice.title}</strong><small>${choice.detail}</small></span><em>${unavailable ? `Il manque ${cost - state.money} $` : choice.effect}</em></button>`;
+  }).join("");
+  document.querySelector("#week-event-dialog").showModal();
+}
+
+function resolveBetweenWeekChoice(choiceId) {
+  const event = betweenWeekEvents.find(item => item.id === state.pendingWeekEvent);
+  const choice = event?.choices.find(item => item.id === choiceId);
+  if (!event || !choice) return;
+  const cost = Math.max(0, -(choice.changes?.money || 0));
+  if (cost > state.money) return showToast("Pas assez d’argent pour ce choix.");
+  applyChanges(choice.changes);
+  applyCombatChanges(choice.combatChanges);
+  state.journal.unshift({ week: state.week, text: `Entre les semaines : ${choice.result}` });
+  state.pendingWeekEvent = null;
+  document.querySelector("#week-event-dialog").close();
+  render();
+  showToast("Décision appliquée à la nouvelle semaine");
+  continueAfterWeekTransition();
+}
+
 function startFight() {
   const opponent = scheduledOpponent();
   if (!opponent) return;
-  fightState = { opponent, tournamentId: state.scheduledFight.tournamentId || null, round: 1, playerPoints: 0, opponentPoints: 0, playerEnergy: state.energy, opponentEnergy: 88 + Math.floor(Math.random() * 8), rounds: [] };
-  document.querySelector("#fight-choices").innerHTML = `<button type="button" data-strategy="attack"><strong>Attaquer</strong><span>Puissance, technique · fatigue élevée</span></button><button type="button" data-strategy="distance"><strong>Boxer à distance</strong><span>Technique, cardio · fatigue modérée</span></button><button type="button" data-strategy="defense"><strong>Jouer la défense</strong><span>Défense, cardio · fatigue réduite</span></button>`;
+  fightState = {
+    opponent,
+    tournamentId: state.scheduledFight.tournamentId || null,
+    round: 1,
+    phase: "choice",
+    playerPoints: 0,
+    opponentPoints: 0,
+    playerEnergy: state.energy,
+    opponentEnergy: 88 + Math.floor(Math.random() * 8),
+    lastPlayerStrategy: null,
+    opponentStrategy: null,
+    cornerBoostAvailable: true,
+    rounds: [],
+  };
+  fightState.opponentStrategy = chooseOpponentStrategy(fightState);
   document.querySelector("#fight-dialog").showModal();
   renderFight();
 }
@@ -675,75 +851,180 @@ function startTournamentRound() {
   startFight();
 }
 
-function strategyData(strategy) {
-  return {
-    attack: { label: "Attaquer", fatigue: 16, player: state.combatStats.power * .46 + state.combatStats.technique * .26 + state.fitness * .18, opponent: 2 },
-    distance: { label: "Boxer à distance", fatigue: 10, player: state.combatStats.technique * .46 + state.combatStats.cardio * .28 + state.combatStats.defense * .12, opponent: 0 },
-    defense: { label: "Jouer la défense", fatigue: 6, player: state.combatStats.defense * .46 + state.combatStats.cardio * .24 + state.combatStats.technique * .12, opponent: -3 },
-  }[strategy];
+function opponentStylePreference(style = "") {
+  if (/puncheur|pression|bagarreur/i.test(style)) return "attack";
+  if (/technicien|mobile/i.test(style)) return "distance";
+  if (/contre|défensif/i.test(style)) return "defense";
+  return ["attack", "distance", "defense"][Math.floor(Math.random() * 3)];
 }
 
-function renderFight(message = "Choisis une consigne pour ce round.") {
+function strategyThatBeats(strategy) {
+  return Object.keys(fightStrategies).find(key => fightStrategies[key].beats === strategy);
+}
+
+function chooseOpponentStrategy(fight) {
+  if (fight.round > 1 && fight.lastPlayerStrategy && Math.random() < .25 + fight.opponent.difficulty / 250) return strategyThatBeats(fight.lastPlayerStrategy);
+  if (fight.opponentEnergy < 24 && Math.random() < .65) return "defense";
+  if (Math.random() < .62) return opponentStylePreference(fight.opponent.style);
+  return ["attack", "distance", "defense"][Math.floor(Math.random() * 3)];
+}
+
+function tacticalEdge(playerStrategy, opponentStrategy) {
+  if (fightStrategies[playerStrategy].beats === opponentStrategy) return 7;
+  if (fightStrategies[opponentStrategy].beats === playerStrategy) return -7;
+  return 0;
+}
+
+function strategyData(strategy) {
+  const definition = fightStrategies[strategy];
+  const player = {
+    attack: state.combatStats.power * .46 + state.combatStats.technique * .26 + state.fitness * .18,
+    distance: state.combatStats.technique * .44 + state.combatStats.cardio * .3 + state.combatStats.defense * .12,
+    defense: state.combatStats.defense * .44 + state.combatStats.technique * .22 + state.combatStats.cardio * .2,
+  }[strategy];
+  return { ...definition, player };
+}
+
+function renderFightChoices() {
   const fight = fightState;
+  const container = document.querySelector("#fight-choices");
+  if (!fight || fight.phase === "finished") {
+    container.innerHTML = "";
+    return;
+  }
+  if (fight.phase === "report") {
+    container.innerHTML = `<button class="next-round-button" type="button" data-next-round><strong>Écouter le coin</strong><span>Passer au round ${fight.round + 1}</span></button>`;
+    return;
+  }
+  container.innerHTML = Object.entries(fightStrategies).map(([key, strategy]) => {
+    const edge = tacticalEdge(key, fight.opponentStrategy);
+    const matchup = edge > 0 ? "Avantage tactique" : edge < 0 ? "Risque d’être contré" : "Duel neutre";
+    const stateClass = edge > 0 ? " tactical-advantage" : edge < 0 ? " tactical-danger" : "";
+    return `<button class="${stateClass.trim()}" type="button" data-strategy="${key}"><strong>${strategy.label}</strong><span>${strategy.detail} · −${strategy.fatigue} E</span><em>${matchup}</em></button>`;
+  }).join("");
+}
+
+function momentumLabel(fight) {
+  const difference = fight.playerPoints - fight.opponentPoints;
+  if (difference >= 2) return "Avantage à ton coin";
+  if (difference <= -2) return "L’adversaire mène";
+  return "Combat équilibré";
+}
+
+function renderFight(message = "Lis sa tendance et choisis une consigne.") {
+  const fight = fightState;
+  if (!fight) return;
   const tournamentName = fight.tournamentId ? tournamentDefs.find(item => item.id === fight.tournamentId).name : "Combat amateur";
   document.querySelector("#fight-week-label").textContent = `${tournamentName} · Semaine ${state.week}`;
-  document.querySelector("#fight-round").textContent = `Round ${fight.round} / 3`;
+  document.querySelector("#fight-round").textContent = fight.phase === "finished" ? "Fin · 3 rounds" : `Round ${fight.round} / 3`;
   document.querySelector("#fight-player-name").textContent = state.profile.firstName;
   document.querySelector("#fight-player-meta").textContent = `${state.profile.nickname ? `« ${state.profile.nickname} » · ` : ""}${state.profile.weightClass} · Coin bleu`;
   document.querySelector("#fight-opponent-name").textContent = fight.opponent.name;
   document.querySelector("#fight-opponent-meta").textContent = `« ${fight.opponent.nickname} » · ${fight.opponent.weightClass || state.profile.weightClass} · Coin rouge`;
   document.querySelector("#fight-player-energy").textContent = `${Math.max(0, fight.playerEnergy)}%`;
   document.querySelector("#fight-opponent-energy").textContent = `${Math.max(0, fight.opponentEnergy)}%`;
+  document.querySelector("#fight-player-energy-bar").style.width = `${Math.max(0, fight.playerEnergy)}%`;
+  document.querySelector("#fight-opponent-energy-bar").style.width = `${Math.max(0, fight.opponentEnergy)}%`;
   document.querySelector("#fight-score").textContent = `${fight.playerPoints} — ${fight.opponentPoints}`;
-  document.querySelector("#fight-status").textContent = message;
+  document.querySelector("#fight-status").textContent = fight.phase === "report" ? `Round ${fight.round} terminé` : message;
+  document.querySelector("#fight-opponent-tell").textContent = fightStrategies[fight.opponentStrategy]?.intent || "Il change de rythme";
+  document.querySelector("#fight-tactical-hint").textContent = `${fight.opponent.style} · difficulté ${fight.opponent.difficulty}`;
+  document.querySelector("#fight-momentum").textContent = momentumLabel(fight);
+  document.querySelector("#fight-round-track").innerHTML = Array.from({ length: 3 }, (_, index) => {
+    const result = fight.rounds[index];
+    const current = fight.phase !== "finished" && index + 1 === fight.round;
+    return `<span class="${result ? "completed" : current ? "current" : ""}">R${index + 1}<strong>${result ? `${result.playerRound}–${result.opponentRound}` : "—"}</strong></span>`;
+  }).join("");
+  const cornerButton = document.querySelector("#fight-corner-boost");
+  cornerButton.hidden = fight.phase === "finished";
+  cornerButton.disabled = fight.phase !== "choice" || fight.round === 1 || !fight.cornerBoostAvailable;
+  cornerButton.textContent = !fight.cornerBoostAvailable ? "Souffle déjà utilisé" : fight.round === 1 ? "Souffle disponible après le round" : "Souffler au coin · +8 E";
   document.querySelector("#fight-instruction").innerHTML = `<p>${message}</p>`;
+  renderFightChoices();
 }
 
 function playRound(strategy) {
   const fight = fightState;
-  if (!fight || fight.round > 3) return;
+  if (!fight || fight.phase !== "choice" || fight.round > 3 || !fightStrategies[strategy]) return;
   const choice = strategyData(strategy);
-  const opponentBase = fight.opponent.difficulty * 1.05 + fight.opponentEnergy * .28 + state.injury * .08;
-  const playerBase = choice.player + fight.playerEnergy * .32 + state.fitness * .22 - state.injury * .16;
-  const playerScore = playerBase + (Math.random() * 18 - 9);
-  const opponentScore = opponentBase + choice.opponent + (Math.random() * 18 - 9);
-  let playerRound = 10;
-  let opponentRound = 9;
-  if (playerScore > opponentScore + 10) opponentRound = 8;
-  else if (opponentScore > playerScore + 10) { playerRound = 9; opponentRound = 10; }
-  else if (opponentScore > playerScore + 3) { playerRound = 9; opponentRound = 10; }
+  const opponentChoice = fightStrategies[fight.opponentStrategy];
+  const matchup = tacticalEdge(strategy, fight.opponentStrategy);
+  const repeatPenalty = fight.lastPlayerStrategy === strategy ? -3 : 0;
+  const experienceBonus = Math.min(5, state.experience / 20);
+  const moraleBonus = (state.morale - 50) * .06;
+  const opponentStrategyBonus = fight.opponentStrategy === "attack" ? 4 : fight.opponentStrategy === "distance" ? 1 : -1;
+  const playerBase = choice.player + fight.playerEnergy * .32 + state.fitness * .22 - state.injury * .16 + matchup + repeatPenalty + experienceBonus + moraleBonus;
+  const opponentBase = fight.opponent.difficulty * 1.05 + fight.opponentEnergy * .28 + state.injury * .08 + opponentStrategyBonus;
+  const edge = playerBase - opponentBase + (Math.random() * 10 - 5);
+  let playerRound;
+  let opponentRound;
+  if (edge >= 11) [playerRound, opponentRound] = [10, 8];
+  else if (edge >= 0) [playerRound, opponentRound] = [10, 9];
+  else if (edge <= -11) [playerRound, opponentRound] = [8, 10];
+  else [playerRound, opponentRound] = [9, 10];
+  const playerEnergyBefore = fight.playerEnergy;
+  const opponentEnergyBefore = fight.opponentEnergy;
   fight.playerPoints += playerRound;
   fight.opponentPoints += opponentRound;
-  fight.playerEnergy = clamp(fight.playerEnergy - choice.fatigue - Math.floor(Math.random() * 4));
-  fight.opponentEnergy = clamp(fight.opponentEnergy - (9 + Math.floor(Math.random() * 7)));
-  fight.rounds.push(`${choice.label} : ${playerRound}–${opponentRound}`);
+  fight.playerEnergy = clamp(fight.playerEnergy - choice.fatigue - Math.floor(Math.random() * 3));
+  fight.opponentEnergy = clamp(fight.opponentEnergy - opponentChoice.fatigue - Math.floor(Math.random() * 3));
+  const tacticalNote = matchup > 0 ? "Ta lecture tactique est juste" : matchup < 0 ? "Son plan contre le tien" : "Les tactiques se neutralisent";
+  const verdict = playerRound > opponentRound ? "Tu prends le round" : "Il prend le round";
+  const feedback = `${fightStrategies[fight.opponentStrategy].intent}. ${tacticalNote}${repeatPenalty ? ", mais tu deviens prévisible" : ""}. ${verdict} ${playerRound}–${opponentRound}. Énergie ${playerEnergyBefore} → ${fight.playerEnergy}.`;
+  fight.rounds.push({ number: fight.round, playerStrategy: strategy, opponentStrategy: fight.opponentStrategy, playerRound, opponentRound, playerEnergyBefore, playerEnergyAfter: fight.playerEnergy, opponentEnergyBefore, opponentEnergyAfter: fight.opponentEnergy, feedback });
+  fight.lastPlayerStrategy = strategy;
   if (fight.round === 3) return finishFight();
+  fight.phase = "report";
+  renderFight(feedback);
+}
+
+function advanceFightRound() {
+  const fight = fightState;
+  if (!fight || fight.phase !== "report" || fight.round >= 3) return;
   fight.round += 1;
-  renderFight(`Round ${fight.round - 1} : ${choice.label}, ${playerRound}–${opponentRound}. Choisis la suite.`);
+  fight.phase = "choice";
+  fight.opponentStrategy = chooseOpponentStrategy(fight);
+  renderFight(`Round ${fight.round} : observe sa nouvelle tendance avant de choisir.`);
+}
+
+function useCornerBoost() {
+  const fight = fightState;
+  if (!fight || fight.phase !== "choice" || fight.round === 1 || !fight.cornerBoostAvailable) return;
+  fight.playerEnergy = clamp(fight.playerEnergy + 8);
+  fight.cornerBoostAvailable = false;
+  renderFight("Le coin te calme et te rend 8 points d’énergie. Choisis maintenant ta consigne.");
 }
 
 function finishFight() {
   const fight = fightState;
+  if (!fight || fight.phase === "finished") return;
+  const fightCountBefore = amateurFightCount();
   let margin = fight.playerPoints - fight.opponentPoints;
   let result;
   if (fight.tournamentId && margin === 0) {
-    if (fight.playerEnergy >= fight.opponentEnergy) fight.playerPoints += 1;
-    else fight.opponentPoints += 1;
-    margin = fight.playerPoints - fight.opponentPoints;
+    const playerAdvances = fight.playerEnergy >= fight.opponentEnergy;
+    margin = playerAdvances ? 1 : -1;
+    fight.tiebreak = playerAdvances ? "Ton énergie restante fait pencher la décision de tournoi en ta faveur." : "Son énergie restante fait pencher la décision de tournoi en sa faveur.";
   }
   if (margin > 0) { result = "Victoire"; state.amateurRecord.wins += 1; applyChanges({ reputation: 7, experience: 18, morale: 9, injury: 4 }); }
   else if (margin < 0) { result = "Défaite"; state.amateurRecord.losses += 1; applyChanges({ reputation: 2, experience: 12, morale: -5, injury: 7 }); }
   else { result = "Match nul"; state.amateurRecord.draws += 1; applyChanges({ reputation: 4, experience: 15, morale: 2, injury: 5 }); }
+  const unlockedFourthAction = fightCountBefore < 10 && amateurFightCount() >= 10;
   const tournamentNote = resolveTournamentRound(fight, result);
   state.energy = clamp(fight.playerEnergy);
   if (fight.tournamentId && result === "Victoire" && state.activeTournament?.status !== "completed") state.energy = clamp(state.energy + 18);
   const injuryEvent = state.injury >= 55 && Math.random() < .35 ? " Une douleur au retour au vestiaire augmente la prudence nécessaire." : "";
   if (injuryEvent) state.injury = clamp(state.injury + 7);
-  state.journal.unshift({ week: state.week, text: `Combat amateur : ${result} contre ${fight.opponent.name}, ${fight.playerPoints}–${fight.opponentPoints}.${tournamentNote ? ` ${tournamentNote}` : ""}${injuryEvent}` });
+  state.journal.unshift({ week: state.week, text: `Combat amateur : ${result} contre ${fight.opponent.name}, ${fight.playerPoints}–${fight.opponentPoints}.${fight.tiebreak ? ` ${fight.tiebreak}` : ""}${tournamentNote ? ` ${tournamentNote}` : ""}${injuryEvent}` });
+  if (unlockedFourthAction) state.journal.unshift({ week: state.week, text: "Dix combats amateurs disputés : le programme hebdomadaire passe définitivement à quatre actions." });
+  const roundSummary = fight.rounds.map(round => `R${round.number} ${fightStrategies[round.playerStrategy].short}/${fightStrategies[round.opponentStrategy].short} ${round.playerRound}–${round.opponentRound}`).join(" · ");
+  const tiebreakNote = fight.tiebreak ? `<br>${fight.tiebreak}` : "";
+  const unlockNote = unlockedFourthAction ? "<br><strong>Progression débloquée :</strong> tu peux maintenant planifier quatre actions par semaine." : "";
+  fight.phase = "finished";
+  fight.result = result;
   // Rafraîchir le tableau après le calcul du troisième round afin que son score soit visible.
   renderFight(`${result} après 3 rounds`);
-  document.querySelector("#fight-choices").innerHTML = "";
-  document.querySelector("#fight-instruction").innerHTML = `<p><strong>${result} — ${fight.playerPoints} à ${fight.opponentPoints}</strong><br>${fight.rounds.join(" · ")}<br>${tournamentNote ? `${tournamentNote}<br>` : ""}Expérience, réputation et état physique ont été mis à jour.${injuryEvent}</p>`;
+  document.querySelector("#fight-instruction").innerHTML = `<p><strong>${result} — ${fight.playerPoints} à ${fight.opponentPoints}</strong><br><span class="fight-round-summary">${roundSummary}</span>${tiebreakNote}<br>${tournamentNote ? `${tournamentNote}<br>` : ""}Expérience, réputation et état physique ont été mis à jour.${injuryEvent}${unlockNote}</p>`;
   document.querySelector("#fight-status").textContent = result;
   const closeButton = document.createElement("button");
   closeButton.className = "primary-button";
@@ -837,25 +1118,28 @@ document.querySelector("#plan-content").addEventListener("click", event => {
 });
 
 document.querySelector("#advance-week").addEventListener("click", executePlan);
+document.querySelector("#plan-start-fight").addEventListener("click", startFight);
+document.querySelector("#plan-withdraw-fight").addEventListener("click", withdrawFight);
 document.querySelector("#summary-close").addEventListener("click", () => {
   document.querySelector("#summary-dialog").close();
-  if (state.activeTournament && state.week >= state.activeTournament.startWeek && state.activeTournament.status !== "completed") openTournamentBoard();
+  if (state.pendingWeekEvent) showBetweenWeekEvent();
+  else continueAfterWeekTransition();
 });
+document.querySelector("#week-event-choices").addEventListener("click", event => {
+  const choice = event.target.closest("[data-week-choice]");
+  if (choice) resolveBetweenWeekChoice(choice.dataset.weekChoice);
+});
+document.querySelector("#summary-dialog").addEventListener("cancel", event => event.preventDefault());
+document.querySelector("#week-event-dialog").addEventListener("cancel", event => event.preventDefault());
 
 document.querySelector("#opponents").addEventListener("click", event => {
   const accept = event.target.closest("[data-accept]");
-  const decline = event.target.closest("[data-decline]");
   if (accept) {
     const opponent = opponents.find(item => item.id === accept.dataset.accept);
     state.scheduledFight = { id: opponent.id, week: offeredFightWeek(opponent) };
     state.journal.unshift({ week: state.week, text: `Combat amateur programmé contre ${opponent.name} pour la semaine ${state.scheduledFight.week}.` });
     render();
     showToast("Combat programmé");
-  }
-  if (decline) {
-    state.declinedFights.push(offerKey(decline.dataset.decline));
-    render();
-    showToast("Proposition refusée");
   }
 });
 
@@ -881,8 +1165,14 @@ document.querySelector("#scheduled-fight").addEventListener("click", event => {
 });
 
 document.querySelector("#fight-choices").addEventListener("click", event => {
+  const nextRound = event.target.closest("[data-next-round]");
+  if (nextRound) return advanceFightRound();
   const choice = event.target.closest("[data-strategy]");
   if (choice) playRound(choice.dataset.strategy);
+});
+document.querySelector("#fight-corner-boost").addEventListener("click", useCornerBoost);
+document.querySelector("#fight-dialog").addEventListener("cancel", event => {
+  if (fightState) event.preventDefault();
 });
 
 function setupMobileCollapsibles() {
