@@ -142,6 +142,27 @@ h2 { font-size: 1.65rem; }
 .opponent-meta { display: flex; justify-content: space-between; gap: 8px; margin: 14px 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--gold); font-size: .68rem; font-weight: 700; text-transform: uppercase; }
 .opponent-card button { width: 100%; }
 .opponent-card button:disabled { cursor: not-allowed; opacity: .45; }
+.tournament-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin: 28px 0 14px; padding-top: 24px; border-top: 1px solid var(--line); }
+.tournament-heading h3 { font-size: 1.45rem; }
+.tournament-heading > span { color: var(--muted); font-size: .7rem; text-transform: uppercase; }
+.tournament-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.tournament-card { display: flex; min-height: 205px; padding: 15px; border: 1px solid var(--line); background: #171917; flex-direction: column; }
+.tournament-card.available { border-color: var(--gold); background: linear-gradient(150deg, rgba(221,182,94,.1), #171917 55%); }
+.tournament-card.locked { opacity: .52; }
+.tournament-card.completed { border-color: var(--green); }
+.tournament-medal { color: var(--gold); font: 800 1.8rem/1 "Barlow Condensed"; }
+.tournament-card h4 { margin: 9px 0 6px; font: 800 1.05rem "Barlow Condensed"; text-transform: uppercase; }
+.tournament-card p { color: var(--muted); font-size: .69rem; line-height: 1.45; }
+.tournament-state { margin: 10px 0; color: var(--gold) !important; font-weight: 700; text-transform: uppercase; }
+.tournament-card button { width: 100%; margin-top: auto; }
+.tournament-card button:disabled { cursor: not-allowed; opacity: .4; }
+.pro-transition { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 16px; padding: 18px; border: 1px solid var(--line); border-left: 4px solid var(--gold); background: #121412; }
+.pro-transition strong { display: block; font-family: "Barlow Condensed"; font-size: 1.35rem; text-transform: uppercase; }
+.pro-transition p { margin-top: 4px; color: var(--muted); font-size: .73rem; }
+.pro-transition button { flex: 0 0 auto; }
+.amateur-closed { grid-column: 1 / -1; padding: 28px; border: 1px solid var(--gold); background: #171917; text-align: center; }
+.amateur-closed strong { display: block; color: var(--gold); font: 800 1.8rem "Barlow Condensed"; text-transform: uppercase; }
+.amateur-closed p { margin-top: 7px; color: var(--muted); font-size: .78rem; }
 .fight-dialog { width: min(760px, calc(100% - 24px)); padding: 0; border: 0; color: var(--ink); background: transparent; }
 .fight-dialog::backdrop { background: rgba(0,0,0,.84); backdrop-filter: blur(5px); }
 .fight-card { padding: 28px; border: 1px solid var(--line); border-top: 4px solid var(--red); background: #171917; }
@@ -225,37 +246,92 @@ h2 { font-size: 1.65rem; }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
 
 @media (max-width: 800px) {
+  .game-shell { width: min(100% - 24px, 1180px); }
   .dashboard-grid { grid-template-columns: 1fr; }
   .action-grid { grid-template-columns: repeat(2, 1fr); }
+  .panel, .fights-panel, .plan-panel { padding: 20px; }
   .membership-panel { align-items: flex-start; flex-wrap: wrap; }
   .membership-status { text-align: left; }
   .opponent-grid { grid-template-columns: 1fr; }
+  .tournament-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 560px) {
+  body { overflow-x: hidden; }
   .creation-card { padding: 24px 18px; }
   .creation-heading { align-items: flex-start; flex-direction: column; }
   .identity-grid, .creation-stats { grid-template-columns: 1fr; }
   .style-field { grid-column: auto; }
-  .allocation-head { align-items: flex-end; }
+  .allocation-head { align-items: flex-start; flex-direction: column; }
+  .points-bank { width: 100%; justify-content: center; }
   .game-shell { width: min(100% - 20px, 1180px); padding-top: 18px; }
-  .fighter-card { align-items: flex-start; flex-wrap: wrap; }
-  .portrait { flex-basis: 54px; height: 54px; }
-  .money-spotlight { margin-left: auto; border-left: 0; padding: 5px 0; }
+  .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; padding-bottom: 16px; }
+  .brand { min-width: 0; }
+  .brand-mark { width: 44px; height: 44px; flex: 0 0 44px; }
+  .brand h1 { font-size: 1.55rem; white-space: nowrap; }
+  .brand .eyebrow { font-size: .61rem; }
+  .week-block { gap: 7px; }
+  .week-block strong { font-size: 2.25rem; }
+  #restart-top { grid-column: 1 / -1; justify-self: end; }
+  .fighter-card { display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: start; gap: 14px; margin: 18px 0; padding: 16px; }
+  .portrait { width: 54px; height: 54px; }
+  .fighter-copy { min-width: 0; }
+  .fighter-copy h2 { overflow-wrap: anywhere; font-size: 1.55rem; }
+  .fighter-copy > p:last-child { line-height: 1.5; }
+  .money-spotlight { display: flex; grid-column: 1 / -1; align-items: baseline; justify-content: space-between; width: 100%; margin: 2px 0 0; padding: 13px 0 0; border-top: 1px solid var(--line); border-left: 0; text-align: left; }
+  .money-spotlight strong { font-size: 2rem; }
   .actions-counter { width: 100%; text-align: left; }
+  .actions-counter { grid-column: 1 / -1; }
   .pips { justify-content: flex-start; }
+  .panel, .fights-panel, .plan-panel { padding: 16px; }
+  .panel-heading { align-items: flex-start; margin-bottom: 18px; }
   .stats-grid, .action-grid { grid-template-columns: 1fr; }
+  .stats-grid { gap: 17px; }
   .combat-stats { grid-template-columns: 1fr 1fr; }
+  .journal-list { max-height: 220px; }
   .membership-panel { flex-direction: column; }
   .membership-button { width: 100%; }
   .fight-notice { align-items: flex-start; flex-direction: column; }
-  .fight-notice button { width: 100%; }
-  .fight-card { padding: 20px 14px; }
-  .ring-scoreboard { grid-template-columns: 1fr; padding: 16px; }
-  .score { order: -1; border: 0; border-bottom: 1px solid var(--line); border-top: 1px solid var(--line); padding: 12px 0; }
+  .fight-notice-actions, .fight-notice button { width: 100%; }
+  .fight-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
+  .fight-card { max-height: calc(100dvh - 12px); padding: 18px 12px; overflow-y: auto; }
+  .fight-topline { gap: 10px; font-size: .65rem; }
+  .ring-scoreboard { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 16px 0; padding: 12px 8px; }
+  .corner { min-width: 0; }
+  .fight-portrait { height: 135px; margin-bottom: 9px; }
+  .corner span { overflow-wrap: anywhere; }
+  .corner strong { font-size: 1.65rem; }
+  .score { grid-column: 1 / -1; order: -1; border: 0; border-bottom: 1px solid var(--line); padding: 0 0 10px; }
+  .score strong { font-size: 2rem; }
+  .fight-instruction { line-height: 1.55; }
   .fight-choices { grid-template-columns: 1fr; }
+  .fight-choices button { min-height: 70px; }
+  .tournament-grid { grid-template-columns: 1fr; }
+  .tournament-heading, .pro-transition { align-items: flex-start; flex-direction: column; }
+  .pro-transition button { width: 100%; }
   .section-heading { align-items: flex-start; flex-direction: column; }
   .section-heading > p { text-align: left; }
+  .action-card { min-height: 130px; }
+  .plan-heading { align-items: flex-start; }
+  .plan-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: start; gap: 8px 12px; }
+  .plan-row-copy { min-width: 0; }
+  .plan-row-copy small { display: block; margin-top: 3px; line-height: 1.45; }
+  .plan-row .plan-remove { grid-column: 2; justify-self: start; min-height: 38px; padding: 6px 0; }
   .plan-footer, .plan-totals { align-items: stretch; flex-direction: column; }
   .advance-button { width: 100%; min-width: 0; }
+  .service-dialog { width: calc(100% - 16px); }
+  .service-card { max-height: calc(100dvh - 16px); padding: 20px 16px; overflow-y: auto; }
+  .service-effect { align-items: flex-start; flex-direction: column; }
+  .service-actions { align-items: stretch; flex-direction: column-reverse; }
+  .service-actions button { width: 100%; }
+  .toast { width: calc(100% - 24px); bottom: 12px; text-align: center; }
+}
+@media (max-width: 380px) {
+  .game-shell { width: calc(100% - 12px); }
+  .brand-mark { width: 40px; height: 40px; flex-basis: 40px; }
+  .brand h1 { font-size: 1.35rem; }
+  .week-block span { display: none; }
+  .fighter-card, .panel, .fights-panel, .plan-panel { padding: 13px; }
+  .combat-stats, .summary-money { grid-template-columns: 1fr; }
+  .fight-portrait { height: 115px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }

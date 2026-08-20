@@ -18,9 +18,23 @@ const styles = {
 };
 
 const opponents = [
-  { id: "leclerc", name: "Thomas Leclerc", nickname: "BETON", weightClass: "Poids welter", style: "Technicien", record: "1 V · 1 D · 0 N", difficulty: 36, risk: "Accessible", week: 4 },
-  { id: "okafor", name: "Darnell Okafor", nickname: "Brick", weightClass: "Poids welter", style: "Puncheur", record: "2 V · 1 D · 0 N", difficulty: 40, risk: "Modéré", week: 5 },
-  { id: "martel", name: "Émile Martel", nickname: "Le Serein", weightClass: "Poids welter", style: "Contre-attaquant", record: "1 V · 2 D · 1 N", difficulty: 43, risk: "Relevé", week: 6 },
+  { id: "leclerc", name: "Thomas Leclerc", nickname: "BETON", style: "Technicien", record: "1 V · 1 D · 0 N", difficulty: 36, risk: "Accessible", dateLead: 3 },
+  { id: "okafor", name: "Darnell Okafor", nickname: "Brick", style: "Puncheur", record: "2 V · 1 D · 0 N", difficulty: 40, risk: "Modéré", dateLead: 4 },
+  { id: "martel", name: "Émile Martel", nickname: "Le Serein", style: "Contre-attaquant", record: "1 V · 2 D · 1 N", difficulty: 43, risk: "Relevé", dateLead: 5 },
+  { id: "gagnon", name: "Olivier Gagnon", nickname: "Le Bûcheron", style: "Bagarreur", record: "3 V · 2 D · 0 N", difficulty: 44, risk: "Relevé", dateLead: 4 },
+  { id: "nguyen", name: "Minh Nguyen", nickname: "Vif-Argent", style: "Boxeur mobile", record: "2 V · 0 D · 1 N", difficulty: 42, risk: "Modéré", dateLead: 5 },
+  { id: "bouchard", name: "Samuel Bouchard", nickname: "Le Mur", style: "Défensif", record: "4 V · 3 D · 0 N", difficulty: 46, risk: "Relevé", dateLead: 5 },
+  { id: "haddad", name: "Yanis Haddad", nickname: "Le Cobra", style: "Contre-attaquant", record: "3 V · 1 D · 1 N", difficulty: 45, risk: "Relevé", dateLead: 5 },
+  { id: "wilson", name: "Jayden Wilson", nickname: "Quickstep", style: "Technicien", record: "2 V · 2 D · 0 N", difficulty: 41, risk: "Modéré", dateLead: 3 },
+  { id: "caron", name: "Alexis Caron", nickname: "La Masse", style: "Puncheur", record: "5 V · 3 D · 0 N", difficulty: 48, risk: "Difficile", dateLead: 4 },
+];
+
+const tournamentDefs = [
+  { id: "bronze", medal: "III", name: "Gants de bronze", description: "Occasion unique au 5e combat amateur.", opponent: { id: "bronze-rival", name: "Nicolas Roy", nickname: "Le Marteau", weightClass: "Poids welter", style: "Pression", record: "5 V · 2 D · 0 N", difficulty: 48, risk: "Relevé" } },
+  { id: "silver", medal: "II", name: "Gants d’argent", description: "Inscription possible du 6e au 10e combat.", opponent: { id: "silver-rival", name: "Isaac Tremblay", nickname: "L’Éclair", weightClass: "Poids welter", style: "Boxeur mobile", record: "8 V · 3 D · 1 N", difficulty: 57, risk: "Difficile" } },
+  { id: "golden", medal: "I", name: "Gants dorés", description: "Accessible dès 10 combats, sans date limite.", opponent: { id: "golden-rival", name: "Marcus Diallo", nickname: "L’Architecte", weightClass: "Poids welter", style: "Complet", record: "18 V · 4 D · 1 N", difficulty: 70, risk: "Très difficile" } },
+  { id: "canadian", medal: "CA", name: "Championnat canadien", description: "Débloqué en remportant les Gants dorés.", opponent: { id: "canadian-rival", name: "Ryan McKenna", nickname: "North Star", weightClass: "Poids welter", style: "Champion national", record: "24 V · 5 D · 0 N", difficulty: 79, risk: "Élite" } },
+  { id: "olympic", medal: "OLY", name: "Équipe nationale", description: "Sélection et parcours olympique après le titre canadien.", opponent: { id: "olympic-rival", name: "Aleksandar Petrov", nickname: "Le Métronome", weightClass: "Poids welter", style: "International", record: "31 V · 6 D · 2 N", difficulty: 86, risk: "International" } },
 ];
 
 const INITIAL_STATE = {
@@ -37,8 +51,13 @@ const INITIAL_STATE = {
   experience: 0,
   gymWeeks: 0,
   amateurRecord: { wins: 0, losses: 0, draws: 0 },
+  professionalRecord: { wins: 0, losses: 0, draws: 0 },
+  careerStatus: "amateur",
   scheduledFight: null,
   declinedFights: [],
+  tournaments: { bronze: "pending", silver: "pending", golden: "pending", canadian: "locked", olympic: "locked" },
+  goldenPlacement: null,
+  olympicCompleted: false,
   journal: [],
 };
 
@@ -102,29 +121,149 @@ function renderFighter() {
   const profile = state.profile;
   const nickname = profile.nickname ? ` « ${profile.nickname} »` : "";
   document.querySelector("#fighter-name").textContent = `${profile.firstName}${nickname} ${profile.lastName}`;
-  document.querySelector("#fighter-meta").textContent = `${profile.weightClass} · ${styles[profile.style].label} · Amateur`;
+  const isProfessional = state.careerStatus === "professional";
+  document.querySelector("#fighter-meta").textContent = `${profile.weightClass} · ${styles[profile.style].label} · ${isProfessional ? "Professionnel" : "Amateur"}`;
   document.querySelector("#fighter-initials").textContent = `${profile.firstName[0]}${profile.lastName[0]}`.toLocaleUpperCase("fr-CA");
   document.querySelector("#fighter-style-label").textContent = styles[profile.style].label;
   const record = state.amateurRecord;
-  document.querySelector("#amateur-record").textContent = `${record.wins} V · ${record.losses} D · ${record.draws} N`;
+  const amateurText = `${record.wins} V · ${record.losses} D · ${record.draws} N`;
+  const pro = state.professionalRecord;
+  document.querySelector("#career-records").innerHTML = isProfessional ? `Montréal, QC <span class="dot">•</span> Bilan pro : ${pro.wins} V · ${pro.losses} D · ${pro.draws} N <span class="dot">•</span> Bilan amateur final : ${amateurText}` : `Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">${amateurText}</span>`;
   document.querySelector("#combat-stats").innerHTML = Object.entries(combatLabels).map(([key, label]) => `<div class="combat-stat"><span>${label}</span><strong>${state.combatStats[key]}</strong></div>`).join("");
+}
+
+function amateurFightCount() {
+  const record = state.amateurRecord;
+  return record.wins + record.losses + record.draws;
+}
+
+function weeklyOpponentOffers() {
+  const start = ((state.week - 1) * 2) % opponents.length;
+  return [start, (start + 1) % opponents.length, (start + 4) % opponents.length].map(index => opponents[index]);
+}
+
+function offerKey(opponentId) {
+  return `${state.week}:${opponentId}`;
+}
+
+function offeredFightWeek(opponent) {
+  return Math.max(4, state.week + opponent.dateLead);
+}
+
+function scheduledOpponent() {
+  if (!state.scheduledFight) return null;
+  return opponents.find(item => item.id === state.scheduledFight.id) || tournamentDefs.find(item => item.id === state.scheduledFight.tournamentId)?.opponent || null;
+}
+
+function tournamentAvailability(id) {
+  const count = amateurFightCount();
+  const status = state.tournaments[id];
+  if (status === "entered") return { available: false, label: "Combat programmé" };
+  if (id === "bronze") {
+    if (status !== "pending") return { available: false, terminal: true, label: status === "won" ? "Remporté" : status === "lost" ? "Participation terminée" : "Occasion manquée" };
+    if (count === 5) return { available: true, label: "Inscription ouverte" };
+    return { available: false, label: count < 5 ? `Encore ${5 - count} combat${5 - count > 1 ? "s" : ""}` : "Occasion manquée" };
+  }
+  if (id === "silver") {
+    if (status === "won" || status === "lost" || status === "missed") return { available: false, terminal: true, label: status === "won" ? "Remporté" : status === "lost" ? "Participation terminée" : "Fenêtre terminée" };
+    if (count >= 6 && count <= 10) return { available: true, label: "Inscription ouverte" };
+    return { available: false, label: count < 6 ? `Disponible au 6e combat` : "Fenêtre terminée" };
+  }
+  if (id === "golden") {
+    if (status === "won") return { available: false, terminal: true, label: `Remporté · ${state.goldenPlacement || 1}re place` };
+    return count >= 10 ? { available: true, label: state.goldenPlacement ? `Nouvelle tentative · meilleur rang ${state.goldenPlacement}` : "Inscription ouverte" } : { available: false, label: `Disponible dans ${10 - count} combat${10 - count > 1 ? "s" : ""}` };
+  }
+  if (id === "canadian") {
+    if (status === "won") return { available: false, terminal: true, label: "Champion canadien" };
+    return state.tournaments.golden === "won" ? { available: true, label: "Sélection ouverte" } : { available: false, label: "Remporte les Gants dorés" };
+  }
+  if (status === "won" || state.olympicCompleted) return { available: false, terminal: true, label: "Parcours olympique terminé" };
+  return state.tournaments.canadian === "won" ? { available: true, label: "Sélection ouverte" } : { available: false, label: "Remporte le championnat canadien" };
+}
+
+function resolveTournamentResult(fight, result, margin) {
+  const id = fight.tournamentId;
+  if (!id) return "";
+  const tournament = tournamentDefs.find(item => item.id === id);
+  if (id === "bronze" || id === "silver") {
+    state.tournaments[id] = result === "Victoire" ? "won" : "lost";
+    if (result === "Victoire") {
+      applyChanges({ reputation: id === "bronze" ? 5 : 7, experience: id === "bronze" ? 8 : 12, morale: 4 });
+      return `${tournament.name} remportés.`;
+    }
+    return `Parcours terminé aux ${tournament.name}.`;
+  }
+  if (id === "golden") {
+    const placement = result === "Victoire" ? 1 : result === "Match nul" ? 2 : margin >= -2 ? 3 : 4;
+    state.goldenPlacement = !state.goldenPlacement ? placement : Math.min(state.goldenPlacement, placement);
+    state.tournaments.golden = placement === 1 ? "won" : "pending";
+    applyChanges({ reputation: placement <= 3 ? 12 : 5, experience: 18, morale: placement <= 3 ? 7 : -2 });
+    return placement <= 3 ? `${placement}${placement === 1 ? "re" : "e"} place aux Gants dorés.` : "Élimination avant le podium des Gants dorés.";
+  }
+  if (id === "canadian") {
+    state.tournaments.canadian = result === "Victoire" ? "won" : "pending";
+    applyChanges({ reputation: result === "Victoire" ? 16 : 6, experience: 20, morale: result === "Victoire" ? 10 : -3 });
+    return result === "Victoire" ? "Titre canadien remporté : la sélection nationale est débloquée." : "Le titre canadien échappe encore au boxeur.";
+  }
+  state.olympicCompleted = true;
+  state.tournaments.olympic = result === "Victoire" ? "won" : "completed";
+  applyChanges({ reputation: result === "Victoire" ? 20 : 10, experience: 25, morale: result === "Victoire" ? 12 : 2 });
+  return `Parcours olympique terminé${result === "Victoire" ? " avec une victoire internationale" : ""}.`;
+}
+
+function professionalEligibility() {
+  const count = amateurFightCount();
+  if (state.olympicCompleted) return { eligible: true, reason: "Parcours olympique terminé" };
+  if (state.goldenPlacement && state.goldenPlacement <= 3) return { eligible: true, reason: `Podium aux Gants dorés · ${state.goldenPlacement}${state.goldenPlacement === 1 ? "re" : "e"} place` };
+  if (count >= 20) return { eligible: true, reason: `${count} combats amateurs disputés` };
+  return { eligible: false, reason: `Termine un parcours majeur ou dispute encore ${20 - count} combat${20 - count > 1 ? "s" : ""}` };
 }
 
 function renderFights() {
   const scheduled = document.querySelector("#scheduled-fight");
+  const opponentsContainer = document.querySelector("#opponents");
+  const tournamentsContainer = document.querySelector("#tournaments");
+  const proTransition = document.querySelector("#pro-transition");
+  const fightCount = amateurFightCount();
+  document.querySelector("#amateur-fight-count").textContent = `${fightCount} combat${fightCount > 1 ? "s" : ""} disputé${fightCount > 1 ? "s" : ""}`;
+
+  if (state.careerStatus === "professional") {
+    scheduled.innerHTML = "";
+    opponentsContainer.innerHTML = '<div class="amateur-closed"><strong>Circuit amateur fermé</strong><p>La carrière professionnelle a commencé. Le bilan amateur est désormais définitif.</p></div>';
+    tournamentsContainer.innerHTML = "";
+    proTransition.innerHTML = "";
+    return;
+  }
+
   if (state.scheduledFight) {
-    const opponent = opponents.find(item => item.id === state.scheduledFight.id);
+    const opponent = scheduledOpponent();
     const isFightWeek = state.week >= state.scheduledFight.week;
-    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé</p><strong>${opponent.name} « ${opponent.nickname} »</strong><p>${isFightWeek ? "Le combat est arrivé : choisis ton entrée ou ton désistement pour continuer." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? '<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">Se désister</button><button id="start-fight" class="primary-button" type="button">Entrer dans le ring</button></div>' : ""}</div>`;
+    const eventName = state.scheduledFight.tournamentId ? tournamentDefs.find(item => item.id === state.scheduledFight.tournamentId).name : "Combat local";
+    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé · ${eventName}</p><strong>${opponent.name} « ${opponent.nickname} »</strong><p>${isFightWeek ? "Le combat est arrivé : choisis ton entrée ou ton désistement pour continuer." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? '<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">Se désister</button><button id="start-fight" class="primary-button" type="button">Entrer dans le ring</button></div>' : ""}</div>`;
   } else {
     scheduled.innerHTML = "";
   }
-  document.querySelector("#opponents").innerHTML = opponents.map(opponent => {
-    const unavailable = state.scheduledFight || state.declinedFights.includes(opponent.id);
-    const status = state.declinedFights.includes(opponent.id) ? "Proposition refusée" : state.scheduledFight ? "Un combat est déjà programmé" : "";
-    const offeredWeek = Math.max(4, opponent.week, state.week);
+  opponentsContainer.innerHTML = weeklyOpponentOffers().map(opponent => {
+    const declinedThisWeek = state.declinedFights.includes(offerKey(opponent.id));
+    const unavailable = state.scheduledFight || declinedThisWeek;
+    const status = declinedThisWeek ? "Proposition refusée cette semaine" : state.scheduledFight ? "Un combat est déjà programmé" : "";
+    const offeredWeek = offeredFightWeek(opponent);
     return `<article class="opponent-card"><p class="eyebrow">Proposé : semaine ${offeredWeek}</p><h3>${opponent.name} « ${opponent.nickname} »</h3><p>${state.profile.weightClass} · ${opponent.style}</p><p>Bilan amateur : ${opponent.record}</p><div class="opponent-meta"><span>Risque : ${opponent.risk}</span><span>Difficulté ${opponent.difficulty}</span></div><button class="secondary-button" type="button" data-accept="${opponent.id}" ${unavailable ? "disabled" : ""}>${status || "Accepter le combat"}</button>${!unavailable ? `<button class="plan-remove" type="button" data-decline="${opponent.id}">Refuser</button>` : ""}</article>`;
   }).join("");
+
+  if (fightCount > 5 && state.tournaments.bronze === "pending") state.tournaments.bronze = "missed";
+  if (fightCount > 10 && state.tournaments.silver === "pending") state.tournaments.silver = "missed";
+  tournamentsContainer.innerHTML = tournamentDefs.map(tournament => {
+    const availability = tournamentAvailability(tournament.id);
+    const blockedByFight = Boolean(state.scheduledFight);
+    const cardClass = availability.terminal ? "completed" : availability.available ? "available" : "locked";
+    const buttonText = blockedByFight && availability.available ? "Combat déjà programmé" : availability.available ? (tournament.id === "olympic" ? "Rejoindre le parcours" : "S’inscrire") : availability.label;
+    return `<article class="tournament-card ${cardClass}"><span class="tournament-medal">${tournament.medal}</span><h4>${tournament.name}</h4><p>${tournament.description}</p><p class="tournament-state">${availability.label}</p><button class="secondary-button" type="button" data-tournament="${tournament.id}" ${!availability.available || blockedByFight ? "disabled" : ""}>${buttonText}</button></article>`;
+  }).join("");
+
+  const pro = professionalEligibility();
+  const blocked = Boolean(state.scheduledFight);
+  proTransition.innerHTML = `<div><strong>Passer professionnel</strong><p>${pro.reason}${blocked && pro.eligible ? " · Termine ou annule d’abord le combat programmé." : ""}</p></div><button id="turn-pro" class="primary-button" type="button" ${!pro.eligible || blocked ? "disabled" : ""}>Passer professionnel</button>`;
 }
 
 function projectedMoney() {
@@ -349,22 +488,48 @@ function executePlan() {
 }
 
 function startFight() {
-  const opponent = opponents.find(item => item.id === state.scheduledFight?.id);
+  const opponent = scheduledOpponent();
   if (!opponent) return;
-  fightState = { opponent, round: 1, playerPoints: 0, opponentPoints: 0, playerEnergy: state.energy, opponentEnergy: 88 + Math.floor(Math.random() * 8), rounds: [] };
+  fightState = { opponent, tournamentId: state.scheduledFight.tournamentId || null, round: 1, playerPoints: 0, opponentPoints: 0, playerEnergy: state.energy, opponentEnergy: 88 + Math.floor(Math.random() * 8), rounds: [] };
   document.querySelector("#fight-choices").innerHTML = `<button type="button" data-strategy="attack"><strong>Attaquer</strong><span>Puissance, technique · fatigue élevée</span></button><button type="button" data-strategy="distance"><strong>Boxer à distance</strong><span>Technique, cardio · fatigue modérée</span></button><button type="button" data-strategy="defense"><strong>Jouer la défense</strong><span>Défense, cardio · fatigue réduite</span></button>`;
   document.querySelector("#fight-dialog").showModal();
   renderFight();
 }
 
 function withdrawFight() {
-  const opponent = opponents.find(item => item.id === state.scheduledFight?.id);
+  const opponent = scheduledOpponent();
   if (!opponent) return;
   if (!window.confirm(`Se désister du combat contre ${opponent.name} ?\n\nLe combat sera annulé et tu pourras poursuivre la carrière.`)) return;
   state.journal.unshift({ week: state.week, text: `Tu te désistes du combat amateur contre ${opponent.name}. Le rendez-vous est annulé.` });
+  const tournamentId = state.scheduledFight.tournamentId;
+  if (tournamentId === "bronze") state.tournaments.bronze = "missed";
+  if (tournamentId === "silver") state.tournaments.silver = "lost";
+  if (["golden", "canadian", "olympic"].includes(tournamentId)) state.tournaments[tournamentId] = "pending";
   state.scheduledFight = null;
   render();
   showToast("Combat annulé");
+}
+
+function registerTournament(id) {
+  const tournament = tournamentDefs.find(item => item.id === id);
+  const availability = tournamentAvailability(id);
+  if (!tournament || !availability.available || state.scheduledFight) return;
+  state.tournaments[id] = "entered";
+  state.scheduledFight = { id: tournament.opponent.id, tournamentId: id, week: state.week + 1 };
+  state.journal.unshift({ week: state.week, text: `Inscription aux ${tournament.name}. Combat programmé contre ${tournament.opponent.name} pour la semaine ${state.scheduledFight.week}.` });
+  render();
+  showToast(`${tournament.name} : inscription confirmée`);
+}
+
+function turnProfessional() {
+  const eligibility = professionalEligibility();
+  if (!eligibility.eligible || state.scheduledFight || state.careerStatus === "professional") return;
+  if (!window.confirm(`Passer professionnel ?\n\nCe choix est définitif. Le circuit amateur sera fermé et un nouveau bilan professionnel commencera à 0–0–0.`)) return;
+  state.careerStatus = "professional";
+  state.professionalRecord = { wins: 0, losses: 0, draws: 0 };
+  state.journal.unshift({ week: state.week, text: `${state.profile.firstName} quitte définitivement le circuit amateur et passe professionnel.` });
+  render();
+  showToast("Carrière professionnelle commencée");
 }
 
 function strategyData(strategy) {
@@ -377,12 +542,13 @@ function strategyData(strategy) {
 
 function renderFight(message = "Choisis une consigne pour ce round.") {
   const fight = fightState;
-  document.querySelector("#fight-week-label").textContent = `Combat amateur · Semaine ${state.week}`;
+  const tournamentName = fight.tournamentId ? tournamentDefs.find(item => item.id === fight.tournamentId).name : "Combat amateur";
+  document.querySelector("#fight-week-label").textContent = `${tournamentName} · Semaine ${state.week}`;
   document.querySelector("#fight-round").textContent = `Round ${fight.round} / 3`;
   document.querySelector("#fight-player-name").textContent = state.profile.firstName;
   document.querySelector("#fight-player-meta").textContent = `${state.profile.nickname ? `« ${state.profile.nickname} » · ` : ""}${state.profile.weightClass} · Coin bleu`;
   document.querySelector("#fight-opponent-name").textContent = fight.opponent.name;
-  document.querySelector("#fight-opponent-meta").textContent = `« ${fight.opponent.nickname} » · ${fight.opponent.weightClass} · Coin rouge`;
+  document.querySelector("#fight-opponent-meta").textContent = `« ${fight.opponent.nickname} » · ${fight.opponent.weightClass || state.profile.weightClass} · Coin rouge`;
   document.querySelector("#fight-player-energy").textContent = `${Math.max(0, fight.playerEnergy)}%`;
   document.querySelector("#fight-opponent-energy").textContent = `${Math.max(0, fight.opponentEnergy)}%`;
   document.querySelector("#fight-score").textContent = `${fight.playerPoints} — ${fight.opponentPoints}`;
@@ -420,14 +586,15 @@ function finishFight() {
   if (margin > 0) { result = "Victoire"; state.amateurRecord.wins += 1; applyChanges({ reputation: 7, experience: 18, morale: 9, injury: 4 }); }
   else if (margin < 0) { result = "Défaite"; state.amateurRecord.losses += 1; applyChanges({ reputation: 2, experience: 12, morale: -5, injury: 7 }); }
   else { result = "Match nul"; state.amateurRecord.draws += 1; applyChanges({ reputation: 4, experience: 15, morale: 2, injury: 5 }); }
+  const tournamentNote = resolveTournamentResult(fight, result, margin);
   state.energy = clamp(fight.playerEnergy);
   const injuryEvent = state.injury >= 55 && Math.random() < .35 ? " Une douleur au retour au vestiaire augmente la prudence nécessaire." : "";
   if (injuryEvent) state.injury = clamp(state.injury + 7);
-  state.journal.unshift({ week: state.week, text: `Combat amateur : ${result} contre ${fight.opponent.name}, ${fight.playerPoints}–${fight.opponentPoints}.${injuryEvent}` });
+  state.journal.unshift({ week: state.week, text: `Combat amateur : ${result} contre ${fight.opponent.name}, ${fight.playerPoints}–${fight.opponentPoints}.${tournamentNote ? ` ${tournamentNote}` : ""}${injuryEvent}` });
   // Rafraîchir le tableau après le calcul du troisième round afin que son score soit visible.
   renderFight(`${result} après 3 rounds`);
   document.querySelector("#fight-choices").innerHTML = "";
-  document.querySelector("#fight-instruction").innerHTML = `<p><strong>${result} — ${fight.playerPoints} à ${fight.opponentPoints}</strong><br>${fight.rounds.join(" · ")}<br>Expérience, réputation et état physique ont été mis à jour.${injuryEvent}</p>`;
+  document.querySelector("#fight-instruction").innerHTML = `<p><strong>${result} — ${fight.playerPoints} à ${fight.opponentPoints}</strong><br>${fight.rounds.join(" · ")}<br>${tournamentNote ? `${tournamentNote}<br>` : ""}Expérience, réputation et état physique ont été mis à jour.${injuryEvent}</p>`;
   document.querySelector("#fight-status").textContent = result;
   const closeButton = document.createElement("button");
   closeButton.className = "primary-button";
@@ -486,7 +653,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   Object.keys(combatLabels).forEach(key => {
     state.combatStats[key] = BASE_COMBAT_STAT + draftStats[key] + styleBonus(style, key);
   });
-  state.journal = [{ week: 1, text: `${state.profile.firstName} signe sa première licence professionnelle. La route commence ici.` }];
+  state.journal = [{ week: 1, text: `${state.profile.firstName} rejoint le circuit amateur. La route commence ici.` }];
   render();
   showToast("Nouvelle carrière lancée");
 });
@@ -527,16 +694,25 @@ document.querySelector("#opponents").addEventListener("click", event => {
   const decline = event.target.closest("[data-decline]");
   if (accept) {
     const opponent = opponents.find(item => item.id === accept.dataset.accept);
-    state.scheduledFight = { id: opponent.id, week: Math.max(4, opponent.week, state.week) };
+    state.scheduledFight = { id: opponent.id, week: offeredFightWeek(opponent) };
     state.journal.unshift({ week: state.week, text: `Combat amateur programmé contre ${opponent.name} pour la semaine ${state.scheduledFight.week}.` });
     render();
     showToast("Combat programmé");
   }
   if (decline) {
-    state.declinedFights.push(decline.dataset.decline);
+    state.declinedFights.push(offerKey(decline.dataset.decline));
     render();
     showToast("Proposition refusée");
   }
+});
+
+document.querySelector("#tournaments").addEventListener("click", event => {
+  const button = event.target.closest("[data-tournament]");
+  if (button) registerTournament(button.dataset.tournament);
+});
+
+document.querySelector("#pro-transition").addEventListener("click", event => {
+  if (event.target.closest("#turn-pro")) turnProfessional();
 });
 
 document.querySelector("#scheduled-fight").addEventListener("click", event => {
