@@ -231,6 +231,7 @@ function weeklyActionLimit() {
 }
 
 function weeklyOpponentOffers() {
+  if (state.week === 1) return [opponents[0], opponents[1], opponents[2]];
   const start = ((state.week - 1) * 2) % opponents.length;
   return [start, (start + 1) % opponents.length, (start + 4) % opponents.length].map(index => opponents[index]);
 }
