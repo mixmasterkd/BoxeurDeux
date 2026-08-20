@@ -286,7 +286,7 @@ h2 { font-size: 1.65rem; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .action-grid { grid-template-columns: repeat(2, 1fr); }
   .panel, .fights-panel, .plan-panel { padding: 20px; }
-  .mobile-section-toggle { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 46px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--line); color: var(--ink); background: #151715; font-weight: 700; text-align: left; text-transform: uppercase; cursor: pointer; }
+  .mobile-section-toggle { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; flex: 0 0 100%; gap: 12px; width: 100%; min-height: 46px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--line); color: var(--ink); background: #151715; font-weight: 700; text-align: left; text-transform: uppercase; cursor: pointer; }
   .toggle-control { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; color: var(--gold); }
   .toggle-state { font-size: .62rem; font-weight: 700; letter-spacing: .08em; }
   .toggle-arrow { font-size: 1.25rem; line-height: 1; transform: rotate(180deg); transition: transform .2s ease; }
