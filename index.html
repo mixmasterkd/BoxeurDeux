@@ -76,7 +76,8 @@
         <button id="restart-top" class="text-button" type="button">Réinitialiser</button>
       </header>
 
-      <section class="fighter-card" aria-labelledby="fighter-name">
+      <section class="fighter-card collapsible-section" data-mobile-open="true" aria-labelledby="fighter-name">
+        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Fiche du boxeur</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
         <div class="portrait" aria-hidden="true"><span id="fighter-initials">—</span></div>
         <div class="fighter-copy">
           <p id="fighter-meta" class="eyebrow">Amateur · En développement</p>
@@ -91,6 +92,7 @@
           <span>Plan de la semaine</span>
           <div id="action-pips" class="pips" aria-label="3 actions restantes"></div>
         </div>
+        <div id="career-medals" class="career-medals"></div>
       </section>
 
       <div class="dashboard-grid">
@@ -122,14 +124,20 @@
         </aside>
       </div>
 
-      <section class="fights-panel" aria-labelledby="fights-title">
+      <section class="fights-panel collapsible-section" data-mobile-open="false" aria-labelledby="fights-title">
+        <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Combats locaux</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
         <div class="section-heading">
           <div><p class="eyebrow">Circuit local</p><h2 id="fights-title">Combats amateurs</h2></div>
           <p>Trois nouvelles offres chaque semaine, avec quelques adversaires qui peuvent revenir.</p>
         </div>
         <div id="scheduled-fight" class="scheduled-fight"></div>
         <div id="opponents" class="opponent-grid"></div>
-        <div class="tournament-heading"><div><p class="eyebrow">Progression nationale</p><h3>Tournois amateurs</h3></div><span id="amateur-fight-count">0 combat disputé</span></div>
+      </section>
+
+      <section class="fights-panel tournaments-panel collapsible-section" data-mobile-open="false" aria-labelledby="tournaments-title">
+        <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Tournois</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
+        <div class="tournament-heading"><div><p class="eyebrow">Progression nationale</p><h3 id="tournaments-title">Tournois amateurs</h3></div><span id="amateur-fight-count">0 combat disputé</span></div>
+        <div id="active-tournament" class="active-tournament"></div>
         <div id="tournaments" class="tournament-grid"></div>
         <div id="pro-transition" class="pro-transition"></div>
       </section>
@@ -144,7 +152,8 @@
         <button id="membership-button" class="membership-button" type="button"></button>
       </section>
 
-      <section class="actions-section" aria-labelledby="actions-title">
+      <section class="actions-section collapsible-section" data-mobile-open="true" aria-labelledby="actions-title">
+        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Actions de la semaine</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
         <div class="section-heading">
           <div>
             <p class="eyebrow">Planifier la semaine</p>
@@ -155,7 +164,8 @@
         <div id="action-grid" class="action-grid"></div>
       </section>
 
-      <section class="plan-panel" aria-labelledby="plan-title">
+      <section class="plan-panel collapsible-section" data-mobile-open="true" aria-labelledby="plan-title">
+        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Plan de la semaine</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
         <div class="plan-heading">
           <div><p class="eyebrow">Aperçu avant confirmation</p><h2 id="plan-title">Plan hebdomadaire</h2></div>
           <span id="plan-count" class="plan-count">0 / 3 actions</span>
@@ -196,6 +206,18 @@
         </div>
         <div id="summary-content" class="summary-content"></div>
         <div class="service-actions"><button id="summary-close" class="primary-button" type="button">Continuer</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="tournament-dialog" class="tournament-dialog">
+      <div class="tournament-board-card">
+        <div class="service-heading">
+          <div><p class="eyebrow">Tableau de progression</p><h2 id="tournament-board-title">Tournoi amateur</h2></div>
+          <button id="tournament-board-close" class="dialog-close" type="button" aria-label="Fermer">×</button>
+        </div>
+        <div id="tournament-board-status" class="tournament-board-status"></div>
+        <div id="tournament-bracket" class="tournament-bracket"></div>
+        <div class="tournament-board-actions"><button id="tournament-next-fight" class="primary-button" type="button">Disputer le prochain combat</button></div>
       </div>
     </dialog>
 

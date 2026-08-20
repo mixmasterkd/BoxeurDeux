@@ -74,7 +74,7 @@ h2 { font-size: 1.65rem; }
 .week-block { display: flex; align-items: baseline; gap: 12px; color: var(--muted); text-transform: uppercase; font-size: .75rem; letter-spacing: .12em; }
 .week-block strong { color: var(--ink); font: 800 2.8rem/1 "Barlow Condensed"; }
 
-.fighter-card { margin: 26px 0; padding: 22px; border: 1px solid var(--line); border-left: 4px solid var(--red); background: linear-gradient(105deg, #242724, #191b1a); box-shadow: 0 16px 40px rgba(0,0,0,.2); }
+.fighter-card { position: relative; margin: 26px 0; padding: 22px 22px 46px; border: 1px solid var(--line); border-left: 4px solid var(--red); background: linear-gradient(105deg, #242724, #191b1a); box-shadow: 0 16px 40px rgba(0,0,0,.2); }
 .portrait { display: grid; place-items: center; flex: 0 0 70px; height: 70px; border-radius: 50%; background: var(--red); color: #171817; font: 800 1.6rem "Barlow Condensed"; }
 .fighter-copy { flex: 1; }
 .fighter-copy h2 { font-size: clamp(1.6rem, 4vw, 2.3rem); }
@@ -84,6 +84,13 @@ h2 { font-size: 1.65rem; }
 .money-spotlight span { display: block; color: var(--muted); font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; }
 .money-spotlight strong { display: block; margin-top: 3px; color: var(--gold); font: 800 2.2rem/1 "Barlow Condensed"; }
 .actions-counter { min-width: 160px; text-align: right; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .09em; }
+.career-medals { position: absolute; right: 22px; bottom: 12px; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: .65rem; text-transform: uppercase; }
+.career-medals strong { display: flex; align-items: center; gap: 5px; color: var(--ink); }
+.career-medals em { font-style: normal; }
+.medal-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+.medal-dot.bronze { background: #b66f3c; }
+.medal-dot.silver { background: #c7cbd0; }
+.medal-dot.gold { background: #e5bd50; }
 .pips { display: flex; justify-content: flex-end; gap: 7px; margin-top: 10px; }
 .pip { width: 34px; height: 7px; background: #444744; transform: skew(-14deg); transition: .2s; }
 .pip.active { background: var(--gold); box-shadow: 0 0 12px rgba(221,182,94,.25); }
@@ -127,6 +134,7 @@ h2 { font-size: 1.65rem; }
 .membership-status.warning strong { color: var(--gold); }
 .membership-button { min-width: 180px; border-color: var(--gold); background: var(--gold); }
 .fights-panel { margin-top: 22px; padding: 24px; border: 1px solid var(--line); background: rgba(29,32,30,.94); }
+.tournaments-panel { border-top: 3px solid var(--gold); }
 .scheduled-fight { margin-bottom: 18px; }
 .scheduled-fight:empty { display: none; }
 .fight-notice { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px; border-left: 4px solid var(--red); background: #24201d; }
@@ -156,6 +164,16 @@ h2 { font-size: 1.65rem; }
 .tournament-state { margin: 10px 0; color: var(--gold) !important; font-weight: 700; text-transform: uppercase; }
 .tournament-card button { width: 100%; margin-top: auto; }
 .tournament-card button:disabled { cursor: not-allowed; opacity: .4; }
+.tournament-medals { display: flex; align-items: center; gap: 5px; margin-top: 9px; color: var(--muted); font-size: .7rem; }
+.active-tournament:empty { display: none; }
+.tournament-countdown { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 16px; padding: 17px; border: 1px solid var(--gold); background: #1b1b16; }
+.tournament-countdown > div { flex: 1; }
+.tournament-countdown strong { display: block; font: 800 1.4rem "Barlow Condensed"; text-transform: uppercase; }
+.tournament-countdown p:not(.eyebrow) { margin-top: 4px; color: var(--muted); font-size: .72rem; }
+.tournament-countdown.ready { border-color: var(--red); }
+.countdown-meter { height: 6px; margin-top: 12px; overflow: hidden; background: #0d0f0d; }
+.countdown-meter span { display: block; height: 100%; background: var(--gold); }
+.mobile-section-toggle { display: none; }
 .pro-transition { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 16px; padding: 18px; border: 1px solid var(--line); border-left: 4px solid var(--gold); background: #121412; }
 .pro-transition strong { display: block; font-family: "Barlow Condensed"; font-size: 1.35rem; text-transform: uppercase; }
 .pro-transition p { margin-top: 4px; color: var(--muted); font-size: .73rem; }
@@ -242,6 +260,24 @@ h2 { font-size: 1.65rem; }
 .service-effect strong { color: var(--gold); font: 800 1.7rem "Barlow Condensed"; white-space: nowrap; }
 .service-effect span { color: var(--muted); font-size: .76rem; }
 .service-actions { justify-content: flex-end; }
+.tournament-dialog { width: min(900px, calc(100% - 24px)); padding: 0; border: 0; color: var(--ink); background: transparent; }
+.tournament-dialog::backdrop { background: rgba(0,0,0,.84); backdrop-filter: blur(5px); }
+.tournament-board-card { padding: 26px; border: 1px solid var(--line); border-top: 4px solid var(--gold); background: #171917; }
+.tournament-board-status { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 20px 0; padding: 14px; border: 1px solid var(--line); background: #111311; }
+.tournament-board-status strong { font-family: "Barlow Condensed"; font-size: 1.3rem; text-transform: uppercase; }
+.tournament-board-status span { color: var(--muted); font-size: .72rem; }
+.tournament-bracket { display: grid; gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+.tournament-bracket.rounds-3 { grid-template-columns: repeat(3, minmax(145px, 1fr)); }
+.tournament-bracket.rounds-5 { grid-template-columns: repeat(5, minmax(145px, 1fr)); }
+.bracket-round { min-height: 145px; padding: 13px; border: 1px solid var(--line); background: #111311; }
+.bracket-round.current { border-color: var(--gold); }
+.bracket-round.won { border-color: var(--green); }
+.bracket-round.lost { border-color: var(--red); }
+.bracket-step { display: block; color: var(--gold); font-size: .63rem; font-weight: 700; text-transform: uppercase; }
+.bracket-round strong { display: block; margin: 10px 0 5px; font: 800 1rem "Barlow Condensed"; text-transform: uppercase; }
+.bracket-round small { display: block; color: var(--muted); font-size: .66rem; line-height: 1.4; }
+.bracket-round em { display: block; margin-top: 12px; color: var(--ink); font-size: .68rem; font-style: normal; font-weight: 700; text-transform: uppercase; }
+.tournament-board-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
 .toast { position: fixed; left: 50%; bottom: 24px; z-index: 10; padding: 12px 18px; background: var(--ink); color: #171817; font-weight: 600; font-size: .8rem; transform: translate(-50%, 150%); opacity: 0; transition: .25s; }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
 
@@ -257,6 +293,12 @@ h2 { font-size: 1.65rem; }
 }
 @media (max-width: 560px) {
   body { overflow-x: hidden; }
+  .mobile-section-toggle { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; width: 100%; min-height: 46px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--line); color: var(--ink); background: #151715; font-weight: 700; text-align: left; text-transform: uppercase; }
+  .toggle-arrow { color: var(--gold); font-size: 1.25rem; transform: rotate(180deg); transition: transform .2s ease; }
+  .mobile-collapsed > .mobile-section-toggle .toggle-arrow { transform: rotate(0); }
+  .collapsible-section.mobile-collapsed > :not(.mobile-section-toggle) { display: none !important; }
+  .collapsible-section.mobile-collapsed { min-height: 0; padding-top: 10px; padding-bottom: 10px; }
+  .collapsible-section.mobile-collapsed > .mobile-section-toggle { margin-bottom: 0; }
   .creation-card { padding: 24px 18px; }
   .creation-heading { align-items: flex-start; flex-direction: column; }
   .identity-grid, .creation-stats { grid-template-columns: 1fr; }
@@ -281,6 +323,7 @@ h2 { font-size: 1.65rem; }
   .money-spotlight strong { font-size: 2rem; }
   .actions-counter { width: 100%; text-align: left; }
   .actions-counter { grid-column: 1 / -1; }
+  .career-medals { position: static; grid-column: 1 / -1; justify-content: flex-start; padding-top: 11px; border-top: 1px solid var(--line); }
   .pips { justify-content: flex-start; }
   .panel, .fights-panel, .plan-panel { padding: 16px; }
   .panel-heading { align-items: flex-start; margin-bottom: 18px; }
@@ -292,6 +335,8 @@ h2 { font-size: 1.65rem; }
   .membership-button { width: 100%; }
   .fight-notice { align-items: flex-start; flex-direction: column; }
   .fight-notice-actions, .fight-notice button { width: 100%; }
+  .tournament-countdown { align-items: stretch; flex-direction: column; }
+  .tournament-countdown button { width: 100%; }
   .fight-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
   .fight-card { max-height: calc(100dvh - 12px); padding: 18px 12px; overflow-y: auto; }
   .fight-topline { gap: 10px; font-size: .65rem; }
@@ -323,6 +368,12 @@ h2 { font-size: 1.65rem; }
   .service-effect { align-items: flex-start; flex-direction: column; }
   .service-actions { align-items: stretch; flex-direction: column-reverse; }
   .service-actions button { width: 100%; }
+  .tournament-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
+  .tournament-board-card { max-height: calc(100dvh - 12px); padding: 18px 12px; overflow-y: auto; }
+  .tournament-board-status { align-items: flex-start; flex-direction: column; }
+  .tournament-bracket, .tournament-bracket.rounds-3, .tournament-bracket.rounds-5 { display: grid; grid-template-columns: 1fr; overflow: visible; }
+  .bracket-round { min-height: 0; }
+  .tournament-board-actions, .tournament-board-actions button { width: 100%; }
   .toast { width: calc(100% - 24px); bottom: 12px; text-align: center; }
 }
 @media (max-width: 380px) {
