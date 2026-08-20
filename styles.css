@@ -231,6 +231,7 @@ h2 { font-size: 1.65rem; }
 .plan-row-copy { flex: 1; }
 .plan-row-copy strong { display: block; font-family: "Barlow Condensed"; text-transform: uppercase; }
 .plan-row-copy small { color: var(--muted); }
+.plan-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .plan-remove { border: 0; color: var(--muted); background: transparent; cursor: pointer; text-decoration: underline; }
 .plan-totals { align-items: flex-start; padding: 15px; border: 1px solid var(--line); background: #111311; }
 .plan-total-block { flex: 1; }
@@ -284,6 +285,7 @@ h2 { font-size: 1.65rem; }
 @media (max-width: 800px) {
   .game-shell { width: min(100% - 24px, 1180px); }
   .dashboard-grid { grid-template-columns: 1fr; }
+  .fighter-card { flex-wrap: wrap; }
   .action-grid { grid-template-columns: repeat(2, 1fr); }
   .panel, .fights-panel, .plan-panel { padding: 20px; }
   .mobile-section-toggle { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; flex: 0 0 100%; gap: 12px; width: 100%; min-height: 46px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--line); color: var(--ink); background: #151715; font-weight: 700; text-align: left; text-transform: uppercase; cursor: pointer; }
@@ -300,70 +302,127 @@ h2 { font-size: 1.65rem; }
   .tournament-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 560px) {
-  body { overflow-x: hidden; }
-  .creation-card { padding: 24px 18px; }
+  body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+  button { touch-action: manipulation; }
+  .creation-screen { padding: 12px 10px calc(20px + env(safe-area-inset-bottom)); }
+  .creation-card { padding: 20px 15px; }
   .creation-heading { align-items: flex-start; flex-direction: column; }
+  .creation-heading h1 { font-size: 2.25rem; }
   .identity-grid, .creation-stats { grid-template-columns: 1fr; }
+  .identity-grid { gap: 12px; margin: 20px 0 24px; }
   .style-field { grid-column: auto; }
   .allocation-head { align-items: flex-start; flex-direction: column; }
   .points-bank { width: 100%; justify-content: center; }
-  .game-shell { width: min(100% - 20px, 1180px); padding-top: 18px; }
-  .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; padding-bottom: 16px; }
-  .brand { min-width: 0; }
-  .brand-mark { width: 44px; height: 44px; flex: 0 0 44px; }
-  .brand h1 { font-size: 1.55rem; white-space: nowrap; }
-  .brand .eyebrow { font-size: .61rem; }
-  .week-block { gap: 7px; }
-  .week-block strong { font-size: 2.25rem; }
-  #restart-top { grid-column: 1 / -1; justify-self: end; }
-  .fighter-card { display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: start; gap: 14px; margin: 18px 0; padding: 16px; }
-  .portrait { width: 54px; height: 54px; }
-  .fighter-copy { min-width: 0; }
-  .fighter-copy h2 { overflow-wrap: anywhere; font-size: 1.55rem; }
-  .fighter-copy > p:last-child { line-height: 1.5; }
-  .money-spotlight { display: flex; grid-column: 1 / -1; align-items: baseline; justify-content: space-between; width: 100%; margin: 2px 0 0; padding: 13px 0 0; border-top: 1px solid var(--line); border-left: 0; text-align: left; }
-  .money-spotlight strong { font-size: 2rem; }
-  .actions-counter { width: 100%; text-align: left; }
-  .actions-counter { grid-column: 1 / -1; }
-  .career-medals { position: static; grid-column: 1 / -1; justify-content: flex-start; padding-top: 11px; border-top: 1px solid var(--line); }
-  .pips { justify-content: flex-start; }
-  .panel, .fights-panel, .plan-panel { padding: 16px; }
-  .panel-heading { align-items: flex-start; margin-bottom: 18px; }
-  .stats-grid, .action-grid { grid-template-columns: 1fr; }
-  .stats-grid { gap: 17px; }
-  .combat-stats { grid-template-columns: 1fr 1fr; }
-  .journal-list { max-height: 220px; }
-  .membership-panel { flex-direction: column; }
-  .membership-button { width: 100%; }
+  .game-shell { width: min(100% - 16px, 1180px); padding: max(6px, env(safe-area-inset-top)) 0 calc(32px + env(safe-area-inset-bottom)); }
+  .topbar { position: sticky; top: env(safe-area-inset-top); z-index: 8; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; min-height: 52px; padding: 7px 0; border-bottom: 1px solid var(--line); background: rgba(16,18,16,.94); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .brand { min-width: 0; gap: 8px; }
+  .brand-mark { width: 38px; height: 38px; flex: 0 0 38px; }
+  .brand h1 { overflow: hidden; font-size: 1.4rem; white-space: nowrap; text-overflow: ellipsis; }
+  .brand .eyebrow, .week-block span { display: none; }
+  .week-block { gap: 0; }
+  .week-block strong { font-size: 1.85rem; }
+  #restart-top { grid-column: auto; justify-self: end; min-height: 44px; padding: 6px; font-size: .6rem; }
+  .fighter-card { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px 12px; margin: 12px 0; padding: 12px; box-shadow: none; }
+  .portrait { width: 46px; height: 46px; flex: 0 0 46px; font-size: 1.25rem; }
+  .fighter-copy { min-width: 0; flex: 1 1 calc(100% - 58px); }
+  .fighter-copy .eyebrow { font-size: .61rem; }
+  .fighter-copy h2 { overflow-wrap: anywhere; font-size: 1.45rem; }
+  .fighter-copy > p:last-child { font-size: .7rem; line-height: 1.35; }
+  .money-spotlight, .actions-counter { flex: 1 1 calc(50% - 6px); min-width: 0; width: auto; margin: 0; padding: 9px 0 0; border-top: 1px solid var(--line); border-left: 0; text-align: left; }
+  .money-spotlight strong { margin-top: 2px; font-size: 1.75rem; }
+  .actions-counter { font-size: .61rem; }
+  .career-medals { position: static; flex: 0 0 100%; justify-content: flex-start; padding-top: 8px; border-top: 1px solid var(--line); font-size: .58rem; }
+  .pips { justify-content: flex-start; gap: 4px; margin-top: 7px; }
+  .pip { width: 25px; height: 6px; }
+  .dashboard-grid { gap: 12px; }
+  .panel, .fights-panel, .plan-panel { padding: 12px; }
+  .panel-heading { align-items: flex-start; margin-bottom: 12px; }
+  .panel-heading h2, .section-heading h2, .plan-heading h2 { font-size: 1.4rem; }
+  #restart { display: none; }
+  .stats-grid, .action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats-grid { gap: 12px 10px; }
+  .stat { min-width: 0; }
+  .stat-top { align-items: end; gap: 4px; margin-bottom: 6px; font-size: .7rem; line-height: 1.15; }
+  .stat-top > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .meter { height: 6px; }
+  .combat-heading { gap: 8px; margin: 16px 0 8px; padding-top: 12px; }
+  .combat-heading span { max-width: 55%; font-size: .59rem; text-align: right; }
+  .combat-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+  .combat-stat { min-width: 0; padding: 8px 3px; text-align: center; }
+  .combat-stat span { margin-bottom: 4px; font-size: .6rem; overflow-wrap: anywhere; }
+  .combat-stat strong { font-size: 1.35rem; }
+  .mobile-section-toggle { min-height: 44px; margin-bottom: 10px; padding: 8px 10px; font-size: .72rem; }
+  .collapsible-section.mobile-collapsed { padding: 0; }
+  .collapsible-section.mobile-collapsed > .mobile-section-toggle { border: 0; }
+  .journal-list { max-height: 200px; }
+  .membership-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 9px 12px; margin-top: 12px; padding: 12px; }
+  .membership-copy h2 { font-size: 1.35rem; }
+  .membership-copy > p:last-child { display: none; }
+  .membership-status { min-width: 0; max-width: 145px; font-size: .65rem; line-height: 1.35; text-align: right; }
+  .membership-status strong { margin-bottom: 2px; font-size: 1.05rem; line-height: 1.05; }
+  .membership-button { grid-column: 1 / -1; width: 100%; min-width: 0; }
+  .membership-status.active + .membership-button:disabled { display: none; }
+  .fights-panel { margin-top: 12px; }
   .fight-notice { align-items: flex-start; flex-direction: column; }
   .fight-notice-actions, .fight-notice button { width: 100%; }
   .tournament-countdown { align-items: stretch; flex-direction: column; }
   .tournament-countdown button { width: 100%; }
   .fight-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
-  .fight-card { max-height: calc(100dvh - 12px); padding: 18px 12px; overflow-y: auto; }
+  .fight-card { max-height: calc(100dvh - 12px); padding: 14px 10px calc(14px + env(safe-area-inset-bottom)); overflow-y: auto; }
   .fight-topline { gap: 10px; font-size: .65rem; }
-  .ring-scoreboard { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 16px 0; padding: 12px 8px; }
+  .ring-scoreboard { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; padding: 10px 6px; }
   .corner { min-width: 0; }
-  .fight-portrait { height: 135px; margin-bottom: 9px; }
+  .fight-portrait { height: clamp(100px, 20vh, 120px); margin-bottom: 7px; }
   .corner span { overflow-wrap: anywhere; }
-  .corner strong { font-size: 1.65rem; }
+  .corner strong { font-size: 1.5rem; }
   .score { grid-column: 1 / -1; order: -1; border: 0; border-bottom: 1px solid var(--line); padding: 0 0 10px; }
-  .score strong { font-size: 2rem; }
-  .fight-instruction { line-height: 1.55; }
-  .fight-choices { grid-template-columns: 1fr; }
-  .fight-choices button { min-height: 70px; }
+  .score strong { font-size: 1.85rem; }
+  .fight-instruction { min-height: 0; margin: 10px 0; font-size: .72rem; line-height: 1.4; }
+  .fight-choices { grid-template-columns: 1fr; gap: 6px; }
+  .fight-choices button { display: grid; grid-template-columns: minmax(95px, auto) 1fr; align-items: center; gap: 9px; min-height: 52px; padding: 8px 10px; }
+  .fight-choices strong { font-size: 1rem; }
+  .fight-choices span { margin: 0; font-size: .65rem; line-height: 1.3; }
   .tournament-grid { grid-template-columns: 1fr; }
   .tournament-heading, .pro-transition { align-items: flex-start; flex-direction: column; }
   .pro-transition button { width: 100%; }
-  .section-heading { align-items: flex-start; flex-direction: column; }
-  .section-heading > p { text-align: left; }
-  .action-card { min-height: 130px; }
-  .plan-heading { align-items: flex-start; }
-  .plan-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: start; gap: 8px 12px; }
+  .tournament-bracket, .tournament-bracket.rounds-3, .tournament-bracket.rounds-5 { display: grid; overflow-x: auto; scroll-snap-type: x proximity; }
+  .tournament-bracket.rounds-3 { grid-template-columns: repeat(3, minmax(145px, 72vw)); }
+  .tournament-bracket.rounds-5 { grid-template-columns: repeat(5, minmax(145px, 72vw)); }
+  .bracket-round { min-height: 132px; scroll-snap-align: start; }
+  .actions-section { margin-top: 20px; }
+  .section-heading { align-items: flex-start; margin-bottom: 11px; }
+  .section-heading > p { display: none; }
+  .action-grid { gap: 8px; }
+  .action-card { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-content: start; gap: 6px 7px; min-height: 118px; padding: 10px; }
+  .action-icon { width: 26px; height: 26px; margin: 0; }
+  .action-card h3 { align-self: center; margin: 0; font-size: 1.02rem; line-height: 1; }
+  .action-card p, .action-card .action-lock, .action-card.selected::after { grid-column: 1 / -1; }
+  .action-card p { font-size: .7rem; line-height: 1.35; }
+  .action-card .action-lock, .action-card.selected::after { margin-top: 1px; font-size: .6rem; line-height: 1.3; overflow-wrap: anywhere; }
+  .action-card:disabled { opacity: .58; }
+  .plan-panel { margin-top: 12px; padding: 12px; }
+  .plan-heading { align-items: flex-end; gap: 8px; }
+  .plan-heading .eyebrow { display: none; }
+  .plan-count { flex: 0 0 auto; font-size: 1.05rem; text-align: right; }
+  .plan-list { gap: 6px; margin: 12px 0; }
+  .plan-list-empty { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .plan-list-empty .plan-slot { justify-content: center; gap: 5px; padding-inline: 4px; }
+  .plan-slot { min-height: 40px; padding: 7px 9px; }
+  .plan-slot span, .plan-order { width: 24px; height: 24px; flex-basis: 24px; }
+  .plan-empty { display: none; }
+  .plan-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: start; gap: 6px 10px; padding: 8px 9px; }
   .plan-row-copy { min-width: 0; }
-  .plan-row-copy small { display: block; margin-top: 3px; line-height: 1.45; }
-  .plan-row .plan-remove { grid-column: 2; justify-self: start; min-height: 38px; padding: 6px 0; }
-  .plan-footer, .plan-totals { align-items: stretch; flex-direction: column; }
+  .plan-row-copy strong { font-size: .94rem; }
+  .plan-row-copy small { display: block; margin-top: 2px; font-size: .62rem; line-height: 1.35; }
+  .plan-row-actions { grid-column: 2; justify-content: flex-start; gap: 14px; }
+  .plan-row .plan-remove { min-height: 30px; padding: 4px 0; font-size: .68rem; }
+  .plan-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 10px; }
+  .plan-total-block:last-child { grid-column: 1 / -1; }
+  .plan-total-block span { margin-bottom: 4px; font-size: .58rem; }
+  .plan-total-block strong { font-size: 1.1rem; }
+  .plan-effects { font-size: .66rem; line-height: 1.4; }
+  .plan-footer { align-items: stretch; gap: 9px; margin-top: 12px; padding-top: 12px; flex-direction: column; }
+  .plan-footer p { font-size: .66rem; line-height: 1.35; }
   .advance-button { width: 100%; min-width: 0; }
   .service-dialog { width: calc(100% - 16px); }
   .service-card { max-height: calc(100dvh - 16px); padding: 20px 16px; overflow-y: auto; }
@@ -371,20 +430,22 @@ h2 { font-size: 1.65rem; }
   .service-actions { align-items: stretch; flex-direction: column-reverse; }
   .service-actions button { width: 100%; }
   .tournament-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
-  .tournament-board-card { max-height: calc(100dvh - 12px); padding: 18px 12px; overflow-y: auto; }
+  .tournament-board-card { max-height: calc(100dvh - 12px); padding: 14px 10px calc(14px + env(safe-area-inset-bottom)); overflow-y: auto; }
   .tournament-board-status { align-items: flex-start; flex-direction: column; }
-  .tournament-bracket, .tournament-bracket.rounds-3, .tournament-bracket.rounds-5 { display: grid; grid-template-columns: 1fr; overflow: visible; }
-  .bracket-round { min-height: 0; }
   .tournament-board-actions, .tournament-board-actions button { width: 100%; }
-  .toast { width: calc(100% - 24px); bottom: 12px; text-align: center; }
+  .toast { width: calc(100% - 20px); bottom: calc(10px + env(safe-area-inset-bottom)); text-align: center; }
 }
 @media (max-width: 380px) {
   .game-shell { width: calc(100% - 12px); }
-  .brand-mark { width: 40px; height: 40px; flex-basis: 40px; }
-  .brand h1 { font-size: 1.35rem; }
-  .week-block span { display: none; }
-  .fighter-card, .panel, .fights-panel, .plan-panel { padding: 13px; }
-  .combat-stats, .summary-money { grid-template-columns: 1fr; }
-  .fight-portrait { height: 115px; }
+  .brand-mark { width: 36px; height: 36px; flex-basis: 36px; }
+  .brand h1 { font-size: 1.25rem; }
+  #restart-top { padding-inline: 4px; font-size: .56rem; }
+  .fighter-card, .panel, .fights-panel, .plan-panel { padding: 10px; }
+  .fighter-card { gap: 9px 10px; }
+  .portrait { width: 42px; height: 42px; flex-basis: 42px; }
+  .fighter-copy { flex-basis: calc(100% - 52px); }
+  .action-card { min-height: 116px; padding: 8px; }
+  .action-card h3 { font-size: .96rem; }
+  .fight-portrait { height: clamp(95px, 18vh, 105px); }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }

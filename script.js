@@ -289,7 +289,11 @@ function renderFights() {
   const tournamentsContainer = document.querySelector("#tournaments");
   const activeTournamentContainer = document.querySelector("#active-tournament");
   const proTransition = document.querySelector("#pro-transition");
+  const localToggleLabel = document.querySelector(".fights-panel:not(.tournaments-panel) .mobile-section-toggle > span:first-child");
+  const tournamentToggleLabel = document.querySelector(".tournaments-panel .mobile-section-toggle > span:first-child");
   const fightCount = amateurFightCount();
+  localToggleLabel.textContent = "Combats locaux";
+  tournamentToggleLabel.textContent = "Tournois";
   document.querySelector("#amateur-fight-count").textContent = `${fightCount} combat${fightCount > 1 ? "s" : ""} disputé${fightCount > 1 ? "s" : ""}`;
 
   if (state.careerStatus === "professional") {
@@ -306,6 +310,7 @@ function renderFights() {
     const isFightWeek = state.week >= state.scheduledFight.week;
     const eventName = state.scheduledFight.tournamentId ? tournamentDefs.find(item => item.id === state.scheduledFight.tournamentId).name : "Combat local";
     const withdrawLabel = state.scheduledFight.tournamentId ? "Abandonner le tournoi" : "Se désister";
+    if (!state.scheduledFight.tournamentId) localToggleLabel.textContent = isFightWeek ? "Combat local · maintenant" : `Combat local · semaine ${state.scheduledFight.week}`;
     scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé · ${eventName}</p><strong>${opponent.name} « ${opponent.nickname} »</strong><p>${isFightWeek ? "Le combat est arrivé : choisis ton entrée ou ton désistement pour continuer." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? `<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">${withdrawLabel}</button><button id="start-fight" class="primary-button" type="button">Entrer dans le ring</button></div>` : ""}</div>`;
   } else {
     scheduled.innerHTML = "";
@@ -326,6 +331,7 @@ function renderFights() {
     const tournament = tournamentDefs.find(item => item.id === active.id);
     const remaining = Math.max(0, active.startWeek - state.week);
     const progress = Math.round(((TOURNAMENT_PREP_WEEKS - remaining) / TOURNAMENT_PREP_WEEKS) * 100);
+    tournamentToggleLabel.textContent = active.status === "completed" ? "Tournoi · parcours terminé" : remaining > 0 ? `Tournoi · dans ${remaining} sem.` : "Tournoi · maintenant";
     activeTournamentContainer.innerHTML = active.status === "completed" ? `<div class="tournament-countdown ready"><div><p class="eyebrow">Parcours terminé</p><strong>${active.summary}</strong></div><button class="secondary-button" type="button" data-open-tournament>Voir le tableau final</button></div>` : remaining > 0 ? `<div class="tournament-countdown"><div><p class="eyebrow">Inscription confirmée · ${tournament.name}</p><strong>Début dans ${remaining} semaine${remaining > 1 ? "s" : ""}</strong><p>Semaine ${active.startWeek} · ${tournament.participants} participants · ${tournament.rounds} combats à gagner</p><div class="countdown-meter"><span style="width:${progress}%"></span></div></div><button class="secondary-button" type="button" data-open-tournament>Voir le tableau</button></div>` : `<div class="tournament-countdown ready"><div><p class="eyebrow">Le tournoi commence</p><strong>${tournament.name}</strong><p>${tournament.participants} participants · prochain tour : ${roundName(tournament.rounds, active.currentRound)}</p></div><button class="primary-button" type="button" data-open-tournament>Ouvrir le tableau</button></div>`;
   } else {
     activeTournamentContainer.innerHTML = "";
@@ -385,8 +391,8 @@ function renderMembership() {
   } else {
     status.className = "membership-status";
     status.innerHTML = "<strong>Abonnement expiré</strong>Gym et sparring verrouillés";
-    button.textContent = `S’abonner · ${GYM_PRICE} $ / 4 semaines`;
     button.disabled = state.money < GYM_PRICE;
+    button.textContent = button.disabled ? `Il manque ${GYM_PRICE - state.money} $ pour s’abonner` : `S’abonner · ${GYM_PRICE} $ / 4 semaines`;
     button.title = button.disabled ? `Il manque ${GYM_PRICE - state.money} $` : "";
   }
 }
@@ -417,7 +423,7 @@ function renderPlan() {
   const content = document.querySelector("#plan-content");
   document.querySelector("#plan-count").textContent = `${weeklyPlan.length} / 3 action${weeklyPlan.length > 1 ? "s" : ""}`;
   if (!weeklyPlan.length) {
-    content.innerHTML = `<div class="plan-list">${Array.from({ length: 3 }, (_, index) => `<div class="plan-slot"><span>${index + 1}</span><em>Emplacement disponible</em></div>`).join("")}</div><div class="plan-empty">Ton programme est vide. Choisis jusqu’à trois actions ci-dessus.</div>`;
+    content.innerHTML = `<div class="plan-list plan-list-empty">${Array.from({ length: 3 }, (_, index) => `<div class="plan-slot"><span>${index + 1}</span><em>Libre</em></div>`).join("")}</div><div class="plan-empty">Ton programme est vide. Choisis jusqu’à trois actions ci-dessus.</div>`;
   } else {
     const totals = planEffects();
     const effectParts = Object.entries(totals.general).filter(([key]) => key !== "money").map(([key, value]) => `${generalStats.find(stat => stat.key === key)?.label || "Expérience"} ${signed(value, key === "experience" ? "" : "%")}`);
@@ -425,9 +431,9 @@ function renderPlan() {
     const plannedRows = weeklyPlan.map((item, index) => {
       const action = actions.find(candidate => candidate.id === item.actionId);
       const target = item.target ? ` · Cible : ${combatLabels[item.target]}` : "";
-      return `<div class="plan-row"><span class="plan-order">${index + 1}</span><div class="plan-row-copy"><strong>${action.title}</strong><small>${action.detail}${target}</small></div>${item.target ? `<button class="plan-remove" type="button" data-edit="${action.id}">Modifier</button>` : ""}<button class="plan-remove" type="button" data-remove="${action.id}">Retirer</button></div>`;
+      return `<div class="plan-row"><span class="plan-order">${index + 1}</span><div class="plan-row-copy"><strong>${action.title}</strong><small>${action.detail}${target}</small></div><div class="plan-row-actions">${item.target ? `<button class="plan-remove" type="button" data-edit="${action.id}">Modifier</button>` : ""}<button class="plan-remove" type="button" data-remove="${action.id}">Retirer</button></div></div>`;
     }).join("");
-    const emptyRows = Array.from({ length: 3 - weeklyPlan.length }, (_, index) => `<div class="plan-slot"><span>${weeklyPlan.length + index + 1}</span><em>Emplacement disponible</em></div>`).join("");
+    const emptyRows = Array.from({ length: 3 - weeklyPlan.length }, (_, index) => `<div class="plan-slot"><span>${weeklyPlan.length + index + 1}</span><em>Libre</em></div>`).join("");
     content.innerHTML = `<div class="plan-list">${plannedRows}${emptyRows}</div><div class="plan-totals"><div class="plan-total-block"><span>Argent à la fin</span><strong class="${projectedMoney() >= state.money ? "positive" : "negative"}">${projectedMoney()} $</strong></div><div class="plan-total-block"><span>Gains / dépenses</span><strong><span class="positive">+${totals.earned} $</span> · <span class="negative">−${totals.spent} $</span></strong></div><div class="plan-total-block"><span>Effets prévus</span><div class="plan-effects">${effectParts.join(" · ") || "Aucun changement de jauge"}</div></div></div>`;
   }
   const tournamentDue = Boolean(state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek);
