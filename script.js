@@ -17,6 +17,12 @@ const styles = {
   balanced: { label: "Équilibré", bonus: { technique: 2, power: 2, cardio: 2, defense: 2 }, hint: "+2 à chaque statistique" },
 };
 
+const opponents = [
+  { id: "leclerc", name: "Thomas Leclerc", nickname: "BETON", weightClass: "Poids welter", style: "Technicien", record: "1 V · 1 D · 0 N", difficulty: 36, risk: "Accessible", week: 4 },
+  { id: "okafor", name: "Darnell Okafor", nickname: "Brick", weightClass: "Poids welter", style: "Puncheur", record: "2 V · 1 D · 0 N", difficulty: 40, risk: "Modéré", week: 5 },
+  { id: "martel", name: "Émile Martel", nickname: "Le Serein", weightClass: "Poids welter", style: "Contre-attaquant", record: "1 V · 2 D · 1 N", difficulty: 43, risk: "Relevé", week: 6 },
+];
+
 const INITIAL_STATE = {
   profile: null,
   combatStats: { technique: BASE_COMBAT_STAT, power: BASE_COMBAT_STAT, cardio: BASE_COMBAT_STAT, defense: BASE_COMBAT_STAT },
@@ -30,6 +36,9 @@ const INITIAL_STATE = {
   injury: 8,
   experience: 0,
   gymWeeks: 0,
+  amateurRecord: { wins: 0, losses: 0, draws: 0 },
+  scheduledFight: null,
+  declinedFights: [],
   journal: [],
 };
 
@@ -57,6 +66,7 @@ let state = structuredClone(INITIAL_STATE);
 let draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
 let weeklyPlan = [];
 let toastTimer;
+let fightState = null;
 
 const clamp = (value, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 const escapeHTML = value => String(value).replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
@@ -92,10 +102,29 @@ function renderFighter() {
   const profile = state.profile;
   const nickname = profile.nickname ? ` « ${profile.nickname} »` : "";
   document.querySelector("#fighter-name").textContent = `${profile.firstName}${nickname} ${profile.lastName}`;
-  document.querySelector("#fighter-meta").textContent = `${profile.weightClass} · ${styles[profile.style].label} · Professionnel débutant`;
+  document.querySelector("#fighter-meta").textContent = `${profile.weightClass} · ${styles[profile.style].label} · Amateur`;
   document.querySelector("#fighter-initials").textContent = `${profile.firstName[0]}${profile.lastName[0]}`.toLocaleUpperCase("fr-CA");
   document.querySelector("#fighter-style-label").textContent = styles[profile.style].label;
+  const record = state.amateurRecord;
+  document.querySelector("#amateur-record").textContent = `${record.wins} V · ${record.losses} D · ${record.draws} N`;
   document.querySelector("#combat-stats").innerHTML = Object.entries(combatLabels).map(([key, label]) => `<div class="combat-stat"><span>${label}</span><strong>${state.combatStats[key]}</strong></div>`).join("");
+}
+
+function renderFights() {
+  const scheduled = document.querySelector("#scheduled-fight");
+  if (state.scheduledFight) {
+    const opponent = opponents.find(item => item.id === state.scheduledFight.id);
+    const isFightWeek = state.week >= state.scheduledFight.week;
+    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé</p><strong>${opponent.name} « ${opponent.nickname} »</strong><p>${isFightWeek ? "Le combat est prêt. Entre dans le ring après ta préparation." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? '<button id="start-fight" class="primary-button" type="button">Entrer dans le ring</button>' : ""}</div>`;
+  } else {
+    scheduled.innerHTML = "";
+  }
+  document.querySelector("#opponents").innerHTML = opponents.map(opponent => {
+    const unavailable = state.scheduledFight || state.declinedFights.includes(opponent.id);
+    const status = state.declinedFights.includes(opponent.id) ? "Proposition refusée" : state.scheduledFight ? "Un combat est déjà programmé" : "";
+    const offeredWeek = Math.max(4, opponent.week, state.week);
+    return `<article class="opponent-card"><p class="eyebrow">Proposé : semaine ${offeredWeek}</p><h3>${opponent.name} « ${opponent.nickname} »</h3><p>${state.profile.weightClass} · ${opponent.style}</p><p>Bilan amateur : ${opponent.record}</p><div class="opponent-meta"><span>Risque : ${opponent.risk}</span><span>Difficulté ${opponent.difficulty}</span></div><button class="secondary-button" type="button" data-accept="${opponent.id}" ${unavailable ? "disabled" : ""}>${status || "Accepter le combat"}</button>${!unavailable ? `<button class="plan-remove" type="button" data-decline="${opponent.id}">Refuser</button>` : ""}</article>`;
+  }).join("");
 }
 
 function projectedMoney() {
@@ -168,16 +197,18 @@ function renderPlan() {
   const content = document.querySelector("#plan-content");
   document.querySelector("#plan-count").textContent = `${weeklyPlan.length} / 3 action${weeklyPlan.length > 1 ? "s" : ""}`;
   if (!weeklyPlan.length) {
-    content.innerHTML = '<div class="plan-empty">Ton programme est vide. Choisis jusqu’à trois actions ci-dessus.</div>';
+    content.innerHTML = `<div class="plan-list">${Array.from({ length: 3 }, (_, index) => `<div class="plan-slot"><span>${index + 1}</span><em>Emplacement disponible</em></div>`).join("")}</div><div class="plan-empty">Ton programme est vide. Choisis jusqu’à trois actions ci-dessus.</div>`;
   } else {
     const totals = planEffects();
     const effectParts = Object.entries(totals.general).filter(([key]) => key !== "money").map(([key, value]) => `${generalStats.find(stat => stat.key === key)?.label || "Expérience"} ${signed(value, key === "experience" ? "" : "%")}`);
     effectParts.push(...Object.entries(totals.combat).map(([key, value]) => `${combatLabels[key]} ${signed(value)}`));
-    content.innerHTML = `<div class="plan-list">${weeklyPlan.map((item, index) => {
+    const plannedRows = weeklyPlan.map((item, index) => {
       const action = actions.find(candidate => candidate.id === item.actionId);
       const target = item.target ? ` · Cible : ${combatLabels[item.target]}` : "";
       return `<div class="plan-row"><span class="plan-order">${index + 1}</span><div class="plan-row-copy"><strong>${action.title}</strong><small>${action.detail}${target}</small></div>${item.target ? `<button class="plan-remove" type="button" data-edit="${action.id}">Modifier</button>` : ""}<button class="plan-remove" type="button" data-remove="${action.id}">Retirer</button></div>`;
-    }).join("")}</div><div class="plan-totals"><div class="plan-total-block"><span>Argent à la fin</span><strong class="${projectedMoney() >= state.money ? "positive" : "negative"}">${projectedMoney()} $</strong></div><div class="plan-total-block"><span>Gains / dépenses</span><strong><span class="positive">+${totals.earned} $</span> · <span class="negative">−${totals.spent} $</span></strong></div><div class="plan-total-block"><span>Effets prévus</span><div class="plan-effects">${effectParts.join(" · ") || "Aucun changement de jauge"}</div></div></div>`;
+    }).join("");
+    const emptyRows = Array.from({ length: 3 - weeklyPlan.length }, (_, index) => `<div class="plan-slot"><span>${weeklyPlan.length + index + 1}</span><em>Emplacement disponible</em></div>`).join("");
+    content.innerHTML = `<div class="plan-list">${plannedRows}${emptyRows}</div><div class="plan-totals"><div class="plan-total-block"><span>Argent à la fin</span><strong class="${projectedMoney() >= state.money ? "positive" : "negative"}">${projectedMoney()} $</strong></div><div class="plan-total-block"><span>Gains / dépenses</span><strong><span class="positive">+${totals.earned} $</span> · <span class="negative">−${totals.spent} $</span></strong></div><div class="plan-total-block"><span>Effets prévus</span><div class="plan-effects">${effectParts.join(" · ") || "Aucun changement de jauge"}</div></div></div>`;
   }
   const valid = weeklyPlan.length > 0 && projectedMoney() >= 0;
   const advance = document.querySelector("#advance-week");
@@ -209,6 +240,7 @@ function render() {
 
   document.querySelector("#journal").innerHTML = state.journal.slice(0, 8).map(entry => `<li><span class="journal-week">Semaine ${entry.week}</span>${escapeHTML(entry.text)}</li>`).join("");
   renderMembership();
+  renderFights();
   renderActions();
   renderPlan();
 }
@@ -315,6 +347,86 @@ function executePlan() {
   document.querySelector("#summary-dialog").showModal();
 }
 
+function startFight() {
+  const opponent = opponents.find(item => item.id === state.scheduledFight?.id);
+  if (!opponent) return;
+  fightState = { opponent, round: 1, playerPoints: 0, opponentPoints: 0, playerEnergy: state.energy, opponentEnergy: 88 + Math.floor(Math.random() * 8), rounds: [] };
+  document.querySelector("#fight-choices").innerHTML = `<button type="button" data-strategy="attack"><strong>Attaquer</strong><span>Puissance, technique · fatigue élevée</span></button><button type="button" data-strategy="distance"><strong>Boxer à distance</strong><span>Technique, cardio · fatigue modérée</span></button><button type="button" data-strategy="defense"><strong>Jouer la défense</strong><span>Défense, cardio · fatigue réduite</span></button>`;
+  document.querySelector("#fight-dialog").showModal();
+  renderFight();
+}
+
+function strategyData(strategy) {
+  return {
+    attack: { label: "Attaquer", fatigue: 16, player: state.combatStats.power * .46 + state.combatStats.technique * .26 + state.fitness * .18, opponent: 2 },
+    distance: { label: "Boxer à distance", fatigue: 10, player: state.combatStats.technique * .46 + state.combatStats.cardio * .28 + state.combatStats.defense * .12, opponent: 0 },
+    defense: { label: "Jouer la défense", fatigue: 6, player: state.combatStats.defense * .46 + state.combatStats.cardio * .24 + state.combatStats.technique * .12, opponent: -3 },
+  }[strategy];
+}
+
+function renderFight(message = "Choisis une consigne pour ce round.") {
+  const fight = fightState;
+  document.querySelector("#fight-week-label").textContent = `Combat amateur · Semaine ${state.week}`;
+  document.querySelector("#fight-round").textContent = `Round ${fight.round} / 3`;
+  document.querySelector("#fight-player-name").textContent = state.profile.firstName;
+  document.querySelector("#fight-opponent-name").textContent = fight.opponent.name;
+  document.querySelector("#fight-player-energy").textContent = `${Math.max(0, fight.playerEnergy)}%`;
+  document.querySelector("#fight-opponent-energy").textContent = `${Math.max(0, fight.opponentEnergy)}%`;
+  document.querySelector("#fight-score").textContent = `${fight.playerPoints} — ${fight.opponentPoints}`;
+  document.querySelector("#fight-status").textContent = message;
+  document.querySelector("#fight-instruction").innerHTML = `<p>${message}</p>`;
+}
+
+function playRound(strategy) {
+  const fight = fightState;
+  if (!fight || fight.round > 3) return;
+  const choice = strategyData(strategy);
+  const opponentBase = fight.opponent.difficulty * 1.05 + fight.opponentEnergy * .28 + state.injury * .08;
+  const playerBase = choice.player + fight.playerEnergy * .32 + state.fitness * .22 - state.injury * .16;
+  const playerScore = playerBase + (Math.random() * 18 - 9);
+  const opponentScore = opponentBase + choice.opponent + (Math.random() * 18 - 9);
+  let playerRound = 10;
+  let opponentRound = 9;
+  if (playerScore > opponentScore + 10) opponentRound = 8;
+  else if (opponentScore > playerScore + 10) { playerRound = 9; opponentRound = 10; }
+  else if (opponentScore > playerScore + 3) { playerRound = 9; opponentRound = 10; }
+  fight.playerPoints += playerRound;
+  fight.opponentPoints += opponentRound;
+  fight.playerEnergy = clamp(fight.playerEnergy - choice.fatigue - Math.floor(Math.random() * 4));
+  fight.opponentEnergy = clamp(fight.opponentEnergy - (9 + Math.floor(Math.random() * 7)));
+  fight.rounds.push(`${choice.label} : ${playerRound}–${opponentRound}`);
+  if (fight.round === 3) return finishFight();
+  fight.round += 1;
+  renderFight(`Round ${fight.round - 1} : ${choice.label}, ${playerRound}–${opponentRound}. Choisis la suite.`);
+}
+
+function finishFight() {
+  const fight = fightState;
+  const margin = fight.playerPoints - fight.opponentPoints;
+  let result;
+  if (margin > 0) { result = "Victoire"; state.amateurRecord.wins += 1; applyChanges({ reputation: 7, experience: 18, morale: 9, injury: 4 }); }
+  else if (margin < 0) { result = "Défaite"; state.amateurRecord.losses += 1; applyChanges({ reputation: 2, experience: 12, morale: -5, injury: 7 }); }
+  else { result = "Match nul"; state.amateurRecord.draws += 1; applyChanges({ reputation: 4, experience: 15, morale: 2, injury: 5 }); }
+  state.energy = clamp(fight.playerEnergy);
+  const injuryEvent = state.injury >= 55 && Math.random() < .35 ? " Une douleur au retour au vestiaire augmente la prudence nécessaire." : "";
+  if (injuryEvent) state.injury = clamp(state.injury + 7);
+  state.journal.unshift({ week: state.week, text: `Combat amateur : ${result} contre ${fight.opponent.name}, ${fight.playerPoints}–${fight.opponentPoints}.${injuryEvent}` });
+  document.querySelector("#fight-choices").innerHTML = "";
+  document.querySelector("#fight-instruction").innerHTML = `<p><strong>${result} — ${fight.playerPoints} à ${fight.opponentPoints}</strong><br>${fight.rounds.join(" · ")}<br>Expérience, réputation et état physique ont été mis à jour.${injuryEvent}</p>`;
+  document.querySelector("#fight-status").textContent = result;
+  const closeButton = document.createElement("button");
+  closeButton.className = "primary-button";
+  closeButton.type = "button";
+  closeButton.textContent = "Retour au camp";
+  closeButton.addEventListener("click", () => {
+    document.querySelector("#fight-dialog").close();
+    state.scheduledFight = null;
+    fightState = null;
+    render();
+  });
+  document.querySelector("#fight-instruction").append(closeButton);
+}
+
 function showToast(message) {
   const toast = document.querySelector("#toast");
   toast.textContent = message;
@@ -345,6 +457,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   }
   error.textContent = "";
   const style = document.querySelector("#fighter-style").value;
+  const corner = document.querySelector("#fighter-corner").value;
   state = structuredClone(INITIAL_STATE);
   state.profile = {
     firstName: document.querySelector("#first-name").value.trim(),
@@ -352,7 +465,9 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
     nickname: document.querySelector("#nickname").value.trim(),
     weightClass: document.querySelector("#weight-class").value,
     style,
+    corner,
   };
+  document.body.classList.toggle("theme-blue", corner === "blue");
   Object.keys(combatLabels).forEach(key => {
     state.combatStats[key] = BASE_COMBAT_STAT + draftStats[key] + styleBonus(style, key);
   });
@@ -392,6 +507,32 @@ document.querySelector("#plan-content").addEventListener("click", event => {
 document.querySelector("#advance-week").addEventListener("click", executePlan);
 document.querySelector("#summary-close").addEventListener("click", () => document.querySelector("#summary-dialog").close());
 
+document.querySelector("#opponents").addEventListener("click", event => {
+  const accept = event.target.closest("[data-accept]");
+  const decline = event.target.closest("[data-decline]");
+  if (accept) {
+    const opponent = opponents.find(item => item.id === accept.dataset.accept);
+    state.scheduledFight = { id: opponent.id, week: Math.max(4, opponent.week, state.week) };
+    state.journal.unshift({ week: state.week, text: `Combat amateur programmé contre ${opponent.name} pour la semaine ${state.scheduledFight.week}.` });
+    render();
+    showToast("Combat programmé");
+  }
+  if (decline) {
+    state.declinedFights.push(decline.dataset.decline);
+    render();
+    showToast("Proposition refusée");
+  }
+});
+
+document.querySelector("#scheduled-fight").addEventListener("click", event => {
+  if (event.target.closest("#start-fight")) startFight();
+});
+
+document.querySelector("#fight-choices").addEventListener("click", event => {
+  const choice = event.target.closest("[data-strategy]");
+  if (choice) playRound(choice.dataset.strategy);
+});
+
 document.querySelector("#membership-button").addEventListener("click", () => {
   if (state.gymWeeks > 0) return;
   if (state.money < GYM_PRICE) return showToast("Pas assez d'argent pour l'abonnement.");
@@ -403,16 +544,21 @@ document.querySelector("#membership-button").addEventListener("click", () => {
   showToast("Abonnement activé");
 });
 
-document.querySelector("#restart").addEventListener("click", () => {
+function resetCareer() {
   if (window.confirm("Recommencer la carrière et créer un nouveau boxeur ?")) {
     state = structuredClone(INITIAL_STATE);
     weeklyPlan = [];
+    fightState = null;
+    document.body.classList.remove("theme-blue");
     draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
     document.querySelector("#creation-form").reset();
     renderCreation();
     render();
   }
-});
+}
+
+document.querySelector("#restart").addEventListener("click", resetCareer);
+document.querySelector("#restart-top").addEventListener("click", resetCareer);
 
 renderCreation();
 render();

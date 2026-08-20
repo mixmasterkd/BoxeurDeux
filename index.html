@@ -41,6 +41,13 @@
             </select>
             <small id="style-bonus"></small>
           </label>
+          <label class="style-field">Coin de combat
+            <select id="fighter-corner" name="fighterCorner" required>
+              <option value="red">Coin rouge</option>
+              <option value="blue">Coin bleu</option>
+            </select>
+            <small>Le coin choisi colore ton interface et ton identité visuelle.</small>
+          </label>
         </div>
 
         <div class="allocation-head">
@@ -56,24 +63,25 @@
     <main id="game" class="game-shell hidden">
       <header class="topbar">
         <div class="brand">
-          <span class="brand-mark" aria-hidden="true">DC</span>
+          <span class="brand-mark" aria-hidden="true">B2</span>
           <div>
             <p class="eyebrow">Gestion de carrière</p>
-            <h1>Dans les cordes</h1>
+            <h1>Boxeur Deux</h1>
           </div>
         </div>
         <div class="week-block">
           <span>Semaine</span>
           <strong id="week">01</strong>
         </div>
+        <button id="restart-top" class="text-button" type="button">Réinitialiser</button>
       </header>
 
       <section class="fighter-card" aria-labelledby="fighter-name">
         <div class="portrait" aria-hidden="true"><span id="fighter-initials">—</span></div>
         <div class="fighter-copy">
-          <p id="fighter-meta" class="eyebrow">Professionnel débutant</p>
+          <p id="fighter-meta" class="eyebrow">Amateur · En développement</p>
           <h2 id="fighter-name">Ton boxeur</h2>
-          <p>Montréal, QC <span class="dot">•</span> Bilan : 0–0–0</p>
+          <p>Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">0 V · 0 D · 0 N</span></p>
         </div>
         <div class="money-spotlight">
           <span>Disponible</span>
@@ -124,6 +132,15 @@
         <button id="membership-button" class="membership-button" type="button"></button>
       </section>
 
+      <section class="fights-panel" aria-labelledby="fights-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">Circuit local</p><h2 id="fights-title">Combats amateurs</h2></div>
+          <p>Les combats développent l’expérience et la réputation. Aucune bourse n’est versée.</p>
+        </div>
+        <div id="scheduled-fight" class="scheduled-fight"></div>
+        <div id="opponents" class="opponent-grid"></div>
+      </section>
+
       <section class="actions-section" aria-labelledby="actions-title">
         <div class="section-heading">
           <div>
@@ -154,7 +171,7 @@
           <div><p class="eyebrow">Service ciblé</p><h2>Séance privée</h2></div>
           <button class="dialog-close" value="cancel" aria-label="Fermer" formnovalidate>×</button>
         </div>
-        <p class="service-lead">Choisis la statistique à travailler. Le coût et les effets seront confirmés avant la séance.</p>
+        <p class="service-lead">Choisis la statistique à travailler. La séance sera seulement ajoutée au plan de la semaine.</p>
         <label>Statistique ciblée
           <select id="private-stat">
             <option value="technique">Technique</option><option value="power">Puissance</option>
@@ -164,7 +181,7 @@
         <div class="service-effect"><strong>90 $</strong><span>+6 à la statistique · −14 énergie · +3 moral</span></div>
         <div class="service-actions">
           <button class="secondary-button" value="cancel" formnovalidate>Annuler</button>
-          <button id="private-confirm" class="primary-button" value="default">Confirmer la séance</button>
+          <button id="private-confirm" class="primary-button" value="default">Ajouter au plan</button>
         </div>
       </form>
     </dialog>
@@ -176,6 +193,23 @@
         </div>
         <div id="summary-content" class="summary-content"></div>
         <div class="service-actions"><button id="summary-close" class="primary-button" type="button">Continuer</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="fight-dialog" class="fight-dialog">
+      <div class="fight-card">
+        <div class="fight-topline"><span id="fight-week-label">Combat amateur</span><strong id="fight-round">Round 1 / 3</strong></div>
+        <div class="ring-scoreboard">
+          <div class="corner player-corner"><span id="fight-player-name">Toi</span><strong id="fight-player-energy">100%</strong><small>Énergie</small></div>
+          <div class="score"><span>Score</span><strong id="fight-score">0 — 0</strong><small id="fight-status">Premier round</small></div>
+          <div class="corner"><span id="fight-opponent-name">Adversaire</span><strong id="fight-opponent-energy">100%</strong><small>Énergie</small></div>
+        </div>
+        <div id="fight-instruction" class="fight-instruction"><p>Choisis une consigne pour ce round.</p></div>
+        <div id="fight-choices" class="fight-choices">
+          <button type="button" data-strategy="attack"><strong>Attaquer</strong><span>Puissance, technique · fatigue élevée</span></button>
+          <button type="button" data-strategy="distance"><strong>Boxer à distance</strong><span>Technique, cardio · fatigue modérée</span></button>
+          <button type="button" data-strategy="defense"><strong>Jouer la défense</strong><span>Défense, cardio · fatigue réduite</span></button>
+        </div>
       </div>
     </dialog>
 

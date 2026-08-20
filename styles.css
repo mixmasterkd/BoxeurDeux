@@ -11,6 +11,8 @@
   --blue: #71a7c5;
 }
 
+body.theme-blue { --red: #4d91df; --gold: #9fc8f6; --green: #72c2a0; --blue: #75b7e8; }
+
 * { box-sizing: border-box; }
 
 body {
@@ -124,6 +126,36 @@ h2 { font-size: 1.65rem; }
 .membership-status.active strong { color: var(--green); }
 .membership-status.warning strong { color: var(--gold); }
 .membership-button { min-width: 180px; border-color: var(--gold); background: var(--gold); }
+.fights-panel { margin-top: 22px; padding: 24px; border: 1px solid var(--line); background: rgba(29,32,30,.94); }
+.scheduled-fight { margin-bottom: 18px; }
+.scheduled-fight:empty { display: none; }
+.fight-notice { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px; border-left: 4px solid var(--red); background: #24201d; }
+.fight-notice strong { display: block; font-family: "Barlow Condensed"; font-size: 1.4rem; text-transform: uppercase; }
+.fight-notice p { margin-top: 3px; color: var(--muted); font-size: .76rem; }
+.fight-notice button { flex: 0 0 auto; }
+.opponent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.opponent-card { padding: 18px; border: 1px solid var(--line); background: #171917; }
+.opponent-card h3 { margin: 5px 0 7px; font-size: 1.35rem; }
+.opponent-card p { color: var(--muted); font-size: .75rem; line-height: 1.5; }
+.opponent-meta { display: flex; justify-content: space-between; gap: 8px; margin: 14px 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--gold); font-size: .68rem; font-weight: 700; text-transform: uppercase; }
+.opponent-card button { width: 100%; }
+.opponent-card button:disabled { cursor: not-allowed; opacity: .45; }
+.fight-dialog { width: min(760px, calc(100% - 24px)); padding: 0; border: 0; color: var(--ink); background: transparent; }
+.fight-dialog::backdrop { background: rgba(0,0,0,.84); backdrop-filter: blur(5px); }
+.fight-card { padding: 28px; border: 1px solid var(--line); border-top: 4px solid var(--red); background: #171917; }
+.fight-topline { display: flex; justify-content: space-between; color: var(--gold); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; }
+.ring-scoreboard { display: grid; grid-template-columns: 1fr 1.1fr 1fr; align-items: center; gap: 14px; margin: 25px 0; padding: 24px 12px; border-top: 2px solid var(--red); border-bottom: 2px solid var(--blue); background: linear-gradient(90deg, #26211f, #151718, #1d2426); text-align: center; }
+.corner span, .score span { display: block; color: var(--muted); font-size: .68rem; text-transform: uppercase; }
+.corner strong { display: block; margin: 7px 0 3px; color: var(--green); font: 800 2rem "Barlow Condensed"; }
+.corner small, .score small { color: var(--muted); font-size: .67rem; }
+.score { border-right: 1px solid var(--line); border-left: 1px solid var(--line); }
+.score strong { display: block; margin: 6px 0; font: 800 2.6rem/1 "Barlow Condensed"; }
+.fight-instruction { min-height: 50px; color: #d4d1ca; text-align: center; font-size: .82rem; }
+.fight-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.fight-choices button { min-height: 86px; padding: 12px; border: 1px solid var(--line); color: var(--ink); background: var(--panel); cursor: pointer; text-align: left; }
+.fight-choices button:hover { border-color: var(--gold); }
+.fight-choices strong { display: block; font-family: "Barlow Condensed"; font-size: 1.2rem; text-transform: uppercase; }
+.fight-choices span { display: block; margin-top: 5px; color: var(--muted); font-size: .69rem; line-height: 1.35; }
 
 .actions-section { margin-top: 35px; }
 .section-heading { align-items: end; margin-bottom: 18px; }
@@ -148,6 +180,9 @@ h2 { font-size: 1.65rem; }
 .plan-empty { padding: 30px 12px; color: var(--muted); text-align: center; font-size: .82rem; }
 .plan-list { display: grid; gap: 8px; margin: 20px 0; }
 .plan-row { padding: 12px 14px; border: 1px solid var(--line); background: #171917; }
+.plan-slot { display: flex; align-items: center; gap: 13px; min-height: 54px; padding: 12px 14px; border: 1px dashed #4a4d49; color: var(--muted); background: rgba(0,0,0,.12); }
+.plan-slot span { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid #565954; border-radius: 50%; color: #7a7d78; font: 800 .85rem "Barlow Condensed"; }
+.plan-slot em { font-size: .75rem; font-style: normal; }
 .plan-order { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border-radius: 50%; color: #171917; background: var(--gold); font: 800 .85rem "Barlow Condensed"; }
 .plan-row-copy { flex: 1; }
 .plan-row-copy strong { display: block; font-family: "Barlow Condensed"; text-transform: uppercase; }
@@ -189,6 +224,7 @@ h2 { font-size: 1.65rem; }
   .action-grid { grid-template-columns: repeat(2, 1fr); }
   .membership-panel { align-items: flex-start; flex-wrap: wrap; }
   .membership-status { text-align: left; }
+  .opponent-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .creation-card { padding: 24px 18px; }
@@ -206,6 +242,12 @@ h2 { font-size: 1.65rem; }
   .combat-stats { grid-template-columns: 1fr 1fr; }
   .membership-panel { flex-direction: column; }
   .membership-button { width: 100%; }
+  .fight-notice { align-items: flex-start; flex-direction: column; }
+  .fight-notice button { width: 100%; }
+  .fight-card { padding: 20px 14px; }
+  .ring-scoreboard { grid-template-columns: 1fr; padding: 16px; }
+  .score { order: -1; border: 0; border-bottom: 1px solid var(--line); border-top: 1px solid var(--line); padding: 12px 0; }
+  .fight-choices { grid-template-columns: 1fr; }
   .section-heading { align-items: flex-start; flex-direction: column; }
   .section-heading > p { text-align: left; }
   .plan-footer, .plan-totals { align-items: stretch; flex-direction: column; }
