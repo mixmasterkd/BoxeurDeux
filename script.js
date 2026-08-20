@@ -115,7 +115,7 @@ function renderFights() {
   if (state.scheduledFight) {
     const opponent = opponents.find(item => item.id === state.scheduledFight.id);
     const isFightWeek = state.week >= state.scheduledFight.week;
-    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé</p><strong>${opponent.name} « ${opponent.nickname} »</strong><p>${isFightWeek ? "Le combat est prêt. Entre dans le ring après ta préparation." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? '<button id="start-fight" class="primary-button" type="button">Entrer dans le ring</button>' : ""}</div>`;
+    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé</p><strong>${opponent.name} « ${opponent.nickname} »</strong><p>${isFightWeek ? "Le combat est arrivé : choisis ton entrée ou ton désistement pour continuer." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? '<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">Se désister</button><button id="start-fight" class="primary-button" type="button">Entrer dans le ring</button></div>' : ""}</div>`;
   } else {
     scheduled.innerHTML = "";
   }
@@ -210,10 +210,11 @@ function renderPlan() {
     const emptyRows = Array.from({ length: 3 - weeklyPlan.length }, (_, index) => `<div class="plan-slot"><span>${weeklyPlan.length + index + 1}</span><em>Emplacement disponible</em></div>`).join("");
     content.innerHTML = `<div class="plan-list">${plannedRows}${emptyRows}</div><div class="plan-totals"><div class="plan-total-block"><span>Argent à la fin</span><strong class="${projectedMoney() >= state.money ? "positive" : "negative"}">${projectedMoney()} $</strong></div><div class="plan-total-block"><span>Gains / dépenses</span><strong><span class="positive">+${totals.earned} $</span> · <span class="negative">−${totals.spent} $</span></strong></div><div class="plan-total-block"><span>Effets prévus</span><div class="plan-effects">${effectParts.join(" · ") || "Aucun changement de jauge"}</div></div></div>`;
   }
-  const valid = weeklyPlan.length > 0 && projectedMoney() >= 0;
+  const fightDue = Boolean(state.scheduledFight && state.week >= state.scheduledFight.week);
+  const valid = weeklyPlan.length > 0 && projectedMoney() >= 0 && !fightDue;
   const advance = document.querySelector("#advance-week");
   advance.disabled = !valid;
-  document.querySelector("#plan-help").textContent = !weeklyPlan.length ? "Sélectionne au moins une action pour continuer." : projectedMoney() < 0 ? "Le plan dépasse ton budget. Retire une dépense ou ajoute du travail." : "Rien ne sera appliqué avant ta confirmation.";
+  document.querySelector("#plan-help").textContent = fightDue ? "Le combat est arrivé : entre dans le ring ou désiste-toi avant de passer à la semaine suivante." : !weeklyPlan.length ? "Sélectionne au moins une action pour continuer." : projectedMoney() < 0 ? "Le plan dépasse ton budget. Retire une dépense ou ajoute du travail." : "Rien ne sera appliqué avant ta confirmation.";
 }
 
 function render() {
@@ -356,6 +357,16 @@ function startFight() {
   renderFight();
 }
 
+function withdrawFight() {
+  const opponent = opponents.find(item => item.id === state.scheduledFight?.id);
+  if (!opponent) return;
+  if (!window.confirm(`Se désister du combat contre ${opponent.name} ?\n\nLe combat sera annulé et tu pourras poursuivre la carrière.`)) return;
+  state.journal.unshift({ week: state.week, text: `Tu te désistes du combat amateur contre ${opponent.name}. Le rendez-vous est annulé.` });
+  state.scheduledFight = null;
+  render();
+  showToast("Combat annulé");
+}
+
 function strategyData(strategy) {
   return {
     attack: { label: "Attaquer", fatigue: 16, player: state.combatStats.power * .46 + state.combatStats.technique * .26 + state.fitness * .18, opponent: 2 },
@@ -369,7 +380,9 @@ function renderFight(message = "Choisis une consigne pour ce round.") {
   document.querySelector("#fight-week-label").textContent = `Combat amateur · Semaine ${state.week}`;
   document.querySelector("#fight-round").textContent = `Round ${fight.round} / 3`;
   document.querySelector("#fight-player-name").textContent = state.profile.firstName;
+  document.querySelector("#fight-player-meta").textContent = `${state.profile.nickname ? `« ${state.profile.nickname} » · ` : ""}${state.profile.weightClass} · Coin bleu`;
   document.querySelector("#fight-opponent-name").textContent = fight.opponent.name;
+  document.querySelector("#fight-opponent-meta").textContent = `« ${fight.opponent.nickname} » · ${fight.opponent.weightClass} · Coin rouge`;
   document.querySelector("#fight-player-energy").textContent = `${Math.max(0, fight.playerEnergy)}%`;
   document.querySelector("#fight-opponent-energy").textContent = `${Math.max(0, fight.opponentEnergy)}%`;
   document.querySelector("#fight-score").textContent = `${fight.playerPoints} — ${fight.opponentPoints}`;
@@ -411,6 +424,8 @@ function finishFight() {
   const injuryEvent = state.injury >= 55 && Math.random() < .35 ? " Une douleur au retour au vestiaire augmente la prudence nécessaire." : "";
   if (injuryEvent) state.injury = clamp(state.injury + 7);
   state.journal.unshift({ week: state.week, text: `Combat amateur : ${result} contre ${fight.opponent.name}, ${fight.playerPoints}–${fight.opponentPoints}.${injuryEvent}` });
+  // Rafraîchir le tableau après le calcul du troisième round afin que son score soit visible.
+  renderFight(`${result} après 3 rounds`);
   document.querySelector("#fight-choices").innerHTML = "";
   document.querySelector("#fight-instruction").innerHTML = `<p><strong>${result} — ${fight.playerPoints} à ${fight.opponentPoints}</strong><br>${fight.rounds.join(" · ")}<br>Expérience, réputation et état physique ont été mis à jour.${injuryEvent}</p>`;
   document.querySelector("#fight-status").textContent = result;
@@ -526,6 +541,7 @@ document.querySelector("#opponents").addEventListener("click", event => {
 
 document.querySelector("#scheduled-fight").addEventListener("click", event => {
   if (event.target.closest("#start-fight")) startFight();
+  if (event.target.closest("#withdraw-fight")) withdrawFight();
 });
 
 document.querySelector("#fight-choices").addEventListener("click", event => {

@@ -133,6 +133,8 @@ h2 { font-size: 1.65rem; }
 .fight-notice strong { display: block; font-family: "Barlow Condensed"; font-size: 1.4rem; text-transform: uppercase; }
 .fight-notice p { margin-top: 3px; color: var(--muted); font-size: .76rem; }
 .fight-notice button { flex: 0 0 auto; }
+.fight-notice-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.fight-notice-actions .withdraw-button { border-color: var(--line); color: var(--muted); background: transparent; }
 .opponent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .opponent-card { padding: 18px; border: 1px solid var(--line); background: #171917; }
 .opponent-card h3 { margin: 5px 0 7px; font-size: 1.35rem; }
@@ -146,6 +148,9 @@ h2 { font-size: 1.65rem; }
 .fight-topline { display: flex; justify-content: space-between; color: var(--gold); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; }
 .ring-scoreboard { display: grid; grid-template-columns: 1fr 1.1fr 1fr; align-items: center; gap: 14px; margin: 25px 0; padding: 24px 12px; border-top: 2px solid var(--red); border-bottom: 2px solid var(--blue); background: linear-gradient(90deg, #26211f, #151718, #1d2426); text-align: center; }
 .corner span, .score span { display: block; color: var(--muted); font-size: .68rem; text-transform: uppercase; }
+.fight-portrait { display: block; width: 100%; max-width: 170px; height: 190px; margin: 0 auto 14px; border: 2px solid var(--red); object-fit: cover; object-position: center top; background: #111311; }
+.player-corner .fight-portrait { border-color: var(--blue); }
+.opponent-corner .fight-portrait { border-color: #e3513d; }
 .corner strong { display: block; margin: 7px 0 3px; color: var(--green); font: 800 2rem "Barlow Condensed"; }
 .corner small, .score small { color: var(--muted); font-size: .67rem; }
 .score { border-right: 1px solid var(--line); border-left: 1px solid var(--line); }
