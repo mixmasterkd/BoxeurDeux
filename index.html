@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Jeu de gestion d'une jeune carrière de boxeur professionnel." />
+    <title>Dans les Cordes — Carrière de boxeur</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section id="creation-screen" class="creation-screen" aria-labelledby="creation-title">
+      <form id="creation-form" class="creation-card">
+        <div class="creation-heading">
+          <div>
+            <p class="eyebrow">Nouvelle carrière</p>
+            <h1 id="creation-title">Crée ton boxeur</h1>
+          </div>
+          <span class="creation-step">Camp de départ</span>
+        </div>
+
+        <div class="identity-grid">
+          <label>Prénom<input id="first-name" name="firstName" autocomplete="given-name" required maxlength="30" /></label>
+          <label>Nom<input id="last-name" name="lastName" autocomplete="family-name" required maxlength="30" /></label>
+          <label>Surnom<input id="nickname" name="nickname" required maxlength="30" placeholder="Ex. Le Nord" /></label>
+          <label>Catégorie de poids
+            <select id="weight-class" name="weightClass" required>
+              <option value="">Choisir…</option>
+              <option>Poids plume</option><option>Poids léger</option><option>Poids super-léger</option>
+              <option>Poids welter</option><option>Poids moyen</option><option>Poids mi-lourd</option><option>Poids lourd</option>
+            </select>
+          </label>
+          <label class="style-field">Style de base
+            <select id="fighter-style" name="fighterStyle" required>
+              <option value="technician">Technicien</option>
+              <option value="puncher">Puncheur</option>
+              <option value="counter">Contre-attaquant</option>
+              <option value="balanced">Équilibré</option>
+            </select>
+            <small id="style-bonus"></small>
+          </label>
+        </div>
+
+        <div class="allocation-head">
+          <div><p class="eyebrow">Attributs de départ</p><h2>Répartis tes points</h2></div>
+          <div class="points-bank"><strong id="points-left">12</strong><span>points restants</span></div>
+        </div>
+        <div id="creation-stats" class="creation-stats"></div>
+        <p id="creation-error" class="form-error" role="alert"></p>
+        <button class="primary-button" type="submit">Commencer la carrière</button>
+      </form>
+    </section>
+
+    <main id="game" class="game-shell hidden">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">DC</span>
+          <div>
+            <p class="eyebrow">Gestion de carrière</p>
+            <h1>Dans les cordes</h1>
+          </div>
+        </div>
+        <div class="week-block">
+          <span>Semaine</span>
+          <strong id="week">01</strong>
+        </div>
+      </header>
+
+      <section class="fighter-card" aria-labelledby="fighter-name">
+        <div class="portrait" aria-hidden="true"><span id="fighter-initials">—</span></div>
+        <div class="fighter-copy">
+          <p id="fighter-meta" class="eyebrow">Professionnel débutant</p>
+          <h2 id="fighter-name">Ton boxeur</h2>
+          <p>Montréal, QC <span class="dot">•</span> Bilan : 0–0–0</p>
+        </div>
+        <div class="actions-counter">
+          <span>Actions restantes</span>
+          <div id="action-pips" class="pips" aria-label="3 actions restantes"></div>
+        </div>
+      </section>
+
+      <div class="dashboard-grid">
+        <section class="panel stats-panel" aria-labelledby="stats-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">État actuel</p>
+              <h2 id="stats-title">Le tableau de bord</h2>
+            </div>
+            <button id="restart" class="text-button" type="button">Recommencer</button>
+          </div>
+          <div id="stats" class="stats-grid"></div>
+          <div class="combat-heading">
+            <p class="eyebrow">Profil de combat</p>
+            <span id="fighter-style-label"></span>
+          </div>
+          <div id="combat-stats" class="combat-stats"></div>
+        </section>
+
+        <aside class="panel journal-panel" aria-labelledby="journal-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Carnet de route</p>
+              <h2 id="journal-title">Journal</h2>
+            </div>
+            <span class="live-dot">En cours</span>
+          </div>
+          <ol id="journal" class="journal-list" aria-live="polite"></ol>
+        </aside>
+      </div>
+
+      <section class="membership-panel" aria-labelledby="membership-title">
+        <div class="membership-copy">
+          <p class="eyebrow">Accès au camp</p>
+          <h2 id="membership-title">Abonnement au gym</h2>
+          <p>L’entraînement régulier et le sparring sont inclus pendant quatre semaines.</p>
+        </div>
+        <div id="membership-status" class="membership-status"></div>
+        <button id="membership-button" class="membership-button" type="button"></button>
+      </section>
+
+      <section class="actions-section" aria-labelledby="actions-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Planifier la semaine</p>
+            <h2 id="actions-title">Choisis ta prochaine action</h2>
+          </div>
+          <p>Chaque choix compte. La semaine se termine après trois actions.</p>
+        </div>
+        <div id="action-grid" class="action-grid"></div>
+      </section>
+    </main>
+
+    <dialog id="private-dialog" class="service-dialog">
+      <form id="private-form" method="dialog" class="service-card">
+        <div class="service-heading">
+          <div><p class="eyebrow">Service ciblé</p><h2>Séance privée</h2></div>
+          <button class="dialog-close" value="cancel" aria-label="Fermer" formnovalidate>×</button>
+        </div>
+        <p class="service-lead">Choisis la statistique à travailler. Le coût et les effets seront confirmés avant la séance.</p>
+        <label>Statistique ciblée
+          <select id="private-stat">
+            <option value="technique">Technique</option><option value="power">Puissance</option>
+            <option value="cardio">Cardio</option><option value="defense">Défense</option>
+          </select>
+        </label>
+        <div class="service-effect"><strong>90 $</strong><span>+6 à la statistique · −14 énergie · +3 moral</span></div>
+        <div class="service-actions">
+          <button class="secondary-button" value="cancel" formnovalidate>Annuler</button>
+          <button id="private-confirm" class="primary-button" value="default">Confirmer la séance</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="script.js"></script>
+  </body>
+</html>
