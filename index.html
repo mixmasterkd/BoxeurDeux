@@ -77,7 +77,7 @@
       </header>
 
       <section class="fighter-card collapsible-section" data-mobile-open="true" aria-labelledby="fighter-name">
-        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Fiche du boxeur</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
+        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Fiche du boxeur</span><span class="toggle-control"><small class="toggle-state">Masquer</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
         <div class="portrait" aria-hidden="true"><span id="fighter-initials">—</span></div>
         <div class="fighter-copy">
           <p id="fighter-meta" class="eyebrow">Amateur · En développement</p>
@@ -96,7 +96,8 @@
       </section>
 
       <div class="dashboard-grid">
-        <section class="panel stats-panel" aria-labelledby="stats-title">
+        <section class="panel stats-panel collapsible-section" data-mobile-open="false" aria-labelledby="stats-title">
+          <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Jauges et profil</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
           <div class="panel-heading">
             <div>
               <p class="eyebrow">État actuel</p>
@@ -112,7 +113,8 @@
           <div id="combat-stats" class="combat-stats"></div>
         </section>
 
-        <aside class="panel journal-panel" aria-labelledby="journal-title">
+        <aside class="panel journal-panel collapsible-section" data-mobile-open="false" aria-labelledby="journal-title">
+          <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Journal</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Carnet de route</p>
@@ -125,7 +127,7 @@
       </div>
 
       <section class="fights-panel collapsible-section" data-mobile-open="false" aria-labelledby="fights-title">
-        <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Combats locaux</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
+        <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Combats locaux</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
         <div class="section-heading">
           <div><p class="eyebrow">Circuit local</p><h2 id="fights-title">Combats amateurs</h2></div>
           <p>Trois nouvelles offres chaque semaine, avec quelques adversaires qui peuvent revenir.</p>
@@ -135,14 +137,15 @@
       </section>
 
       <section class="fights-panel tournaments-panel collapsible-section" data-mobile-open="false" aria-labelledby="tournaments-title">
-        <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Tournois</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
+        <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Tournois</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
         <div class="tournament-heading"><div><p class="eyebrow">Progression nationale</p><h3 id="tournaments-title">Tournois amateurs</h3></div><span id="amateur-fight-count">0 combat disputé</span></div>
         <div id="active-tournament" class="active-tournament"></div>
         <div id="tournaments" class="tournament-grid"></div>
         <div id="pro-transition" class="pro-transition"></div>
       </section>
 
-      <section class="membership-panel" aria-labelledby="membership-title">
+      <section class="membership-panel collapsible-section" data-mobile-open="false" aria-labelledby="membership-title">
+        <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Abonnement au gym</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
         <div class="membership-copy">
           <p class="eyebrow">Accès au camp</p>
           <h2 id="membership-title">Abonnement au gym</h2>
@@ -153,7 +156,7 @@
       </section>
 
       <section class="actions-section collapsible-section" data-mobile-open="true" aria-labelledby="actions-title">
-        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Actions de la semaine</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
+        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Actions de la semaine</span><span class="toggle-control"><small class="toggle-state">Masquer</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
         <div class="section-heading">
           <div>
             <p class="eyebrow">Planifier la semaine</p>
@@ -165,7 +168,7 @@
       </section>
 
       <section class="plan-panel collapsible-section" data-mobile-open="true" aria-labelledby="plan-title">
-        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Plan de la semaine</span><span class="toggle-arrow" aria-hidden="true">⌄</span></button>
+        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Plan de la semaine</span><span class="toggle-control"><small class="toggle-state">Masquer</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
         <div class="plan-heading">
           <div><p class="eyebrow">Aperçu avant confirmation</p><h2 id="plan-title">Plan hebdomadaire</h2></div>
           <span id="plan-count" class="plan-count">0 / 3 actions</span>

@@ -273,11 +273,14 @@ function professionalEligibility() {
 }
 
 function expandMobileSection(selector) {
-  if (!window.matchMedia("(max-width: 560px)").matches) return;
+  if (!window.matchMedia("(max-width: 800px)").matches) return;
   const section = document.querySelector(selector);
   if (!section) return;
   section.classList.remove("mobile-collapsed");
-  section.querySelector(":scope > .mobile-section-toggle")?.setAttribute("aria-expanded", "true");
+  const toggle = section.querySelector(":scope > .mobile-section-toggle");
+  toggle?.setAttribute("aria-expanded", "true");
+  const stateLabel = toggle?.querySelector(".toggle-state");
+  if (stateLabel) stateLabel.textContent = "Masquer";
 }
 
 function renderFights() {
@@ -880,11 +883,14 @@ function setupMobileCollapsibles() {
   document.querySelectorAll(".collapsible-section").forEach(section => {
     const toggle = section.querySelector(":scope > .mobile-section-toggle");
     const startsOpen = section.dataset.mobileOpen === "true";
+    const stateLabel = toggle.querySelector(".toggle-state");
     section.classList.toggle("mobile-collapsed", !startsOpen);
     toggle.setAttribute("aria-expanded", String(startsOpen));
+    if (stateLabel) stateLabel.textContent = startsOpen ? "Masquer" : "Afficher";
     toggle.addEventListener("click", () => {
       const collapsed = section.classList.toggle("mobile-collapsed");
       toggle.setAttribute("aria-expanded", String(!collapsed));
+      if (stateLabel) stateLabel.textContent = collapsed ? "Afficher" : "Masquer";
     });
   });
 }
