@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="Jeu de gestion d'une jeune carrière de boxeur professionnel." />
+    <meta name="description" content="Jeu de gestion d’une carrière de boxeur amateur, semaine après semaine." />
     <title>Boxeur Deux — Carrière de boxeur</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -51,14 +51,29 @@
         </div>
 
         <div class="allocation-head">
-          <div><p class="eyebrow">Attributs de départ</p><h2>Répartis tes points</h2></div>
-          <div class="points-bank"><strong id="points-left">12</strong><span>points restants</span></div>
+          <div><p class="eyebrow">Attributs de départ</p><h2>Personnalise ton boxeur</h2><p class="service-lead">Le style attribue cinq points automatiquement. Répartis ensuite tes cinq points personnels.</p></div>
+          <div class="points-bank"><strong id="points-left">5</strong><span>points restants</span></div>
         </div>
         <div id="creation-stats" class="creation-stats"></div>
         <p id="creation-error" class="form-error" role="alert"></p>
-        <button class="primary-button" type="submit">Commencer la carrière</button>
+        <div class="creation-actions">
+          <button class="primary-button" type="submit">Commencer la carrière</button>
+          <button id="import-career-creation" class="secondary-button" type="button">Importer une carrière</button>
+          <input id="import-career-file" type="file" accept="application/json,.json" hidden />
+        </div>
       </form>
     </section>
+
+    <dialog id="resume-dialog" class="service-dialog resume-dialog" aria-labelledby="resume-dialog-title">
+      <div class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Sauvegarde locale</p><h2 id="resume-dialog-title">Reprendre ta carrière ?</h2></div></div>
+        <p id="resume-copy" class="service-lead">Une carrière enregistrée a été trouvée sur cet appareil.</p>
+        <div class="service-actions resume-actions">
+          <button id="resume-new" class="secondary-button" type="button">Nouvelle carrière</button>
+          <button id="resume-load" class="primary-button" type="button" autofocus>Reprendre</button>
+        </div>
+      </div>
+    </dialog>
 
     <main id="game" class="game-shell hidden">
       <header class="topbar">
@@ -72,9 +87,14 @@
         <div class="week-block" aria-label="État de la semaine">
           <span class="week-label">Semaine</span>
           <strong id="week">01</strong>
-          <span id="top-energy" class="top-energy" aria-label="Énergie 72 %">E:72%</span>
         </div>
-        <button id="restart-top" class="text-button" type="button">Réinitialiser</button>
+        <div class="top-vitals" aria-label="Jauges rapides">
+          <span id="top-energy" class="top-energy" aria-label="Énergie 72 %">E:72%</span>
+          <span id="top-fitness" class="top-fitness" aria-label="Forme physique 68 %">Fo:68%</span>
+          <span id="top-fatigue" class="top-fatigue" aria-label="Fatigue 0 %">Fa:0%</span>
+          <span id="top-morale" class="top-morale" aria-label="Moral 68 %">M:68%</span>
+          <span id="top-money" class="top-money" aria-label="Argent disponible">0$</span>
+        </div>
       </header>
 
       <section class="fighter-card" aria-labelledby="fighter-name">
@@ -83,6 +103,7 @@
           <p id="fighter-meta" class="eyebrow">Amateur · En développement</p>
           <h2 id="fighter-name">Ton boxeur</h2>
           <p id="career-records">Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">0 V · 0 D · 0 N</span></p>
+          <button id="edit-profile" class="fighter-edit-button" type="button">Modifier le profil</button>
         </div>
         <div class="money-spotlight">
           <span>Disponible</span>
@@ -92,6 +113,7 @@
           <span>Plan de la semaine</span>
           <div id="action-pips" class="pips" aria-label="3 actions restantes"></div>
         </div>
+        <div id="fighter-next-fight" class="fighter-next-fight"></div>
         <div id="career-medals" class="career-medals"></div>
       </section>
 
@@ -102,7 +124,16 @@
               <p class="eyebrow">État actuel</p>
               <h2 id="stats-title">Le tableau de bord</h2>
             </div>
-            <button id="restart" class="text-button" type="button">Recommencer</button>
+            <div class="panel-heading-actions">
+              <button id="export-career" class="text-button" type="button">Exporter</button>
+              <button id="restart" class="text-button" type="button">Recommencer</button>
+            </div>
+          </div>
+          <div class="level-strip" aria-live="polite">
+            <div><span>Niveau</span><strong id="level">1</strong></div>
+            <div class="level-xp"><span id="xp-progress">XP 0 / 100</span><div class="meter"><div id="xp-meter-fill" class="meter-fill"></div></div></div>
+            <span id="level-notice" class="level-notice" hidden></span>
+            <button id="open-level-dialog" class="secondary-button" type="button" disabled><span id="level-button-label">Points :</span> <span id="level-points">0</span></button>
           </div>
           <div id="stats" class="stats-grid"></div>
           <div class="combat-heading">
@@ -112,47 +143,57 @@
           <div id="combat-stats" class="combat-stats"></div>
         </section>
 
-        <aside class="panel journal-panel collapsible-section" data-mobile-open="false" aria-labelledby="journal-title">
-          <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Journal</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Carnet de route</p>
-              <h2 id="journal-title">Journal</h2>
-            </div>
-            <span class="live-dot">En cours</span>
-          </div>
-          <ol id="journal" class="journal-list" aria-live="polite"></ol>
-        </aside>
       </div>
 
+      <div class="management-grid">
+        <div class="management-column career-column">
       <section class="fights-panel collapsible-section" data-mobile-open="false" aria-labelledby="fights-title">
         <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Combats locaux</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
         <div class="section-heading">
           <div><p class="eyebrow">Circuit local</p><h2 id="fights-title">Combats amateurs</h2></div>
           <p>Trois nouvelles offres chaque semaine, avec quelques adversaires qui peuvent revenir.</p>
         </div>
+        <p id="fight-avoidance-warning" class="avoidance-warning" hidden></p>
         <div id="scheduled-fight" class="scheduled-fight"></div>
         <div id="opponents" class="opponent-grid"></div>
       </section>
 
       <section class="fights-panel tournaments-panel collapsible-section" data-mobile-open="false" aria-labelledby="tournaments-title">
         <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Tournois</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
-        <div class="tournament-heading"><div><p class="eyebrow">Progression nationale</p><h3 id="tournaments-title">Tournois amateurs</h3></div><span id="amateur-fight-count">0 combat disputé</span></div>
+        <div class="tournament-heading"><div><p class="eyebrow">Progression nationale</p><h2 id="tournaments-title">Tournois amateurs</h2></div><span id="amateur-fight-count">0 combat disputé</span></div>
         <div id="active-tournament" class="active-tournament"></div>
         <div id="tournaments" class="tournament-grid"></div>
         <div id="pro-transition" class="pro-transition"></div>
       </section>
+        </div>
 
+        <div class="management-column camp-column">
       <section class="membership-panel" aria-labelledby="membership-title">
         <div class="membership-copy">
           <p class="eyebrow">Accès au camp</p>
-          <h2 id="membership-title">Abonnement au gym</h2>
-          <p>L’entraînement régulier et le sparring sont inclus pendant quatre semaines.</p>
+          <h2 id="membership-title">GYM de boxe</h2>
+          <p>Mitaines, défense et sparring.</p>
         </div>
         <div id="membership-status" class="membership-status"></div>
         <button id="membership-button" class="membership-button" type="button"></button>
+        <div id="boxing-gym-services" class="gym-services"></div>
       </section>
 
+      <section class="membership-panel strength-membership-panel" aria-labelledby="strength-membership-title">
+        <div class="membership-copy"><p class="eyebrow">Préparation physique</p><h2 id="strength-membership-title">Gym de musculation</h2><p>Exercices, préparateurs et boutique.</p></div>
+        <div id="strength-membership-status" class="membership-status"></div>
+        <button id="strength-membership-button" class="membership-button" type="button"></button>
+        <div id="strength-gym-services" class="gym-services"></div>
+      </section>
+
+      <section class="coaching-panel" aria-labelledby="coaching-title">
+        <div class="section-heading"><div><p class="eyebrow">Progression ciblée</p><h2 id="coaching-title">Coachs privés</h2></div><p>GYM de boxe : rabais de 10 $ sur les coachs de boxe. Gym de musculation : accès obligatoire aux préparateurs physiques.</p></div>
+        <div id="private-coaching" class="private-coaching"></div>
+      </section>
+        </div>
+      </div>
+
+      <div class="weekly-layout">
       <section class="actions-section" aria-labelledby="actions-title">
         <div class="section-heading">
           <div>
@@ -181,30 +222,47 @@
           </div>
         </div>
       </section>
+      </div>
     </main>
 
-    <dialog id="private-dialog" class="service-dialog">
-      <form id="private-form" method="dialog" class="service-card">
-        <div class="service-heading">
-          <div><p class="eyebrow">Service ciblé</p><h2>Séance privée</h2></div>
-          <button class="dialog-close" value="cancel" aria-label="Fermer" formnovalidate>×</button>
+    <dialog id="profile-dialog" class="service-dialog profile-dialog" aria-labelledby="profile-dialog-title">
+      <form id="profile-form" class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Fiche du boxeur</p><h2 id="profile-dialog-title">Modifier le profil</h2></div><button id="profile-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
+        <div class="profile-form-grid">
+          <label>Prénom<input id="edit-first-name" autocomplete="given-name" required maxlength="30" /></label>
+          <label>Nom<input id="edit-last-name" autocomplete="family-name" required maxlength="30" /></label>
+          <label>Surnom<input id="edit-nickname" required maxlength="30" /></label>
+          <label>Catégorie de poids<select id="edit-weight-class" required>
+            <option>Poids plume</option><option>Poids léger</option><option>Poids super-léger</option>
+            <option>Poids welter</option><option>Poids moyen</option><option>Poids mi-lourd</option><option>Poids lourd</option>
+          </select></label>
+          <label>Coin de combat<select id="edit-corner"><option value="red">Coin rouge</option><option value="blue">Coin bleu</option></select></label>
         </div>
-        <p class="service-lead">Choisis la statistique à travailler. La séance sera seulement ajoutée au plan de la semaine.</p>
-        <label>Statistique ciblée
-          <select id="private-stat">
-            <option value="technique">Technique</option><option value="power">Puissance</option>
-            <option value="cardio">Cardio</option><option value="defense">Défense</option>
-          </select>
-        </label>
-        <div class="service-effect"><strong>90 $</strong><span>+6 à la statistique · −14 énergie · +3 moral</span></div>
-        <div class="service-actions">
-          <button class="secondary-button" value="cancel" formnovalidate>Annuler</button>
-          <button id="private-confirm" class="primary-button" value="default">Ajouter au plan</button>
-        </div>
+        <p id="profile-edit-note" class="service-lead">Le style de base et ses points restent inchangés.</p>
+        <div class="service-actions"><button id="profile-cancel" class="secondary-button" type="button">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div>
       </form>
     </dialog>
 
-    <dialog id="summary-dialog" class="service-dialog summary-dialog">
+    <dialog id="level-dialog" class="service-dialog level-dialog" aria-labelledby="level-dialog-title">
+      <div class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Progression</p><h2 id="level-dialog-title">Répartir tes points</h2></div><button id="level-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
+        <p id="level-dialog-copy" class="service-lead">Chaque niveau gagné donne trois points à répartir.</p>
+        <div id="level-choices" class="level-choices"></div>
+      </div>
+    </dialog>
+
+    <dialog id="private-dialog" class="service-dialog" aria-labelledby="private-dialog-title">
+      <form id="private-form" method="dialog" class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Coaching privé</p><h2 id="private-dialog-title">Choisir un spécialiste</h2></div><button class="dialog-close" value="cancel" aria-label="Fermer" formnovalidate>×</button></div>
+        <p id="private-dialog-copy" class="service-lead">Les coachs de boxe travaillent technique et défense. Les préparateurs physiques travaillent puissance et cardio.</p>
+        <div id="private-coach-options" class="coach-menu-grid"></div>
+        <label id="private-stat-field" hidden>Qualité travaillée<select id="private-stat"></select></label>
+        <div id="private-dialog-effect" class="service-effect"></div>
+        <div class="service-actions"><button class="secondary-button" value="cancel" formnovalidate>Annuler</button><button id="private-confirm" class="primary-button" value="default" disabled>Payer le premier cours</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="summary-dialog" class="service-dialog summary-dialog" aria-labelledby="summary-title">
       <div class="service-card">
         <div class="service-heading">
           <div><p class="eyebrow">Semaine terminée</p><h2 id="summary-title">Bilan</h2></div>
@@ -214,7 +272,7 @@
       </div>
     </dialog>
 
-    <dialog id="week-event-dialog" class="service-dialog week-event-dialog">
+    <dialog id="week-event-dialog" class="service-dialog week-event-dialog" aria-labelledby="week-event-title">
       <div class="service-card">
         <div class="service-heading">
           <div><p class="eyebrow">Entre deux semaines</p><h2 id="week-event-title">Une décision à prendre</h2></div>
@@ -224,7 +282,7 @@
       </div>
     </dialog>
 
-    <dialog id="tournament-dialog" class="tournament-dialog">
+    <dialog id="tournament-dialog" class="tournament-dialog" aria-labelledby="tournament-board-title">
       <div class="tournament-board-card">
         <div class="service-heading">
           <div><p class="eyebrow">Tableau de progression</p><h2 id="tournament-board-title">Tournoi amateur</h2></div>
@@ -236,7 +294,7 @@
       </div>
     </dialog>
 
-    <dialog id="fight-dialog" class="fight-dialog">
+    <dialog id="fight-dialog" class="fight-dialog" aria-labelledby="fight-opponent-name">
       <div class="fight-card">
         <div class="fight-topline"><span id="fight-week-label">Combat amateur</span><strong id="fight-round">Round 1 / 3</strong></div>
         <div class="ring-scoreboard">
