@@ -231,7 +231,7 @@ function weeklyActionLimit() {
 }
 
 function weeklyOpponentOffers() {
-  if (state.week === 1) return [opponents[0], opponents[1], opponents[2]];
+  if (amateurFightCount() === 0) return [opponents[0], opponents[1], opponents[2]];
   const start = ((state.week - 1) * 2) % opponents.length;
   return [start, (start + 1) % opponents.length, (start + 4) % opponents.length].map(index => opponents[index]);
 }
@@ -420,6 +420,7 @@ function renderFights() {
   const pro = professionalEligibility();
   const blocked = Boolean(state.scheduledFight || state.activeTournament);
   proTransition.innerHTML = `<div><strong>Passer professionnel</strong><p>${pro.reason}${blocked && pro.eligible ? " · Termine ou annule d’abord le combat programmé." : ""}</p></div><button id="turn-pro" class="primary-button" type="button" ${!pro.eligible || blocked ? "disabled" : ""}>Passer professionnel</button>`;
+  if (amateurFightCount() === 0 && !state.scheduledFight) expandMobileSection(".fights-panel:not(.tournaments-panel)");
   if (state.scheduledFight && state.week >= state.scheduledFight.week && !state.scheduledFight.tournamentId) expandMobileSection(".fights-panel:not(.tournaments-panel)");
   if (state.activeTournament && state.week >= state.activeTournament.startWeek) expandMobileSection(".tournaments-panel");
 }
