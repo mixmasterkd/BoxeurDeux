@@ -182,9 +182,9 @@ const privateCoaches = [
 ];
 
 const jobs = Object.freeze([
-  { id: "convenience", title: "Commis de dépanneur", schedule: "Horaire souple", wage: 75, energy: -14, fatigue: 10, morale: -1, injury: 0, detail: "La solution la moins payante, mais la plus facile à concilier avec le camp." },
-  { id: "courier", title: "Coursier local", schedule: "Quarts variables", wage: 100, energy: -20, fatigue: 16, morale: -3, injury: 1, detail: "Une meilleure paie avec plus de kilomètres et de fatigue dans les jambes." },
-  { id: "warehouse", title: "Manutention de nuit", schedule: "Quart exigeant", wage: 130, energy: -27, fatigue: 23, morale: -5, injury: 3, detail: "La paie la plus élevée, au prix d’une lourde dépense physique." },
+  { id: "convenience", title: "Commis de dépanneur", schedule: "Horaire souple", wage: 75, interviewWeeks: 1, energy: -14, fatigue: 10, morale: -1, injury: 0, detail: "La solution la moins payante, mais la plus facile à concilier avec le camp." },
+  { id: "courier", title: "Coursier local", schedule: "Quarts variables", wage: 100, interviewWeeks: 2, energy: -20, fatigue: 16, morale: -3, injury: 1, detail: "Une meilleure paie avec plus de kilomètres et de fatigue dans les jambes." },
+  { id: "warehouse", title: "Manutention de nuit", schedule: "Quart exigeant", wage: 130, interviewWeeks: 3, energy: -27, fatigue: 23, morale: -5, injury: 3, detail: "La paie la plus élevée, au prix d’une lourde dépense physique." },
 ]);
 
 const REMY_TANK = Object.freeze({
@@ -245,6 +245,9 @@ const INITIAL_STATE = {
   olympicCompleted: false,
   pendingWeekEvent: null,
   jobId: null,
+  jobsHeldCount: 0,
+  jobApplication: null,
+  jobReferenceBonus: false,
   missedWorkWeeks: 0,
   jobAttendanceWeek: 0,
   jobTenureWeeks: 0,
@@ -401,6 +404,7 @@ const actions = [
   { id: "physio", category: "recovery", icon: "T", title: "Physiothérapie", detail: "55 $ · −16 risque · +8 énergie · +2 forme · accélère la guérison", cost: 55, changes: { money: -55, injury: -16, injuryWeeks: -1, energy: 8, fitness: 2 }, message: "Le traitement du physiothérapeute calme les douleurs avant qu'elles ne s'installent." },
   { id: "spa", category: "recovery", icon: "R", title: "Spa et récupération", detail: "65 $ · +38 énergie · −20 risque · +6 moral", cost: 65, changes: { money: -65, energy: 38, injury: -20, morale: 6 }, message: "Le protocole de récupération remet le corps et la tête en état." },
   { id: "work", category: "career", icon: "$", title: "Travailler", detail: "Emploi requis · la paie et la fatigue dépendent du poste", requiresJob: true, message: "Un quart de travail paie les factures, mais laisse les jambes lourdes." },
+  { id: "interview", category: "career", icon: "E", title: "Passer des entrevues", detail: "Candidature requise · −3 énergie · +1 moral", changes: { energy: -3, morale: 1 }, message: "Une entrevue fait avancer la candidature vers un nouvel emploi." },
   { id: "vacation", category: "career", icon: "☼", title: "Vacances payées", detail: "Congé payé · récupération sans perdre ton emploi · hors limite d’actions", requiresJob: true, message: "Une semaine de congé payé protège le corps sans couper le revenu." },
   { id: "promotion", category: "career", icon: "M", title: "Promotion locale", detail: "20 $ · +8 réputation · +3 moral · −10 énergie", cost: 20, changes: { money: -20, reputation: 8, morale: 3, energy: -10 }, message: "Quelques apparitions locales font circuler ton nom dans le quartier." },
   { id: "family", category: "career", icon: "F", title: "Temps avec les proches", detail: "+9 moral · +6 énergie", changes: { morale: 9, energy: 6 }, message: "Une soirée avec les proches remet la carrière en perspective." },
@@ -408,7 +412,7 @@ const actions = [
   { id: "drug-sales", category: "career", icon: "!", title: "Vente de stupéfiants", detail: "À venir · risques judiciaires et semaines de détention dans une future version", future: true, message: "Cette activité n’est pas encore disponible." },
 ];
 
-const actionFatigue = { gym: 12, "group-class": 11, "home-bag": 9, private: 10, sparring: 22, roadwork: 14, heavybag: 15, video: 4, "strength-power": 18, "strength-circuit": 16, rest: -20, eat: 2, physio: -10, spa: -25, work: 18, promotion: 6, family: -4, sponsor: 8 };
+const actionFatigue = { gym: 12, "group-class": 11, "home-bag": 9, private: 10, sparring: 22, roadwork: 14, heavybag: 15, video: 4, "strength-power": 18, "strength-circuit": 16, rest: -20, eat: 2, physio: -10, spa: -25, work: 18, interview: 1, promotion: 6, family: -4, sponsor: 8 };
 
 const strengthGymProducts = [
   { id: "protein-bar", label: "Barre protéinée", price: 10, effect: "+3 E · −1 Fa · +1 M", changes: { energy: 3, fatigue: -1, morale: 1 } },
@@ -439,6 +443,7 @@ let fightState = null;
 let selectedPrivateCoachId = null;
 let draftPortraitId = 0;
 let drugSalesTapCount = 0;
+let resumeCareerAlertsAfterLevelDialog = false;
 
 const clamp = (value, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 const escapeHTML = value => String(value).replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
@@ -564,7 +569,7 @@ function normalizeCareerState(source) {
     week: [1, 99999], money: [0, 9999999], energy: [0, 100], fitness: [0, 100], morale: [0, 100], reputation: [0, 100],
     injury: [0, 100], fatigue: [0, 100], injuryWeeks: [0, 52], experience: [0, 10000000], level: [1, 999], levelPoints: [0, 9999],
     gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], boxingInactivityWeeks: [0, 999], boxingTrainingWeek: [0, 99999], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
-    missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999], jobTenureWeeks: [0, 99999], jobVacationEarnedAtTenure: [0, 99999], vacationBankWeeks: [0, MAX_PAID_VACATION_WEEKS], jobWagesEarned: [0, 9999999], recreationalTrainingWeeks: [0, 10],
+    missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999], jobTenureWeeks: [0, 99999], jobsHeldCount: [0, 999], jobVacationEarnedAtTenure: [0, 99999], vacationBankWeeks: [0, MAX_PAID_VACATION_WEEKS], jobWagesEarned: [0, 9999999], recreationalTrainingWeeks: [0, 10],
     supplementWeek: [1, 99999], avoidanceWeeks: [0, 999], lastFightWeek: [0, 99999], injuryStartedWeek: [0, 99999],
   };
   Object.entries(boundedStats).forEach(([key, [min, max]]) => { normalized[key] = safeNumber(source[key], base[key] ?? min, min, max); });
@@ -580,6 +585,20 @@ function normalizeCareerState(source) {
   normalized.levelAnnouncementPending = Boolean(source.levelAnnouncementPending);
   normalized.jobLossNotice = source.jobLossNotice ? safeText(source.jobLossNotice, "", 180) : null;
   normalized.jobId = jobs.some(job => job.id === source.jobId) ? source.jobId : null;
+  const inferredJobsHeld = source.jobsHeldCount ?? (normalized.jobId || (!source.introJobRequired && source.careerStatus !== "recreational") ? 1 : 0);
+  normalized.jobsHeldCount = safeNumber(inferredJobsHeld, 0, 0, 999);
+  normalized.jobReferenceBonus = Boolean(source.jobReferenceBonus);
+  const applicationJob = jobs.find(job => job.id === source.jobApplication?.jobId);
+  if (applicationJob) {
+    const requiredWeeks = safeNumber(source.jobApplication.requiredWeeks, applicationJob.interviewWeeks, 1, applicationJob.interviewWeeks);
+    normalized.jobApplication = {
+      jobId: applicationJob.id,
+      progress: safeNumber(source.jobApplication.progress, 0, 0, requiredWeeks),
+      requiredWeeks,
+      offerReady: Boolean(source.jobApplication.offerReady),
+      referenceBonusApplied: Boolean(source.jobApplication.referenceBonusApplied),
+    };
+  } else normalized.jobApplication = null;
   normalized.jobVacationEarnedAtTenure = safeNumber(source.jobVacationEarnedAtTenure ?? source.jobVacationClaimedAtTenure, 0, 0, 99999);
   if (!normalized.jobId) {
     normalized.missedWorkWeeks = 0;
@@ -896,6 +915,7 @@ function hydrateCareer(snapshot) {
       const action = actions.find(candidate => candidate.id === item?.actionId);
       if (!action || seenActions.has(action.id)) return false;
       if (action.id === "private" && !state.privateProgram) return false;
+      if (action.id === "interview" && !state.jobApplication) return false;
       if (action.id === "work" && seenActions.has("vacation")) return false;
       if (action.id === "vacation" && seenActions.has("work")) return false;
       if (isBonusAction(action)) {
@@ -965,7 +985,7 @@ function restoreCareer(snapshot) {
     render();
     maybeShowDivisionMigration();
     showToast("Carrière restaurée");
-    if (state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
+    if (state.pendingWeekEvent || state.jobLossNotice || state.levelAnnouncementPending) setTimeout(showCareerAlertOrContinue, 0);
     return true;
   } catch (error) {
     console.error("[Boxeur Deux] Sauvegarde refusée :", error);
@@ -1237,8 +1257,9 @@ function renderLevel() {
   choices.innerHTML = Object.entries(combatLabels).map(([key, label]) => `<button class="level-choice" type="button" data-level-stat="${key}" ${state.levelPoints < 1 || state.combatStats[key] >= 99 ? "disabled" : ""}><span>${label}</span><strong>${state.combatStats[key]}</strong><em>+1</em></button>`).join("");
 }
 
-function openLevelDialog() {
+function openLevelDialog(resumeCareerAlerts = false) {
   if (state.levelPoints < 1) return;
+  resumeCareerAlertsAfterLevelDialog = resumeCareerAlerts;
   state.levelNotice = null;
   state.levelAnnouncementPending = false;
   renderLevel();
@@ -1444,6 +1465,22 @@ function hasWeakBoxingRhythm() {
 }
 
 const boxingTrainingActionIds = new Set(["gym", "group-class", "home-bag", "sparring", "heavybag"]);
+const lowFitnessAllowedActionIds = new Set(["gym", "group-class", "home-bag", "roadwork", "video"]);
+const progressiveReturnActionIds = new Set(["gym", "group-class", "home-bag", "roadwork"]);
+
+function isProgressiveReturn(action) {
+  return Boolean(action && state.fitness < 18 && progressiveReturnActionIds.has(action.id));
+}
+
+function actionDisplayDetail(action) {
+  if (action?.id === "interview" && state.jobApplication) {
+    const job = jobs.find(item => item.id === state.jobApplication.jobId);
+    return `${job?.title || "Candidature"} · ${state.jobApplication.progress}/${state.jobApplication.requiredWeeks} entrevue${state.jobApplication.requiredWeeks > 1 ? "s" : ""} · −3 énergie · +1 moral`;
+  }
+  if (!isProgressiveReturn(action)) return action.detail;
+  const label = action.id === "roadwork" ? "Footing léger" : "Reprise progressive";
+  return `${label} · intensité réduite · +${Math.max(4, action.changes?.fitness || 0)} forme · peu de risque · progression de statistique suspendue`;
+}
 
 function planHasBoxingTraining(privateCoach = null) {
   return weeklyPlan.some(item => boxingTrainingActionIds.has(item.actionId)) || privateCoach?.type === "boxing";
@@ -1462,6 +1499,9 @@ function updateBoxingRhythm(events, endingWeek) {
     return;
   }
   state.boxingInactivityWeeks = Math.min(999, state.boxingInactivityWeeks + 1);
+  if (state.boxingInactivityWeeks === 2) {
+    events.push("Rythme fragile : une autre semaine sans entraînement de boxe déclenchera le rythme faible.");
+  }
   if (state.boxingInactivityWeeks === 3) {
     events.push("Trois semaines sans entraînement de boxe : rythme faible. Le prochain programme est limité à une action jusqu’au retour au GYM, au sac, aux mitaines ou au sparring.");
     state.journal.unshift({ week: endingWeek, text: "Rythme faible : reprends un entraînement de boxe pour retrouver un programme complet." });
@@ -1948,10 +1988,11 @@ function isRecreationalLimitReached() {
 
 function actionIsVisibleForCareer(action) {
   if (!action) return false;
+  if (action.id === "interview" && !state.jobApplication) return false;
   if (isAwaitingAmateurTransition()) return false;
   if (isRecreationalLimitReached()) return false;
   if (!isRecreationalCareer()) return action.id !== "group-class";
-  const recreationalActions = ["gym", "group-class", "home-bag", "rest", "work", "vacation", "drug-sales"];
+  const recreationalActions = ["gym", "group-class", "home-bag", "rest", "work", "vacation", "interview", "drug-sales"];
   if (state.strengthGymWeeks > 0) recreationalActions.push("strength-power", "strength-circuit");
   return recreationalActions.includes(action.id);
 }
@@ -1962,6 +2003,10 @@ function actionRequirementLock(action) {
   if (action.future && action.id !== "drug-sales") return "Bientôt disponible";
   if (action.id === "drug-sales") return "";
   if (action.id === "work" && !currentJob()) return "Choisis d’abord un emploi dans le panneau Emploi";
+  if (action.id === "interview") {
+    if (!state.jobApplication) return "Choisis d’abord un emploi visé dans le panneau Emploi";
+    if (state.jobApplication.offerReady) return "Offre confirmée : le poste commencera la semaine prochaine";
+  }
   if (action.id === "vacation") {
     if (state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek) return "Indisponible pendant un tournoi";
     const vacation = vacationStatus();
@@ -1990,7 +2035,7 @@ function actionConditionLock(action) {
   if (action.id === "work" && state.fatigue >= 75) return "Fatigue trop élevée : repose-toi avant de retravailler";
   if (action.id === "rest" && !restRecoveryIsNeeded()) return "Repos inutile : ton boxeur est déjà frais et intact";
   if (action.category === "training" && state.energy < 28) return "Énergie trop basse pour bien t’entraîner";
-  if (action.category === "training" && state.fitness < 18) return "Forme physique trop basse : récupère d’abord";
+  if (action.category === "training" && state.fitness < 18 && !lowFitnessAllowedActionIds.has(action.id)) return "Forme trop basse : choisis une reprise progressive avant cette séance intensive";
   if (action.category === "training" && state.morale < 25) return "Moral trop bas : le camp ne peut pas être productif";
   if (action.category === "training" && state.fatigue >= 75) return "Fatigue trop élevée : récupère avant l’entraînement";
   if (actionFatigue[action.id] >= 17 && state.fatigue >= 88) return "Fatigue trop élevée pour une séance intensive";
@@ -2075,13 +2120,13 @@ function renderActions() {
       const isRecommended = recommended.has(action.id) && !action.future && !lock;
       const privateCoach = action.id === "private" ? privateCoaches.find(coach => coach.id === state.privateProgram?.coachId) : null;
       const duePrice = privateCoach ? privateCourseDuePrice(privateCoach) : 0;
-      const progressDetail = action.progressStat ? ` · ${state.trainingProgress[action.progressStat]}/10 vers +1 ${combatLabels[action.progressStat].toLowerCase()}` : "";
+      const progressDetail = action.progressStat && !isProgressiveReturn(action) ? ` · ${state.trainingProgress[action.progressStat]}/10 vers +1 ${combatLabels[action.progressStat].toLowerCase()}` : "";
       const work = action.id === "work" ? workOutcome() : action.id === "vacation" ? vacationOutcome() : null;
       const job = ["work", "vacation"].includes(action.id) ? currentJob() : null;
       const actionDetail = work && job ? action.id === "vacation"
         ? `${job.title} · +${work.money} $ · +${work.energy} énergie · ${work.fatigue} fatigue · +${work.morale} moral`
         : `${job.title} · +${work.money} $ · ${work.energy} énergie · +${work.fatigue} fatigue · ${work.morale} moral${work.injury ? ` · +${work.injury} risque` : ""}`
-        : action.detail;
+        : actionDisplayDetail(action);
       const detail = privateCoach ? `${combatLabels[state.privateProgram.target]} · séance ${state.privateProgram.sessionsCompleted + 1} / ${privateCoach.sessions} · ${duePrice ? `${duePrice} $` : "déjà payée"} · +10 XP` : `${actionDetail}${progressDetail}`;
       return `<button class="action-card${action.future ? " future" : ""}${selected ? " selected" : ""}${isRecommended ? " recommended" : ""}" type="button" data-action="${action.id}" ${lock ? "disabled" : ""} aria-pressed="${selected}">
         <span class="action-icon" aria-hidden="true">${action.icon}</span><h3>${action.title}</h3><p>${detail}</p>
@@ -2193,50 +2238,100 @@ function renderEmployment() {
   const employment = document.querySelector("#employment");
   if (!employment) return;
   const job = currentJob();
+  const application = state.jobApplication;
+  const targetJob = jobs.find(item => item.id === application?.jobId);
   if (!job) {
     const required = state.introJobRequired;
-    employment.innerHTML = `<div class="coaching-heading"><span>${required ? "Premier emploi requis" : "Aucun emploi"}</span><small>${required ? "Choisis ton emploi de départ avant de passer ta première semaine." : "Tu peux rester sans emploi ou chercher un nouveau poste quand tu le souhaites."}</small></div><button id="open-job-menu" class="primary-button" type="button">${required ? "Choisir mon emploi de départ" : "Choisir un emploi"}</button>`;
+    if (application && targetJob) {
+      const ready = application.offerReady;
+      employment.innerHTML = `<div class="private-program employment-program application${ready ? " ready" : ""}"><span>${ready ? "Offre confirmée" : "Recherche d’emploi"}</span><strong>${escapeHTML(targetJob.title)} · ${application.progress}/${application.requiredWeeks} entrevue${application.requiredWeeks > 1 ? "s" : ""}</strong><small>${ready ? "Le poste commencera à la prochaine semaine." : "Planifie « Passer des entrevues » pour faire avancer la candidature. Sans cette action, le compteur reste en pause."}</small><div class="employment-actions"><button id="open-job-menu" class="secondary-button" type="button">Changer de candidature</button><button id="cancel-job-application" class="text-button" type="button">Annuler la candidature</button></div></div>`;
+      return;
+    }
+    employment.innerHTML = `<div class="coaching-heading"><span>${required ? "Premier emploi requis" : "Sans emploi"}</span><small>${required ? "Choisis ton emploi de départ avant de passer ta première semaine." : "Choisis un poste, puis fais progresser les entrevues dans tes actions hebdomadaires."}</small></div><button id="open-job-menu" class="primary-button" type="button">${required ? "Choisir mon emploi de départ" : "Chercher un emploi"}</button>`;
     return;
   }
   const absenceNote = state.missedWorkWeeks === 0
     ? "Présence en règle"
     : state.missedWorkWeeks === 1
       ? "1 absence · deux chances restantes"
-      : "2 absences · prochain quart manqué : congédiement";
+      : "2/3 absences · prochain quart manqué : congédiement";
   const vacation = vacationStatus();
-  employment.innerHTML = `<div class="private-program employment-program"><span>Emploi actif · ${escapeHTML(job.schedule)}</span><strong>${escapeHTML(job.title)} · ${job.wage} $ par quart</strong><small>${escapeHTML(job.detail)} ${absenceNote}. Vacances : ${escapeHTML(vacation.reason)}.</small><div class="employment-actions"><button id="open-job-menu" class="secondary-button" type="button">Changer d’emploi</button><button id="quit-job" class="text-button" type="button">Quitter l’emploi</button></div></div>`;
+  const warningClass = state.missedWorkWeeks >= 2 ? " danger" : state.missedWorkWeeks === 1 ? " warning" : "";
+  const applicationCopy = application && targetJob ? `<div class="employment-application"><span>Candidature en cours</span><strong>${escapeHTML(targetJob.title)} · ${application.progress}/${application.requiredWeeks}</strong><small>${application.offerReady ? "Offre confirmée pour la semaine prochaine." : "Chaque action « Passer des entrevues » ajoute une étape."}</small></div>` : "";
+  employment.innerHTML = `<div class="private-program employment-program${warningClass}"><span>Emploi actif · ${escapeHTML(job.schedule)}</span><strong>${escapeHTML(job.title)} · ${job.wage} $ par quart</strong><small>${escapeHTML(job.detail)} <b>${absenceNote}</b>. Vacances : ${escapeHTML(vacation.reason)}.</small>${applicationCopy}<div class="employment-actions"><button id="open-job-menu" class="secondary-button" type="button">${application ? "Changer de candidature" : "Postuler ailleurs"}</button>${application ? '<button id="cancel-job-application" class="text-button" type="button">Annuler la candidature</button>' : ""}<button id="quit-job" class="text-button" type="button">Quitter l’emploi</button></div></div>`;
 }
 
 function openJobMenu() {
   const activeJob = currentJob();
-  document.querySelector("#job-options").innerHTML = jobs.map(job => `<button class="coach-card${job.id === activeJob?.id ? " selected" : ""}" type="button" data-select-job="${job.id}" aria-pressed="${job.id === activeJob?.id}"><strong>${escapeHTML(job.title)}</strong><span>${job.wage} $ · ${escapeHTML(job.schedule)}</span><small>${job.energy} énergie · +${job.fatigue} fatigue · ${job.morale} moral${job.injury ? ` · +${job.injury} risque` : ""}<br>${escapeHTML(job.detail)}</small></button>`).join("");
+  const immediate = state.introJobRequired && state.jobsHeldCount === 0 && !activeJob;
+  document.querySelector("#job-dialog-title").textContent = immediate ? "Choisir l’emploi de départ" : "Choisir une candidature";
+  const copy = document.querySelector("#job-dialog-copy");
+  if (copy) copy.textContent = immediate ? "Ton premier emploi est obtenu immédiatement. Ensuite, chaque changement demandera des entrevues planifiées dans la semaine." : "Choisis le poste visé. Une nouvelle candidature remet la progression actuelle à zéro; l’embauche est garantie lorsque toutes les entrevues sont terminées.";
+  document.querySelector("#job-options").innerHTML = jobs.map(job => {
+    const isActive = job.id === activeJob?.id;
+    const isTarget = job.id === state.jobApplication?.jobId;
+    const referenceEligible = state.jobReferenceBonus || Boolean(activeJob && state.jobTenureWeeks >= 12 && state.missedWorkWeeks === 0);
+    const requiredWeeks = Math.max(1, job.interviewWeeks - (referenceEligible ? 1 : 0));
+    const hiring = immediate ? "Embauche immédiate" : `${requiredWeeks} semaine${requiredWeeks > 1 ? "s" : ""} d’entrevues${referenceEligible && job.interviewWeeks > 1 ? " · bon dossier inclus" : ""}`;
+    return `<button class="coach-card${isTarget ? " selected" : ""}" type="button" data-select-job="${job.id}" aria-pressed="${isTarget}" ${isActive ? "disabled" : ""}><strong>${escapeHTML(job.title)}</strong><span>${job.wage} $ · ${escapeHTML(job.schedule)}</span><small>${hiring}<br>${job.energy} énergie · +${job.fatigue} fatigue · ${job.morale} moral${job.injury ? ` · +${job.injury} risque` : ""}<br>${escapeHTML(job.detail)}</small></button>`;
+  }).join("");
   document.querySelector("#job-dialog").showModal();
+}
+
+function hireJob(job, initial = false) {
+  const previousJob = currentJob();
+  state.jobId = job.id;
+  state.jobsHeldCount += 1;
+  state.introJobRequired = false;
+  state.missedWorkWeeks = 0;
+  state.jobTenureWeeks = 0;
+  state.jobVacationEarnedAtTenure = 0;
+  state.vacationBankWeeks = 0;
+  state.jobWagesEarned = 0;
+  state.workStreak = 0;
+  state.jobApplication = null;
+  state.jobReferenceBonus = false;
+  const verb = initial ? "commence" : previousJob ? `quitte ${previousJob.title} et commence` : "obtient";
+  state.journal.unshift({ week: state.week, text: `${state.profile.firstName} ${verb} un emploi : ${job.title}, ${job.wage} $ par quart travaillé.` });
 }
 
 function selectJob(jobId) {
   const job = jobs.find(item => item.id === jobId);
   if (!job) return;
-  const changed = state.jobId !== job.id;
-  state.jobId = job.id;
-  state.introJobRequired = false;
-  state.missedWorkWeeks = 0;
-  if (changed) {
-    state.jobTenureWeeks = 0;
-    state.jobVacationEarnedAtTenure = 0;
-    state.vacationBankWeeks = 0;
-    state.jobWagesEarned = 0;
+  if (state.introJobRequired && state.jobsHeldCount === 0 && !currentJob()) {
+    hireJob(job, true);
+    document.querySelector("#job-dialog").close();
+    render();
+    showToast(`${job.title} · action Travailler débloquée`);
+    return;
   }
-  if (changed) state.journal.unshift({ week: state.week, text: `${state.profile.firstName} accepte un emploi : ${job.title}, ${job.wage} $ par quart travaillé.` });
+  if (job.id === state.jobId) return;
+  const activeJob = currentJob();
+  const referenceEligible = state.jobReferenceBonus || Boolean(activeJob && state.jobTenureWeeks >= 12 && state.missedWorkWeeks === 0);
+  const requiredWeeks = Math.max(1, job.interviewWeeks - (referenceEligible ? 1 : 0));
+  state.jobApplication = { jobId: job.id, progress: 0, requiredWeeks, offerReady: false, referenceBonusApplied: referenceEligible };
+  weeklyPlan = weeklyPlan.filter(item => item.actionId !== "interview");
+  state.journal.unshift({ week: state.week, text: `Candidature envoyée : ${job.title}. ${requiredWeeks} semaine${requiredWeeks > 1 ? "s" : ""} d’entrevues requise${requiredWeeks > 1 ? "s" : ""}.` });
   document.querySelector("#job-dialog").close();
   render();
-  showToast(`${job.title} · action Travailler débloquée`);
+  showToast(`${job.title} · candidature lancée`);
+}
+
+function cancelJobApplication() {
+  if (!state.jobApplication) return;
+  const job = jobs.find(item => item.id === state.jobApplication.jobId);
+  state.jobApplication = null;
+  weeklyPlan = weeklyPlan.filter(item => item.actionId !== "interview");
+  render();
+  showToast(`Candidature ${job ? `chez ${job.title} ` : ""}annulée`);
 }
 
 function quitJob() {
   const job = currentJob();
   if (!job) return;
   if (!window.confirm(`Quitter ${job.title} ?\n\nTu pourras rester sans emploi ou en choisir un autre plus tard.`)) return;
-  state.journal.unshift({ week: state.week, text: `${state.profile.firstName} quitte son emploi : ${job.title}.` });
+  state.jobReferenceBonus = state.jobTenureWeeks >= 12 && state.missedWorkWeeks === 0;
+  state.journal.unshift({ week: state.week, text: `${state.profile.firstName} quitte son emploi : ${job.title}.${state.jobReferenceBonus ? " Son bon dossier réduira la prochaine recherche d’une entrevue." : ""}` });
   state.jobId = null;
   state.missedWorkWeeks = 0;
   state.jobTenureWeeks = 0;
@@ -2246,6 +2341,39 @@ function quitJob() {
   state.workStreak = 0;
   render();
   showToast("Emploi quitté");
+}
+
+function advanceJobApplication(events, week) {
+  if (!weeklyPlan.some(item => item.actionId === "interview") || !state.jobApplication || state.jobApplication.offerReady) return;
+  const job = jobs.find(item => item.id === state.jobApplication.jobId);
+  if (!job) {
+    state.jobApplication = null;
+    return;
+  }
+  state.jobApplication.progress = Math.min(state.jobApplication.requiredWeeks, state.jobApplication.progress + 1);
+  if (state.jobApplication.progress >= state.jobApplication.requiredWeeks) {
+    state.jobApplication.offerReady = true;
+    const note = `${job.title} : entrevues terminées, offre confirmée. Le poste commencera la semaine prochaine.`;
+    events.push(note);
+    state.journal.unshift({ week, text: note });
+    return;
+  }
+  const remaining = state.jobApplication.requiredWeeks - state.jobApplication.progress;
+  const note = `${job.title} : entrevue ${state.jobApplication.progress}/${state.jobApplication.requiredWeeks} terminée. Encore ${remaining} semaine${remaining > 1 ? "s" : ""} d’entrevue.`;
+  events.push(note);
+  state.journal.unshift({ week, text: note });
+}
+
+function activateReadyJobOffer(events) {
+  if (!state.jobApplication?.offerReady) return;
+  const job = jobs.find(item => item.id === state.jobApplication.jobId);
+  if (!job) {
+    state.jobApplication = null;
+    return;
+  }
+  const previousJob = currentJob();
+  hireJob(job, false);
+  events.push(previousJob ? `Changement d’emploi : ${job.title} est maintenant actif.` : `Nouvel emploi : ${job.title} est maintenant actif.`);
 }
 
 const gymPlans = Object.freeze([
@@ -2367,6 +2495,7 @@ function settleJobAttendance(worked, events, week, excused = false, paidWork = f
     state.jobVacationEarnedAtTenure = 0;
     state.vacationBankWeeks = 0;
     state.jobWagesEarned = 0;
+    state.jobReferenceBonus = false;
     state.jobLossNotice = `Tu as perdu ton emploi de ${job.title} après trois absences consécutives.${vacationPayout ? ` Une indemnité de vacances de ${vacationPayout} $ a été versée.` : ""}`;
     return;
   }
@@ -2405,7 +2534,14 @@ function actionChangesFor(item) {
     return { money: -privateCourseDuePrice(coach), energy: -14, fatigue: coach.fatigue, fitness: coach.fitness, morale: coach.morale, experience: 10 };
   }
   const changes = { ...(action.changes || {}) };
-  if (actionFatigue[action.id]) changes.fatigue = (changes.fatigue || 0) + actionFatigue[action.id];
+  const progressiveReturn = isProgressiveReturn(action);
+  if (progressiveReturn) {
+    if (changes.energy < 0) changes.energy = Math.round(changes.energy * .58);
+    changes.fitness = Math.max(4, changes.fitness || 0);
+    if (changes.injury > 0) changes.injury = Math.min(1, changes.injury);
+    if (changes.experience > 0) changes.experience = Math.max(3, Math.round(changes.experience * .5));
+  }
+  if (actionFatigue[action.id]) changes.fatigue = (changes.fatigue || 0) + (progressiveReturn ? Math.max(3, Math.round(actionFatigue[action.id] * .5)) : actionFatigue[action.id]);
   if (action.category === "training" && changes.experience) {
     const readiness = clamp(.45 + state.energy / 220 + state.fitness / 260 + state.morale / 600 - state.fatigue / 260, .45, 1.15);
     changes.experience = Math.max(1, Math.round(changes.experience * readiness));
@@ -2419,7 +2555,7 @@ function planItemEffects(item) {
   return {
     action,
     general: actionChangesFor(item),
-    combat: reachesMilestone ? { [action.progressStat]: 1 } : {},
+    combat: reachesMilestone && !isProgressiveReturn(action) ? { [action.progressStat]: 1 } : {},
   };
 }
 
@@ -2530,13 +2666,13 @@ function renderPlan() {
       const coach = action.id === "private" ? privateCoaches.find(item => item.id === state.privateProgram?.coachId) : null;
       const duePrice = coach ? privateCourseDuePrice(coach) : 0;
       const currentProgress = action.progressStat ? state.trainingProgress[action.progressStat] || 0 : 0;
-      const progressDetail = action.progressStat ? currentProgress >= 9 ? ` · cette séance donne +1 ${combatLabels[action.progressStat].toLowerCase()}` : ` · progression prévue : ${currentProgress + 1}/10` : "";
+      const progressDetail = action.progressStat && !isProgressiveReturn(action) ? currentProgress >= 9 ? ` · cette séance donne +1 ${combatLabels[action.progressStat].toLowerCase()}` : ` · progression prévue : ${currentProgress + 1}/10` : "";
       const work = action.id === "work" ? workOutcome() : action.id === "vacation" ? vacationOutcome() : null;
       const job = ["work", "vacation"].includes(action.id) ? currentJob() : null;
       const actionDetail = work && job ? action.id === "vacation"
         ? `${job.title} · +${work.money} $ · +${work.energy} énergie · ${work.fatigue} fatigue · +${work.morale} moral`
         : `${job.title} · +${work.money} $ · ${work.energy} énergie · +${work.fatigue} fatigue · ${work.morale} moral${work.injury ? ` · +${work.injury} risque` : ""}`
-        : action.detail;
+        : actionDisplayDetail(action);
       const detail = coach ? `${combatLabels[state.privateProgram.target]} · ${duePrice ? `${duePrice} $` : "séance déjà payée"} · cours ${state.privateProgram.sessionsCompleted + 1} / ${coach.sessions}` : `${actionDetail}${progressDetail}`;
       return `<div class="plan-row"><span class="plan-order">${index + 1}</span><div class="plan-row-copy"><strong>${action.title}</strong><small>${detail}</small></div><div class="plan-row-actions"><button class="plan-remove" type="button" data-remove="${action.id}">Retirer</button></div></div>`;
     }).join("");
@@ -2722,7 +2858,7 @@ function completePrivateCourse(events, week) {
 function advanceTrainingProgress(events, week) {
   weeklyPlan.forEach(item => {
     const action = actions.find(candidate => candidate.id === item.actionId);
-    if (!action?.progressStat) return;
+    if (!action?.progressStat || isProgressiveReturn(action)) return;
     const stat = action.progressStat;
     state.trainingProgress[stat] = (state.trainingProgress[stat] || 0) + 1;
     if (state.trainingProgress[stat] < 10) return;
@@ -2736,6 +2872,7 @@ function advanceTrainingProgress(events, week) {
 function endWeek(events) {
   const endingWeek = state.week;
   state.week += 1;
+  activateReadyJobOffer(events);
   state.supplementWeek = state.week;
   state.supplementsUsed = [];
   const weekEvents = betweenWeekEventsForCurrentCareer();
@@ -2850,6 +2987,7 @@ function executePlan() {
   }
   state.workStreak = workedThisWeek ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
   settleJobAttendance(workedThisWeek || vacationThisWeek, events, endingWeek, false, workedThisWeek);
+  advanceJobApplication(events, endingWeek);
   advanceRecreationalTraining(events, endingWeek);
   if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = endingWeek + SPONSOR_COOLDOWN_WEEKS;
   if (workedThisWeek && state.workStreak >= 3) events.push("Tu enchaînes les semaines de travail : ta fraîcheur au camp commence à souffrir.");
@@ -2905,6 +3043,7 @@ function applyPreFightPlan() {
   if (weeklyPlan.some(item => item.actionId === "video")) state.preFightStudyWeek = state.week;
   state.workStreak = worked ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
   settleJobAttendance(worked || vacation, events, state.week, false, worked);
+  advanceJobApplication(events, state.week);
   if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = state.week + SPONSOR_COOLDOWN_WEEKS;
   weeklyPlan = [];
   if (events.length) state.journal.unshift({ week: state.week, text: `Préparation du gala : ${events.join(" ")}` });
@@ -3315,7 +3454,7 @@ function closeTournamentBoard() {
     endWeek(events);
     render();
     showToast("Tournoi terminé · retour au calendrier");
-    if (state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
+    if (state.pendingWeekEvent || state.jobLossNotice || state.levelAnnouncementPending) setTimeout(showCareerAlertOrContinue, 0);
   }
 }
 
@@ -4151,6 +4290,7 @@ document.querySelector("#private-coaching").addEventListener("click", event => {
 document.querySelector("#employment").addEventListener("click", event => {
   if (event.target.closest("#open-job-menu")) openJobMenu();
   if (event.target.closest("#quit-job")) quitJob();
+  if (event.target.closest("#cancel-job-application")) cancelJobApplication();
 });
 
 document.querySelector("#job-options").addEventListener("click", event => {
@@ -4187,8 +4327,13 @@ document.querySelector("#edit-profile")?.addEventListener("click", openProfileEd
 document.querySelector("#profile-form")?.addEventListener("submit", saveProfileEdits);
 document.querySelector("#profile-dialog-close")?.addEventListener("click", () => document.querySelector("#profile-dialog")?.close());
 document.querySelector("#profile-cancel")?.addEventListener("click", () => document.querySelector("#profile-dialog")?.close());
-document.querySelector("#open-level-dialog")?.addEventListener("click", openLevelDialog);
+document.querySelector("#open-level-dialog")?.addEventListener("click", () => openLevelDialog(false));
 document.querySelector("#level-dialog-close")?.addEventListener("click", () => document.querySelector("#level-dialog")?.close());
+document.querySelector("#level-dialog")?.addEventListener("close", () => {
+  if (!resumeCareerAlertsAfterLevelDialog) return;
+  resumeCareerAlertsAfterLevelDialog = false;
+  showCareerAlertOrContinue();
+});
 document.querySelector("#level-up-later")?.addEventListener("click", () => {
   state.levelAnnouncementPending = false;
   document.querySelector("#level-up-dialog")?.close();
@@ -4197,7 +4342,7 @@ document.querySelector("#level-up-later")?.addEventListener("click", () => {
 });
 document.querySelector("#level-up-allocate")?.addEventListener("click", () => {
   document.querySelector("#level-up-dialog")?.close();
-  openLevelDialog();
+  openLevelDialog(true);
 });
 document.querySelector("#job-loss-acknowledge")?.addEventListener("click", () => {
   state.jobLossNotice = null;
@@ -4214,6 +4359,7 @@ document.querySelector("#level-choices")?.addEventListener("click", event => {
   applyCombatChanges({ [stat]: 1 });
   render();
   showToast(`+1 ${combatLabels[stat]}`);
+  if (state.levelPoints === 0 && resumeCareerAlertsAfterLevelDialog) setTimeout(() => document.querySelector("#level-dialog")?.close(), 0);
 });
 document.querySelector("#plan-start-fight").addEventListener("click", startFight);
 document.querySelector("#plan-withdraw-fight").addEventListener("click", withdrawFight);

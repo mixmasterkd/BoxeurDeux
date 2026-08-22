@@ -633,6 +633,7 @@ test("évite la double paie, limite le repos inutile et rétablit le rythme de b
 
   await openStoredCareer(page, amateurSnapshot({
     energy: 100,
+    fitness: 10,
     fatigue: 0,
     injury: 0,
     injuryWeeks: 0,
@@ -642,6 +643,9 @@ test("évite la double paie, limite le repos inutile et rétablit le rythme de b
   }));
   await expect(page.locator('[data-action="rest"]')).toBeDisabled();
   await expect(page.locator('[data-action="rest"]')).toContainText("déjà frais et intact");
+  await expect(page.locator('[data-action="gym"]')).toBeEnabled();
+  await expect(page.locator('[data-action="gym"]')).toContainText("Reprise progressive");
+  await expect(page.locator('[data-action="sparring"]')).toBeDisabled();
   await expect(page.locator("#action-limit-help")).toContainText("Rythme faible");
   await expect(page.locator("#action-pips span")).toHaveCount(1);
   await page.locator('[data-action="gym"]').click();
@@ -659,6 +663,52 @@ test("met en avant les montées de niveau et les congédiements", async ({ page 
   await expect(page.locator("#level-up-title")).toContainText("Niveau 2 atteint");
   await page.locator("#level-up-allocate").click();
   await expect(page.locator("#level-dialog")).toBeVisible();
+  for (let point = 0; point < 3; point += 1) await page.locator("#level-choices [data-level-stat]:not([disabled])").first().click();
+  await expect(page.locator("#level-dialog")).not.toBeVisible();
+  await expect(page.locator("#week-event-dialog")).toBeVisible();
+});
+
+test("fait progresser une candidature seulement avec les entrevues et garantit l’embauche", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    jobId: null,
+    jobsHeldCount: 1,
+    introJobRequired: false,
+    initialGymRequired: false,
+  }));
+  await page.locator("#open-job-menu").click();
+  await page.locator('[data-select-job="warehouse"]').click();
+  let saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.jobId).toBeNull();
+  expect(saved.jobApplication).toMatchObject({ jobId: "warehouse", progress: 0, requiredWeeks: 3, offerReady: false });
+  await expect(page.locator('[data-action="interview"]')).toBeVisible();
+
+  async function finishWeek() {
+    await page.locator("#advance-week").click();
+    await expect(page.locator("#summary-dialog")).toBeVisible();
+    await page.locator("#summary-close").click();
+    await expect(page.locator("#week-event-dialog")).toBeVisible();
+    await page.locator("#week-event-choices button:not([disabled])").first().click();
+  }
+
+  await page.locator('[data-action="family"]').click();
+  await finishWeek();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.jobApplication.progress).toBe(0);
+
+  for (let interview = 1; interview <= 3; interview += 1) {
+    await page.locator('[data-action="interview"]').click();
+    await page.locator("#advance-week").click();
+    await expect(page.locator("#summary-dialog")).toBeVisible();
+    saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+    if (interview < 3) {
+      expect(saved.jobId).toBeNull();
+      expect(saved.jobApplication.progress).toBe(interview);
+      await page.locator("#summary-close").click();
+      await page.locator("#week-event-choices button:not([disabled])").first().click();
+    }
+  }
+  expect(saved.jobId).toBe("warehouse");
+  expect(saved.jobApplication).toBeNull();
 });
 
 test("affiche les deux divisions du même tournoi extérieur et le conseil du coach abonné", async ({ page }) => {
