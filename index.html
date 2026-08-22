@@ -25,11 +25,15 @@
           <label>Prénom<input id="first-name" name="firstName" autocomplete="given-name" required maxlength="30" /></label>
           <label>Nom<input id="last-name" name="lastName" autocomplete="family-name" required maxlength="30" /></label>
           <label>Surnom<input id="nickname" name="nickname" required maxlength="30" placeholder="Ex. Le Nord" /></label>
+          <label>Division de compétition
+            <select id="fighter-sex" name="fighterSex" required>
+              <option value="male">Masculine</option>
+              <option value="female">Féminine</option>
+            </select>
+          </label>
           <label>Catégorie de poids
             <select id="weight-class" name="weightClass" required>
               <option value="">Choisir…</option>
-              <option>Poids plume</option><option>Poids léger</option><option>Poids super-léger</option>
-              <option>Poids welter</option><option>Poids moyen</option><option>Poids mi-lourd</option><option>Poids lourd</option>
             </select>
           </label>
           <label class="style-field">Style de base
@@ -49,6 +53,12 @@
             <small>Le coin choisi colore ton interface et ton identité visuelle.</small>
           </label>
         </div>
+
+        <fieldset class="portrait-picker">
+          <legend>Portrait du boxeur</legend>
+          <p>Choisis l’image qui accompagnera toute la carrière.</p>
+          <div id="creation-portraits" class="portrait-options"></div>
+        </fieldset>
 
         <div class="allocation-head">
           <div><p class="eyebrow">Attributs de départ</p><h2>Personnalise ton boxeur</h2><p class="service-lead">Le style attribue cinq points automatiquement. Répartis ensuite tes cinq points personnels.</p></div>
@@ -98,7 +108,7 @@
       </header>
 
       <section class="fighter-card" aria-labelledby="fighter-name">
-        <div class="portrait" aria-hidden="true"><span id="fighter-initials">—</span></div>
+        <div id="fighter-portrait" class="portrait portrait-crop" role="img" aria-label="Portrait du boxeur"><img id="fighter-portrait-image" src="assets/portraits-hommes.webp" width="1152" height="768" alt="" /></div>
         <div class="fighter-copy">
           <p id="fighter-meta" class="eyebrow">Amateur · En développement</p>
           <h2 id="fighter-name">Ton boxeur</h2>
@@ -147,22 +157,21 @@
 
       <div class="management-grid">
         <div class="management-column career-column">
-      <section class="fights-panel collapsible-section" data-mobile-open="false" aria-labelledby="fights-title">
-        <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Combats locaux</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
-        <div class="section-heading">
-          <div><p class="eyebrow">Circuit local</p><h2 id="fights-title">Combats amateurs</h2></div>
-          <p>Trois nouvelles offres chaque semaine, avec quelques adversaires qui peuvent revenir.</p>
+      <section class="fights-panel calendar-panel collapsible-section" data-mobile-open="true" aria-labelledby="calendar-title">
+        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Calendrier des combats</span><span class="toggle-control"><small class="toggle-state">Masquer</small><span class="toggle-arrow" aria-hidden="true">⌃</span></span></button>
+        <div class="calendar-heading">
+          <div><p class="eyebrow">Saison amateur</p><h2 id="calendar-title">Calendrier des galas et tournois</h2></div>
+          <div class="calendar-heading-meta"><span id="calendar-date-label">Janvier · semaine 1</span><span id="amateur-fight-count">0 combat disputé</span></div>
         </div>
+        <p class="calendar-lead">Les événements sont annoncés quelques semaines à l’avance. Lorsqu’ils ont lieu le même soir, il faut choisir.</p>
         <p id="fight-avoidance-warning" class="avoidance-warning" hidden></p>
         <div id="scheduled-fight" class="scheduled-fight"></div>
-        <div id="opponents" class="opponent-grid"></div>
-      </section>
-
-      <section class="fights-panel tournaments-panel collapsible-section" data-mobile-open="false" aria-labelledby="tournaments-title">
-        <button class="mobile-section-toggle" type="button" aria-expanded="false"><span>Tournois</span><span class="toggle-control"><small class="toggle-state">Afficher</small><span class="toggle-arrow" aria-hidden="true">⌄</span></span></button>
-        <div class="tournament-heading"><div><p class="eyebrow">Progression nationale</p><h2 id="tournaments-title">Tournois amateurs</h2></div><span id="amateur-fight-count">0 combat disputé</span></div>
         <div id="active-tournament" class="active-tournament"></div>
-        <div id="tournaments" class="tournament-grid"></div>
+        <div id="calendar-events" class="calendar-events" aria-live="polite"></div>
+        <details class="tournament-catalog">
+          <summary>Voir les parcours de tournoi</summary>
+          <div id="tournaments" class="tournament-grid"></div>
+        </details>
         <div id="pro-transition" class="pro-transition"></div>
       </section>
         </div>
@@ -232,14 +241,26 @@
           <label>Prénom<input id="edit-first-name" autocomplete="given-name" required maxlength="30" /></label>
           <label>Nom<input id="edit-last-name" autocomplete="family-name" required maxlength="30" /></label>
           <label>Surnom<input id="edit-nickname" required maxlength="30" /></label>
-          <label>Catégorie de poids<select id="edit-weight-class" required>
-            <option>Poids plume</option><option>Poids léger</option><option>Poids super-léger</option>
-            <option>Poids welter</option><option>Poids moyen</option><option>Poids mi-lourd</option><option>Poids lourd</option>
-          </select></label>
+          <label>Division<input id="edit-sex-label" readonly /></label>
+          <label>Catégorie de poids<select id="edit-weight-class" required></select></label>
+          <label>Portrait<select id="edit-portrait"><option value="0">Portrait 1</option><option value="1">Portrait 2</option><option value="2">Portrait 3</option></select></label>
           <label>Coin de combat<select id="edit-corner"><option value="red">Coin rouge</option><option value="blue">Coin bleu</option></select></label>
         </div>
         <p id="profile-edit-note" class="service-lead">Le style de base et ses points restent inchangés.</p>
         <div class="service-actions"><button id="profile-cancel" class="secondary-button" type="button">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="division-migration-dialog" class="service-dialog migration-dialog" aria-labelledby="division-migration-title">
+      <form id="division-migration-form" class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Mise à jour de carrière</p><h2 id="division-migration-title">Choisir ta division</h2></div></div>
+        <p class="service-lead">Tes statistiques, ton bilan et ta progression sont conservés. Ce choix adapte seulement les catégories, les adversaires et les portraits.</p>
+        <div class="profile-form-grid">
+          <label>Division de compétition<select id="migration-sex"><option value="male">Masculine</option><option value="female">Féminine</option></select></label>
+          <label>Catégorie<select id="migration-weight" required></select></label>
+          <label>Portrait<select id="migration-portrait"><option value="0">Portrait 1</option><option value="1">Portrait 2</option><option value="2">Portrait 3</option></select></label>
+        </div>
+        <div class="service-actions"><button class="primary-button" type="submit">Confirmer et continuer</button></div>
       </form>
     </dialog>
 
@@ -285,39 +306,89 @@
     <dialog id="tournament-dialog" class="tournament-dialog" aria-labelledby="tournament-board-title">
       <div class="tournament-board-card">
         <div class="service-heading">
-          <div><p class="eyebrow">Tableau de progression</p><h2 id="tournament-board-title">Tournoi amateur</h2></div>
+          <div><p class="eyebrow">Compétition sur plusieurs jours</p><h2 id="tournament-board-title">Tournoi amateur</h2></div>
           <button id="tournament-board-close" class="dialog-close" type="button" aria-label="Fermer">×</button>
         </div>
         <div id="tournament-board-status" class="tournament-board-status"></div>
-        <div id="tournament-bracket" class="tournament-bracket"></div>
+        <div id="tournament-daily-status" class="tournament-daily-status" aria-live="polite"></div>
+        <details class="tournament-bracket-disclosure" open>
+          <summary>Tableau et adversaires</summary>
+          <div id="tournament-bracket" class="tournament-bracket"></div>
+        </details>
+        <section id="tournament-interbout" class="tournament-interbout" hidden aria-labelledby="tournament-interbout-title">
+          <div><p class="eyebrow">Fin de journée</p><h3 id="tournament-interbout-title">Préparer le prochain combat</h3></div>
+          <p id="tournament-recovery-preview"></p>
+          <div id="tournament-recovery-choices" class="tournament-recovery-choices"></div>
+        </section>
         <div class="tournament-board-actions"><button id="tournament-next-fight" class="primary-button" type="button">Disputer le prochain combat</button></div>
       </div>
     </dialog>
 
     <dialog id="fight-dialog" class="fight-dialog" aria-labelledby="fight-opponent-name">
       <div class="fight-card">
-        <div class="fight-topline"><span id="fight-week-label">Combat amateur</span><strong id="fight-round">Round 1 / 3</strong></div>
-        <div class="ring-scoreboard">
-          <div class="corner player-corner"><img class="fight-portrait" src="assets/boxeur-coin-bleu.png" width="1024" height="1536" loading="lazy" decoding="async" alt="Portrait illustré du boxeur du coin bleu"><span id="fight-player-name">Toi</span><small id="fight-player-meta">Coin bleu</small><strong id="fight-player-energy">100%</strong><div class="fight-energy-track" aria-hidden="true"><span id="fight-player-energy-bar"></span></div><small>Énergie</small></div>
-          <div class="score"><span>Score</span><strong id="fight-score">0 — 0</strong><small id="fight-status">Premier round</small></div>
-          <div class="corner opponent-corner"><img class="fight-portrait" src="assets/adversaire-coin-rouge.png" width="1024" height="1536" loading="lazy" decoding="async" alt="Portrait illustré de l’adversaire du coin rouge"><span id="fight-opponent-name">Adversaire</span><small id="fight-opponent-meta">Coin rouge</small><strong id="fight-opponent-energy">100%</strong><div class="fight-energy-track" aria-hidden="true"><span id="fight-opponent-energy-bar"></span></div><small>Énergie</small></div>
+        <div class="fight-topline"><span id="fight-week-label">Combat amateur</span><strong id="fight-round">Round 1 / 3 · échange 1 / 5</strong></div>
+
+        <div id="fight-ring-stage" class="fight-ring-stage" data-cue="neutral">
+          <img class="ring-backdrop" src="assets/ring-tactique.webp" width="1280" height="720" loading="lazy" decoding="async" alt="Ring de boxe, coin bleu à gauche et coin rouge à droite" />
+          <div class="ring-fighter ring-fighter-player" aria-hidden="true"><div class="ring-fighter-silhouette"></div></div>
+          <div class="ring-fighter ring-fighter-opponent" aria-hidden="true"><div class="ring-fighter-silhouette"></div></div>
+          <img id="fight-impact-effect" class="fight-impact-effect" src="assets/effet-impact.webp" width="512" height="512" loading="lazy" decoding="async" alt="" aria-hidden="true" />
+          <div class="ring-position-labels" aria-hidden="true"><span>Câbles bleus</span><strong>Centre</strong><span>Câbles rouges</span></div>
         </div>
+
+        <div class="ring-scoreboard">
+          <div class="corner player-corner">
+            <div class="fight-portrait portrait-crop"><img id="fight-player-portrait" src="assets/portraits-hommes.webp" width="1152" height="768" loading="lazy" decoding="async" alt="" /></div>
+            <span id="fight-player-name">Toi</span><small id="fight-player-meta">Coin bleu</small>
+            <strong id="fight-player-energy">100%</strong><div class="fight-energy-track" aria-hidden="true"><span id="fight-player-energy-bar"></span></div><small>Énergie</small>
+          </div>
+          <div class="score"><span id="fight-score-label">Décision cachée</span><strong id="fight-score">—</strong><small id="fight-status">Premier échange</small></div>
+          <div class="corner opponent-corner">
+            <div class="fight-portrait"><img id="fight-opponent-portrait" src="assets/adversaire-coin-rouge.webp" width="512" height="768" loading="lazy" decoding="async" alt="Portrait illustré de l’adversaire" /></div>
+            <span id="fight-opponent-name">Adversaire</span><small id="fight-opponent-meta">Coin rouge</small>
+            <strong id="fight-opponent-energy">100%</strong><div class="fight-energy-track" aria-hidden="true"><span id="fight-opponent-energy-bar"></span></div><small>Énergie estimée</small>
+          </div>
+        </div>
+
+        <div class="fight-state-strip" aria-label="Situation actuelle du ring">
+          <div><span>Distance</span><strong id="fight-distance">Extérieur</strong></div>
+          <div><span>Position</span><strong id="fight-position">Centre du ring</strong></div>
+          <div><span>Initiative</span><strong id="fight-momentum">Équilibrée</strong></div>
+          <div><span>Lucidité</span><strong id="fight-composure">Calme</strong></div>
+          <div><span>Tête</span><strong id="fight-head-status">Intacte</strong></div>
+          <div><span>Corps</span><strong id="fight-body-status">Intact</strong></div>
+        </div>
+
         <div class="fight-tactics">
           <div><span>Lecture adverse</span><strong id="fight-opponent-tell">Tendance inconnue</strong><small id="fight-tactical-hint">Observe son style avant de choisir.</small></div>
-          <div><span>Dynamique</span><strong id="fight-momentum">Combat équilibré</strong><small>Varie tes consignes pour rester imprévisible.</small></div>
-          <button id="fight-corner-boost" class="secondary-button" type="button" disabled>Souffler au coin · +8 E</button>
+          <div><span>Directive du coach</span><strong id="fight-coach-directive">À définir</strong><small id="fight-coach-confidence">Son diagnostic peut être imparfait.</small></div>
+          <button id="fight-corner-boost" class="secondary-button" type="button" hidden disabled>Récupérer au coin</button>
         </div>
-        <div id="fight-round-track" class="fight-round-track" aria-label="Résultats des rounds"></div>
-        <div id="fight-instruction" class="fight-instruction" aria-live="polite"><p>Choisis une consigne pour ce round.</p></div>
-        <div id="fight-choices" class="fight-choices">
-          <button type="button" data-strategy="attack"><strong>Attaquer</strong><span>Puissance, technique · fatigue élevée</span></button>
-          <button type="button" data-strategy="distance"><strong>Boxer à distance</strong><span>Technique, cardio · fatigue modérée</span></button>
-          <button type="button" data-strategy="defense"><strong>Jouer la défense</strong><span>Défense, cardio · fatigue réduite</span></button>
+
+        <section id="fight-coach-panel" class="fight-coach-panel" aria-labelledby="fight-coach-title">
+          <div><p class="eyebrow">Le coin te parle</p><h3 id="fight-coach-title">Directive avant le round</h3></div>
+          <p id="fight-coach-analysis">Le coach étudie l’adversaire et la situation réelle du ring.</p>
+          <div id="fight-coach-choices" class="fight-coach-choices"></div>
+        </section>
+
+        <div id="fight-round-track" class="fight-round-track" aria-label="Progression des rounds"></div>
+        <div id="fight-instruction" class="fight-instruction" aria-live="polite"><p>Écoute le coach avant le premier échange.</p></div>
+        <div class="fight-decision-area">
+          <div id="fight-choices" class="fight-choices"></div>
         </div>
+        <details class="fight-log-disclosure" open>
+          <summary>Échanges récents</summary>
+          <ol id="fight-log" class="fight-log"></ol>
+        </details>
+        <div id="fight-judge-cards" class="fight-judge-cards" hidden></div>
+        <div id="fight-announcer" class="visually-hidden" role="status" aria-live="assertive"></div>
       </div>
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="career-calendar.js"></script>
+    <script src="tournament-engine.js"></script>
+    <script src="combat-engine.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

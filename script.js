@@ -5,11 +5,55 @@ const STRENGTH_GYM_PRICE = 95;
 const PRIVATE_PRICE = 90;
 const TOURNAMENT_PREP_WEEKS = 4;
 const SAVE_KEY = "boxeur-deux-career-v2";
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 const MAX_SUPPLEMENTS_PER_WEEK = 2;
 const SPONSOR_COOLDOWN_WEEKS = 4;
 
-const weightClasses = ["Poids plume", "Poids léger", "Poids super-léger", "Poids welter", "Poids moyen", "Poids mi-lourd", "Poids lourd"];
+const weightClassDefs = Object.freeze({
+  male: Object.freeze([
+    { id: "M50", label: "M50 · 47 à 50 kg", minKg: 47, maxKg: 50 },
+    { id: "M55", label: "M55 · 50 à 55 kg", minKg: 50, maxKg: 55 },
+    { id: "M60", label: "M60 · 55 à 60 kg", minKg: 55, maxKg: 60 },
+    { id: "M65", label: "M65 · 60 à 65 kg", minKg: 60, maxKg: 65 },
+    { id: "M70", label: "M70 · 65 à 70 kg", minKg: 65, maxKg: 70 },
+    { id: "M75", label: "M75 · 70 à 75 kg", minKg: 70, maxKg: 75 },
+    { id: "M80", label: "M80 · 75 à 80 kg", minKg: 75, maxKg: 80 },
+    { id: "M85", label: "M85 · 80 à 85 kg", minKg: 80, maxKg: 85 },
+    { id: "M90", label: "M90 · 85 à 90 kg", minKg: 85, maxKg: 90 },
+    { id: "M90+", label: "M90+ · plus de 90 kg", minKg: 90, maxKg: 130 },
+  ]),
+  female: Object.freeze([
+    { id: "W48", label: "W48 · 45 à 48 kg", minKg: 45, maxKg: 48 },
+    { id: "W51", label: "W51 · 48 à 51 kg", minKg: 48, maxKg: 51 },
+    { id: "W54", label: "W54 · 51 à 54 kg", minKg: 51, maxKg: 54 },
+    { id: "W57", label: "W57 · 54 à 57 kg", minKg: 54, maxKg: 57 },
+    { id: "W60", label: "W60 · 57 à 60 kg", minKg: 57, maxKg: 60 },
+    { id: "W65", label: "W65 · 60 à 65 kg", minKg: 60, maxKg: 65 },
+    { id: "W70", label: "W70 · 65 à 70 kg", minKg: 65, maxKg: 70 },
+    { id: "W75", label: "W75 · 70 à 75 kg", minKg: 70, maxKg: 75 },
+    { id: "W80", label: "W80 · 75 à 80 kg", minKg: 75, maxKg: 80 },
+    { id: "W80+", label: "W80+ · plus de 80 kg", minKg: 80, maxKg: 120 },
+  ]),
+});
+const weightClasses = [...weightClassDefs.male, ...weightClassDefs.female].map(item => item.id);
+
+function weightClassesForSex(sex = "male") {
+  return weightClassDefs[sex === "female" ? "female" : "male"];
+}
+
+function weightClassDefinition(id, sex = "male") {
+  return weightClassesForSex(sex).find(item => item.id === id) || weightClassesForSex(sex)[3];
+}
+
+function weightClassLabel(id, sex = "male") {
+  return weightClassDefinition(id, sex).label;
+}
+
+function defaultCompetitionWeight(category) {
+  const span = category.maxKg - category.minKg;
+  const value = span > 10 ? category.minKg + 3 : category.minKg + span * .65;
+  return Math.round(value * 10) / 10;
+}
 
 const combatLabels = {
   technique: "Technique",
@@ -32,20 +76,37 @@ const fightStrategies = {
 };
 
 const opponents = [
-  { id: "leclerc", name: "Thomas Leclerc", nickname: "BETON", style: "Technicien", record: "1 V · 1 D · 0 N", difficulty: 36, risk: "Accessible", dateLead: 3 },
-  { id: "kramer", name: "Maxime Kramer", nickname: "THE QUITTER", style: "Défensif", record: "0 V · 2 D · 0 N", difficulty: 34, risk: "Accessible", dateLead: 4 },
-  { id: "okafor", name: "Darnell Okafor", nickname: "Brick", style: "Puncheur", record: "2 V · 1 D · 0 N", difficulty: 40, risk: "Modéré", dateLead: 4 },
-  { id: "martel", name: "Émile Martel", nickname: "Le Serein", style: "Contre-attaquant", record: "1 V · 2 D · 1 N", difficulty: 43, risk: "Relevé", dateLead: 5 },
-  { id: "gagnon", name: "Olivier Gagnon", nickname: "Le Bûcheron", style: "Bagarreur", record: "3 V · 2 D · 0 N", difficulty: 44, risk: "Relevé", dateLead: 4 },
-  { id: "nguyen", name: "Minh Nguyen", nickname: "Vif-Argent", style: "Boxeur mobile", record: "2 V · 0 D · 1 N", difficulty: 42, risk: "Modéré", dateLead: 5 },
-  { id: "bouchard", name: "Samuel Bouchard", nickname: "Le Mur", style: "Défensif", record: "4 V · 3 D · 0 N", difficulty: 46, risk: "Relevé", dateLead: 5 },
-  { id: "haddad", name: "Yanis Haddad", nickname: "Le Cobra", style: "Contre-attaquant", record: "3 V · 1 D · 1 N", difficulty: 45, risk: "Relevé", dateLead: 5 },
-  { id: "wilson", name: "Jayden Wilson", nickname: "Quickstep", style: "Technicien", record: "2 V · 2 D · 0 N", difficulty: 41, risk: "Modéré", dateLead: 3 },
-  { id: "caron", name: "Alexis Caron", nickname: "La Masse", style: "Puncheur", record: "5 V · 3 D · 0 N", difficulty: 48, risk: "Difficile", dateLead: 4 },
+  { id: "leclerc", name: "Thomas Leclerc", nickname: "BETON", style: "Technicien", record: "1 V · 1 D", difficulty: 36, risk: "Accessible", dateLead: 3 },
+  { id: "kramer", name: "Maxime Kramer", nickname: "THE QUITTER", style: "Défensif", record: "0 V · 2 D", difficulty: 34, risk: "Accessible", dateLead: 4 },
+  { id: "okafor", name: "Darnell Okafor", nickname: "Brick", style: "Puncheur", record: "2 V · 1 D", difficulty: 40, risk: "Modéré", dateLead: 4 },
+  { id: "martel", name: "Émile Martel", nickname: "Le Serein", style: "Contre-attaquant", record: "2 V · 2 D", difficulty: 43, risk: "Relevé", dateLead: 5 },
+  { id: "gagnon", name: "Olivier Gagnon", nickname: "Le Bûcheron", style: "Bagarreur", record: "3 V · 2 D", difficulty: 44, risk: "Relevé", dateLead: 4 },
+  { id: "nguyen", name: "Minh Nguyen", nickname: "Vif-Argent", style: "Boxeur mobile", record: "3 V · 0 D", difficulty: 42, risk: "Modéré", dateLead: 5 },
+  { id: "bouchard", name: "Samuel Bouchard", nickname: "Le Mur", style: "Défensif", record: "4 V · 3 D", difficulty: 46, risk: "Relevé", dateLead: 5 },
+  { id: "haddad", name: "Yanis Haddad", nickname: "Le Cobra", style: "Contre-attaquant", record: "4 V · 1 D", difficulty: 45, risk: "Relevé", dateLead: 5 },
+  { id: "wilson", name: "Jayden Wilson", nickname: "Quickstep", style: "Technicien", record: "2 V · 2 D", difficulty: 41, risk: "Modéré", dateLead: 3 },
+  { id: "caron", name: "Alexis Caron", nickname: "La Masse", style: "Puncheur", record: "5 V · 3 D", difficulty: 48, risk: "Difficile", dateLead: 4 },
 ];
 
+const femaleOpponents = [
+  { id: "f-beaulieu", name: "Camille Beaulieu", nickname: "La Boussole", style: "Technicien", record: "1 V · 1 D", difficulty: 36, risk: "Accessible", dateLead: 3 },
+  { id: "f-kim", name: "Naomi Kim", nickname: "Quickstep", style: "Défensif", record: "0 V · 2 D", difficulty: 34, risk: "Accessible", dateLead: 4 },
+  { id: "f-okafor", name: "Amara Okafor", nickname: "Brick", style: "Puncheur", record: "2 V · 1 D", difficulty: 40, risk: "Modéré", dateLead: 4 },
+  { id: "f-martel", name: "Élodie Martel", nickname: "La Sereine", style: "Contre-attaquant", record: "2 V · 2 D", difficulty: 43, risk: "Relevé", dateLead: 5 },
+  { id: "f-gagnon", name: "Marianne Gagnon", nickname: "La Forge", style: "Bagarreur", record: "3 V · 2 D", difficulty: 44, risk: "Relevé", dateLead: 4 },
+  { id: "f-nguyen", name: "Linh Nguyen", nickname: "Vif-Argent", style: "Boxeur mobile", record: "3 V · 1 D", difficulty: 42, risk: "Modéré", dateLead: 5 },
+  { id: "f-bouchard", name: "Sophie Bouchard", nickname: "Le Mur", style: "Défensif", record: "4 V · 3 D", difficulty: 46, risk: "Relevé", dateLead: 5 },
+  { id: "f-haddad", name: "Maya Haddad", nickname: "Le Cobra", style: "Contre-attaquant", record: "3 V · 1 D", difficulty: 45, risk: "Relevé", dateLead: 5 },
+  { id: "f-wilson", name: "Avery Wilson", nickname: "North Star", style: "Technicien", record: "2 V · 2 D", difficulty: 41, risk: "Modéré", dateLead: 3 },
+  { id: "f-caron", name: "Maude Caron", nickname: "La Masse", style: "Puncheur", record: "5 V · 3 D", difficulty: 48, risk: "Difficile", dateLead: 4 },
+];
+
+function opponentPool() {
+  return state?.profile?.sex === "female" ? femaleOpponents : opponents;
+}
+
 const tournamentDefs = [
-  { id: "bronze", medal: "III", name: "Gants de bronze", description: "8 participants · 3 combats · occasion unique au 5e combat.", participants: 8, rounds: 3, baseDifficulty: 45 },
+  { id: "bronze", medal: "III", name: "Gants de bronze", description: "8 participants · 3 combats · inscription de 0 à 5 combats amateurs.", participants: 8, rounds: 3, baseDifficulty: 45 },
   { id: "silver", medal: "II", name: "Gants d’argent", description: "8 participants · 3 combats · inscription du 6e au 10e combat.", participants: 8, rounds: 3, baseDifficulty: 52 },
   { id: "golden", medal: "I", name: "Gants dorés", description: "8 participants · 3 combats · rejouable dès 10 combats.", participants: 8, rounds: 3, baseDifficulty: 64 },
   { id: "canadian", medal: "CA", name: "Championnat canadien", description: "32 participants · 5 combats · exige l’or aux Gants dorés.", participants: 32, rounds: 5, baseDifficulty: 70 },
@@ -57,6 +118,12 @@ const tournamentNames = [
   ["Ryan", "McKenna", "North Star"], ["Aleksandar", "Petrov", "Le Métronome"], ["Diego", "Vargas", "El Fuego"],
   ["Noah", "Kim", "Le Fantôme"], ["Lucas", "Moreau", "La Flèche"], ["Amir", "Benali", "Le Roc"],
   ["Mateo", "Silva", "Tempête"], ["Ethan", "Clarke", "Ice"], ["Hugo", "Laroche", "Le Faucon"]
+];
+const tournamentNamesFemale = [
+  ["Jade", "Roy", "Le Marteau"], ["Sarah", "Tremblay", "L’Éclair"], ["Amina", "Diallo", "L’Architecte"],
+  ["Olivia", "McKenna", "North Star"], ["Irina", "Petrova", "Le Métronome"], ["Lucía", "Vargas", "Fuego"],
+  ["Hana", "Kim", "Le Fantôme"], ["Léa", "Moreau", "La Flèche"], ["Noura", "Benali", "Le Roc"],
+  ["Valentina", "Silva", "Tempête"], ["Emma", "Clarke", "Ice"], ["Chloé", "Laroche", "Le Faucon"]
 ];
 const tournamentStyles = ["Pression", "Boxeur mobile", "Contre-attaquant", "Puncheur", "Défensif", "Complet"];
 
@@ -85,6 +152,7 @@ const INITIAL_STATE = {
   injury: 8,
   fatigue: 0,
   injuryWeeks: 0,
+  injuryStartedWeek: 0,
   privateProgram: null,
   experience: 0,
   level: 1,
@@ -97,6 +165,10 @@ const INITIAL_STATE = {
   professionalRecord: { wins: 0, losses: 0, draws: 0 },
   careerStatus: "amateur",
   scheduledFight: null,
+  calendar: null,
+  bookings: [],
+  currentWeightKg: null,
+  migrationPending: false,
   tournaments: { bronze: "pending", silver: "pending", golden: "pending", canadian: "locked", olympic: "locked" },
   activeTournament: null,
   medals: {
@@ -234,6 +306,7 @@ let weeklyPlan = [];
 let toastTimer;
 let fightState = null;
 let selectedPrivateCoachId = null;
+let draftPortraitId = 0;
 
 const clamp = (value, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 const escapeHTML = value => String(value).replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
@@ -244,6 +317,37 @@ const safeNumber = (value, fallback = 0, min = 0, max = 100, integer = true) => 
   const bounded = clamp(normalized, min, max);
   return integer ? Math.round(bounded) : bounded;
 };
+const safeIdentifier = (value, fallback = "") => safeText(value, fallback, 180).replace(/[^a-zA-Z0-9._:-]/g, "-");
+
+function normalizeStoredBooking(booking, index) {
+  if (!booking || typeof booking !== "object") return null;
+  const eventId = safeIdentifier(booking.eventId || booking.event?.id, `legacy-event-${index}`);
+  const status = ["registered", "active", "completed", "cancelled", "withdrawn"].includes(booking.status) ? booking.status : "registered";
+  return {
+    id: safeIdentifier(booking.id, `booking-${eventId}`),
+    eventId,
+    event: null,
+    status,
+    registeredOn: /^\d{4}-\d{2}-\d{2}$/.test(booking.registeredOn || "") ? booking.registeredOn : null,
+    travelOptionId: safeIdentifier(booking.travelOptionId, "none"),
+    interval: null,
+    payment: {
+      total: safeNumber(booking.payment?.total, 0, 0, 100000),
+      status: ["paid", "grandfathered"].includes(booking.payment?.status) ? booking.payment.status : "paid",
+      transactionId: safeIdentifier(booking.payment?.transactionId, "") || null,
+    },
+    travelEffects: {
+      energy: safeNumber(booking.travelEffects?.energy, 0, -100, 100),
+      fatigue: safeNumber(booking.travelEffects?.fatigue, 0, -100, 100),
+    },
+    eligibilityAtRegistration: booking.eligibilityAtRegistration && typeof booking.eligibilityAtRegistration === "object" ? cloneData(booking.eligibilityAtRegistration) : null,
+    eligibilitySnapshot: booking.eligibilitySnapshot && typeof booking.eligibilitySnapshot === "object" ? cloneData(booking.eligibilitySnapshot) : null,
+    weighInStatus: safeText(booking.weighInStatus, "pending", 40),
+    expectedBouts: safeNumber(booking.expectedBouts, 1, 1, 5),
+    grandfathered: Boolean(booking.grandfathered),
+    travelApplied: Boolean(booking.travelApplied),
+  };
+}
 
 function normalizeRecord(record, fallback) {
   const source = record && typeof record === "object" ? record : {};
@@ -262,7 +366,7 @@ function normalizeOpponentData(opponent, fallbackWeightClass) {
     nickname: safeText(opponent.nickname, "Sans surnom", 50),
     weightClass: weightClasses.includes(opponent.weightClass) ? opponent.weightClass : fallbackWeightClass,
     style: safeText(opponent.style, "Équilibré", 40),
-    record: safeText(opponent.record, "0 V · 0 D · 0 N", 40),
+    record: safeText(opponent.record, "0 V · 0 D", 40),
     difficulty: safeNumber(opponent.difficulty, 40, 20, 99),
     rating: safeNumber(opponent.rating ?? opponent.difficulty, 40, 20, 99),
     risk: safeText(opponent.risk, "Modéré", 30),
@@ -278,11 +382,16 @@ function normalizeOpponentData(opponent, fallbackWeightClass) {
 function normalizeCareerState(source) {
   if (!source?.profile || typeof source.profile !== "object") throw new Error("Profil manquant");
   const base = cloneData(INITIAL_STATE);
+  const hasCompetitionSex = ["male", "female"].includes(source.profile.sex);
+  const profileSex = hasCompetitionSex ? source.profile.sex : "male";
+  const allowedWeights = weightClassesForSex(profileSex).map(item => item.id);
   const profile = {
     firstName: safeText(source.profile.firstName, "Boxeur", 30),
     lastName: safeText(source.profile.lastName, "Deux", 30),
     nickname: safeText(source.profile.nickname, "", 30),
-    weightClass: weightClasses.includes(source.profile.weightClass) ? source.profile.weightClass : "Poids welter",
+    sex: profileSex,
+    weightClass: allowedWeights.includes(source.profile.weightClass) ? source.profile.weightClass : weightClassesForSex(profileSex)[3].id,
+    portraitId: safeNumber(source.profile.portraitId, 0, 0, 2),
     style: styles[source.profile.style] ? source.profile.style : "balanced",
     corner: source.profile.corner === "blue" ? "blue" : "red",
   };
@@ -290,6 +399,13 @@ function normalizeCareerState(source) {
     ...base,
     ...source,
     profile,
+    migrationPending: Boolean(source.migrationPending) || !hasCompetitionSex || !allowedWeights.includes(source.profile.weightClass),
+    bookings: Array.isArray(source.bookings) ? source.bookings.slice(0, 30).map(normalizeStoredBooking).filter(Boolean) : [],
+    calendar: source.calendar && typeof source.calendar === "object" ? {
+      version: safeNumber(source.calendar.version, 0, 0, 20),
+      epoch: /^\d{4}-\d{2}-\d{2}$/.test(source.calendar.epoch || "") ? source.calendar.epoch : null,
+      seed: safeText(source.calendar.seed, `${profile.firstName}-${profile.lastName}-${profile.sex}`, 120),
+    } : null,
     careerStatus: source.careerStatus === "professional" ? "professional" : "amateur",
     combatStats: Object.fromEntries(Object.keys(combatLabels).map(key => [key, safeNumber(source.combatStats?.[key], base.combatStats[key], 0, 99)])),
     amateurRecord: normalizeRecord(source.amateurRecord, base.amateurRecord),
@@ -313,9 +429,12 @@ function normalizeCareerState(source) {
     week: [1, 99999], money: [0, 9999999], energy: [0, 100], fitness: [0, 100], morale: [0, 100], reputation: [0, 100],
     injury: [0, 100], fatigue: [0, 100], injuryWeeks: [0, 52], experience: [0, 10000000], level: [1, 999], levelPoints: [0, 9999],
     gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], workStreak: [0, 3], sponsorAvailableWeek: [1, 99999],
-    supplementWeek: [1, 99999], avoidanceWeeks: [0, 999], lastFightWeek: [0, 99999],
+    supplementWeek: [1, 99999], avoidanceWeeks: [0, 999], lastFightWeek: [0, 99999], injuryStartedWeek: [0, 99999],
   };
   Object.entries(boundedStats).forEach(([key, [min, max]]) => { normalized[key] = safeNumber(source[key], base[key] ?? min, min, max); });
+  const category = weightClassDefinition(profile.weightClass, profile.sex);
+  const defaultWeight = defaultCompetitionWeight(category);
+  normalized.currentWeightKg = safeNumber(source.currentWeightKg, defaultWeight, 35, 140, false);
   normalized.experience = Math.max(normalized.experience, xpForLevel(normalized.level));
   normalized.levelPoints = safeNumber(source.levelPoints, base.levelPoints, 0, 9999);
   normalized.goldenPlacement = [1, 2, 3].includes(Number(source.goldenPlacement)) ? Number(source.goldenPlacement) : null;
@@ -380,6 +499,100 @@ function persistCareer() {
   }
 }
 
+function calendarSeedForCareer() {
+  return `${state.profile?.firstName || "boxeur"}-${state.profile?.lastName || "deux"}-${state.profile?.sex || "male"}`;
+}
+
+function ensureCareerCalendar() {
+  if (!globalThis.BoxeurCalendar || !state.profile) return;
+  const throughWeek = Math.max(10, state.week + 8);
+  const config = {
+    seed: state.calendar?.seed || calendarSeedForCareer(),
+    epoch: state.calendar?.epoch || undefined,
+    startWeek: 1,
+    weeks: throughWeek,
+  };
+  if (state.calendar?.version === BoxeurCalendar.CALENDAR_VERSION && Array.isArray(state.calendar.events)) {
+    state.calendar = BoxeurCalendar.extendCalendar(state.calendar, { throughWeek });
+    rehydrateCalendarBookings();
+    linkLegacyCompetitionBookings();
+    return;
+  }
+  const migrated = BoxeurCalendar.migrateLegacyState({ ...state, calendar: null }, { legacySaveVersion: SAVE_VERSION - 1, seed: config.seed, epoch: config.epoch, currentWeek: state.week });
+  const generated = BoxeurCalendar.generateCalendar(config);
+  const events = new Map(generated.events.map(event => [event.id, event]));
+  (migrated.events || []).forEach(event => events.set(event.id, event));
+  state.calendar = { ...generated, events: [...events.values()].sort((left, right) => left.startDate.localeCompare(right.startDate) || left.id.localeCompare(right.id)) };
+  if (!state.bookings.length && migrated.bookings?.length) state.bookings = migrated.bookings;
+  rehydrateCalendarBookings();
+  linkLegacyCompetitionBookings();
+}
+
+function rehydrateCalendarBookings() {
+  if (!state.calendar?.events || !Array.isArray(state.bookings)) return;
+  const events = new Map(state.calendar.events.map(event => [event.id, event]));
+  state.bookings = state.bookings.map(booking => {
+    const event = events.get(booking.eventId);
+    if (!event) return null;
+    let interval;
+    try {
+      interval = booking.grandfathered
+        ? { startDate: event.startDate, endDate: event.endDate, travelOptionId: booking.travelOptionId }
+        : BoxeurCalendar.bookingInterval(event, booking.travelOptionId);
+    } catch {
+      interval = { startDate: event.startDate, endDate: event.endDate, travelOptionId: booking.travelOptionId };
+    }
+    return { ...booking, event: cloneData(event), interval };
+  }).filter(Boolean);
+}
+
+function linkLegacyCompetitionBookings() {
+  if (!Array.isArray(state.bookings)) return;
+  const usable = state.bookings.filter(booking => !["cancelled", "withdrawn", "completed"].includes(booking.status));
+  if (state.activeTournament && !state.activeTournament.bookingId) {
+    const booking = usable.find(item => item.event?.kind === "tournament" && item.event?.tournamentId === state.activeTournament.id && item.event?.careerWeek === state.activeTournament.startWeek)
+      || usable.find(item => item.event?.kind === "tournament" && item.event?.tournamentId === state.activeTournament.id);
+    if (booking) {
+      state.activeTournament.bookingId = booking.id;
+      state.activeTournament.eventId = booking.eventId;
+    }
+  }
+  if (!state.scheduledFight || state.scheduledFight.bookingId) return;
+  const booking = state.scheduledFight.tournamentId
+    ? usable.find(item => item.id === state.activeTournament?.bookingId || (item.event?.kind === "tournament" && item.event?.tournamentId === state.scheduledFight.tournamentId))
+    : usable.find(item => item.event?.kind === "gala" && item.event?.careerWeek === state.scheduledFight.week && item.grandfathered);
+  if (!booking) return;
+  state.scheduledFight.bookingId = booking.id;
+  state.scheduledFight.eventId = booking.eventId;
+  state.scheduledFight.event = cloneData(booking.event);
+  state.scheduledFight.travelEffects ||= cloneData(booking.travelEffects || { energy: 0, fatigue: 0 });
+  state.scheduledFight.travelApplied = Boolean(booking.travelApplied || booking.grandfathered);
+}
+
+function careerWeekDate(weekday = 0) {
+  if (!globalThis.BoxeurCalendar) return null;
+  ensureCareerCalendar();
+  return BoxeurCalendar.dateForCareerWeek(state.calendar.epoch, state.week, weekday);
+}
+
+function activeBookings() {
+  return (state.bookings || []).filter(booking => !["cancelled", "withdrawn", "completed"].includes(booking.status));
+}
+
+function bookingForEvent(eventId) {
+  return (state.bookings || []).find(booking => booking.eventId === eventId && !["cancelled", "withdrawn"].includes(booking.status)) || null;
+}
+
+function dueTournamentBooking() {
+  const weekStart = careerWeekDate(0);
+  const weekEnd = careerWeekDate(6);
+  return activeBookings().find(booking => booking.event?.kind === "tournament" && booking.event.startDate <= weekEnd && booking.event.endDate >= weekStart) || null;
+}
+
+function dueGalaBooking() {
+  return activeBookings().find(booking => booking.event?.kind === "gala" && booking.event.careerWeek === state.week) || null;
+}
+
 function normalizeCompetitionState() {
   if (state.activeTournament) {
     const tournament = tournamentDefs.find(item => item.id === state.activeTournament.id);
@@ -401,6 +614,58 @@ function normalizeCompetitionState() {
       })) : [];
       raw.medal = ["bronze", "silver", "gold"].includes(raw.medal) ? raw.medal : null;
       raw.summary = safeText(raw.summary, "", 300);
+      raw.eventId = safeText(raw.eventId, "", 140) || null;
+      raw.bookingId = safeText(raw.bookingId, "", 180) || null;
+      const deferred = raw.deferredScheduledFight;
+      const deferredOpponent = normalizeOpponentData(deferred?.opponent, state.profile.weightClass);
+      if (deferred && !deferred.tournamentId && deferredOpponent) {
+        raw.deferredScheduledFight = {
+          id: deferredOpponent.id,
+          opponent: deferredOpponent,
+          tournamentId: null,
+          tournamentRound: null,
+          week: safeNumber(deferred.week, state.week + 1, state.week + 1, 99999),
+          bookingId: safeText(deferred.bookingId, "", 180) || null,
+          eventId: safeText(deferred.eventId, "", 140) || null,
+          event: deferred.event && typeof deferred.event === "object" ? cloneData(deferred.event) : null,
+          homeAdvantage: deferred.homeAdvantage && typeof deferred.homeAdvantage === "object" ? cloneData(deferred.homeAdvantage) : null,
+          travelEffects: deferred.travelEffects && typeof deferred.travelEffects === "object" ? {
+            energy: safeNumber(deferred.travelEffects.energy, 0, -100, 100),
+            fatigue: safeNumber(deferred.travelEffects.fatigue, 0, -100, 100),
+          } : { energy: 0, fatigue: 0 },
+          travelApplied: Boolean(deferred.travelApplied),
+          fightSeed: safeText(deferred.fightSeed, "", 220) || freshFightSeed("gala-restaure"),
+        };
+      } else {
+        delete raw.deferredScheduledFight;
+      }
+      if (globalThis.BoxeurTournament && raw.status !== "completed") {
+        const category = weightClassDefinition(state.profile.weightClass, state.profile.sex);
+        const context = {
+          id: raw.eventId || `${raw.id}-legacy-${raw.startWeek}`,
+          totalBouts: tournament.rounds,
+          started: state.week >= raw.startWeek,
+          condition: {
+            energy: state.energy,
+            fatigue: state.fatigue,
+            injury: state.injury,
+            fitness: state.fitness,
+            cardio: state.combatStats.cardio,
+            headDamage: 0,
+            bodyDamage: 0,
+            lucidity: 100,
+          },
+          weight: { className: category.label, minKg: category.minKg, maxKg: category.maxKg },
+        };
+        try {
+          raw.competition = raw.competition
+            ? BoxeurTournament.normalizeTournament(raw.competition, context)
+            : BoxeurTournament.migrateLegacyTournament(raw, context);
+        } catch (error) {
+          console.warn("[Boxeur Deux] Migration du tournoi actif impossible; un nouvel état quotidien est créé.", error);
+          raw.competition = BoxeurTournament.createTournament({ ...context, started: context.started });
+        }
+      }
       state.tournaments[tournament.id] = raw.status === "completed" ? state.tournaments[tournament.id] : "entered";
     }
   }
@@ -414,7 +679,7 @@ function normalizeCompetitionState() {
   }
   const tournamentRound = tournament ? safeNumber(raw.tournamentRound, state.activeTournament.currentRound, 0, tournament.rounds - 1) : null;
   const embedded = normalizeOpponentData(raw.opponent, state.profile.weightClass);
-  const localTemplate = opponents.find(item => item.id === raw.id);
+  const localTemplate = [...opponents, ...femaleOpponents].find(item => item.id === raw.id);
   const tournamentOpponent = tournament ? state.activeTournament.opponents[tournamentRound] : null;
   const opponent = embedded || tournamentOpponent || (localTemplate ? normalizeOpponentData(localTemplate, state.profile.weightClass) : null);
   if (!opponent) {
@@ -422,11 +687,21 @@ function normalizeCompetitionState() {
     return;
   }
   state.scheduledFight = {
+    ...raw,
     id: opponent.id,
     opponent,
     tournamentId: tournament?.id || null,
     tournamentRound,
     week: safeNumber(raw.week, state.week, 1, 99999),
+    bookingId: safeText(raw.bookingId, "", 180) || null,
+    eventId: safeText(raw.eventId, "", 140) || null,
+    event: raw.event && typeof raw.event === "object" ? cloneData(raw.event) : null,
+    homeAdvantage: raw.homeAdvantage && typeof raw.homeAdvantage === "object" ? cloneData(raw.homeAdvantage) : null,
+    travelEffects: raw.travelEffects && typeof raw.travelEffects === "object" ? {
+      energy: safeNumber(raw.travelEffects.energy, 0, -100, 100),
+      fatigue: safeNumber(raw.travelEffects.fatigue, 0, -100, 100),
+    } : { energy: 0, fatigue: 0 },
+    travelApplied: Boolean(raw.travelApplied),
   };
 }
 
@@ -437,6 +712,7 @@ function hydrateCareer(snapshot) {
   try {
     state = normalizeCareerState(source);
     normalizeCompetitionState();
+    ensureCareerCalendar();
     syncLevelProgress();
     const seenActions = new Set();
     weeklyPlan = (Array.isArray(snapshot?.weeklyPlan) ? snapshot.weeklyPlan : []).filter(item => {
@@ -454,6 +730,16 @@ function hydrateCareer(snapshot) {
     weeklyPlan = previousPlan;
     throw error;
   }
+}
+
+function maybeShowDivisionMigration() {
+  const dialog = document.querySelector("#division-migration-dialog");
+  if (!state.profile || !state.migrationPending || state.scheduledFight || state.activeTournament || dialog?.open) return;
+  const sexSelect = document.querySelector("#migration-sex");
+  sexSelect.value = state.profile.sex || "male";
+  renderWeightOptions(document.querySelector("#migration-weight"), sexSelect.value, state.profile.weightClass);
+  document.querySelector("#migration-portrait").value = String(state.profile.portraitId || 0);
+  dialog.showModal();
 }
 
 function loadSavedSnapshot() {
@@ -491,6 +777,7 @@ function restoreCareer(snapshot) {
   try {
     hydrateCareer(snapshot);
     render();
+    maybeShowDivisionMigration();
     showToast("Carrière restaurée");
     if (state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
     return true;
@@ -514,6 +801,25 @@ function showResumePrompt() {
 
 function pointsLeft() {
   return CREATION_POINTS - Object.values(draftStats).reduce((sum, value) => sum + value, 0);
+}
+
+function portraitAsset(sex = "male") {
+  return sex === "female" ? "assets/portraits-femmes.webp" : "assets/portraits-hommes.webp";
+}
+
+function renderWeightOptions(select, sex, selected) {
+  if (!select) return;
+  const options = weightClassesForSex(sex);
+  const value = options.some(item => item.id === selected) ? selected : options[3].id;
+  select.innerHTML = options.map(item => `<option value="${item.id}">${item.label}</option>`).join("");
+  select.value = value;
+}
+
+function renderCreationPortraits() {
+  const sex = document.querySelector("#fighter-sex")?.value === "female" ? "female" : "male";
+  const container = document.querySelector("#creation-portraits");
+  if (!container) return;
+  container.innerHTML = [0, 1, 2].map(index => `<button class="portrait-option" type="button" data-portrait-id="${index}" aria-pressed="${draftPortraitId === index}"><span class="portrait-option-preview" style="--portrait-index:${index}"><img src="${portraitAsset(sex)}" width="1152" height="768" alt="Portrait ${index + 1}, division ${sex === "female" ? "féminine" : "masculine"}" /></span><span>Portrait ${index + 1}</span></button>`).join("");
 }
 
 function renderLevel() {
@@ -546,6 +852,10 @@ function renderLevel() {
 }
 
 function renderCreation() {
+  const sex = document.querySelector("#fighter-sex")?.value === "female" ? "female" : "male";
+  const weightSelect = document.querySelector("#weight-class");
+  renderWeightOptions(weightSelect, sex, weightSelect?.value);
+  renderCreationPortraits();
   const selectedStyle = document.querySelector("#fighter-style").value;
   const styleBonuses = styles[selectedStyle].bonuses;
   const bonusSummary = Object.entries(styleBonuses).filter(([, value]) => value).map(([key, value]) => `+${value} ${combatLabels[key].toLowerCase()}`).join(" · ");
@@ -565,11 +875,16 @@ function renderFighter() {
   document.querySelector("#fighter-name").textContent = `${profile.firstName}${nickname} ${profile.lastName}`;
   const isProfessional = state.careerStatus === "professional";
   const campStatus = state.injuryWeeks > 0 ? ` · Blessé (${state.injuryWeeks} sem.)` : state.fatigue >= 75 ? " · Camp épuisé" : state.morale < 25 ? " · Moral fragile" : "";
-  document.querySelector("#fighter-meta").textContent = `${profile.weightClass} · ${styles[profile.style].label} · ${isProfessional ? "Professionnel" : "Amateur"}${campStatus}`;
-  document.querySelector("#fighter-initials").textContent = `${profile.firstName[0]}${profile.lastName[0]}`.toLocaleUpperCase("fr-CA");
+  const divisionLabel = profile.sex === "female" ? "Division féminine" : "Division masculine";
+  document.querySelector("#fighter-meta").textContent = `${weightClassLabel(profile.weightClass, profile.sex)} · ${divisionLabel} · ${styles[profile.style].label} · ${isProfessional ? "Professionnel" : "Amateur"}${campStatus}`;
+  const portrait = document.querySelector("#fighter-portrait");
+  const portraitImage = document.querySelector("#fighter-portrait-image");
+  portrait?.style.setProperty("--portrait-index", String(profile.portraitId || 0));
+  if (portraitImage) portraitImage.src = portraitAsset(profile.sex);
+  portrait?.setAttribute("aria-label", `Portrait de ${profile.firstName}`);
   document.querySelector("#fighter-style-label").textContent = styles[profile.style].label;
   const record = state.amateurRecord;
-  const amateurText = `${record.wins} V · ${record.losses} D · ${record.draws} N`;
+  const amateurText = `${record.wins} V · ${record.losses} D${record.draws ? ` · ${record.draws} N historique${record.draws > 1 ? "s" : ""}` : ""}`;
   const pro = state.professionalRecord;
   document.querySelector("#career-records").innerHTML = isProfessional ? `Montréal, QC <span class="dot">•</span> Bilan pro : ${pro.wins} V · ${pro.losses} D · ${pro.draws} N <span class="dot">•</span> Bilan amateur final : ${amateurText}` : `Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">${amateurText}</span>`;
   const medalTotals = Object.values(state.medals).reduce((totals, medals) => ({ bronze: totals.bronze + medals.bronze, silver: totals.silver + medals.silver, gold: totals.gold + medals.gold }), { bronze: 0, silver: 0, gold: 0 });
@@ -598,8 +913,10 @@ function openProfileEditor() {
   document.querySelector("#edit-last-name").value = state.profile.lastName;
   document.querySelector("#edit-nickname").value = state.profile.nickname;
   const weightSelect = document.querySelector("#edit-weight-class");
-  weightSelect.value = state.profile.weightClass;
+  document.querySelector("#edit-sex-label").value = state.profile.sex === "female" ? "Féminine" : "Masculine";
+  renderWeightOptions(weightSelect, state.profile.sex, state.profile.weightClass);
   weightSelect.disabled = Boolean(state.scheduledFight || state.activeTournament);
+  document.querySelector("#edit-portrait").value = String(state.profile.portraitId || 0);
   document.querySelector("#edit-corner").value = state.profile.corner;
   document.querySelector("#profile-edit-note").textContent = weightSelect.disabled ? "La catégorie est verrouillée pendant un combat ou un tournoi programmé. Le style de base reste inchangé." : "Le style de base et ses points restent inchangés.";
   document.querySelector("#profile-dialog").showModal();
@@ -612,7 +929,15 @@ function saveProfileEdits(event) {
   state.profile.firstName = document.querySelector("#edit-first-name").value.trim();
   state.profile.lastName = document.querySelector("#edit-last-name").value.trim();
   state.profile.nickname = document.querySelector("#edit-nickname").value.trim();
-  if (!document.querySelector("#edit-weight-class").disabled) state.profile.weightClass = document.querySelector("#edit-weight-class").value;
+  if (!document.querySelector("#edit-weight-class").disabled) {
+    const nextWeightClass = document.querySelector("#edit-weight-class").value;
+    if (nextWeightClass !== state.profile.weightClass) {
+      state.profile.weightClass = nextWeightClass;
+      const category = weightClassDefinition(nextWeightClass, state.profile.sex);
+      state.currentWeightKg = defaultCompetitionWeight(category);
+    }
+  }
+  state.profile.portraitId = safeNumber(document.querySelector("#edit-portrait").value, 0, 0, 2);
   state.profile.corner = document.querySelector("#edit-corner").value === "blue" ? "blue" : "red";
   applyCareerTheme();
   document.querySelector("#profile-dialog").close();
@@ -640,6 +965,16 @@ function recordNumbers(record = "") {
 
 function deterministicSeed(value) {
   return [...String(value)].reduce((seed, character) => ((seed * 31) + character.charCodeAt(0)) >>> 0, 2166136261);
+}
+
+function freshFightSeed(prefix = "combat") {
+  const words = new Uint32Array(2);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(words);
+  else {
+    words[0] = Math.floor(Math.random() * 0xFFFFFFFF);
+    words[1] = Date.now() >>> 0;
+  }
+  return `${prefix}-${Date.now().toString(36)}-${words[0].toString(36)}-${words[1].toString(36)}`;
 }
 
 function opponentStatsForRating(rating, style, seedSource) {
@@ -670,7 +1005,10 @@ function opponentExperienceReward(difficulty) {
 }
 
 function weeklyActionLimit() {
-  return amateurFightCount() >= 10 ? 4 : 3;
+  const base = amateurFightCount() >= 10 ? 4 : 3;
+  if (state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek) return 0;
+  const galaDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
+  return Math.max(0, base - (galaDue ? 1 : 0));
 }
 
 function buildLocalOpponent(template, offset, slot) {
@@ -684,7 +1022,7 @@ function buildLocalOpponent(template, offset, slot) {
   const prepared = {
     ...template,
     weightClass: state.profile.weightClass,
-    record: `${wins} V · ${losses} D · ${record.draws} N`,
+    record: `${wins} V · ${losses} D`,
     difficulty: rating,
     rating,
     risk,
@@ -695,12 +1033,13 @@ function buildLocalOpponent(template, offset, slot) {
 }
 
 function weeklyOpponentOffers() {
+  const pool = opponentPool();
   const count = amateurFightCount();
   if (count === 0 && state.week === 1) {
-    return [buildLocalOpponent(opponents[1], -1, 0), buildLocalOpponent(opponents[0], -4, 1), buildLocalOpponent(opponents[2], 2, 2)];
+    return [buildLocalOpponent(pool[1], -1, 0), buildLocalOpponent(pool[0], -4, 1), buildLocalOpponent(pool[2], 2, 2)];
   }
-  const start = ((state.week - 1) * 2 + count) % opponents.length;
-  const templates = [start, (start + 3) % opponents.length, (start + 7) % opponents.length].map(index => opponents[index]);
+  const start = ((state.week - 1) * 2 + count) % pool.length;
+  const templates = [start, (start + 3) % pool.length, (start + 7) % pool.length].map(index => pool[index]);
   return templates.map((template, index) => buildLocalOpponent(template, [-4, -1, 2][index], index));
 }
 
@@ -710,7 +1049,7 @@ function offeredFightWeek(opponent) {
 
 function scheduledOpponent() {
   if (!state.scheduledFight) return null;
-  return state.scheduledFight.opponent || opponents.find(item => item.id === state.scheduledFight.id) || null;
+  return state.scheduledFight.opponent || [...opponents, ...femaleOpponents].find(item => item.id === state.scheduledFight.id) || null;
 }
 
 function tournamentAvailability(id) {
@@ -720,8 +1059,8 @@ function tournamentAvailability(id) {
   if (state.activeTournament) return { available: false, label: "Un autre tournoi est en cours" };
   if (id === "bronze") {
     if (status !== "pending") return { available: false, terminal: true, label: status === "won" ? "Remporté" : status === "lost" ? "Participation terminée" : "Occasion manquée" };
-    if (count === 5) return { available: true, label: "Inscription ouverte" };
-    return { available: false, label: count < 5 ? `Encore ${5 - count} combat${5 - count > 1 ? "s" : ""}` : "Occasion manquée" };
+    if (count <= 5) return { available: true, label: `Inscription ouverte · ${5 - count} combat${5 - count > 1 ? "s" : ""} encore permis avant la date` };
+    return { available: false, label: "Occasion manquée" };
   }
   if (id === "silver") {
     if (status === "won" || status === "lost" || status === "missed") return { available: false, terminal: true, label: status === "won" ? "Remporté" : status === "lost" ? "Participation terminée" : "Fenêtre terminée" };
@@ -739,13 +1078,14 @@ function tournamentAvailability(id) {
 
 function generateTournamentOpponents(tournament) {
   const seed = state.week + amateurFightCount() + tournament.baseDifficulty;
+  const names = state.profile.sex === "female" ? tournamentNamesFemale : tournamentNames;
   // Les parcours avancés sont surtout plus exigeants par leur longueur et leur progression
   // ronde après ronde; un décalage initial trop élevé les rendait presque impossibles.
   const stageBonus = { bronze: -2, silver: -1, golden: 0, canadian: -1, olympic: 0 }[tournament.id] ?? 0;
   const roundStep = { bronze: 2, silver: 2, golden: 2, canadian: 1.5, olympic: 1.5 }[tournament.id] || 2;
   const playerRating = playerCombatStrength();
   return Array.from({ length: tournament.rounds }, (_, round) => {
-    const identity = tournamentNames[(seed + round * 3) % tournamentNames.length];
+    const identity = names[(seed + round * 3) % names.length];
     const rating = clamp(Math.round(playerRating + stageBonus + round * roundStep), 32, 98);
     const wins = Math.max(3, amateurFightCount() + Math.round(stageBonus) + round * 3);
     const losses = Math.max(1, 5 - round);
@@ -755,7 +1095,7 @@ function generateTournamentOpponents(tournament) {
       nickname: identity[2],
       weightClass: state.profile.weightClass,
       style: tournamentStyles[(seed + round) % tournamentStyles.length],
-      record: `${wins} V · ${losses} D · ${round % 2} N`,
+      record: `${wins} V · ${losses} D`,
       difficulty: rating,
       rating,
       experience: Math.round(state.experience + stageBonus * 25 + round * 35),
@@ -782,8 +1122,9 @@ function tournamentMedalForLoss(tournament, roundIndex) {
   return null;
 }
 
-function completeTournament(medal = null) {
+function completeTournament(medal = null, reason = "") {
   const active = state.activeTournament;
+  if (!active) return "";
   const tournament = tournamentDefs.find(item => item.id === active.id);
   if (medal) state.medals[active.id][medal] += 1;
   if (active.id === "bronze" || active.id === "silver") state.tournaments[active.id] = medal === "gold" ? "won" : "lost";
@@ -797,19 +1138,45 @@ function completeTournament(medal = null) {
   applyChanges({ reputation: medal === "gold" ? 15 : medal ? 9 : 3, experience: medal === "gold" ? 20 : 12, morale: medal ? 8 : -4 });
   active.status = "completed";
   active.medal = medal;
-  active.summary = `${tournament.name} terminés : ${medalLabel}.`;
+  const booking = state.bookings.find(item => item.id === active.bookingId);
+  if (booking) booking.status = "completed";
+  active.summary = reason ? `${tournament.name} terminés : ${reason}.` : `${tournament.name} terminés : ${medalLabel}.`;
   state.journal.unshift({ week: state.week, text: active.summary });
   return active.summary;
 }
 
-function resolveTournamentRound(fight, result) {
+function resolveTournamentRound(fight, result, method = "decision", score = "") {
   const active = state.activeTournament;
   if (!fight.tournamentId || !active || active.id !== fight.tournamentId) return "";
   const tournament = tournamentDefs.find(item => item.id === active.id);
   const roundIndex = active.currentRound;
-  active.results.push({ round: roundIndex, opponent: fight.opponent.name, result, score: `${fight.playerPoints}–${fight.opponentPoints}${fight.tiebreak ? " · départage" : ""}` });
-  if (result !== "Victoire") return completeTournament(tournamentMedalForLoss(tournament, roundIndex));
-  active.currentRound += 1;
+  const condition = {
+    energy: fight.fighters.player.energy,
+    fatigue: state.fatigue,
+    injury: state.injury,
+    fitness: state.fitness,
+    cardio: state.combatStats.cardio,
+    headDamage: fight.fighters.player.head,
+    bodyDamage: fight.fighters.player.body,
+    lucidity: fight.fighters.player.lucidity,
+  };
+  if (active.competition) {
+    active.competition = BoxeurTournament.recordBoutResult(active.competition, {
+      result: result === "Victoire" ? "win" : "loss",
+      method,
+      score,
+      opponent: fight.opponent.name,
+      condition,
+      medical: { knockedOut: fight.result?.method === "KO" && fight.result?.winner === "opponent", acuteInjury: fight.fighters.player.head >= 82 },
+    });
+  }
+  active.results.push({ round: roundIndex, opponent: fight.opponent.name, result, score: score || method });
+  if (result !== "Victoire") {
+    const booking = state.bookings.find(item => item.id === active.bookingId);
+    if (booking) booking.status = "completed";
+    return completeTournament(tournamentMedalForLoss(tournament, roundIndex));
+  }
+  active.currentRound = active.competition?.wins ?? active.currentRound + 1;
   if (active.currentRound >= tournament.rounds) return completeTournament("gold");
   return `Victoire en ${roundName(tournament.rounds, roundIndex)}. ${tournament.rounds - active.currentRound} combat${tournament.rounds - active.currentRound > 1 ? "s" : ""} à gagner.`;
 }
@@ -834,17 +1201,15 @@ function expandMobileSection(selector) {
 }
 
 function renderFights() {
+  ensureCareerCalendar();
+  ensureDueTournamentActive();
   const scheduled = document.querySelector("#scheduled-fight");
-  const opponentsContainer = document.querySelector("#opponents");
+  const calendarContainer = document.querySelector("#calendar-events");
   const tournamentsContainer = document.querySelector("#tournaments");
   const activeTournamentContainer = document.querySelector("#active-tournament");
   const proTransition = document.querySelector("#pro-transition");
-  const localToggleLabel = document.querySelector(".fights-panel:not(.tournaments-panel) .mobile-section-toggle > span:first-child");
-  const tournamentToggleLabel = document.querySelector(".tournaments-panel .mobile-section-toggle > span:first-child");
   const avoidanceWarning = document.querySelector("#fight-avoidance-warning");
   const fightCount = amateurFightCount();
-  localToggleLabel.textContent = "Combats locaux";
-  tournamentToggleLabel.textContent = "Tournois";
   if (avoidanceWarning) {
     avoidanceWarning.hidden = state.avoidanceWeeks < 3;
     avoidanceWarning.textContent = state.avoidanceWeeks >= 6 ? "Avertissement du coach : les offres deviennent moins ambitieuses tant que tu évites les combats." : state.avoidanceWeeks >= 3 ? `Tu n’as pas combattu depuis ${state.avoidanceWeeks} semaines : ta réputation commence à baisser.` : "";
@@ -853,7 +1218,7 @@ function renderFights() {
 
   if (state.careerStatus === "professional") {
     scheduled.innerHTML = "";
-    opponentsContainer.innerHTML = '<div class="amateur-closed"><strong>Circuit amateur fermé</strong><p>La carrière professionnelle a commencé. Le bilan amateur est désormais définitif.</p></div>';
+    calendarContainer.innerHTML = '<div class="amateur-closed"><strong>Circuit amateur fermé</strong><p>La carrière professionnelle a commencé. Le bilan amateur est désormais définitif.</p></div>';
     activeTournamentContainer.innerHTML = "";
     tournamentsContainer.innerHTML = "";
     proTransition.innerHTML = "";
@@ -865,20 +1230,48 @@ function renderFights() {
     const isFightWeek = state.week >= state.scheduledFight.week;
     const eventName = state.scheduledFight.tournamentId ? tournamentDefs.find(item => item.id === state.scheduledFight.tournamentId).name : "Combat local";
     const withdrawLabel = state.scheduledFight.tournamentId ? "Abandonner le tournoi" : "Se désister";
-    if (!state.scheduledFight.tournamentId) localToggleLabel.textContent = isFightWeek ? "Combat local · maintenant" : `Combat local · semaine ${state.scheduledFight.week}`;
-    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé · ${eventName}</p><strong>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</strong><p>${isFightWeek ? "Le combat est arrivé : choisis ton entrée ou ton désistement pour continuer." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? `<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">${withdrawLabel}</button><button id="start-fight" class="primary-button" type="button">Entrer dans le ring</button></div>` : ""}</div>`;
+    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé · ${eventName}</p><strong>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</strong><p>${isFightWeek ? `Le combat occupe une action : prépare d’abord jusqu’à ${weeklyActionLimit()} action${weeklyActionLimit() > 1 ? "s" : ""}, puis entre dans le ring.` : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? `<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">${withdrawLabel}</button><button id="start-fight" class="primary-button" type="button">Préparation terminée · combattre</button></div>` : ""}</div>`;
   } else {
     scheduled.innerHTML = "";
   }
-  opponentsContainer.innerHTML = weeklyOpponentOffers().map(opponent => {
-    const offeredWeek = offeredFightWeek(opponent);
-    const difficulty = opponentDifficulty(opponent);
-    const reward = opponentReputationReward(difficulty);
-    const clashesWithTournament = Boolean(state.activeTournament && offeredWeek >= state.activeTournament.startWeek);
-    const unavailable = state.scheduledFight || clashesWithTournament;
-    const status = state.scheduledFight ? "Un combat est déjà programmé" : clashesWithTournament ? "Date incompatible avec le tournoi" : "";
-    return `<article class="opponent-card"><p class="eyebrow">Proposé : semaine ${offeredWeek}</p><h3>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</h3><p>${escapeHTML(state.profile.weightClass)} · ${escapeHTML(opponent.style)}</p><p>Bilan amateur : ${escapeHTML(opponent.record)}</p><div class="opponent-meta"><span>Risque : ${escapeHTML(opponent.risk)}</span><span>Difficulté ${difficulty}</span><span>Réputation +${reward}</span></div><button class="secondary-button" type="button" data-accept="${escapeHTML(opponent.id)}" ${unavailable ? "disabled" : ""}>${status || "Accepter le combat"}</button></article>`;
-  }).join("");
+
+  const weekStart = careerWeekDate(0);
+  const weekEnd = BoxeurCalendar.dateForCareerWeek(state.calendar.epoch, state.week + 5, 6);
+  const currentEvents = state.calendar.events.filter(event => event.endDate >= weekStart && event.startDate <= weekEnd);
+  const grouped = BoxeurCalendar.groupEventsByDate(currentEvents);
+  const formatDate = value => new Intl.DateTimeFormat("fr-CA", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
+  document.querySelector("#calendar-date-label").textContent = `${formatDate(weekStart)} · 6 semaines annoncées`;
+  calendarContainer.innerHTML = Object.entries(grouped).sort(([left], [right]) => left.localeCompare(right)).map(([date, events]) => {
+    const eventCards = events.map(event => {
+      const booked = bookingForEvent(event.id);
+      const eventClass = event.kind === "tournament" ? "tournament" : event.scope === "home-gym" ? "home" : "";
+      const type = event.kind === "tournament" ? "Tournoi" : event.scope === "home-gym" ? "Gala à ton gym" : event.scope === "regional" ? "Gala régional" : "Gala local";
+      const venue = `${event.venue.city}, ${event.venue.region}`;
+      if (event.kind === "tournament") {
+        const eligibility = BoxeurCalendar.evaluateEligibility(event, state, { bookings: activeBookings(), includeBookings: true });
+        const travelChoices = BoxeurCalendar.travelOptionsForEvent(event);
+        const buttons = booked
+          ? `<button class="secondary-button" type="button" disabled>Inscription confirmée · ${booked.payment?.total || 0} $</button>`
+          : travelChoices.map(choice => {
+            const quote = BoxeurCalendar.quoteEventCost(event, choice.id);
+            return `<button class="secondary-button" type="button" data-book-tournament="${event.id}" data-travel="${choice.id}" ${eligibility.eligible ? "" : "disabled"}>${escapeHTML(choice.label)} · ${quote.total} $</button>`;
+          }).join("");
+        return `<article class="calendar-event ${eventClass}${booked ? " booked" : ""}${eligibility.eligible || booked ? "" : " unavailable"}"><div class="calendar-event-head"><span class="calendar-event-type">${type}</span><span class="calendar-event-badge">${event.rounds} jours · 5 juges</span></div><h3>${escapeHTML(event.name)}</h3><p>${venue} · pesée quotidienne · un combat par jour.</p><div class="calendar-event-meta"><span>${weightClassLabel(state.profile.weightClass, state.profile.sex)}</span><span>${eligibility.reason}</span><span>Date limite ${formatDate(event.registrationDeadline)}</span></div><div class="calendar-event-actions">${buttons}</div></article>`;
+      }
+      const slots = event.opponentSlots || [];
+      const travel = BoxeurCalendar.travelOptionsForEvent(event)[0];
+      const quote = BoxeurCalendar.quoteEventCost(event, travel?.id || "none");
+      const buttons = booked
+        ? `<button class="secondary-button" type="button" disabled>Combat réservé</button>`
+        : slots.map((slot, index) => {
+          const candidate = opponentForGala(event, index);
+          return `<button class="secondary-button calendar-opponent-choice" type="button" data-book-gala="${event.id}" data-slot="${index}"><strong>${escapeHTML(candidate.name)} « ${escapeHTML(candidate.nickname)} »</strong><span>${escapeHTML(candidate.style)} · ${escapeHTML(candidate.record)} · difficulté ${opponentDifficulty(candidate)}</span><em>${escapeHTML(slot.label)}${quote.total ? ` · ${quote.total} $` : " · gratuit"}</em></button>`;
+        }).join("");
+      const advantage = event.homeAdvantage ? " · légère aide du coin à domicile" : "";
+      return `<article class="calendar-event ${eventClass}${booked ? " booked" : ""}"><div class="calendar-event-head"><span class="calendar-event-type">${type}</span><span class="calendar-event-badge">3 juges</span></div><h3>${escapeHTML(event.name)}</h3><p>${venue}${advantage}. Aucune pesée à gérer.</p><div class="calendar-event-meta"><span>${weightClassLabel(state.profile.weightClass, state.profile.sex)}</span><span>${event.scope === "regional" ? "Transport et hébergement requis" : "Aucuns frais"}</span><span>Vendredi ou samedi</span></div><div class="calendar-event-actions">${buttons}</div></article>`;
+    }).join("");
+    return `<section class="calendar-date-group"><div class="calendar-date"><strong>${escapeHTML(formatDate(date))}</strong><span>${events.length} événement${events.length > 1 ? "s" : ""}</span></div><div class="calendar-day-events">${eventCards}</div></section>`;
+  }).join("") || '<div class="amateur-closed"><strong>Aucun événement annoncé</strong><p>Le calendrier sera prolongé à la prochaine semaine.</p></div>';
 
   if (fightCount > 5 && state.tournaments.bronze === "pending") state.tournaments.bronze = "missed";
   if (fightCount > 10 && state.tournaments.silver === "pending") state.tournaments.silver = "missed";
@@ -887,27 +1280,23 @@ function renderFights() {
     const tournament = tournamentDefs.find(item => item.id === active.id);
     const remaining = Math.max(0, active.startWeek - state.week);
     const progress = Math.round(((TOURNAMENT_PREP_WEEKS - remaining) / TOURNAMENT_PREP_WEEKS) * 100);
-    tournamentToggleLabel.textContent = active.status === "completed" ? "Tournoi · parcours terminé" : remaining > 0 ? `Tournoi · dans ${remaining} sem.` : "Tournoi · maintenant";
     activeTournamentContainer.innerHTML = active.status === "completed" ? `<div class="tournament-countdown ready"><div><p class="eyebrow">Parcours terminé</p><strong>${escapeHTML(active.summary)}</strong></div><button class="secondary-button" type="button" data-open-tournament>Voir le tableau final</button></div>` : remaining > 0 ? `<div class="tournament-countdown"><div><p class="eyebrow">Inscription confirmée · ${tournament.name}</p><strong>Début dans ${remaining} semaine${remaining > 1 ? "s" : ""}</strong><p>Semaine ${active.startWeek} · ${tournament.participants} participants · ${tournament.rounds} combats à gagner</p><div class="countdown-meter"><span style="width:${progress}%"></span></div></div><button class="secondary-button" type="button" data-open-tournament>Voir le tableau</button></div>` : `<div class="tournament-countdown ready"><div><p class="eyebrow">Le tournoi commence</p><strong>${tournament.name}</strong><p>${tournament.participants} participants · prochain tour : ${roundName(tournament.rounds, active.currentRound)}</p></div><button class="primary-button" type="button" data-open-tournament>Ouvrir le tableau</button></div>`;
   } else {
     activeTournamentContainer.innerHTML = "";
   }
   tournamentsContainer.innerHTML = tournamentDefs.map(tournament => {
     const availability = tournamentAvailability(tournament.id);
-    const blockedByFight = Boolean(state.scheduledFight || state.activeTournament);
     const cardClass = availability.terminal ? "completed" : availability.available ? "available" : "locked";
-    const buttonText = blockedByFight && availability.available ? "Combat déjà programmé" : availability.available ? (tournament.id === "olympic" ? "Rejoindre le parcours" : "S’inscrire") : availability.label;
     const medals = state.medals[tournament.id];
     const medalSummary = medals.bronze + medals.silver + medals.gold ? `<div class="tournament-medals"><span class="medal-dot bronze"></span>${medals.bronze}<span class="medal-dot silver"></span>${medals.silver}<span class="medal-dot gold"></span>${medals.gold}</div>` : "";
-    return `<article class="tournament-card ${cardClass}"><span class="tournament-medal">${tournament.medal}</span><h3>${tournament.name}</h3><p>${tournament.description}</p>${medalSummary}<p class="tournament-state">${availability.label}</p><button class="secondary-button" type="button" data-tournament="${tournament.id}" ${!availability.available || blockedByFight ? "disabled" : ""}>${buttonText}</button></article>`;
+    const nextEvent = state.calendar.events.find(event => event.kind === "tournament" && event.tournamentId === tournament.id && event.endDate >= weekStart);
+    return `<article class="tournament-card ${cardClass}"><span class="tournament-medal">${tournament.medal}</span><h3>${tournament.name}</h3><p>${tournament.description}</p>${medalSummary}<p class="tournament-state">${nextEvent ? `${formatDate(nextEvent.startDate)} · inscription dans le calendrier` : availability.label}</p></article>`;
   }).join("");
 
   const pro = professionalEligibility();
   const blocked = Boolean(state.scheduledFight || state.activeTournament);
   proTransition.innerHTML = `<div><strong>Passer professionnel</strong><p>${pro.reason}${blocked && pro.eligible ? " · Termine ou annule d’abord le combat programmé." : ""}</p></div><button id="turn-pro" class="primary-button" type="button" ${!pro.eligible || blocked ? "disabled" : ""}>Passer professionnel</button>`;
-  if (amateurFightCount() === 0 && !state.scheduledFight) expandMobileSection(".fights-panel:not(.tournaments-panel)");
-  if (state.scheduledFight && state.week >= state.scheduledFight.week && !state.scheduledFight.tournamentId) expandMobileSection(".fights-panel:not(.tournaments-panel)");
-  if (state.activeTournament && state.week >= state.activeTournament.startWeek) expandMobileSection(".tournaments-panel");
+  if (amateurFightCount() === 0 || state.scheduledFight || state.activeTournament) expandMobileSection(".calendar-panel");
 }
 
 function projectedMoney() {
@@ -1173,8 +1562,7 @@ function planValidation() {
   const scheduledFightDue = Boolean(state.scheduledFight && state.week >= state.scheduledFight.week);
   if (state.pendingWeekEvent) return { valid: false, reason: "Choisis d’abord l’événement entre les semaines." };
   if (tournamentDue && state.injuryWeeks === 0) return { valid: false, reason: "Le tournoi a commencé : ouvre le tableau pour disputer le prochain combat." };
-  if (scheduledFightDue) return { valid: false, reason: "Le combat est arrivé : entre dans le ring ou désiste-toi." };
-  if (!weeklyPlan.length) return { valid: false, reason: "Sélectionne au moins une action pour continuer." };
+  if (!weeklyPlan.length && !scheduledFightDue) return { valid: false, reason: "Sélectionne au moins une action pour continuer." };
   if (weeklyPlan.length > weeklyActionLimit()) return { valid: false, reason: `Le plan dépasse la limite de ${weeklyActionLimit()} actions.` };
   const seen = new Set();
   for (const item of weeklyPlan) {
@@ -1190,7 +1578,7 @@ function planValidation() {
   const finalFatigue = clamp(state.fatigue + (totals.rawGeneral.fatigue || 0));
   if (finalEnergy < 5) return { valid: false, reason: "Ce programme épuiserait complètement ton boxeur. Ajoute de la récupération." };
   if (finalFatigue >= 96) return { valid: false, reason: "Ce programme pousserait la fatigue à un niveau dangereux. Ajoute du repos." };
-  return { valid: true, reason: tournamentDue ? "Tournoi en pause pendant la blessure : planifie une semaine de récupération." : "Rien ne sera appliqué avant ta confirmation." };
+  return { valid: true, reason: scheduledFightDue ? `Le combat réserve une action. Tu peux encore préparer ${weeklyPlan.length}/${weeklyActionLimit()} action${weeklyActionLimit() > 1 ? "s" : ""} avant d’entrer dans le ring.` : tournamentDue ? "Tournoi en pause pendant la blessure : planifie une semaine de récupération." : "Rien ne sera appliqué avant ta confirmation." };
 }
 
 function renderPlan() {
@@ -1225,7 +1613,7 @@ function renderPlan() {
   advance.hidden = localFightDue;
   advance.title = validation.valid ? "" : validation.reason;
   fightActions.hidden = !localFightDue;
-  document.querySelector("#plan-help").textContent = localFightDue ? "Le combat est arrivé : choisis ton entrée dans le ring ou ton désistement." : validation.reason;
+  document.querySelector("#plan-help").textContent = localFightDue ? `Le combat occupe une action. Tes ${actionLimit} autres choix seront appliqués avant l’entrée dans le ring.` : validation.reason;
 }
 
 function render() {
@@ -1234,6 +1622,8 @@ function render() {
   document.querySelector("#game").classList.toggle("hidden", !hasFighter);
   if (!hasFighter) return;
 
+  ensureCareerCalendar();
+  ensureDueTournamentActive();
   renderFighter();
   document.querySelector("#money-spotlight").textContent = `${state.money} $`;
   document.querySelector("#week").textContent = String(state.week).padStart(2, "0");
@@ -1253,7 +1643,8 @@ function render() {
   topMoney.textContent = `${state.money}$`;
   topMoney.setAttribute("aria-label", `Argent disponible ${state.money} dollars`);
   const actionLimit = weeklyActionLimit();
-  document.querySelector("#action-limit-help").textContent = actionLimit === 4 ? "Expérience acquise : compose maintenant un programme de quatre actions." : `Trois actions par semaine · la quatrième se débloque après ${10 - amateurFightCount()} combat${10 - amateurFightCount() > 1 ? "s" : ""}.`;
+  const galaDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
+  document.querySelector("#action-limit-help").textContent = actionLimit === 0 ? "Le tournoi occupe toute la semaine : les décisions se prennent dans le hub de compétition." : galaDue ? `Le gala réserve une action : ${actionLimit} choix de camp restent disponibles avant le combat.` : actionLimit === 4 ? "Expérience acquise : compose maintenant un programme de quatre actions." : `Trois actions par semaine · la quatrième se débloque après ${Math.max(0, 10 - amateurFightCount())} combat${10 - amateurFightCount() > 1 ? "s" : ""}.`;
   const pips = document.querySelector("#action-pips");
   pips.innerHTML = Array.from({ length: actionLimit }, (_, index) => `<span class="pip ${index < weeklyPlan.length ? "active" : ""}"></span>`).join("");
   pips.setAttribute("aria-label", `${weeklyPlan.length} action${weeklyPlan.length > 1 ? "s" : ""} planifiée${weeklyPlan.length > 1 ? "s" : ""} sur ${actionLimit}`);
@@ -1403,7 +1794,16 @@ function endWeek(events) {
   state.energy = clamp(state.energy + 6);
   state.morale = clamp(state.morale - 1);
   state.fatigue = clamp(state.fatigue - (state.energy < 35 ? 4 : 6));
-  if (!weeklyPlan.some(item => actions.find(action => action.id === item.actionId)?.category === "training")) state.fitness = clamp(state.fitness - 1);
+  if (state.profile && !state.activeTournament) {
+    const targetWeight = defaultCompetitionWeight(weightClassDefinition(state.profile.weightClass, state.profile.sex));
+    const weightDifference = targetWeight - state.currentWeightKg;
+    if (Math.abs(weightDifference) >= .05) {
+      const weeklyAdjustment = clamp(weightDifference, -.8, .8);
+      state.currentWeightKg = Math.round((state.currentWeightKg + weeklyAdjustment) * 10) / 10;
+    }
+  }
+  if (!weeklyPlan.some(item => actions.find(action => action.id === item.actionId)?.category === "training") && state.preFightTrainingWeek !== endingWeek) state.fitness = clamp(state.fitness - 1);
+  if (state.preFightTrainingWeek === endingWeek) state.preFightTrainingWeek = 0;
   const membershipWasActive = state.gymWeeks > 0;
   const strengthMembershipWasActive = state.strengthGymWeeks > 0;
   if (membershipWasActive) state.gymWeeks -= 1;
@@ -1411,16 +1811,25 @@ function endWeek(events) {
 
   let summary = "La récupération naturelle te rend un peu d'énergie.";
   if (state.injuryWeeks > 0) {
-    state.injuryWeeks -= 1;
-    state.injury = clamp(state.injury - 12);
-    summary = state.injuryWeeks ? `Tu récupères de ta blessure : encore ${state.injuryWeeks} semaine à ménager le camp.` : "Tu es rétabli : le camp peut reprendre progressivement.";
+    if (state.injuryStartedWeek === endingWeek) {
+      summary = `La récupération obligatoire commence : encore ${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} à ménager le camp.`;
+    } else {
+      state.injuryWeeks -= 1;
+      state.injury = clamp(state.injury - 12);
+      if (!state.injuryWeeks) state.injuryStartedWeek = 0;
+      summary = state.injuryWeeks ? `Tu récupères de ta blessure : encore ${state.injuryWeeks} semaine à ménager le camp.` : "Tu es rétabli : le camp peut reprendre progressivement.";
+    }
     events.push(summary);
   } else if (state.injury >= 55 && Math.random() < (state.injury + state.fatigue * .45) / 180) {
     state.injuryWeeks = state.injury >= 75 || state.fatigue >= 75 ? 2 : 1;
+    state.injuryStartedWeek = endingWeek;
     state.fitness = clamp(state.fitness - 10);
     state.morale = clamp(state.morale - 8);
+    const cancelledBookingId = state.scheduledFight?.bookingId;
     const cancelledFight = state.scheduledFight ? ` Le combat prévu contre ${scheduledOpponent()?.name || "ton adversaire"} est annulé.` : "";
     state.scheduledFight = null;
+    const cancelledBooking = state.bookings.find(item => item.id === cancelledBookingId);
+    if (cancelledBooking) cancelledBooking.status = "cancelled";
     summary = `Blessure au camp : ${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} de récupération obligatoire.${cancelledFight}`;
     events.push(summary);
   } else if (state.energy < 20 || state.fatigue >= 85) {
@@ -1502,6 +1911,39 @@ function executePlan() {
   document.querySelector("#summary-dialog").showModal();
 }
 
+function applyPreFightPlan() {
+  const localFightDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
+  if (!localFightDue) return true;
+  const validation = planValidation();
+  if (!validation.valid) {
+    showToast(validation.reason);
+    return false;
+  }
+  if (!weeklyPlan.length) return true;
+  const events = [];
+  const totals = planEffects();
+  const privateCoachThisWeek = weeklyPlan.some(item => item.actionId === "private") ? privateCoaches.find(coach => coach.id === state.privateProgram?.coachId) : null;
+  weeklyPlan.forEach(item => {
+    const { action } = planItemEffects(item);
+    state.journal.unshift({ week: state.week, text: `Avant le gala : ${action.message}` });
+  });
+  applyChanges(totals.rawGeneral);
+  advanceTrainingProgress(events, state.week);
+  applyCombatChanges(totals.rawCombat);
+  if (weeklyPlan.some(item => item.actionId === "private")) completePrivateCourse(events, state.week);
+  const boxingWork = weeklyPlan.some(item => ["gym", "sparring", "heavybag", "video"].includes(item.actionId)) || privateCoachThisWeek?.type === "boxing";
+  state.preFightTrainingWeek = boxingWork || weeklyPlan.some(item => actions.find(action => action.id === item.actionId)?.category === "training") ? state.week : 0;
+  if (privateCoachThisWeek?.type === "physical" && !boxingWork) state.boxingNeglectWeeks += 1;
+  else if (boxingWork) state.boxingNeglectWeeks = 0;
+  const worked = weeklyPlan.some(item => item.actionId === "work");
+  if (weeklyPlan.some(item => item.actionId === "video")) state.preFightStudyWeek = state.week;
+  state.workStreak = worked ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
+  if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = state.week + SPONSOR_COOLDOWN_WEEKS;
+  weeklyPlan = [];
+  if (events.length) state.journal.unshift({ week: state.week, text: `Préparation du gala : ${events.join(" ")}` });
+  return true;
+}
+
 function continueAfterWeekTransition() {
   if (state.activeTournament && state.week >= state.activeTournament.startWeek && state.activeTournament.status !== "completed") openTournamentBoard();
 }
@@ -1535,36 +1977,83 @@ function resolveBetweenWeekChoice(choiceId) {
   continueAfterWeekTransition();
 }
 
-function startFight() {
+async function startFight() {
   if (fightState || document.querySelector("#fight-dialog")?.open) return;
   const opponent = scheduledOpponent();
   if (!opponent) return;
   if (state.week < state.scheduledFight.week) return showToast(`Combat prévu à la semaine ${state.scheduledFight.week}.`);
   if (state.injuryWeeks > 0) return showToast("Blessure en cours : ce combat doit être annulé.");
+  if (!state.scheduledFight.tournamentId && !applyPreFightPlan()) return;
+  if (!state.scheduledFight.travelApplied) {
+    applyChanges({ energy: state.scheduledFight.travelEffects?.energy || 0, fatigue: state.scheduledFight.travelEffects?.fatigue || 0 });
+    state.scheduledFight.travelApplied = true;
+  }
   const difficulty = opponentDifficulty(opponent);
   const opponentStats = opponent.stats || opponentStatsForRating(difficulty, opponent.style, opponent.id);
-  fightState = {
-    opponent,
-    opponentStats,
+  if (!state.scheduledFight.fightSeed) state.scheduledFight.fightSeed = freshFightSeed(`${state.scheduledFight.id}-${state.week}`);
+  const scheduled = cloneData(state.scheduledFight);
+  const activeEffect = state.activeTournament?.competition?.activeEffects?.find(effect => effect.type === "scouting");
+  const homeStudy = Number(scheduled.homeAdvantage?.coachReadBonus || 0);
+  const campStudy = state.preFightStudyWeek === state.week ? .10 : 0;
+  const coach = privateCoaches.find(item => item.id === state.privateProgram?.coachId && item.type === "boxing");
+  fightState = BoxeurCombat.createFight({
+    id: `${scheduled.id}-${state.week}-${scheduled.tournamentRound ?? "local"}`,
+    seed: scheduled.fightSeed,
+    kind: scheduled.tournamentId ? "tournament" : "local",
+    tournamentId: scheduled.tournamentId,
+    opponentDifficulty: difficulty,
+    exchangesPerRound: 5,
+    coachQuality: clamp(.60 + (coach?.reward || 0) * .035 + homeStudy, .55, .78),
+    studyBonus: Math.max(campStudy, activeEffect?.readAccuracyBonus || 0, homeStudy),
+    studyExchangeLimit: activeEffect?.exchangesRemaining,
+    playerEffects: state.activeTournament?.competition?.activeEffects || [],
+    player: {
+      id: "player",
+      name: state.profile.firstName,
+      style: styles[state.profile.style].label,
+      stats: state.combatStats,
+      energy: state.activeTournament?.competition?.condition?.energy ?? state.energy,
+      fitness: state.fitness,
+      fatigue: state.fatigue,
+      injury: state.injury,
+      morale: state.morale,
+      experience: state.experience,
+      level: state.level,
+      head: state.activeTournament?.competition?.condition?.headDamage || 0,
+      body: state.activeTournament?.competition?.condition?.bodyDamage || 0,
+      lucidity: clamp((state.activeTournament?.competition?.condition?.lucidity ?? 100) + Number(scheduled.homeAdvantage?.openingComposure || 0)),
+    },
+    opponent: { id: opponent.id, name: opponent.name, style: opponent.style, stats: opponentStats },
+  });
+  fightState.careerMeta = {
+    opponent: cloneData(opponent),
     opponentDifficulty: difficulty,
     reputationReward: opponentReputationReward(difficulty),
-    experienceReward: state.scheduledFight.tournamentId ? 20 + (state.scheduledFight.tournamentRound || 0) * 2 : opponentExperienceReward(difficulty),
-    tournamentId: state.scheduledFight.tournamentId || null,
-    round: 1,
-    phase: "choice",
-    playerPoints: 0,
-    opponentPoints: 0,
-    playerEnergy: state.energy,
-    opponentEnergy: clamp(Math.round(84 + (opponentStats.cardio - 40) * .18 + Math.random() * 5), 78, 97),
-    lastPlayerStrategy: null,
-    opponentStrategy: null,
-    opponentTellStrategy: null,
-    playerDamageTaken: 0,
-    opponentDamageTaken: 0,
-    cornerBoostAvailable: true,
-    rounds: [],
+    experienceReward: scheduled.tournamentId ? 20 + (scheduled.tournamentRound || 0) * 2 : opponentExperienceReward(difficulty),
+    tournamentId: scheduled.tournamentId || null,
+    tournamentRound: scheduled.tournamentRound,
+    bookingId: scheduled.bookingId || null,
   };
-  prepareOpponentRound(fightState);
+  const stage = document.querySelector("#fight-ring-stage");
+  stage.dataset.cue = "neutral";
+  stage.classList.remove("show-impact");
+  configureRingImages();
+  const backdrop = stage.querySelector(".ring-backdrop");
+  if (backdrop) {
+    backdrop.loading = "eager";
+    backdrop.fetchPriority = "high";
+    let preloadTimer;
+    try {
+      await Promise.race([
+        backdrop.decode(),
+        new Promise(resolve => { preloadTimer = setTimeout(resolve, 1200); }),
+      ]);
+    } catch {
+      // Le texte et les commandes restent utilisables si le décor ne peut pas être décodé.
+    } finally {
+      clearTimeout(preloadTimer);
+    }
+  }
   document.querySelector("#fight-dialog").showModal();
   renderFight();
 }
@@ -1575,10 +2064,137 @@ function withdrawFight() {
   if (!window.confirm(`Se désister du combat contre ${opponent.name} ?\n\nLe combat sera annulé et tu pourras poursuivre la carrière.`)) return;
   state.journal.unshift({ week: state.week, text: `Tu te désistes du combat amateur contre ${opponent.name}. Le rendez-vous est annulé.` });
   const tournamentId = state.scheduledFight.tournamentId;
+  const bookingId = state.scheduledFight.bookingId;
   if (tournamentId && state.activeTournament) completeTournament(null);
   state.scheduledFight = null;
+  if (tournamentId) restoreDeferredGalaAfterTournamentBout();
+  const booking = state.bookings.find(item => item.id === bookingId);
+  if (booking) booking.status = "withdrawn";
   render();
   showToast("Combat annulé");
+}
+
+function opponentForGala(event, slotIndex) {
+  const pool = opponentPool();
+  const index = Math.abs(deterministicSeed(`${event.id}-${slotIndex}-${state.profile.sex}`)) % pool.length;
+  const slot = event.opponentSlots?.[slotIndex] || event.opponentSlots?.[0] || { ratingOffset: 0 };
+  const opponent = buildLocalOpponent(pool[index], Number(slot.ratingOffset) || 0, slotIndex);
+  opponent.id = `${event.id}-${opponent.id}-${slotIndex}`;
+  opponent.stats = opponentStatsForRating(opponent.rating, opponent.style, opponent.id);
+  return opponent;
+}
+
+function bookGalaEvent(eventId, slotIndex) {
+  ensureCareerCalendar();
+  const event = state.calendar.events.find(item => item.id === eventId && item.kind === "gala");
+  if (!event) return showToast("Ce gala n’est plus disponible.");
+  if (state.scheduledFight) return showToast("Un autre combat est déjà programmé.");
+  if (event.careerWeek === state.week && weeklyPlan.length >= (amateurFightCount() >= 10 ? 4 : 3)) return showToast("Retire une action : le gala doit réserver une place dans la semaine.");
+  const travel = BoxeurCalendar.travelOptionsForEvent(event)[0];
+  const result = BoxeurCalendar.createBooking({ event, career: state, existingBookings: activeBookings(), travelOptionId: travel?.id, currentDate: careerWeekDate(0) });
+  if (!result.ok) return showToast(result.reason || "Inscription impossible.");
+  const opponent = opponentForGala(event, safeNumber(slotIndex, 0, 0, 2));
+  state.money = result.moneyAfter;
+  state.bookings.push(result.booking);
+  state.scheduledFight = {
+    id: opponent.id,
+    opponent,
+    tournamentId: null,
+    tournamentRound: null,
+    bookingId: result.booking.id,
+    eventId: event.id,
+    event,
+    week: event.careerWeek,
+    homeAdvantage: event.homeAdvantage || null,
+    travelEffects: result.booking.travelEffects || { energy: 0, fatigue: 0 },
+    travelApplied: false,
+    fightSeed: freshFightSeed(`${event.id}-${opponent.id}`),
+  };
+  state.journal.unshift({ week: state.week, text: `${event.name} réservé contre ${opponent.name}, le ${event.startDate}.${result.quote.total ? ` Frais : ${result.quote.total} $.` : " Gala gratuit."}` });
+  render();
+  showToast(`Combat réservé · semaine ${event.careerWeek}`);
+}
+
+function bookTournamentEvent(eventId, travelOptionId) {
+  ensureCareerCalendar();
+  const event = state.calendar.events.find(item => item.id === eventId && item.kind === "tournament");
+  if (!event) return showToast("Ce tournoi n’est plus disponible.");
+  const result = BoxeurCalendar.createBooking({ event, career: state, existingBookings: activeBookings(), travelOptionId, currentDate: careerWeekDate(0) });
+  if (!result.ok) return showToast(result.reason || "Inscription impossible.");
+  state.money = result.moneyAfter;
+  state.bookings.push(result.booking);
+  state.tournaments[event.tournamentId] = "entered";
+  state.journal.unshift({ week: state.week, text: `Inscription aux ${event.name} confirmée pour ${result.quote.total} $ (${event.venue.city}).` });
+  render();
+  showToast(`${event.name} · inscription confirmée`);
+}
+
+function activateTournamentBooking(booking) {
+  if (!booking || state.activeTournament || booking.event?.kind !== "tournament") return state.activeTournament;
+  const event = booking.event;
+  const checkIn = BoxeurCalendar.checkInTournament(booking, state, { fightCount: amateurFightCount(), checkedAt: event.startDate });
+  if (!checkIn.ok) {
+    booking.status = "withdrawn";
+    state.tournaments[event.tournamentId] = "missed";
+    state.journal.unshift({ week: state.week, text: `${event.name} : inscription annulée au contrôle d’admissibilité. ${checkIn.reason}` });
+    showToast(checkIn.reason);
+    return null;
+  }
+  booking.status = "active";
+  booking.eligibilitySnapshot = checkIn.eligibilitySnapshot;
+  if (!booking.travelApplied) {
+    applyChanges({ energy: booking.travelEffects?.energy || 0, fatigue: booking.travelEffects?.fatigue || 0 });
+    booking.travelApplied = true;
+  }
+  const definition = tournamentDefs.find(item => item.id === event.tournamentId);
+  const category = weightClassDefinition(state.profile.weightClass, state.profile.sex);
+  const competition = BoxeurTournament.createTournament({
+    id: event.id,
+    totalBouts: event.rounds,
+    started: true,
+    condition: { energy: state.energy, fatigue: state.fatigue, injury: state.injury, fitness: state.fitness, cardio: state.combatStats.cardio, headDamage: 0, bodyDamage: 0, lucidity: 100 },
+    weight: { className: category.label, minKg: category.minKg, maxKg: category.maxKg },
+  });
+  state.activeTournament = {
+    id: event.tournamentId,
+    eventId: event.id,
+    bookingId: booking.id,
+    startWeek: event.careerWeek,
+    status: "active",
+    currentRound: 0,
+    opponents: generateTournamentOpponents(definition),
+    results: [],
+    medal: null,
+    summary: "",
+    competition,
+  };
+  state.journal.unshift({ week: state.week, text: `${event.name} commence à ${event.venue.city}. Pesée et examen avant chaque combat.` });
+  return state.activeTournament;
+}
+
+function ensureDueTournamentActive() {
+  if (state.activeTournament) return state.activeTournament;
+  const booking = dueTournamentBooking();
+  if (!booking) return null;
+  return activateTournamentBooking(booking);
+}
+
+function scheduledFightBlocksTournament() {
+  const scheduled = state.scheduledFight;
+  return Boolean(scheduled && (scheduled.tournamentId || scheduled.week <= state.week));
+}
+
+function deferFutureGalaForTournament(active) {
+  const scheduled = state.scheduledFight;
+  if (!active || !scheduled || scheduled.tournamentId || scheduled.week <= state.week) return;
+  active.deferredScheduledFight = cloneData(scheduled);
+}
+
+function restoreDeferredGalaAfterTournamentBout() {
+  const active = state.activeTournament;
+  if (!active?.deferredScheduledFight || state.scheduledFight) return;
+  state.scheduledFight = cloneData(active.deferredScheduledFight);
+  delete active.deferredScheduledFight;
 }
 
 function registerTournament(id) {
@@ -1616,8 +2232,13 @@ function renderTournamentBoard() {
   const active = state.activeTournament;
   if (!active) return;
   const tournament = tournamentDefs.find(item => item.id === active.id);
+  let competition = active.competition;
   const remaining = Math.max(0, active.startWeek - state.week);
   if (remaining === 0 && active.status === "preparing") active.status = "active";
+  if (remaining === 0 && competition?.phase === BoxeurTournament.PHASES.PREPARING) {
+    active.competition = BoxeurTournament.activateTournament(competition);
+    competition = active.competition;
+  }
   document.querySelector("#tournament-board-title").textContent = tournament.name;
   document.querySelector("#tournament-board-status").innerHTML = active.status === "completed" ? `<strong>${escapeHTML(active.summary)}</strong><span>${tournament.participants} participants · parcours terminé</span>` : remaining > 0 ? `<strong>Début dans ${remaining} semaine${remaining > 1 ? "s" : ""}</strong><span>Semaine ${active.startWeek} · profite de la préparation</span>` : `<strong>${roundName(tournament.rounds, active.currentRound)}</strong><span>${active.currentRound} victoire${active.currentRound > 1 ? "s" : ""} · ${tournament.rounds - active.currentRound} combat${tournament.rounds - active.currentRound > 1 ? "s" : ""} restant${tournament.rounds - active.currentRound > 1 ? "s" : ""}</span>`;
   const bracket = document.querySelector("#tournament-bracket");
@@ -1630,11 +2251,54 @@ function renderTournamentBoard() {
     const resultText = result ? `${result.result} · ${result.score}` : isCurrent ? "Prochain combat" : "À venir";
     return `<div class="bracket-round ${stateClass}"><span class="bracket-step">${roundName(tournament.rounds, index)}</span><strong>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</strong><small>${escapeHTML(opponent.style)} · ${escapeHTML(opponent.record)} · difficulté ${displayedDifficulty}</small><em>${escapeHTML(resultText)}</em></div>`;
   }).join("");
+
+  const dailyStatus = document.querySelector("#tournament-daily-status");
+  const interBout = document.querySelector("#tournament-interbout");
+  const recoveryChoices = document.querySelector("#tournament-recovery-choices");
+  const category = weightClassDefinition(state.profile.weightClass, state.profile.sex);
+  if (competition && active.status !== "completed") {
+    const phaseLabels = {
+      daily_check: "Pesée et contrôle à effectuer",
+      ready: "Autorisé à boxer aujourd’hui",
+      in_bout: "Combat en cours",
+      inter_bout: "Journée terminée · récupération à choisir",
+      completed: "Tournoi remporté",
+      eliminated: "Éliminé du tournoi",
+      withdrawn: "Retiré du tournoi",
+    };
+    const medicalLabel = competition.medical?.status === "fit_with_warning" ? "apte avec surveillance" : competition.medical?.status === "fit" ? "apte" : "à contrôler";
+    dailyStatus.innerHTML = `<div><span>Jour du tournoi</span><strong>${competition.day} / ${competition.totalBouts}</strong></div><div><span>Poids actuel</span><strong>${Number(state.currentWeightKg).toFixed(1)} kg</strong><small>${category.minKg} à ${category.maxKg} kg</small></div><div><span>Énergie disponible</span><strong>${Math.round(competition.condition.energy)} %</strong><small>Fatigue ${Math.round(competition.condition.fatigue)} %</small></div><div><span>Contrôle</span><strong>${escapeHTML(phaseLabels[competition.phase] || competition.phase)}</strong><small>État : ${medicalLabel}</small></div>`;
+    const showRecovery = competition.phase === BoxeurTournament.PHASES.INTER_BOUT;
+    interBout.hidden = !showRecovery;
+    if (showRecovery) {
+      document.querySelector("#tournament-recovery-preview").textContent = "Un seul choix pour la nuit : récupérer davantage, protéger une zone touchée ou étudier le prochain adversaire. Un repas plus complet aide la récupération mais rapproche légèrement de la limite de poids.";
+      recoveryChoices.innerHTML = BoxeurTournament.getInterBoutChoices(competition).map(choice => {
+        const delta = tournamentRecoveryWeightDelta(choice.id);
+        const nextWeight = Math.round((state.currentWeightKg + delta) * 10) / 10;
+        const weightWarning = nextWeight > category.maxKg ? " · risque de disqualification" : "";
+        return `<button type="button" data-tournament-recovery="${choice.id}"><strong>${escapeHTML(choice.title)}</strong><span>${escapeHTML(choice.summary)}</span><em>${escapeHTML(choice.tradeoff)} · poids estimé ${nextWeight.toFixed(1)} kg${weightWarning}</em></button>`;
+      }).join("");
+    } else {
+      recoveryChoices.innerHTML = "";
+    }
+  } else {
+    dailyStatus.innerHTML = active.status === "completed" ? `<div><span>Parcours</span><strong>${escapeHTML(active.summary)}</strong></div>` : "";
+    interBout.hidden = true;
+    recoveryChoices.innerHTML = "";
+  }
+
   const button = document.querySelector("#tournament-next-fight");
   button.hidden = active.status === "completed";
-  button.disabled = remaining > 0 || Boolean(state.scheduledFight) || state.injuryWeeks > 0;
-  button.textContent = remaining > 0 ? `Début dans ${remaining} semaine${remaining > 1 ? "s" : ""}` : state.injuryWeeks > 0 ? `Blessé · ${state.injuryWeeks} sem. de récupération` : `Disputer ${roundName(tournament.rounds, active.currentRound).toLowerCase()}`;
-  button.title = state.injuryWeeks > 0 ? "Retourne au camp et planifie une semaine de récupération." : "";
+  const blockedPhase = competition && [BoxeurTournament.PHASES.INTER_BOUT, BoxeurTournament.PHASES.IN_BOUT].includes(competition.phase);
+  button.disabled = remaining > 0 || scheduledFightBlocksTournament() || blockedPhase;
+  button.textContent = remaining > 0
+    ? `Début dans ${remaining} semaine${remaining > 1 ? "s" : ""}`
+    : competition?.phase === BoxeurTournament.PHASES.DAILY_CHECK
+        ? `${state.injuryWeeks > 0 ? "Passer le contrôle médical" : "Passer la pesée"} du jour ${competition.day}`
+        : competition?.phase === BoxeurTournament.PHASES.INTER_BOUT
+          ? "Choisis la récupération de la nuit"
+          : `Disputer ${roundName(tournament.rounds, active.currentRound).toLowerCase()}`;
+  button.title = state.injuryWeeks > 0 ? "Le contrôle quotidien décidera si le tournoi peut continuer." : "";
 }
 
 function openTournamentBoard() {
@@ -1647,22 +2311,101 @@ function openTournamentBoard() {
 function closeTournamentBoard() {
   document.querySelector("#tournament-dialog").close();
   if (state.activeTournament?.status === "completed") {
+    const events = [state.activeTournament.summary];
     state.activeTournament = null;
+    weeklyPlan = [];
+    endWeek(events);
     render();
+    showToast("Tournoi terminé · retour au calendrier");
+    if (state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
+  }
+}
+
+function tournamentRecoveryWeightDelta(choiceId) {
+  return choiceId === BoxeurTournament.CHOICE_IDS.REST ? .45 : choiceId === BoxeurTournament.CHOICE_IDS.PROTECT ? .2 : 0;
+}
+
+function syncTournamentConditionToCareer() {
+  const condition = state.activeTournament?.competition?.condition;
+  if (!condition) return;
+  state.energy = clamp(Math.round(condition.energy));
+  state.fatigue = clamp(Math.round(condition.fatigue));
+  state.injury = clamp(Math.round(condition.injury));
+}
+
+function applyTournamentRecovery(choiceId) {
+  const active = state.activeTournament;
+  const competition = active?.competition;
+  if (!competition || competition.phase !== BoxeurTournament.PHASES.INTER_BOUT) return;
+  try {
+    const choice = BoxeurTournament.getInterBoutChoices(competition).find(item => item.id === choiceId);
+    if (!choice) return;
+    const recoveryId = competition.interBout?.id;
+    active.competition = BoxeurTournament.applyInterBoutChoice(competition, choiceId, { recoveryId, targetZone: choice.targetZone });
+    state.currentWeightKg = Math.round((state.currentWeightKg + tournamentRecoveryWeightDelta(choiceId)) * 10) / 10;
+    syncTournamentConditionToCareer();
+    state.journal.unshift({ week: state.week, text: `${tournamentDefs.find(item => item.id === active.id)?.name} · nuit ${active.competition.day - 1} : ${choice.title}. Poids prévu ${state.currentWeightKg.toFixed(1)} kg.` });
+    renderTournamentBoard();
+    persistCareer();
+    showToast("Choix appliqué · nouvelle journée de tournoi");
+  } catch (error) {
+    console.error("[Boxeur Deux] Récupération de tournoi impossible :", error);
+    showToast("Ce choix de récupération n’est plus disponible.");
   }
 }
 
 function startTournamentRound() {
   const active = state.activeTournament;
-  if (!active || active.status === "completed" || state.week < active.startWeek || state.scheduledFight) return;
-  if (state.injuryWeeks > 0) return showToast(`Blessé pour encore ${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} : récupère avant ce combat.`);
+  if (!active || active.status === "completed" || state.week < active.startWeek || scheduledFightBlocksTournament()) return;
   active.status = "active";
   const opponent = active.opponents[active.currentRound];
   if (!opponent) {
     console.error("[Boxeur Deux] Tournoi incohérent : adversaire du prochain tour introuvable.", { tournament: active.id, round: active.currentRound });
     return showToast("Impossible d’ouvrir ce combat. Recharge la carrière pour réparer le tableau.");
   }
-  state.scheduledFight = { id: opponent.id, opponent, tournamentId: active.id, tournamentRound: active.currentRound, week: state.week };
+  const category = weightClassDefinition(state.profile.weightClass, state.profile.sex);
+  try {
+    if (active.competition?.phase === BoxeurTournament.PHASES.DAILY_CHECK) {
+      active.competition = BoxeurTournament.performDailyChecks(active.competition, {
+        weightKg: state.currentWeightKg,
+        minKg: category.minKg,
+        maxKg: category.maxKg,
+        toleranceKg: 0,
+        restrictionDays: state.injuryWeeks > 0 ? state.injuryWeeks * 7 : 0,
+        acuteInjury: state.injury >= 88,
+      });
+      if (active.competition.phase === BoxeurTournament.PHASES.WITHDRAWN) {
+        const reason = active.competition.termination?.reason === "weigh_in" ? `disqualification à la pesée (${state.currentWeightKg.toFixed(1)} kg pour une limite de ${category.maxKg} kg)` : "retrait après le contrôle d’aptitude";
+        completeTournament(null, reason);
+        renderTournamentBoard();
+        persistCareer();
+        return showToast(reason);
+      }
+      renderTournamentBoard();
+      persistCareer();
+      return showToast(`Pesée réussie · ${state.currentWeightKg.toFixed(1)} kg`);
+    }
+    if (active.competition?.phase !== BoxeurTournament.PHASES.READY) return showToast("Termine d’abord la décision inter-combats.");
+    active.competition = BoxeurTournament.beginBout(active.competition);
+  } catch (error) {
+    console.error("[Boxeur Deux] Contrôle quotidien impossible :", error);
+    return showToast(error.message || "Le tournoi ne peut pas poursuivre aujourd’hui.");
+  }
+  const booking = state.bookings.find(item => item.id === active.bookingId);
+  deferFutureGalaForTournament(active);
+  state.scheduledFight = {
+    id: opponent.id,
+    opponent,
+    tournamentId: active.id,
+    tournamentRound: active.currentRound,
+    bookingId: active.bookingId || null,
+    eventId: active.eventId || null,
+    event: booking?.event || null,
+    week: state.week,
+    travelApplied: true,
+    travelEffects: { energy: 0, fatigue: 0 },
+    fightSeed: freshFightSeed(`${active.eventId || active.id}-${active.currentRound}`),
+  };
   document.querySelector("#tournament-dialog").close();
   startFight();
 }
@@ -1932,6 +2675,304 @@ function finishFight() {
   document.querySelector("#fight-instruction").append(closeButton);
 }
 
+/* Interface V4 du moteur tactique. Ces déclarations remplacent les anciens
+   résolveurs par round tout en gardant leur code lisible pour la comparaison. */
+function fightDistanceLabel(distance) {
+  return { outside: "Extérieur", mid: "Mi-distance", inside: "Corps à corps" }[distance] || "Variable";
+}
+
+function fightPositionLabel(ring) {
+  if (ring.position === "center") return "Centre du ring";
+  const subject = ring.pressured === "player" ? "Tu es" : ring.pressured === "opponent" ? "Adversaire" : "Combat";
+  const place = ring.position === "near_ropes" ? "près des câbles" : ring.position === "ropes" ? "dans les câbles" : "dans un coin";
+  return `${subject} ${place}`;
+}
+
+function fightDamageLabel(value, zone) {
+  if (value < 15) return zone === "head" ? "Intacte" : "Intact";
+  if (value < 35) return "Touché";
+  if (value < 55) return "Marqué";
+  if (value < 75) return "Ébranlé";
+  return "Critique";
+}
+
+function fightComposureLabel(value) {
+  if (value >= 82) return "Calme";
+  if (value >= 62) return "Vigilant";
+  if (value >= 42) return "Troublé";
+  return "Désorienté";
+}
+
+function momentumLabel(fight) {
+  const value = fight?.ring?.momentum || 0;
+  if (value >= 1.5) return "Ton coin impose le rythme";
+  if (value >= .5) return "Légère initiative";
+  if (value <= -1.5) return "Forte pression adverse";
+  if (value <= -.5) return "Initiative adverse";
+  return "Équilibrée";
+}
+
+function opponentPortraitAsset() {
+  const opponentCorner = state.profile.corner === "blue" ? "rouge" : "bleu";
+  if (state.profile.sex === "female") return `assets/boxeuse-coin-${opponentCorner}.webp`;
+  return opponentCorner === "rouge" ? "assets/adversaire-coin-rouge.webp" : "assets/boxeur-coin-bleu.webp";
+}
+
+function configureRingImages() {
+  const playerVisual = document.querySelector(".ring-fighter-player .ring-fighter-silhouette");
+  const opponentVisual = document.querySelector(".ring-fighter-opponent .ring-fighter-silhouette");
+  const playerCornerAsset = state.profile.sex === "female"
+    ? `assets/boxeuse-coin-${state.profile.corner === "blue" ? "bleu" : "rouge"}.webp`
+    : state.profile.corner === "blue" ? "assets/boxeur-coin-bleu.webp" : "assets/adversaire-coin-rouge.webp";
+  if (playerVisual) {
+    playerVisual.style.setProperty("--fighter-image", `url(\"${playerCornerAsset}\")`);
+    playerVisual.style.setProperty("--fighter-size", "cover");
+    playerVisual.style.setProperty("--fighter-position", "center 18%");
+  }
+  if (opponentVisual) {
+    opponentVisual.style.setProperty("--fighter-image", `url(\"${opponentPortraitAsset()}\")`);
+    opponentVisual.style.setProperty("--fighter-size", "cover");
+    opponentVisual.style.setProperty("--fighter-position", "center 18%");
+  }
+}
+
+function triggerFightVisual(result) {
+  const stage = document.querySelector("#fight-ring-stage");
+  if (!stage || !result) return;
+  let cue = result.visualCue || "neutral";
+  if (result.knockdown) cue = `${result.knockdown.knockedDown}-knockdown`;
+  else if (cue === "knockout" || cue === "referee-stoppage") cue = `${fightState?.result?.loser || (result.side === "player" ? "opponent" : "player")}-knockdown`;
+  cue = cue.replace("-hard", "");
+  stage.dataset.cue = cue;
+  const impact = /hit|trade|knockdown/.test(cue);
+  stage.classList.remove("show-impact");
+  if (impact) {
+    void stage.offsetWidth;
+    stage.classList.add("show-impact");
+  }
+  const important = result.significant || result.knockdown || result.fightResult;
+  if (important) document.querySelector("#fight-announcer").textContent = result.events?.map(event => event.text).join(" ") || result.text || result.fightResult?.label;
+}
+
+function renderFightChoices() {
+  const container = document.querySelector("#fight-choices");
+  if (!fightState || fightState.phase !== "exchange") {
+    container.innerHTML = "";
+    return;
+  }
+  const riskLabels = { low: "Risque faible", medium: "Risque mesuré", high: "Risque élevé" };
+  container.innerHTML = BoxeurCombat.getAvailableActions(fightState).map(action => `<button type="button" data-fight-action="${action.id}" class="${action.directiveAligned ? "coach-match" : ""}"><strong>${escapeHTML(action.label)}</strong><span>${escapeHTML(action.description)} · coût env. ${action.baseEnergyCost.toFixed(1)} E</span><em>${action.directiveAligned ? "Suit la directive du coach" : riskLabels[action.risk] || "Issue incertaine"}</em></button>`).join("");
+}
+
+function renderFightCoach() {
+  const panel = document.querySelector("#fight-coach-panel");
+  const choices = document.querySelector("#fight-coach-choices");
+  if (!fightState || fightState.phase !== "corner") {
+    panel.hidden = true;
+    choices.innerHTML = "";
+    return;
+  }
+  panel.hidden = false;
+  const pending = fightState.coach.pending;
+  document.querySelector("#fight-coach-title").textContent = fightState.round === 1 ? "Directive avant le combat" : `Pause du coach avant le round ${fightState.round}`;
+  document.querySelector("#fight-coach-analysis").textContent = `${pending.observation} Lecture proposée : ${pending.prediction}. Confiance ${pending.confidence}.`;
+  choices.innerHTML = BoxeurCombat.getCoachOptions(fightState).map(option => `<button type="button" data-coach-option="${option.id}"><strong>${escapeHTML(option.label)}${option.recommended ? " · conseillé" : ""}</strong><span>${escapeHTML(option.description)} Compromis : ${escapeHTML(option.tradeoff)}</span></button>`).join("");
+}
+
+function renderFight(message = "Observe la situation puis choisis une réponse.") {
+  if (!fightState) return;
+  const view = BoxeurCombat.getPublicState(fightState);
+  const meta = fightState.careerMeta || {};
+  const opponent = meta.opponent || { name: view.fighters.opponent.name, nickname: "", weightClass: state.profile.weightClass, style: view.fighters.opponent.style };
+  const tournamentName = meta.tournamentId ? tournamentDefs.find(item => item.id === meta.tournamentId)?.name || "Tournoi amateur" : (state.scheduledFight?.event?.name || "Gala amateur");
+  const playerIsBlue = state.profile.corner === "blue";
+  const playerCorner = document.querySelector(".player-corner");
+  const opponentCorner = document.querySelector(".opponent-corner");
+  playerCorner.classList.toggle("blue-corner", playerIsBlue);
+  playerCorner.classList.toggle("red-corner", !playerIsBlue);
+  opponentCorner.classList.toggle("red-corner", playerIsBlue);
+  opponentCorner.classList.toggle("blue-corner", !playerIsBlue);
+  const playerPortrait = document.querySelector(".player-corner .portrait-crop");
+  playerPortrait.style.setProperty("--portrait-index", String(state.profile.portraitId || 0));
+  const playerPortraitImage = document.querySelector("#fight-player-portrait");
+  playerPortraitImage.src = portraitAsset(state.profile.sex);
+  playerPortraitImage.alt = `Portrait de ${state.profile.firstName}, coin ${playerIsBlue ? "bleu" : "rouge"}`;
+  const opponentPortrait = document.querySelector("#fight-opponent-portrait");
+  opponentPortrait.src = opponentPortraitAsset();
+  opponentPortrait.alt = `Portrait de ${opponent.name}, coin ${playerIsBlue ? "rouge" : "bleu"}`;
+  configureRingImages();
+
+  document.querySelector("#fight-week-label").textContent = `${tournamentName} · semaine ${state.week}`;
+  document.querySelector("#fight-round").textContent = view.status.finished ? "Combat terminé" : view.phase === "corner" ? `${view.round === 1 ? "Briefing" : "Entre les rounds"} · round ${view.round} / 3` : `Round ${view.round} / 3 · échange ${view.currentExchange.number} / ${view.format.exchangesPerRound}`;
+  document.querySelector("#fight-player-name").textContent = state.profile.firstName;
+  document.querySelector("#fight-player-meta").textContent = `${state.profile.nickname ? `« ${state.profile.nickname} » · ` : ""}${state.profile.weightClass} · coin ${playerIsBlue ? "bleu" : "rouge"}`;
+  document.querySelector("#fight-opponent-name").textContent = opponent.name;
+  document.querySelector("#fight-opponent-meta").textContent = `${opponent.nickname ? `« ${opponent.nickname} » · ` : ""}${opponent.weightClass || state.profile.weightClass} · coin ${playerIsBlue ? "rouge" : "bleu"}`;
+  document.querySelector("#fight-player-energy").textContent = `${Math.round(view.fighters.player.energy)}%`;
+  document.querySelector("#fight-opponent-energy").textContent = `${Math.round(view.fighters.opponent.energy)}%`;
+  document.querySelector("#fight-player-energy-bar").style.width = `${view.fighters.player.energy}%`;
+  document.querySelector("#fight-opponent-energy-bar").style.width = `${view.fighters.opponent.energy}%`;
+  document.querySelector("#fight-distance").textContent = fightDistanceLabel(view.ring.distance);
+  document.querySelector("#fight-position").textContent = fightPositionLabel(view.ring);
+  document.querySelector("#fight-momentum").textContent = momentumLabel(view);
+  document.querySelector("#fight-composure").textContent = fightComposureLabel(view.fighters.player.lucidity);
+  document.querySelector("#fight-head-status").textContent = fightDamageLabel(view.fighters.player.head, "head");
+  document.querySelector("#fight-body-status").textContent = fightDamageLabel(view.fighters.player.body, "body");
+  const stage = document.querySelector("#fight-ring-stage");
+  stage.dataset.playerCorner = playerIsBlue ? "blue" : "red";
+  stage.dataset.distance = view.ring.distance;
+  stage.dataset.position = view.ring.position === "center" ? "center" : `${view.ring.position === "corner" ? "corner" : "ropes"}-${view.ring.pressured || "player"}`;
+
+  const tell = view.currentExchange?.intention || (view.coach.pending ? `Le coach anticipe : ${view.coach.pending.prediction}.` : "Le plan adverse reste difficile à lire.");
+  document.querySelector("#fight-opponent-tell").textContent = tell;
+  document.querySelector("#fight-tactical-hint").textContent = view.currentExchange ? `${view.currentExchange.situation} · lecture estimée ${Math.round(view.currentExchange.readingAccuracy * 100)} %` : `${opponent.style} · difficulté ${meta.opponentDifficulty || view.opponentDifficulty}`;
+  document.querySelector("#fight-coach-directive").textContent = view.coach.activeDirective?.label || "À choisir";
+  document.querySelector("#fight-coach-confidence").textContent = view.roundState?.coachRevealedWrong ? "La première lecture ne se confirme pas : adapte-toi." : "Suivre la directive aide, sans garantir l’échange.";
+
+  document.querySelector("#fight-round-track").innerHTML = Array.from({ length: 3 }, (_, index) => {
+    const completed = view.rounds[index];
+    const current = !view.status.finished && index + 1 === view.round;
+    const label = completed ? `${view.format.exchangesPerRound} échanges` : current ? `${view.exchange}/${view.format.exchangesPerRound}` : "À venir";
+    return `<span class="${completed ? "completed" : current ? "current" : ""}">Round ${index + 1}<strong>${label}</strong></span>`;
+  }).join("");
+
+  const scoreLabel = document.querySelector("#fight-score-label");
+  const score = document.querySelector("#fight-score");
+  const cards = document.querySelector("#fight-judge-cards");
+  if (view.status.finished) {
+    scoreLabel.textContent = view.result.method === "decision" ? `Décision · ${view.format.judgeCount} juges` : "Arrêt du combat";
+    score.textContent = view.result.method === "decision" ? view.result.decision : view.result.label;
+    cards.hidden = !view.result.judgeCards;
+    cards.innerHTML = (view.result.judgeCards || []).map((card, index) => `<div class="judge-card ${card.winner === "player" ? "winner" : ""}"><span>Juge ${index + 1}</span><strong>${card.playerTotal}–${card.opponentTotal}</strong></div>`).join("");
+  } else {
+    scoreLabel.textContent = "Cartes cachées";
+    score.textContent = "—";
+    cards.hidden = true;
+    cards.innerHTML = "";
+  }
+  document.querySelector("#fight-status").textContent = view.status.finished ? view.result.label : view.phase === "corner" ? "Le coach donne ses directives" : "Décision tactique en cours";
+  const instruction = document.querySelector("#fight-instruction");
+  instruction.innerHTML = `<p>${escapeHTML(view.phase === "corner" ? "Choisis entre une directive tactique, une adaptation contextuelle et la récupération." : message)}</p>`;
+  const recent = view.history.filter(item => item.text).slice(-7);
+  document.querySelector("#fight-log").innerHTML = recent.map(item => `<li>${item.round ? `R${item.round}${item.exchange ? `·E${item.exchange}` : ""} — ` : ""}${escapeHTML(item.text)}</li>`).join("") || "<li>Le combat va commencer.</li>";
+  renderFightCoach();
+  renderFightChoices();
+  if (!view.status.finished) requestAnimationFrame(() => {
+    const selector = view.phase === "corner" ? "#fight-coach-choices button" : "#fight-choices button";
+    document.querySelector(selector)?.focus({ preventScroll: false });
+  });
+}
+
+function chooseFightCoachDirective(optionId) {
+  if (!fightState || fightState.phase !== "corner") return;
+  const transition = BoxeurCombat.chooseCoachDirective(fightState, optionId);
+  fightState = transition.state;
+  triggerFightVisual(transition.result);
+  renderFight(transition.result.text);
+}
+
+function playRound(actionId) {
+  if (!fightState || fightState.phase !== "exchange") return;
+  try {
+    const transition = BoxeurCombat.resolveExchange(fightState, actionId);
+    fightState = transition.state;
+    triggerFightVisual(transition.result);
+    if (fightState.status.finished) finishFight();
+    else renderFight(transition.result.text);
+  } catch (error) {
+    console.error("[Boxeur Deux] Échange impossible :", error);
+    showToast("Cette action n’est plus disponible.");
+  }
+}
+
+function advanceFightRound() {
+  renderFight("Le coach analyse le round terminé.");
+}
+
+function useCornerBoost() {
+  if (fightState?.phase === "corner") chooseFightCoachDirective("recover");
+}
+
+function finishFight() {
+  if (!fightState?.status.finished || fightState.careerApplied) return;
+  const fightCountBefore = amateurFightCount();
+  const meta = fightState.careerMeta || {};
+  const fightResult = fightState.result;
+  const won = fightResult.winner === "player";
+  const result = won ? "Victoire" : "Défaite";
+  const exposure = fightResult.exposure?.player || fightState.fighters.player.legacyExposure || 0;
+  const fightFatigue = clamp(Math.round(8 + (100 - fightState.fighters.player.energy) * .14 + exposure * .25 - state.combatStats.cardio * .035), 8, 32);
+  const injuryIncrease = clamp(Math.round(2 + exposure * .28 + (won ? 0 : 2) - (state.combatStats.defense - 40) * .025 + fightState.fighters.player.head * .025), 1, 15);
+  if (won) {
+    state.amateurRecord.wins += 1;
+    applyChanges({ reputation: meta.tournamentId ? 6 + (state.activeTournament?.currentRound || 0) : meta.reputationReward, experience: meta.experienceReward, morale: 7, injury: injuryIncrease, fatigue: fightFatigue });
+  } else {
+    state.amateurRecord.losses += 1;
+    applyChanges({ reputation: 2, experience: Math.max(10, (meta.experienceReward || 16) - 6), morale: -5, injury: injuryIncrease + 2, fatigue: fightFatigue + 3 });
+  }
+  state.energy = clamp(Math.round(fightState.fighters.player.energy));
+  state.lastFightWeek = state.week;
+  state.avoidanceWeeks = 0;
+  const score = fightResult.method === "decision" ? `décision ${fightResult.decision}` : `${fightResult.label} · R${fightResult.round || fightState.round}`;
+  const tournamentNote = resolveTournamentRound({ ...fightState, tournamentId: meta.tournamentId, opponent: meta.opponent }, result, fightResult.method, score);
+  const unlockedFourthAction = fightCountBefore < 10 && amateurFightCount() >= 10;
+  let injuryEvent = "";
+  if (!won && fightResult.method === "KO") {
+    state.injuryWeeks = Math.max(state.injuryWeeks, 2);
+    state.injuryStartedWeek = state.week;
+    injuryEvent = " Une récupération obligatoire de deux semaines suit le KO.";
+  } else if (!won && fightResult.method === "TKO") {
+    state.injuryWeeks = Math.max(state.injuryWeeks, 1);
+    state.injuryStartedWeek = state.week;
+    injuryEvent = " Une semaine de récupération obligatoire suit l’arrêt.";
+  } else {
+    const acuteInjuryChance = clamp((state.injury - 58) / 160 + exposure / 240 + fightState.fighters.player.head / 600, 0, .38);
+    if (!state.injuryWeeks && Math.random() < acuteInjuryChance) {
+      state.injuryWeeks = state.injury >= 80 ? 2 : 1;
+      state.injuryStartedWeek = state.week;
+      state.fitness = clamp(state.fitness - 6);
+      state.morale = clamp(state.morale - 3);
+      injuryEvent = ` Une blessure impose ${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} de récupération.`;
+    } else if (state.injury >= 55) injuryEvent = " Le corps sort marqué du combat.";
+  }
+  const methodLabel = fightResult.method === "decision" ? `${fightResult.label} (${fightResult.decision})` : `${won ? "Victoire" : "Défaite"} par ${fightResult.label}`;
+  state.journal.unshift({ week: state.week, text: `Combat amateur : ${methodLabel} contre ${meta.opponent?.name || fightState.fighters.opponent.name}.${tournamentNote ? ` ${tournamentNote}` : ""}${injuryEvent}` });
+  if (unlockedFourthAction) state.journal.unshift({ week: state.week, text: "Dix combats amateurs disputés : le programme hebdomadaire passe définitivement à quatre actions." });
+  const booking = state.bookings.find(item => item.id === meta.bookingId);
+  if (booking && !meta.tournamentId) booking.status = "completed";
+  fightState.careerApplied = true;
+  state.scheduledFight = null;
+  if (meta.tournamentId) {
+    restoreDeferredGalaAfterTournamentBout();
+  } else {
+    const weekTransitionEvents = [];
+    weeklyPlan = [];
+    endWeek(weekTransitionEvents);
+  }
+  persistCareer();
+  renderFight(`${methodLabel}.`);
+  const instruction = document.querySelector("#fight-instruction");
+  instruction.innerHTML = `<p><strong>${escapeHTML(methodLabel)}</strong><br>${meta.tournamentId ? escapeHTML(tournamentNote || "Le tableau est mis à jour.") : "Expérience, réputation, fatigue et état physique ont été mis à jour."}${injuryEvent ? `<br>${escapeHTML(injuryEvent.trim())}` : ""}</p>`;
+  const closeButton = document.createElement("button");
+  closeButton.className = "primary-button";
+  closeButton.type = "button";
+  closeButton.textContent = meta.tournamentId ? "Retour au tournoi" : "Retour au camp";
+  closeButton.addEventListener("click", () => {
+    document.querySelector("#fight-dialog").close();
+    const wasTournament = Boolean(meta.tournamentId);
+    fightState = null;
+    if (wasTournament) {
+      render();
+      openTournamentBoard();
+    } else {
+      render();
+      if (state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
+    }
+    maybeShowDivisionMigration();
+  });
+  instruction.append(closeButton);
+}
+
 function showToast(message) {
   const toast = document.querySelector("#toast");
   toast.textContent = message;
@@ -1951,6 +2992,18 @@ document.querySelector("#creation-stats").addEventListener("click", event => {
 });
 
 document.querySelector("#fighter-style").addEventListener("change", renderCreation);
+document.querySelector("#fighter-sex").addEventListener("change", () => {
+  draftPortraitId = 0;
+  const sex = document.querySelector("#fighter-sex").value;
+  renderWeightOptions(document.querySelector("#weight-class"), sex, null);
+  renderCreation();
+});
+document.querySelector("#creation-portraits").addEventListener("click", event => {
+  const button = event.target.closest("[data-portrait-id]");
+  if (!button) return;
+  draftPortraitId = safeNumber(button.dataset.portraitId, 0, 0, 2);
+  renderCreationPortraits();
+});
 document.querySelector("#creation-form").addEventListener("submit", event => {
   event.preventDefault();
   const form = event.currentTarget;
@@ -1963,6 +3016,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   error.textContent = "";
   const style = document.querySelector("#fighter-style").value;
   const corner = document.querySelector("#fighter-corner").value;
+  const sex = document.querySelector("#fighter-sex").value === "female" ? "female" : "male";
   state = cloneData(INITIAL_STATE);
   weeklyPlan = [];
   fightState = null;
@@ -1971,10 +3025,16 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
     firstName: document.querySelector("#first-name").value.trim(),
     lastName: document.querySelector("#last-name").value.trim(),
     nickname: document.querySelector("#nickname").value.trim(),
+    sex,
     weightClass: document.querySelector("#weight-class").value,
+    portraitId: draftPortraitId,
     style,
     corner,
   };
+  const category = weightClassDefinition(state.profile.weightClass, sex);
+  state.currentWeightKg = defaultCompetitionWeight(category);
+  state.migrationPending = false;
+  ensureCareerCalendar();
   document.body.classList.toggle("theme-blue", corner === "blue");
   Object.keys(combatLabels).forEach(key => { state.combatStats[key] = BASE_COMBAT_STAT + styles[style].bonuses[key] + draftStats[key]; });
   state.journal = [{ week: 1, text: `${state.profile.firstName} rejoint le circuit amateur. La route commence ici.` }];
@@ -2006,11 +3066,34 @@ document.querySelector("#resume-new")?.addEventListener("click", () => {
   weeklyPlan = [];
   fightState = null;
   selectedPrivateCoachId = null;
+  draftPortraitId = 0;
   draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
   document.querySelector("#creation-form").reset();
   renderCreation();
   render();
 });
+
+document.querySelector("#migration-sex")?.addEventListener("change", event => {
+  renderWeightOptions(document.querySelector("#migration-weight"), event.currentTarget.value, null);
+});
+document.querySelector("#division-migration-form")?.addEventListener("submit", event => {
+  event.preventDefault();
+  const sex = document.querySelector("#migration-sex").value === "female" ? "female" : "male";
+  const weightClass = document.querySelector("#migration-weight").value;
+  if (!weightClassesForSex(sex).some(item => item.id === weightClass)) return;
+  state.profile.sex = sex;
+  state.profile.weightClass = weightClass;
+  state.profile.portraitId = safeNumber(document.querySelector("#migration-portrait").value, 0, 0, 2);
+  const category = weightClassDefinition(weightClass, sex);
+  state.currentWeightKg = defaultCompetitionWeight(category);
+  state.migrationPending = false;
+  state.calendar = null;
+  ensureCareerCalendar();
+  document.querySelector("#division-migration-dialog").close();
+  render();
+  showToast("Division et catégorie enregistrées");
+});
+document.querySelector("#division-migration-dialog")?.addEventListener("cancel", event => event.preventDefault());
 
 document.querySelector("#action-grid").addEventListener("click", event => {
   const button = event.target.closest(".action-card");
@@ -2082,18 +3165,11 @@ document.querySelector("#week-event-choices").addEventListener("click", event =>
 document.querySelector("#summary-dialog").addEventListener("cancel", event => event.preventDefault());
 document.querySelector("#week-event-dialog").addEventListener("cancel", event => event.preventDefault());
 
-document.querySelector("#opponents").addEventListener("click", event => {
-  const accept = event.target.closest("[data-accept]");
-  if (accept) {
-    const opponent = weeklyOpponentOffers().find(item => item.id === accept.dataset.accept);
-    const fightWeek = opponent ? offeredFightWeek(opponent) : 0;
-    const clashesWithTournament = Boolean(state.activeTournament && fightWeek >= state.activeTournament.startWeek);
-    if (!opponent || state.scheduledFight || clashesWithTournament) return showToast("Cette offre n’est plus disponible.");
-    state.scheduledFight = { id: opponent.id, opponent: cloneData(opponent), week: fightWeek };
-    state.journal.unshift({ week: state.week, text: `Combat amateur programmé contre ${opponent.name} pour la semaine ${state.scheduledFight.week}.` });
-    render();
-    showToast("Combat programmé");
-  }
+document.querySelector("#calendar-events").addEventListener("click", event => {
+  const gala = event.target.closest("[data-book-gala]");
+  if (gala) return bookGalaEvent(gala.dataset.bookGala, gala.dataset.slot);
+  const tournament = event.target.closest("[data-book-tournament]");
+  if (tournament) return bookTournamentEvent(tournament.dataset.bookTournament, tournament.dataset.travel);
 });
 
 document.querySelector("#tournaments").addEventListener("click", event => {
@@ -2106,7 +3182,15 @@ document.querySelector("#active-tournament").addEventListener("click", event => 
 });
 
 document.querySelector("#tournament-board-close").addEventListener("click", closeTournamentBoard);
+document.querySelector("#tournament-dialog").addEventListener("cancel", event => {
+  event.preventDefault();
+  closeTournamentBoard();
+});
 document.querySelector("#tournament-next-fight").addEventListener("click", startTournamentRound);
+document.querySelector("#tournament-recovery-choices").addEventListener("click", event => {
+  const choice = event.target.closest("[data-tournament-recovery]");
+  if (choice) applyTournamentRecovery(choice.dataset.tournamentRecovery);
+});
 
 document.querySelector("#pro-transition").addEventListener("click", event => {
   if (event.target.closest("#turn-pro")) turnProfessional();
@@ -2118,10 +3202,12 @@ document.querySelector("#scheduled-fight").addEventListener("click", event => {
 });
 
 document.querySelector("#fight-choices").addEventListener("click", event => {
-  const nextRound = event.target.closest("[data-next-round]");
-  if (nextRound) return advanceFightRound();
-  const choice = event.target.closest("[data-strategy]");
-  if (choice) playRound(choice.dataset.strategy);
+  const choice = event.target.closest("[data-fight-action]");
+  if (choice) playRound(choice.dataset.fightAction);
+});
+document.querySelector("#fight-coach-choices").addEventListener("click", event => {
+  const choice = event.target.closest("[data-coach-option]");
+  if (choice) chooseFightCoachDirective(choice.dataset.coachOption);
 });
 document.querySelector("#fight-corner-boost").addEventListener("click", useCornerBoost);
 document.querySelector("#fight-dialog").addEventListener("cancel", event => {

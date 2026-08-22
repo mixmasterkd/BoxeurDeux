@@ -656,3 +656,182 @@ h2 { font-size: 1.65rem; }
   .fight-portrait { height: clamp(95px, 18vh, 105px); }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+
+/* V4 — identité illustrée, calendrier et combats tactiques */
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+
+.portrait-picker { margin: -10px 0 30px; padding: 16px; border: 1px solid var(--line); }
+.portrait-picker legend { padding: 0 8px; color: var(--ink); font: 800 1.15rem "Barlow Condensed"; text-transform: uppercase; }
+.portrait-picker > p { margin-bottom: 12px; color: var(--muted); font-size: .75rem; }
+.portrait-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.portrait-option { position: relative; min-height: 150px; padding: 0; overflow: hidden; border: 2px solid var(--line); color: var(--ink); background: #0d0f0d; cursor: pointer; }
+.portrait-option[aria-pressed="true"] { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(221,182,94,.2); }
+.portrait-option-preview { position: absolute; inset: 0; overflow: hidden; }
+.portrait-option-preview img, .portrait-crop > img { width: 300%; max-width: none; height: 200%; object-fit: cover; transform: translate(calc(var(--portrait-index, 0) * -33.3333%), -5%); transform-origin: top left; }
+.portrait-option span { position: absolute; right: 0; bottom: 0; left: 0; padding: 8px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.92)); font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+.portrait-crop { position: relative; overflow: hidden; background: #0d0f0d; }
+.portrait-crop > img { position: absolute; inset: 0 auto auto 0; }
+.fighter-card > .portrait { border: 2px solid var(--red); }
+
+.calendar-panel { margin-top: 22px; }
+.calendar-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 8px; }
+.calendar-heading-meta { display: grid; gap: 4px; color: var(--muted); font-size: .68rem; text-align: right; text-transform: uppercase; }
+.calendar-heading-meta span:first-child { color: var(--gold); font-weight: 800; }
+.calendar-lead { margin-bottom: 18px; color: var(--muted); font-size: .78rem; line-height: 1.45; }
+.calendar-events { display: grid; gap: 18px; }
+.calendar-date-group { display: grid; grid-template-columns: 125px minmax(0, 1fr); gap: 12px; }
+.calendar-date { padding: 14px 12px; border-top: 3px solid var(--red); color: var(--muted); background: #121412; text-transform: uppercase; }
+.calendar-date strong { display: block; color: var(--ink); font: 800 1.25rem "Barlow Condensed"; }
+.calendar-date span { display: block; margin-top: 4px; font-size: .64rem; }
+.calendar-day-events { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.calendar-event { display: flex; min-width: 0; min-height: 190px; padding: 16px; border: 1px solid var(--line); background: #171917; flex-direction: column; }
+.calendar-event.home { border-color: var(--green); background: linear-gradient(145deg, rgba(108,183,137,.11), #171917 62%); }
+.calendar-event.tournament { border-color: var(--gold); background: linear-gradient(145deg, rgba(221,182,94,.1), #171917 62%); }
+.calendar-event.booked { box-shadow: inset 0 0 0 2px var(--red); }
+.calendar-event.unavailable { opacity: .72; }
+.calendar-event-head { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+.calendar-event-type { color: var(--red); font-size: .62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.calendar-event-badge { padding: 3px 6px; border: 1px solid var(--line); color: var(--gold); font-size: .58rem; text-transform: uppercase; }
+.calendar-event h3 { margin: 7px 0 5px; font-size: 1.25rem; }
+.calendar-event p { color: var(--muted); font-size: .71rem; line-height: 1.45; }
+.calendar-event-meta { display: flex; flex-wrap: wrap; gap: 5px 10px; margin: 12px 0; color: var(--gold); font-size: .62rem; font-weight: 700; text-transform: uppercase; }
+.calendar-event-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: auto; }
+.calendar-event-actions button { min-width: 0; min-height: 44px; padding: 8px; font-size: .68rem; }
+.calendar-opponent-choice { display: grid; gap: 3px; text-align: left; }
+.calendar-opponent-choice strong { font: 800 .86rem/1.1 "Barlow Condensed"; text-transform: uppercase; }
+.calendar-opponent-choice span { color: var(--muted); font-size: .6rem; line-height: 1.25; }
+.calendar-opponent-choice em { color: var(--gold); font-size: .58rem; font-style: normal; }
+.tournament-catalog { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+.tournament-catalog summary, .tournament-bracket-disclosure summary, .fight-log-disclosure summary { min-height: 44px; padding: 11px 0; color: var(--gold); cursor: pointer; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.tournament-catalog .tournament-grid { margin-top: 10px; }
+
+.fight-dialog { width: min(1040px, calc(100% - 24px)); max-height: calc(100dvh - 24px); }
+.fight-card { max-height: calc(100dvh - 24px); overflow-y: auto; }
+.fight-ring-stage { position: relative; width: 100%; aspect-ratio: 16 / 7; margin: 16px 0 0; overflow: hidden; border: 1px solid var(--line); background: #090b0a; isolation: isolate; }
+.ring-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 55%; }
+.ring-fighter { position: absolute; z-index: 2; bottom: 13%; width: 15%; min-width: 82px; aspect-ratio: .72; transition: left .24s ease, right .24s ease, transform .18s ease, filter .18s ease; }
+.ring-fighter-player { left: 28%; }
+.ring-fighter-opponent { right: 28%; }
+.ring-fighter-silhouette { width: 100%; height: 100%; border: 2px solid rgba(255,255,255,.55); border-radius: 48% 48% 24% 24%; background-color: #111; background-image: var(--fighter-image); background-repeat: no-repeat; background-size: var(--fighter-size, cover); background-position: var(--fighter-position, center top); box-shadow: 0 12px 30px rgba(0,0,0,.55); }
+.fight-ring-stage[data-distance="outside"] .ring-fighter-player { left: 20%; }
+.fight-ring-stage[data-distance="outside"] .ring-fighter-opponent { right: 20%; }
+.fight-ring-stage[data-distance="inside"] .ring-fighter-player { left: 37%; transform: translateX(-30%); }
+.fight-ring-stage[data-distance="inside"] .ring-fighter-opponent { right: 37%; transform: translateX(30%); }
+.fight-ring-stage[data-position="ropes-player"] .ring-fighter-player { left: 8%; }
+.fight-ring-stage[data-position="corner-player"] .ring-fighter-player { left: 2%; filter: saturate(.7); }
+.fight-ring-stage[data-position="ropes-opponent"] .ring-fighter-opponent { right: 8%; }
+.fight-ring-stage[data-position="corner-opponent"] .ring-fighter-opponent { right: 2%; filter: saturate(.7); }
+.fight-ring-stage[data-player-corner="red"] .ring-fighter-player { right: 28%; left: auto; }
+.fight-ring-stage[data-player-corner="red"] .ring-fighter-opponent { right: auto; left: 28%; }
+.fight-ring-stage[data-player-corner="red"][data-distance="outside"] .ring-fighter-player { right: 20%; left: auto; }
+.fight-ring-stage[data-player-corner="red"][data-distance="outside"] .ring-fighter-opponent { right: auto; left: 20%; }
+.fight-ring-stage[data-player-corner="red"][data-distance="inside"] .ring-fighter-player { right: 37%; left: auto; transform: translateX(30%); }
+.fight-ring-stage[data-player-corner="red"][data-distance="inside"] .ring-fighter-opponent { right: auto; left: 37%; transform: translateX(-30%); }
+.fight-ring-stage[data-player-corner="red"][data-position="ropes-player"] .ring-fighter-player { right: 8%; left: auto; }
+.fight-ring-stage[data-player-corner="red"][data-position="corner-player"] .ring-fighter-player { right: 2%; left: auto; }
+.fight-ring-stage[data-player-corner="red"][data-position="ropes-opponent"] .ring-fighter-opponent { right: auto; left: 8%; }
+.fight-ring-stage[data-player-corner="red"][data-position="corner-opponent"] .ring-fighter-opponent { right: auto; left: 2%; }
+.fight-ring-stage[data-cue="player-hit"] .ring-fighter-player,
+.fight-ring-stage[data-cue="player-rocked"] .ring-fighter-player { transform: translateX(-8%) rotate(-2deg); filter: saturate(.65); }
+.fight-ring-stage[data-cue="opponent-hit"] .ring-fighter-opponent,
+.fight-ring-stage[data-cue="opponent-rocked"] .ring-fighter-opponent { transform: translateX(8%) rotate(2deg); filter: saturate(.65); }
+.fight-ring-stage[data-cue="player-knockdown"] .ring-fighter-player { transform: translateY(32%) rotate(-12deg); }
+.fight-ring-stage[data-cue="opponent-knockdown"] .ring-fighter-opponent { transform: translateY(32%) rotate(12deg); }
+.fight-impact-effect { position: absolute; z-index: 4; top: 29%; left: 50%; width: 23%; opacity: 0; pointer-events: none; transform: translate(-50%, -50%) scale(.45); }
+.fight-ring-stage.show-impact .fight-impact-effect { animation: fight-impact .24s ease-out; }
+.fight-ring-stage[data-cue^="player-"] .fight-impact-effect { left: 37%; }
+.fight-ring-stage[data-cue^="opponent-"] .fight-impact-effect { left: 63%; }
+.fight-ring-stage[data-player-corner="red"][data-cue^="player-"] .fight-impact-effect { left: 63%; }
+.fight-ring-stage[data-player-corner="red"][data-cue^="opponent-"] .fight-impact-effect { left: 37%; }
+@keyframes fight-impact { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.35) rotate(-8deg); } 45% { opacity: .95; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.05) rotate(5deg); } }
+.ring-position-labels { position: absolute; z-index: 3; right: 10px; bottom: 7px; left: 10px; display: flex; justify-content: space-between; color: rgba(255,255,255,.78); font-size: .52rem; text-shadow: 0 1px 4px #000; text-transform: uppercase; }
+
+.ring-scoreboard { margin: 0; padding: 15px 12px; }
+.fight-portrait { display: block; width: min(100%, 126px); height: 104px; margin: 0 auto 8px; overflow: hidden; border: 2px solid var(--red); background: #111311; }
+.fight-portrait:not(.portrait-crop) img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
+.fight-portrait.portrait-crop > img { width: 300%; height: 200%; }
+.fight-state-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; margin: 10px 0; }
+.fight-state-strip > div { min-width: 0; padding: 8px 7px; border: 1px solid var(--line); background: #101210; text-align: center; }
+.fight-state-strip span { display: block; color: var(--muted); font-size: .55rem; letter-spacing: .06em; text-transform: uppercase; }
+.fight-state-strip strong { display: block; margin-top: 3px; overflow-wrap: anywhere; font: 800 .82rem/1.1 "Barlow Condensed"; text-transform: uppercase; }
+.fight-tactics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fight-coach-panel { margin: 11px 0; padding: 14px; border: 1px solid var(--gold); background: linear-gradient(145deg, rgba(221,182,94,.08), #111311 58%); }
+.fight-coach-panel h3 { font-size: 1.2rem; }
+.fight-coach-panel > p:not(.eyebrow) { margin: 7px 0 10px; color: var(--muted); font-size: .74rem; line-height: 1.45; }
+.fight-coach-choices, .tournament-recovery-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fight-coach-choices button, .tournament-recovery-choices button { min-height: 70px; padding: 10px; border: 1px solid var(--line); color: var(--ink); background: var(--panel); cursor: pointer; text-align: left; }
+.fight-coach-choices button:hover, .fight-coach-choices button:focus-visible,
+.tournament-recovery-choices button:hover, .tournament-recovery-choices button:focus-visible { border-color: var(--gold); }
+.fight-coach-choices strong, .tournament-recovery-choices strong { display: block; font: 800 1rem "Barlow Condensed"; text-transform: uppercase; }
+.fight-coach-choices span, .tournament-recovery-choices span { display: block; margin-top: 4px; color: var(--muted); font-size: .63rem; line-height: 1.35; }
+.fight-decision-area { position: relative; }
+.fight-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fight-choices button { min-height: 78px; }
+.fight-choices button.coach-match { border-color: var(--green); box-shadow: inset 3px 0 0 var(--green); }
+.fight-choices button.coach-match em { color: var(--green); }
+.fight-log-disclosure { margin-top: 10px; border-top: 1px solid var(--line); }
+.fight-log { display: grid; gap: 6px; max-height: 132px; margin: 0; padding: 0 0 0 24px; overflow-y: auto; color: var(--muted); font-size: .7rem; line-height: 1.4; }
+.fight-log li::marker { color: var(--gold); font-weight: 800; }
+.fight-judge-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 7px; margin-top: 12px; }
+.judge-card { padding: 10px; border: 1px solid var(--line); background: #101210; text-align: center; }
+.judge-card span { display: block; color: var(--muted); font-size: .58rem; text-transform: uppercase; }
+.judge-card strong { display: block; margin-top: 4px; font: 800 1.25rem "Barlow Condensed"; }
+.judge-card.winner { border-color: var(--green); }
+
+.tournament-daily-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; margin: 12px 0; }
+.tournament-daily-status > div { padding: 10px; border: 1px solid var(--line); background: #111311; }
+.tournament-daily-status span { display: block; color: var(--muted); font-size: .6rem; text-transform: uppercase; }
+.tournament-daily-status strong { display: block; margin-top: 4px; font: 800 1.05rem "Barlow Condensed"; }
+.tournament-interbout { margin-top: 12px; padding: 14px; border: 1px solid var(--gold); background: #161711; }
+.tournament-interbout > p { margin: 7px 0 10px; color: var(--muted); font-size: .72rem; line-height: 1.4; }
+.tournament-board-actions { position: sticky; bottom: 0; z-index: 4; padding-top: 10px; background: linear-gradient(transparent, #171917 34%); }
+
+@media (max-width: 760px) {
+  .portrait-options { gap: 7px; }
+  .portrait-option { min-height: 125px; }
+  .calendar-date-group { grid-template-columns: 1fr; gap: 6px; }
+  .calendar-date { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 9px 10px; }
+  .calendar-date span { margin: 0; }
+  .fight-ring-stage { aspect-ratio: 4 / 2.5; }
+  .fight-state-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fight-coach-choices, .tournament-recovery-choices { grid-template-columns: 1fr; }
+  .fight-coach-choices button, .tournament-recovery-choices button { min-height: 56px; }
+}
+
+@media (max-width: 560px) {
+  .calendar-heading { align-items: flex-start; flex-direction: column; }
+  .calendar-heading-meta { text-align: left; }
+  .calendar-day-events { grid-template-columns: 1fr; }
+  .calendar-event { min-height: 0; }
+  .calendar-event-actions { grid-template-columns: 1fr; }
+  .fight-dialog { width: 100%; max-height: 100dvh; }
+  .fight-card { max-height: 100dvh; padding: 8px 8px calc(10px + env(safe-area-inset-bottom)); border-right: 0; border-left: 0; }
+  .fight-ring-stage { margin-top: 8px; aspect-ratio: 4 / 2.1; }
+  .ring-fighter { min-width: 54px; width: 17%; }
+  .ring-position-labels { font-size: .46rem; }
+  .fight-topline span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ring-scoreboard { grid-template-columns: minmax(0, 1fr) 74px minmax(0, 1fr); gap: 4px; padding: 6px 4px; }
+  .fight-portrait { height: 58px; margin-bottom: 4px; }
+  .score { grid-column: auto; order: 0; padding-bottom: 0; }
+  .score strong { font-size: 1.4rem; }
+  .corner { min-width: 0; }
+  .corner strong { margin-top: 2px; overflow: hidden; font-size: 1.05rem; text-overflow: ellipsis; white-space: nowrap; }
+  .corner small { font-size: .55rem; }
+  .fight-state-strip { margin: 6px 0; }
+  .fight-state-strip > div { padding: 6px 4px; }
+  .fight-state-strip strong { font-size: .72rem; }
+  .fight-tactics { margin-bottom: 6px; }
+  .fight-coach-panel { margin: 7px 0; padding: 9px; }
+  .fight-coach-panel > p:not(.eyebrow) { margin: 4px 0 7px; font-size: .67rem; }
+  .fight-round-track { margin: 5px 0; }
+  .fight-instruction { margin: 6px 0; }
+  .fight-decision-area { position: sticky; z-index: 6; bottom: calc(-10px - env(safe-area-inset-bottom)); margin: 0 -8px; padding: 7px 8px calc(10px + env(safe-area-inset-bottom)); background: rgba(16,18,16,.97); box-shadow: 0 -10px 25px rgba(0,0,0,.35); }
+  .fight-choices { grid-template-columns: 1fr; gap: 5px; }
+  .fight-choices button { grid-template-columns: minmax(100px, .8fr) 1.2fr; min-height: 48px; padding: 7px 9px; }
+  .fight-log-disclosure[open] .fight-log { max-height: 84px; }
+  .fight-log-disclosure summary { min-height: 40px; padding: 8px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fight-ring-stage.show-impact .fight-impact-effect { animation: none; opacity: 0; }
+}
