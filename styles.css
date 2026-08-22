@@ -12,6 +12,10 @@
 }
 
 body.theme-blue { --red: #4d91df; --gold: #9fc8f6; --green: #72c2a0; --blue: #75b7e8; }
+body.theme-green { --red: #4aa86f; --gold: #b8df8f; --green: #83d39d; --blue: #79c6a7; }
+body.theme-purple { --red: #aa78d9; --gold: #e2c1ff; --green: #a9d29c; --blue: #c99ce9; }
+body.theme-gold { --red: #d59a35; --gold: #ffe29a; --green: #b6c87c; --blue: #e1bd69; }
+body.theme-pink { --red: #df759a; --gold: #ffc4d8; --green: #a7d6b0; --blue: #eda0bb; }
 
 * { box-sizing: border-box; }
 
@@ -139,6 +143,21 @@ h2 { font-size: 1.65rem; }
 .career-alert-dialog .service-card { border-top: 4px solid var(--gold); }
 .career-alert-dialog .service-lead { margin: 20px 0; font-size: .9rem; line-height: 1.55; }
 .job-loss-dialog .service-card { border-top-color: var(--red); }
+.developer-dialog .service-card { border-top-color: #6c9fe8; }
+.developer-tool-section, .developer-corner-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.developer-tool-section h3, .developer-corner-section h3 { margin: 0; font: 800 1.3rem/1 "Barlow Condensed"; text-transform: uppercase; }
+.developer-tool-section > p, .developer-corner-section > p { margin: 6px 0 0; color: var(--muted); font-size: .76rem; }
+.developer-tool-card { border-left: 3px solid var(--green); }
+.developer-corner-card { border-left: 3px solid var(--blue); }
+.developer-corner-card[data-developer-corner="red"] { border-left-color: #e3513d; }
+.developer-corner-card[data-developer-corner="blue"] { border-left-color: #71a7c5; }
+.developer-corner-card[data-developer-corner="green"] { border-left-color: #6cb789; }
+.developer-corner-card[data-developer-corner="purple"] { border-left-color: #b280de; }
+.developer-corner-card[data-developer-corner="gold"] { border-left-color: #ddb65e; }
+.developer-corner-card[data-developer-corner="pink"] { border-left-color: #df759a; }
+.developer-corner-card[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+.developer-code-label { display: grid; gap: 8px; margin: 18px 0 4px; color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.developer-code-label input { width: 100%; min-height: 46px; padding: 9px 11px; border: 1px solid var(--line); color: var(--ink); background: #111311; font: 800 1.25rem "Barlow Condensed"; letter-spacing: .2em; }
 .combat-heading { margin: 28px 0 12px; padding-top: 22px; border-top: 1px solid var(--line); }
 .combat-heading .eyebrow { margin: 0; }
 .combat-heading span { color: var(--gold); font-size: .7rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
@@ -277,13 +296,13 @@ h2 { font-size: 1.65rem; }
 .corner span, .score span { display: block; color: var(--muted); font-size: .68rem; text-transform: uppercase; }
 .fight-portrait { display: block; width: 100%; max-width: 170px; height: 190px; margin: 0 auto 14px; border: 2px solid var(--red); object-fit: cover; object-position: center top; background: #111311; }
 .corner.blue-corner .fight-portrait { border-color: var(--blue); }
-.corner.red-corner .fight-portrait { border-color: #e3513d; }
+.corner.red-corner .fight-portrait { border-color: var(--red); }
 .corner strong { display: block; margin: 7px 0 3px; color: var(--green); font: 800 2rem "Barlow Condensed"; }
 .corner small, .score small { color: var(--muted); font-size: .67rem; }
 .fight-energy-track { width: min(120px, 100%); height: 6px; margin: 0 auto 4px; overflow: hidden; border-radius: 99px; background: #0d0f0d; }
 .fight-energy-track > span { display: block; height: 100%; border-radius: inherit; background: var(--green); transition: width .2s ease; }
 .corner.blue-corner .fight-energy-track > span { background: var(--blue); }
-.corner.red-corner .fight-energy-track > span { background: #e3513d; }
+.corner.red-corner .fight-energy-track > span { background: var(--red); }
 .score { border-right: 1px solid var(--line); border-left: 1px solid var(--line); }
 .score strong { display: block; margin: 6px 0; font: 800 2.6rem/1 "Barlow Condensed"; }
 .fight-tactics { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; margin: 0 0 10px; }

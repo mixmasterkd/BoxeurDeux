@@ -18,11 +18,36 @@ const RECREATIONAL_START_DATE = "2026-09-07";
 const RECREATIONAL_SPARRING_WEEK = 6;
 const RECREATIONAL_MAX_WEEK = 10;
 const SAVE_KEY = "boxeur-deux-career-v2";
+const DEV_RETURN_SAVE_KEY = `${SAVE_KEY}-dev-return`;
+const DEV_TEST_ACTIVE_KEY = `${SAVE_KEY}-dev-active`;
+const DEV_UNLOCK_CODE = "128";
 const SAVE_VERSION = 5;
 const MAX_SUPPLEMENTS_PER_WEEK = 2;
 const SPONSOR_COOLDOWN_WEEKS = 4;
 const FIRST_PAID_VACATION_WEEKS = 8;
 const PAID_VACATION_INTERVAL_WEEKS = 12;
+const MAX_PAID_VACATION_WEEKS = 3;
+
+const cornerThemes = Object.freeze([
+  { id: "red", label: "Rouge", detail: "Couleur classique du coin rouge." },
+  { id: "blue", label: "Bleu", detail: "Couleur classique du coin bleu." },
+  { id: "green", label: "Vert", detail: "Aperçu d’une couleur de coin professionnelle." },
+  { id: "purple", label: "Violet", detail: "Aperçu d’une couleur de coin professionnelle." },
+  { id: "gold", label: "Doré", detail: "Aperçu d’une couleur de coin professionnelle." },
+  { id: "pink", label: "Rose", detail: "Aperçu d’une couleur de coin professionnelle." },
+]);
+
+function isCornerTheme(value) {
+  return cornerThemes.some(theme => theme.id === value);
+}
+
+function cornerLabel(corner) {
+  return cornerThemes.find(theme => theme.id === corner)?.label.toLowerCase() || "rouge";
+}
+
+function opposingCorner(corner) {
+  return corner === "blue" ? "red" : "blue";
+}
 
 const weightClassDefs = Object.freeze({
   male: Object.freeze([
@@ -195,6 +220,8 @@ const INITIAL_STATE = {
   strengthGymWeeks: 0,
   trainingProgress: { technique: 0, power: 0, cardio: 0, defense: 0 },
   boxingNeglectWeeks: 0,
+  boxingInactivityWeeks: 0,
+  boxingTrainingWeek: 0,
   amateurRecord: { wins: 0, losses: 0, draws: 0 },
   professionalRecord: { wins: 0, losses: 0, draws: 0 },
   careerStatus: "recreational",
@@ -221,7 +248,9 @@ const INITIAL_STATE = {
   missedWorkWeeks: 0,
   jobAttendanceWeek: 0,
   jobTenureWeeks: 0,
-  jobVacationClaimedAtTenure: 0,
+  jobVacationEarnedAtTenure: 0,
+  vacationBankWeeks: 0,
+  jobWagesEarned: 0,
   workStreak: 0,
   sponsorAvailableWeek: 1,
   supplementWeek: 1,
@@ -372,7 +401,7 @@ const actions = [
   { id: "physio", category: "recovery", icon: "T", title: "Physiothérapie", detail: "55 $ · −16 risque · +8 énergie · +2 forme · accélère la guérison", cost: 55, changes: { money: -55, injury: -16, injuryWeeks: -1, energy: 8, fitness: 2 }, message: "Le traitement du physiothérapeute calme les douleurs avant qu'elles ne s'installent." },
   { id: "spa", category: "recovery", icon: "R", title: "Spa et récupération", detail: "65 $ · +38 énergie · −20 risque · +6 moral", cost: 65, changes: { money: -65, energy: 38, injury: -20, morale: 6 }, message: "Le protocole de récupération remet le corps et la tête en état." },
   { id: "work", category: "career", icon: "$", title: "Travailler", detail: "Emploi requis · la paie et la fatigue dépendent du poste", requiresJob: true, message: "Un quart de travail paie les factures, mais laisse les jambes lourdes." },
-  { id: "vacation", category: "career", icon: "☼", title: "Vacances payées", detail: "Congé payé · récupération sans perdre ton emploi", requiresJob: true, message: "Une semaine de congé payé protège le corps sans couper le revenu." },
+  { id: "vacation", category: "career", icon: "☼", title: "Vacances payées", detail: "Congé payé · récupération sans perdre ton emploi · hors limite d’actions", requiresJob: true, message: "Une semaine de congé payé protège le corps sans couper le revenu." },
   { id: "promotion", category: "career", icon: "M", title: "Promotion locale", detail: "20 $ · +8 réputation · +3 moral · −10 énergie", cost: 20, changes: { money: -20, reputation: 8, morale: 3, energy: -10 }, message: "Quelques apparitions locales font circuler ton nom dans le quartier." },
   { id: "family", category: "career", icon: "F", title: "Temps avec les proches", detail: "+9 moral · +6 énergie", changes: { morale: 9, energy: 6 }, message: "Une soirée avec les proches remet la carrière en perspective." },
   { id: "sponsor", category: "career", icon: "$+", title: "Petite commandite", detail: "+85 $ · +2 réputation · −12 énergie · −2 moral · délai de 4 semaines", requiresReputation: 30, changes: { money: 85, reputation: 2, morale: -2, energy: -12 }, message: "Une entreprise locale finance une partie du camp en échange d'une apparition promotionnelle." },
@@ -409,6 +438,7 @@ let toastTimer;
 let fightState = null;
 let selectedPrivateCoachId = null;
 let draftPortraitId = 0;
+let drugSalesTapCount = 0;
 
 const clamp = (value, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 const escapeHTML = value => String(value).replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
@@ -496,7 +526,7 @@ function normalizeCareerState(source) {
     weightClass: allowedWeights.includes(source.profile.weightClass) ? source.profile.weightClass : weightClassesForSex(profileSex)[3].id,
     portraitId: safeNumber(source.profile.portraitId, 0, 0, 2),
     style: styles[source.profile.style] ? source.profile.style : "balanced",
-    corner: source.profile.corner === "blue" ? "blue" : "red",
+    corner: isCornerTheme(source.profile.corner) ? source.profile.corner : "red",
   };
   const normalized = {
     ...base,
@@ -533,8 +563,8 @@ function normalizeCareerState(source) {
   const boundedStats = {
     week: [1, 99999], money: [0, 9999999], energy: [0, 100], fitness: [0, 100], morale: [0, 100], reputation: [0, 100],
     injury: [0, 100], fatigue: [0, 100], injuryWeeks: [0, 52], experience: [0, 10000000], level: [1, 999], levelPoints: [0, 9999],
-    gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
-    missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999], jobTenureWeeks: [0, 99999], jobVacationClaimedAtTenure: [0, 99999], recreationalTrainingWeeks: [0, 10],
+    gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], boxingInactivityWeeks: [0, 999], boxingTrainingWeek: [0, 99999], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
+    missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999], jobTenureWeeks: [0, 99999], jobVacationEarnedAtTenure: [0, 99999], vacationBankWeeks: [0, MAX_PAID_VACATION_WEEKS], jobWagesEarned: [0, 9999999], recreationalTrainingWeeks: [0, 10],
     supplementWeek: [1, 99999], avoidanceWeeks: [0, 999], lastFightWeek: [0, 99999], injuryStartedWeek: [0, 99999],
   };
   Object.entries(boundedStats).forEach(([key, [min, max]]) => { normalized[key] = safeNumber(source[key], base[key] ?? min, min, max); });
@@ -550,10 +580,13 @@ function normalizeCareerState(source) {
   normalized.levelAnnouncementPending = Boolean(source.levelAnnouncementPending);
   normalized.jobLossNotice = source.jobLossNotice ? safeText(source.jobLossNotice, "", 180) : null;
   normalized.jobId = jobs.some(job => job.id === source.jobId) ? source.jobId : null;
+  normalized.jobVacationEarnedAtTenure = safeNumber(source.jobVacationEarnedAtTenure ?? source.jobVacationClaimedAtTenure, 0, 0, 99999);
   if (!normalized.jobId) {
     normalized.missedWorkWeeks = 0;
     normalized.jobTenureWeeks = 0;
-    normalized.jobVacationClaimedAtTenure = 0;
+    normalized.jobVacationEarnedAtTenure = 0;
+    normalized.vacationBankWeeks = 0;
+    normalized.jobWagesEarned = 0;
   }
   normalized.introJobRequired = normalized.careerStatus === "recreational" && Boolean(source.introJobRequired ?? !normalized.jobId);
   normalized.initialGymRequired = normalized.careerStatus === "recreational" && Boolean(source.initialGymRequired ?? true);
@@ -608,7 +641,8 @@ function syncLevelProgress() {
 }
 
 function applyCareerTheme() {
-  document.body.classList.toggle("theme-blue", state.profile?.corner === "blue");
+  document.body.classList.remove(...cornerThemes.filter(theme => theme.id !== "red").map(theme => `theme-${theme.id}`));
+  if (state.profile?.corner && state.profile.corner !== "red") document.body.classList.add(`theme-${state.profile.corner}`);
 }
 
 function careerSnapshot() {
@@ -856,13 +890,24 @@ function hydrateCareer(snapshot) {
     ensureCareerCalendar();
     syncLevelProgress();
     const seenActions = new Set();
+    let restoredCoreActions = 0;
+    let restoredVacation = false;
     weeklyPlan = (Array.isArray(snapshot?.weeklyPlan) ? snapshot.weeklyPlan : []).filter(item => {
       const action = actions.find(candidate => candidate.id === item?.actionId);
       if (!action || seenActions.has(action.id)) return false;
       if (action.id === "private" && !state.privateProgram) return false;
+      if (action.id === "work" && seenActions.has("vacation")) return false;
+      if (action.id === "vacation" && seenActions.has("work")) return false;
+      if (isBonusAction(action)) {
+        if (restoredVacation || !vacationStatus().available) return false;
+        restoredVacation = true;
+      } else {
+        if (restoredCoreActions >= weeklyActionLimit()) return false;
+        restoredCoreActions += 1;
+      }
       seenActions.add(action.id);
       return true;
-    }).slice(0, weeklyActionLimit());
+    });
     fightState = null;
     selectedPrivateCoachId = null;
     applyCareerTheme();
@@ -926,6 +971,206 @@ function restoreCareer(snapshot) {
     console.error("[Boxeur Deux] Sauvegarde refusée :", error);
     showToast("Fichier de carrière invalide.");
     return false;
+  }
+}
+
+const developerPresetDefinitions = Object.freeze([
+  { id: "recreational-start", label: "Récréatif · départ", detail: "Semaine 1, emploi et premier abonnement déjà réglés." },
+  { id: "remy-ready", label: "Récréatif · Rémy prêt", detail: "Semaine 6, cinq entraînements complétés : le sparring est prêt." },
+  { id: "amateur-rookie", label: "Amateur · début", detail: "Début de saison, quelques galas et peu de ressources." },
+  { id: "bronze-ready", label: "Gants de bronze", detail: "Cinq combats au dossier, semaine précédant les Gants de bronze." },
+  { id: "silver-ready", label: "Gants d’argent", detail: "Dix combats au dossier, prêt à vérifier les conditions d’argent." },
+  { id: "golden-ready", label: "Gants dorés", detail: "Carrière avancée, budget et statistiques de niveau élevé." },
+  { id: "pro-ready", label: "Professionnel · aperçu", detail: "Boxeur déjà passé pro pour tester l’affichage et les couleurs futures." },
+  { id: "recovery-case", label: "Test récupération", detail: "Fatigue, blessure légère et banque de vacances active." },
+]);
+
+const developerToolDefinitions = Object.freeze([
+  { id: "funds", label: "Fonds de test", detail: "Fixe le solde à 9 999 $." },
+  { id: "recover", label: "Récupération complète", detail: "Énergie à 100 %, fatigue et blessure à 0." },
+  { id: "next-week", label: "Semaine suivante", detail: "Avance sans action ni dépense ; indisponible lorsqu’un combat est dû." },
+]);
+
+function developerPresetSnapshot(id) {
+  const preset = cloneData(INITIAL_STATE);
+  const advanced = ["silver-ready", "golden-ready", "pro-ready"].includes(id);
+  preset.profile = {
+    firstName: id === "recovery-case" ? "Maya" : id === "pro-ready" ? "Jordan" : "Alex",
+    lastName: "Test",
+    nickname: id === "golden-ready" ? "Le Vétéran" : id === "pro-ready" ? "La Relève" : "Le Banc",
+    sex: id === "recovery-case" ? "female" : "male",
+    weightClass: id === "recovery-case" ? "W57" : "M65",
+    portraitId: id === "recovery-case" ? 2 : 1,
+    style: advanced ? "puncher" : "balanced",
+    corner: id === "pro-ready" ? "green" : "blue",
+  };
+  preset.careerStartDate = RECREATIONAL_START_DATE;
+  preset.money = advanced ? 1400 : 420;
+  preset.energy = advanced ? 86 : 78;
+  preset.fitness = advanced ? 70 : 48;
+  preset.morale = 72;
+  preset.reputation = advanced ? 46 : 14;
+  preset.gymWeeks = 8;
+  preset.strengthGymWeeks = advanced ? 8 : 0;
+  preset.initialGymRequired = false;
+  preset.introJobRequired = false;
+  preset.jobId = "courier";
+  preset.jobTenureWeeks = advanced ? 20 : 4;
+  preset.jobWagesEarned = advanced ? 2000 : 400;
+  preset.jobVacationEarnedAtTenure = advanced ? 20 : 0;
+  preset.combatStats = advanced
+    ? { technique: 58, power: 56, cardio: 59, defense: 57 }
+    : { technique: 44, power: 43, cardio: 44, defense: 43 };
+
+  if (id === "recreational-start") {
+    preset.careerStatus = "recreational";
+    preset.week = 1;
+    preset.recreationalTrainingWeeks = 0;
+    preset.recreationalSparringStatus = "training";
+  } else if (id === "remy-ready") {
+    preset.careerStatus = "recreational";
+    preset.week = RECREATIONAL_SPARRING_WEEK;
+    preset.recreationalTrainingWeeks = 5;
+    preset.recreationalSparringStatus = "training";
+  } else if (id === "pro-ready") {
+    preset.careerStatus = "professional";
+    preset.week = 52;
+    preset.amateurRecord = { wins: 18, losses: 4, draws: 0 };
+    preset.professionalRecord = { wins: 6, losses: 1, draws: 0 };
+    preset.experience = 1500;
+    preset.reputation = 68;
+    preset.money = 2600;
+    preset.combatStats = { technique: 65, power: 62, cardio: 64, defense: 63 };
+  } else {
+    preset.careerStatus = "amateur";
+    preset.week = id === "bronze-ready" ? 15 : id === "silver-ready" ? 31 : id === "golden-ready" ? 45 : 4;
+    const fights = id === "bronze-ready" ? 5 : id === "silver-ready" ? 10 : id === "golden-ready" ? 16 : id === "recovery-case" ? 7 : 1;
+    preset.amateurRecord = { wins: Math.max(0, fights - 2), losses: Math.min(2, fights), draws: 0 };
+    preset.experience = advanced ? 820 : 120;
+  }
+  if (id === "recovery-case") {
+    preset.fatigue = 58;
+    preset.injury = 34;
+    preset.injuryWeeks = 1;
+    preset.vacationBankWeeks = 2;
+    preset.jobTenureWeeks = 20;
+    preset.jobVacationEarnedAtTenure = 20;
+    preset.jobWagesEarned = 1600;
+  }
+  return { version: SAVE_VERSION, savedAt: new Date().toISOString(), state: preset, weeklyPlan: [] };
+}
+
+function hasDeveloperReturnCareer() {
+  try {
+    return Boolean(localStorage.getItem(DEV_RETURN_SAVE_KEY));
+  } catch {
+    return false;
+  }
+}
+
+function openDeveloperTestMenu() {
+  const options = document.querySelector("#developer-test-options");
+  const toolOptions = document.querySelector("#developer-tool-options");
+  const cornerOptions = document.querySelector("#developer-corner-options");
+  const returnButton = document.querySelector("#developer-return-career");
+  if (!options || !toolOptions || !cornerOptions || !returnButton) return;
+  options.innerHTML = developerPresetDefinitions.map(preset => `<button class="coach-card" type="button" data-developer-preset="${preset.id}"><strong>${preset.label}</strong><small>${preset.detail}</small></button>`).join("");
+  toolOptions.innerHTML = developerToolDefinitions.map(tool => `<button class="coach-card developer-tool-card" type="button" data-developer-tool="${tool.id}"><strong>${tool.label}</strong><small>${tool.detail}</small></button>`).join("");
+  cornerOptions.innerHTML = cornerThemes.map(theme => `<button class="coach-card developer-corner-card" type="button" data-developer-corner="${theme.id}" aria-pressed="${state.profile?.corner === theme.id}"><strong>Coin ${theme.label}</strong><small>${theme.detail}</small></button>`).join("");
+  returnButton.hidden = !hasDeveloperReturnCareer();
+  document.querySelector("#developer-test-dialog")?.showModal();
+}
+
+function applyDeveloperCorner(corner) {
+  if (!state.profile || !isCornerTheme(corner)) return;
+  state.profile.corner = corner;
+  applyCareerTheme();
+  render();
+  const options = document.querySelector("#developer-corner-options");
+  if (options) {
+    options.querySelectorAll("[data-developer-corner]").forEach(button => {
+      button.setAttribute("aria-pressed", String(button.dataset.developerCorner === corner));
+    });
+  }
+  showToast(`Coin ${cornerLabel(corner)} appliqué`);
+}
+
+function runDeveloperTool(id) {
+  if (!state.profile || !developerToolDefinitions.some(tool => tool.id === id)) return;
+  if (id === "funds") {
+    state.money = 9999;
+    render();
+    showToast("Fonds de test appliqués · solde : 9 999 $");
+    return;
+  }
+  if (id === "recover") {
+    state.energy = 100;
+    state.fatigue = 0;
+    state.injury = 0;
+    state.injuryWeeks = 0;
+    state.injuryStartedWeek = 0;
+    render();
+    showToast("Récupération complète appliquée");
+    return;
+  }
+  const fightDue = Boolean(state.scheduledFight && state.week >= state.scheduledFight.week);
+  const tournamentDue = Boolean(state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek);
+  if (fightDue || tournamentDue) {
+    showToast("Un combat est dû : utilise l’interface de combat ou du tournoi.");
+    return;
+  }
+  const skippedWeek = state.week;
+  const events = [];
+  weeklyPlan = [];
+  endWeek(events);
+  state.pendingWeekEvent = null;
+  scheduleRecreationalSparring(events);
+  state.journal.unshift({ week: skippedWeek, text: "Outil de test : semaine avancée sans action ni dépense." });
+  render();
+  showToast(`Semaine ${skippedWeek + 1} · aucune action ni dépense appliquée`);
+}
+
+function registerDeveloperSecretTap() {
+  drugSalesTapCount += 1;
+  if (drugSalesTapCount < 5) return;
+  drugSalesTapCount = 0;
+  const input = document.querySelector("#developer-code-input");
+  const error = document.querySelector("#developer-code-error");
+  if (input) input.value = "";
+  if (error) error.textContent = "";
+  document.querySelector("#developer-code-dialog")?.showModal();
+}
+
+function loadDeveloperPreset(id) {
+  if (!developerPresetDefinitions.some(preset => preset.id === id)) return;
+  try {
+    if (!localStorage.getItem(DEV_TEST_ACTIVE_KEY)) localStorage.setItem(DEV_RETURN_SAVE_KEY, JSON.stringify(careerSnapshot()));
+    localStorage.setItem(DEV_TEST_ACTIVE_KEY, "1");
+    hydrateCareer(developerPresetSnapshot(id));
+    weeklyPlan = [];
+    render();
+    document.querySelector("#developer-test-dialog")?.close();
+    showToast("Profil de test chargé · ta carrière est conservée");
+  } catch (error) {
+    console.error("[Boxeur Deux] Chargement du profil de test impossible :", error);
+    showToast("Profil de test impossible à charger.");
+  }
+}
+
+function restoreDeveloperReturnCareer() {
+  try {
+    const raw = localStorage.getItem(DEV_RETURN_SAVE_KEY);
+    if (!raw) return showToast("Aucune carrière de retour n’est disponible.");
+    hydrateCareer(JSON.parse(raw));
+    localStorage.removeItem(DEV_RETURN_SAVE_KEY);
+    localStorage.removeItem(DEV_TEST_ACTIVE_KEY);
+    weeklyPlan = [];
+    render();
+    document.querySelector("#developer-test-dialog")?.close();
+    showToast("Carrière principale restaurée");
+  } catch (error) {
+    console.error("[Boxeur Deux] Restauration de la carrière principale impossible :", error);
+    showToast("Restauration impossible.");
   }
 }
 
@@ -1088,7 +1333,14 @@ function openProfileEditor() {
   renderWeightOptions(weightSelect, state.profile.sex, state.profile.weightClass);
   weightSelect.disabled = Boolean(state.scheduledFight || state.activeTournament);
   document.querySelector("#edit-portrait").value = String(state.profile.portraitId || 0);
-  document.querySelector("#edit-corner").value = state.profile.corner;
+  const cornerSelect = document.querySelector("#edit-corner");
+  cornerSelect.querySelector("option[data-test-corner]")?.remove();
+  if (!cornerSelect.querySelector(`option[value="${state.profile.corner}"]`)) {
+    const option = new Option(`Coin ${cornerLabel(state.profile.corner)} · test`, state.profile.corner);
+    option.dataset.testCorner = "true";
+    cornerSelect.add(option);
+  }
+  cornerSelect.value = state.profile.corner;
   document.querySelector("#profile-edit-note").textContent = weightSelect.disabled ? "La catégorie est verrouillée pendant un combat ou un tournoi programmé. Le style de base reste inchangé." : "Le style de base et ses points restent inchangés.";
   document.querySelector("#profile-dialog").showModal();
 }
@@ -1109,7 +1361,7 @@ function saveProfileEdits(event) {
     }
   }
   state.profile.portraitId = safeNumber(document.querySelector("#edit-portrait").value, 0, 0, 2);
-  state.profile.corner = document.querySelector("#edit-corner").value === "blue" ? "blue" : "red";
+  state.profile.corner = isCornerTheme(document.querySelector("#edit-corner").value) ? document.querySelector("#edit-corner").value : "red";
   applyCareerTheme();
   document.querySelector("#profile-dialog").close();
   render();
@@ -1179,7 +1431,41 @@ function weeklyActionLimit() {
   const base = amateurFightCount() >= 10 ? 4 : 3;
   if (state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek) return 0;
   const galaDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
-  return Math.max(0, base - (galaDue ? 1 : 0));
+  const available = Math.max(0, base - (galaDue ? 1 : 0));
+  return hasWeakBoxingRhythm() ? Math.min(1, available) : available;
+}
+
+function isCompetitiveCareer() {
+  return state.careerStatus === "amateur" || state.careerStatus === "professional";
+}
+
+function hasWeakBoxingRhythm() {
+  return isCompetitiveCareer() && state.boxingInactivityWeeks >= 3;
+}
+
+const boxingTrainingActionIds = new Set(["gym", "group-class", "home-bag", "sparring", "heavybag"]);
+
+function planHasBoxingTraining(privateCoach = null) {
+  return weeklyPlan.some(item => boxingTrainingActionIds.has(item.actionId)) || privateCoach?.type === "boxing";
+}
+
+function recordBoxingTrainingForWeek(week, privateCoach = null) {
+  if (isCompetitiveCareer() && planHasBoxingTraining(privateCoach)) state.boxingTrainingWeek = week;
+}
+
+function updateBoxingRhythm(events, endingWeek) {
+  if (!isCompetitiveCareer()) return;
+  if (state.boxingTrainingWeek === endingWeek) {
+    if (state.boxingInactivityWeeks >= 3) events.push("Rythme de boxe retrouvé : le programme hebdomadaire reprend sa capacité normale.");
+    state.boxingInactivityWeeks = 0;
+    state.boxingTrainingWeek = 0;
+    return;
+  }
+  state.boxingInactivityWeeks = Math.min(999, state.boxingInactivityWeeks + 1);
+  if (state.boxingInactivityWeeks === 3) {
+    events.push("Trois semaines sans entraînement de boxe : rythme faible. Le prochain programme est limité à une action jusqu’au retour au GYM, au sac, aux mitaines ou au sparring.");
+    state.journal.unshift({ week: endingWeek, text: "Rythme faible : reprends un entraînement de boxe pour retrouver un programme complet." });
+  }
 }
 
 function buildLocalOpponent(template, offset, slot) {
@@ -1621,16 +1907,27 @@ function protectedBudgetLock(cost) {
 function vacationStatus() {
   const job = currentJob();
   if (!job) return { available: false, reason: "Un emploi est requis pour obtenir des vacances payées" };
-  const requiredTenure = state.jobVacationClaimedAtTenure
-    ? state.jobVacationClaimedAtTenure + PAID_VACATION_INTERVAL_WEEKS
+  if (state.vacationBankWeeks > 0) {
+    return { available: true, reason: `${state.vacationBankWeeks}/${MAX_PAID_VACATION_WEEKS} semaine${state.vacationBankWeeks > 1 ? "s" : ""} en banque · ne compte pas comme action` };
+  }
+  const requiredTenure = state.jobVacationEarnedAtTenure
+    ? state.jobVacationEarnedAtTenure + PAID_VACATION_INTERVAL_WEEKS
     : FIRST_PAID_VACATION_WEEKS;
   const remaining = Math.max(0, requiredTenure - state.jobTenureWeeks);
   return {
-    available: remaining === 0,
+    available: false,
     requiredTenure,
     remaining,
-    reason: remaining ? `Vacances payées dans ${remaining} semaine${remaining > 1 ? "s" : ""}` : "Vacances payées disponibles",
+    reason: remaining ? `Prochaine semaine de vacances dans ${remaining} semaine${remaining > 1 ? "s" : ""}` : "La prochaine semaine de vacances sera créditée à la fin de la semaine",
   };
+}
+
+function isBonusAction(action) {
+  return action?.id === "vacation";
+}
+
+function plannedCoreActionCount() {
+  return weeklyPlan.filter(item => !isBonusAction(actions.find(action => action.id === item.actionId))).length;
 }
 
 function isRecreationalCareer() {
@@ -1654,7 +1951,7 @@ function actionIsVisibleForCareer(action) {
   if (isAwaitingAmateurTransition()) return false;
   if (isRecreationalLimitReached()) return false;
   if (!isRecreationalCareer()) return action.id !== "group-class";
-  const recreationalActions = ["gym", "group-class", "home-bag", "rest", "work", "vacation"];
+  const recreationalActions = ["gym", "group-class", "home-bag", "rest", "work", "vacation", "drug-sales"];
   if (state.strengthGymWeeks > 0) recreationalActions.push("strength-power", "strength-circuit");
   return recreationalActions.includes(action.id);
 }
@@ -1662,9 +1959,11 @@ function actionIsVisibleForCareer(action) {
 function actionRequirementLock(action) {
   if (!action) return "Action inconnue";
   if (!actionIsVisibleForCareer(action)) return isAwaitingAmateurTransition() ? "Passe amateur pour reprendre la carrière" : "Cette action n’est pas disponible à ce statut";
-  if (action.future) return "Bientôt disponible";
+  if (action.future && action.id !== "drug-sales") return "Bientôt disponible";
+  if (action.id === "drug-sales") return "";
   if (action.id === "work" && !currentJob()) return "Choisis d’abord un emploi dans le panneau Emploi";
   if (action.id === "vacation") {
+    if (state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek) return "Indisponible pendant un tournoi";
     const vacation = vacationStatus();
     if (!vacation.available) return vacation.reason;
   }
@@ -1689,6 +1988,7 @@ function actionConditionLock(action) {
   const job = action.id === "work" ? currentJob() : null;
   if (action.id === "work" && state.energy < Math.max(30, Math.abs(job?.energy || 0) + 8)) return "Énergie insuffisante pour ce quart de travail";
   if (action.id === "work" && state.fatigue >= 75) return "Fatigue trop élevée : repose-toi avant de retravailler";
+  if (action.id === "rest" && !restRecoveryIsNeeded()) return "Repos inutile : ton boxeur est déjà frais et intact";
   if (action.category === "training" && state.energy < 28) return "Énergie trop basse pour bien t’entraîner";
   if (action.category === "training" && state.fitness < 18) return "Forme physique trop basse : récupère d’abord";
   if (action.category === "training" && state.morale < 25) return "Moral trop bas : le camp ne peut pas être productif";
@@ -1697,12 +1997,29 @@ function actionConditionLock(action) {
   return "";
 }
 
+function restRecoveryIsNeeded() {
+  if (state.energy < 92 || state.fatigue > 10 || state.injury > 0 || state.injuryWeeks > 0) return true;
+  const plannedStrain = weeklyPlan.filter(item => item.actionId !== "rest").reduce((total, item) => {
+    const changes = actionChangesFor(item);
+    return {
+      energy: total.energy + (changes.energy || 0),
+      fatigue: total.fatigue + (changes.fatigue || 0),
+      injury: total.injury + (changes.injury || 0),
+    };
+  }, { energy: state.energy, fatigue: state.fatigue, injury: state.injury });
+  return plannedStrain.energy < 92 || plannedStrain.fatigue > 10 || plannedStrain.injury > 0;
+}
+
 function actionLock(action) {
   const requirement = actionRequirementLock(action);
   if (requirement) return requirement;
   const condition = actionConditionLock(action);
   if (condition) return condition;
-  if (weeklyPlan.length >= weeklyActionLimit()) return "Plan complet — retire une action";
+  const workAndVacationPlanned = weeklyPlan.some(item => item.actionId === "work") && weeklyPlan.some(item => item.actionId === "vacation");
+  if (workAndVacationPlanned || (action.id === "work" && weeklyPlan.some(item => item.actionId === "vacation")) || (action.id === "vacation" && weeklyPlan.some(item => item.actionId === "work"))) {
+    return "Les vacances payées remplacent le travail cette semaine";
+  }
+  if (!isBonusAction(action) && plannedCoreActionCount() >= weeklyActionLimit()) return "Plan complet — retire une action";
   if (action.id === "private") {
     const coach = privateCoaches.find(item => item.id === state.privateProgram?.coachId);
     const price = coach ? privateCourseDuePrice(coach) : 0;
@@ -1886,7 +2203,8 @@ function renderEmployment() {
     : state.missedWorkWeeks === 1
       ? "1 absence · deux chances restantes"
       : "2 absences · prochain quart manqué : congédiement";
-  employment.innerHTML = `<div class="private-program employment-program"><span>Emploi actif · ${escapeHTML(job.schedule)}</span><strong>${escapeHTML(job.title)} · ${job.wage} $ par quart</strong><small>${escapeHTML(job.detail)} ${absenceNote}.</small><div class="employment-actions"><button id="open-job-menu" class="secondary-button" type="button">Changer d’emploi</button><button id="quit-job" class="text-button" type="button">Quitter l’emploi</button></div></div>`;
+  const vacation = vacationStatus();
+  employment.innerHTML = `<div class="private-program employment-program"><span>Emploi actif · ${escapeHTML(job.schedule)}</span><strong>${escapeHTML(job.title)} · ${job.wage} $ par quart</strong><small>${escapeHTML(job.detail)} ${absenceNote}. Vacances : ${escapeHTML(vacation.reason)}.</small><div class="employment-actions"><button id="open-job-menu" class="secondary-button" type="button">Changer d’emploi</button><button id="quit-job" class="text-button" type="button">Quitter l’emploi</button></div></div>`;
 }
 
 function openJobMenu() {
@@ -1904,7 +2222,9 @@ function selectJob(jobId) {
   state.missedWorkWeeks = 0;
   if (changed) {
     state.jobTenureWeeks = 0;
-    state.jobVacationClaimedAtTenure = 0;
+    state.jobVacationEarnedAtTenure = 0;
+    state.vacationBankWeeks = 0;
+    state.jobWagesEarned = 0;
   }
   if (changed) state.journal.unshift({ week: state.week, text: `${state.profile.firstName} accepte un emploi : ${job.title}, ${job.wage} $ par quart travaillé.` });
   document.querySelector("#job-dialog").close();
@@ -1920,7 +2240,9 @@ function quitJob() {
   state.jobId = null;
   state.missedWorkWeeks = 0;
   state.jobTenureWeeks = 0;
-  state.jobVacationClaimedAtTenure = 0;
+  state.jobVacationEarnedAtTenure = 0;
+  state.vacationBankWeeks = 0;
+  state.jobWagesEarned = 0;
   state.workStreak = 0;
   render();
   showToast("Emploi quitté");
@@ -1985,7 +2307,25 @@ function selectStrengthGymPlan(planId) {
   showToast(`Musculation active · ${plan.weeks} semaines`);
 }
 
-function settleJobAttendance(worked, events, week, excused = false) {
+function accruePaidVacation(job, events, week) {
+  const requiredTenure = state.jobVacationEarnedAtTenure
+    ? state.jobVacationEarnedAtTenure + PAID_VACATION_INTERVAL_WEEKS
+    : FIRST_PAID_VACATION_WEEKS;
+  if (state.jobTenureWeeks < requiredTenure) return;
+  state.jobVacationEarnedAtTenure = requiredTenure;
+  if (state.vacationBankWeeks >= MAX_PAID_VACATION_WEEKS) {
+    const note = `${job.title} : la banque de vacances est déjà pleine (${MAX_PAID_VACATION_WEEKS} semaines).`;
+    events.push(note);
+    state.journal.unshift({ week, text: note });
+    return;
+  }
+  state.vacationBankWeeks += 1;
+  const note = `${job.title} : une semaine de vacances payées est ajoutée à ta banque (${state.vacationBankWeeks}/${MAX_PAID_VACATION_WEEKS}).`;
+  events.push(note);
+  state.journal.unshift({ week, text: note });
+}
+
+function settleJobAttendance(worked, events, week, excused = false, paidWork = false) {
   if (state.jobAttendanceWeek === week) return;
   state.jobAttendanceWeek = week;
   const job = currentJob();
@@ -2001,6 +2341,8 @@ function settleJobAttendance(worked, events, week, excused = false) {
     }
     state.missedWorkWeeks = 0;
     state.jobTenureWeeks += 1;
+    if (paidWork) state.jobWagesEarned += job.wage;
+    accruePaidVacation(job, events, week);
     return;
   }
   if (excused || state.injuryWeeks > 0) {
@@ -2008,19 +2350,24 @@ function settleJobAttendance(worked, events, week, excused = false) {
     events.push(note);
     state.journal.unshift({ week, text: note });
     state.jobTenureWeeks += 1;
+    accruePaidVacation(job, events, week);
     return;
   }
   state.missedWorkWeeks += 1;
   if (state.missedWorkWeeks >= 3) {
-    const note = `${job.title} : congédiement après trois semaines consécutives sans quart travaillé.`;
+    const vacationPayout = state.vacationBankWeeks > 0 ? Math.round(state.jobWagesEarned * .04) : 0;
+    if (vacationPayout) state.money += vacationPayout;
+    const note = `${job.title} : congédiement après trois semaines consécutives sans quart travaillé.${vacationPayout ? ` Indemnité de vacances : +${vacationPayout} $ (4 % des salaires reçus).` : ""}`;
     events.push(note);
     state.journal.unshift({ week, text: note });
     state.jobId = null;
     state.missedWorkWeeks = 0;
     state.workStreak = 0;
     state.jobTenureWeeks = 0;
-    state.jobVacationClaimedAtTenure = 0;
-    state.jobLossNotice = `Tu as perdu ton emploi de ${job.title} après trois absences consécutives.`;
+    state.jobVacationEarnedAtTenure = 0;
+    state.vacationBankWeeks = 0;
+    state.jobWagesEarned = 0;
+    state.jobLossNotice = `Tu as perdu ton emploi de ${job.title} après trois absences consécutives.${vacationPayout ? ` Une indemnité de vacances de ${vacationPayout} $ a été versée.` : ""}`;
     return;
   }
   const remaining = 3 - state.missedWorkWeeks;
@@ -2146,7 +2493,7 @@ function planValidation() {
   if (isRecreationalCareer() && state.initialGymRequired && state.gymWeeks === 0) return { valid: false, reason: "Active d’abord le premier abonnement au GYM de boxe." };
   if (tournamentDue && state.injuryWeeks === 0) return { valid: false, reason: "Le tournoi a commencé : ouvre le tableau pour disputer le prochain combat." };
   if (!weeklyPlan.length && !scheduledFightDue) return { valid: false, reason: "Sélectionne au moins une action pour continuer." };
-  if (weeklyPlan.length > weeklyActionLimit()) return { valid: false, reason: `Le plan dépasse la limite de ${weeklyActionLimit()} actions.` };
+  if (plannedCoreActionCount() > weeklyActionLimit()) return { valid: false, reason: `Le plan dépasse la limite de ${weeklyActionLimit()} actions.` };
   const seen = new Set();
   for (const item of weeklyPlan) {
     const action = actions.find(candidate => candidate.id === item.actionId);
@@ -2155,19 +2502,23 @@ function planValidation() {
     const lock = actionRequirementLock(action) || actionConditionLock(action);
     if (lock) return { valid: false, reason: `${action.title} : ${lock}.` };
   }
+  if (seen.has("work") && seen.has("vacation")) return { valid: false, reason: "Les vacances payées remplacent le travail cette semaine." };
   const totals = planEffects();
   if (state.money + (totals.rawGeneral.money || 0) < 0) return { valid: false, reason: "Le plan dépasse ton budget. Retire une dépense ou ajoute du travail." };
   const finalEnergy = clamp(state.energy + (totals.rawGeneral.energy || 0));
   const finalFatigue = clamp(state.fatigue + (totals.rawGeneral.fatigue || 0));
   if (finalEnergy < 5) return { valid: false, reason: "Ce programme épuiserait complètement ton boxeur. Ajoute de la récupération." };
   if (finalFatigue >= 96) return { valid: false, reason: "Ce programme pousserait la fatigue à un niveau dangereux. Ajoute du repos." };
-  return { valid: true, reason: scheduledFightDue ? `Le combat réserve une action. Tu peux encore préparer ${weeklyPlan.length}/${weeklyActionLimit()} action${weeklyActionLimit() > 1 ? "s" : ""} avant d’entrer dans le ring.` : tournamentDue ? "Tournoi en pause pendant la blessure : planifie une semaine de récupération." : "Rien ne sera appliqué avant ta confirmation." };
+  const coreActions = plannedCoreActionCount();
+  return { valid: true, reason: scheduledFightDue ? `Le combat réserve une action. Tu peux encore préparer ${coreActions}/${weeklyActionLimit()} action${weeklyActionLimit() > 1 ? "s" : ""} avant d’entrer dans le ring.` : tournamentDue ? "Tournoi en pause pendant la blessure : planifie une semaine de récupération." : "Rien ne sera appliqué avant ta confirmation." };
 }
 
 function renderPlan() {
   const content = document.querySelector("#plan-content");
   const actionLimit = weeklyActionLimit();
-  document.querySelector("#plan-count").textContent = `${weeklyPlan.length} / ${actionLimit} action${actionLimit > 1 ? "s" : ""}`;
+  const coreActionCount = plannedCoreActionCount();
+  const vacationPlanned = weeklyPlan.some(item => item.actionId === "vacation");
+  document.querySelector("#plan-count").textContent = `${coreActionCount} / ${actionLimit} action${actionLimit > 1 ? "s" : ""}${vacationPlanned ? " · + vacances" : ""}`;
   if (!weeklyPlan.length) {
     content.innerHTML = `<div class="plan-list plan-list-empty">${Array.from({ length: actionLimit }, (_, index) => `<div class="plan-slot"><span>${index + 1}</span><em>Libre</em></div>`).join("")}</div><div class="plan-empty">Ton programme est vide. Choisis jusqu’à ${actionLimit} actions ci-dessus.</div>`;
   } else {
@@ -2189,7 +2540,7 @@ function renderPlan() {
       const detail = coach ? `${combatLabels[state.privateProgram.target]} · ${duePrice ? `${duePrice} $` : "séance déjà payée"} · cours ${state.privateProgram.sessionsCompleted + 1} / ${coach.sessions}` : `${actionDetail}${progressDetail}`;
       return `<div class="plan-row"><span class="plan-order">${index + 1}</span><div class="plan-row-copy"><strong>${action.title}</strong><small>${detail}</small></div><div class="plan-row-actions"><button class="plan-remove" type="button" data-remove="${action.id}">Retirer</button></div></div>`;
     }).join("");
-    const emptyRows = Array.from({ length: actionLimit - weeklyPlan.length }, (_, index) => `<div class="plan-slot"><span>${weeklyPlan.length + index + 1}</span><em>Libre</em></div>`).join("");
+    const emptyRows = Array.from({ length: Math.max(0, actionLimit - coreActionCount) }, (_, index) => `<div class="plan-slot"><span>${coreActionCount + index + 1}</span><em>Libre</em></div>`).join("");
     content.innerHTML = `<div class="plan-list">${plannedRows}${emptyRows}</div><div class="plan-totals"><div class="plan-total-block"><span>Argent à la fin</span><strong class="${projectedMoney() >= state.money ? "positive" : "negative"}">${projectedMoney()} $</strong></div><div class="plan-total-block"><span>Gains / dépenses</span><strong><span class="positive">+${totals.earned} $</span> · <span class="negative">−${totals.spent} $</span></strong></div><div class="plan-total-block"><span>Effets prévus</span><div class="plan-effects">${effectParts.join(" · ") || "Aucun changement de jauge"}</div></div></div>`;
   }
   const localFightDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
@@ -2238,10 +2589,11 @@ function render() {
   topMoney.setAttribute("aria-label", `Argent disponible ${state.money} dollars`);
   const actionLimit = weeklyActionLimit();
   const galaDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
-  document.querySelector("#action-limit-help").textContent = isAwaitingAmateurTransition() ? "Le parcours est en pause : confirme le passage amateur dans le calendrier." : isRecreationalLimitReached() ? "La semaine 10 clôt le parcours récréatif : confirme le passage amateur dans le calendrier." : isRecreationalCareer() ? `Parcours récréatif : peu de choix, une base solide. Le sparring avec Rémy arrive en semaine ${RECREATIONAL_SPARRING_WEEK}.` : actionLimit === 0 ? "Le tournoi occupe toute la semaine : les décisions se prennent dans le hub de compétition." : galaDue ? `Le gala réserve une action : ${actionLimit} choix de camp restent disponibles avant le combat.` : actionLimit === 4 ? "Expérience acquise : compose maintenant un programme de quatre actions." : `Trois actions par semaine · la quatrième se débloque après ${Math.max(0, 10 - amateurFightCount())} combat${10 - amateurFightCount() > 1 ? "s" : ""}.`;
+  document.querySelector("#action-limit-help").textContent = isAwaitingAmateurTransition() ? "Le parcours est en pause : confirme le passage amateur dans le calendrier." : isRecreationalLimitReached() ? "La semaine 10 clôt le parcours récréatif : confirme le passage amateur dans le calendrier." : isRecreationalCareer() ? `Parcours récréatif : peu de choix, une base solide. Le sparring avec Rémy arrive en semaine ${RECREATIONAL_SPARRING_WEEK}.` : actionLimit === 0 ? "Le tournoi occupe toute la semaine : les décisions se prennent dans le hub de compétition." : hasWeakBoxingRhythm() ? "Rythme faible : une seule action est disponible jusqu’à un entraînement de boxe." : galaDue ? `Le gala réserve une action : ${actionLimit} choix de camp restent disponibles avant le combat.` : actionLimit === 4 ? "Expérience acquise : compose maintenant un programme de quatre actions." : `Trois actions par semaine · la quatrième se débloque après ${Math.max(0, 10 - amateurFightCount())} combat${10 - amateurFightCount() > 1 ? "s" : ""}.`;
   const pips = document.querySelector("#action-pips");
-  pips.innerHTML = Array.from({ length: actionLimit }, (_, index) => `<span class="pip ${index < weeklyPlan.length ? "active" : ""}"></span>`).join("");
-  pips.setAttribute("aria-label", `${weeklyPlan.length} action${weeklyPlan.length > 1 ? "s" : ""} planifiée${weeklyPlan.length > 1 ? "s" : ""} sur ${actionLimit}`);
+  const plannedCoreActions = plannedCoreActionCount();
+  pips.innerHTML = Array.from({ length: actionLimit }, (_, index) => `<span class="pip ${index < plannedCoreActions ? "active" : ""}"></span>`).join("");
+  pips.setAttribute("aria-label", `${plannedCoreActions} action${plannedCoreActions > 1 ? "s" : ""} planifiée${plannedCoreActions > 1 ? "s" : ""} sur ${actionLimit}${weeklyPlan.some(item => item.actionId === "vacation") ? ", plus une semaine de vacances payées" : ""}`);
 
   document.querySelector("#stats").innerHTML = generalStats.map(stat => {
     const display = `${state[stat.key]}${stat.suffix}`;
@@ -2281,6 +2633,7 @@ function applyCombatChanges(changes = {}) {
 
 function toggleAction(action) {
   if (!action) return showToast("Cette action n’est plus disponible.");
+  if (action.id === "drug-sales") return registerDeveloperSecretTap();
   const existing = weeklyPlan.findIndex(item => item.actionId === action.id);
   if (existing >= 0) {
     weeklyPlan.splice(existing, 1);
@@ -2449,6 +2802,7 @@ function endWeek(events) {
   } else if (state.scheduledFight || state.activeTournament || state.lastFightWeek >= endingWeek) {
     state.avoidanceWeeks = 0;
   }
+  updateBoxingRhythm(events, endingWeek);
   state.journal.unshift({ week: endingWeek, text: `Bilan : ${summary}` });
   if (membershipWasActive && state.gymWeeks === 0) {
     const expiry = "Ton abonnement au GYM de boxe est expiré. Renouvelle-le pour reprendre l'entraînement et le sparring.";
@@ -2479,7 +2833,8 @@ function executePlan() {
   advanceTrainingProgress(events, endingWeek);
   applyCombatChanges(totals.rawCombat);
   if (weeklyPlan.some(item => item.actionId === "private")) completePrivateCourse(events, endingWeek);
-  const boxingWorkThisWeek = weeklyPlan.some(item => ["gym", "sparring", "heavybag", "video"].includes(item.actionId)) || privateCoachThisWeek?.type === "boxing";
+  const boxingWorkThisWeek = planHasBoxingTraining(privateCoachThisWeek);
+  recordBoxingTrainingForWeek(endingWeek, privateCoachThisWeek);
   if (privateCoachThisWeek?.type === "physical" && !boxingWorkThisWeek) state.boxingNeglectWeeks += 1;
   else if (boxingWorkThisWeek) state.boxingNeglectWeeks = 0;
   if (state.boxingNeglectWeeks >= 3) {
@@ -2490,11 +2845,11 @@ function executePlan() {
   const workedThisWeek = weeklyPlan.some(item => item.actionId === "work");
   const vacationThisWeek = weeklyPlan.some(item => item.actionId === "vacation");
   if (vacationThisWeek) {
-    state.jobVacationClaimedAtTenure = state.jobTenureWeeks;
-    events.push("Vacances payées : la paie est maintenue et le corps récupère sans avertissement d’emploi.");
+    state.vacationBankWeeks = Math.max(0, state.vacationBankWeeks - 1);
+    events.push("Vacances payées : la paie est maintenue et le corps récupère sans avertissement d’emploi. Cette tuile ne compte pas parmi les actions de la semaine.");
   }
   state.workStreak = workedThisWeek ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
-  settleJobAttendance(workedThisWeek || vacationThisWeek, events, endingWeek);
+  settleJobAttendance(workedThisWeek || vacationThisWeek, events, endingWeek, false, workedThisWeek);
   advanceRecreationalTraining(events, endingWeek);
   if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = endingWeek + SPONSOR_COOLDOWN_WEEKS;
   if (workedThisWeek && state.workStreak >= 3) events.push("Tu enchaînes les semaines de travail : ta fraîcheur au camp commence à souffrir.");
@@ -2539,16 +2894,17 @@ function applyPreFightPlan() {
   advanceTrainingProgress(events, state.week);
   applyCombatChanges(totals.rawCombat);
   if (weeklyPlan.some(item => item.actionId === "private")) completePrivateCourse(events, state.week);
-  const boxingWork = weeklyPlan.some(item => ["gym", "sparring", "heavybag", "video"].includes(item.actionId)) || privateCoachThisWeek?.type === "boxing";
+  const boxingWork = planHasBoxingTraining(privateCoachThisWeek);
+  recordBoxingTrainingForWeek(state.week, privateCoachThisWeek);
   state.preFightTrainingWeek = boxingWork || weeklyPlan.some(item => actions.find(action => action.id === item.actionId)?.category === "training") ? state.week : 0;
   if (privateCoachThisWeek?.type === "physical" && !boxingWork) state.boxingNeglectWeeks += 1;
   else if (boxingWork) state.boxingNeglectWeeks = 0;
   const worked = weeklyPlan.some(item => item.actionId === "work");
   const vacation = weeklyPlan.some(item => item.actionId === "vacation");
-  if (vacation) state.jobVacationClaimedAtTenure = state.jobTenureWeeks;
+  if (vacation) state.vacationBankWeeks = Math.max(0, state.vacationBankWeeks - 1);
   if (weeklyPlan.some(item => item.actionId === "video")) state.preFightStudyWeek = state.week;
   state.workStreak = worked ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
-  settleJobAttendance(worked || vacation, events, state.week);
+  settleJobAttendance(worked || vacation, events, state.week, false, worked);
   if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = state.week + SPONSOR_COOLDOWN_WEEKS;
   weeklyPlan = [];
   if (events.length) state.journal.unshift({ week: state.week, text: `Préparation du gala : ${events.join(" ")}` });
@@ -2703,7 +3059,7 @@ function bookGalaEvent(eventId, slotIndex) {
   const event = state.calendar.events.find(item => item.id === eventId && item.kind === "gala");
   if (!event) return showToast("Ce gala n’est plus disponible.");
   if (state.scheduledFight) return showToast("Un autre combat est déjà programmé.");
-  if (event.careerWeek === state.week && weeklyPlan.length >= (amateurFightCount() >= 10 ? 4 : 3)) return showToast("Retire une action : le gala doit réserver une place dans la semaine.");
+  if (event.careerWeek === state.week && plannedCoreActionCount() >= (amateurFightCount() >= 10 ? 4 : 3)) return showToast("Retire une action : le gala doit réserver une place dans la semaine.");
   const travel = BoxeurCalendar.travelOptionsForEvent(event)[0];
   const result = BoxeurCalendar.createBooking({ event, career: state, existingBookings: activeBookings(), travelOptionId: travel?.id, currentDate: careerWeekDate(0) });
   if (!result.ok) return showToast(result.reason || "Inscription impossible.");
@@ -3130,21 +3486,25 @@ function renderFight(message = "Lis sa tendance et choisis une consigne.") {
   const fight = fightState;
   if (!fight) return;
   const tournamentName = fight.tournamentId ? tournamentDefs.find(item => item.id === fight.tournamentId)?.name || "Tournoi amateur" : "Combat amateur";
-  const playerIsBlue = state.profile.corner === "blue";
+  const playerCornerTheme = state.profile.corner;
+  const playerIsBlue = playerCornerTheme === "blue";
+  const opponentCornerTheme = opposingCorner(playerCornerTheme);
   const playerCorner = document.querySelector(".player-corner");
   const opponentCorner = document.querySelector(".opponent-corner");
   playerCorner.classList.toggle("blue-corner", playerIsBlue);
   playerCorner.classList.toggle("red-corner", !playerIsBlue);
   opponentCorner.classList.toggle("red-corner", playerIsBlue);
   opponentCorner.classList.toggle("blue-corner", !playerIsBlue);
-  playerCorner.querySelector(".fight-portrait").alt = `Portrait illustré de ${state.profile.firstName}, coin ${playerIsBlue ? "bleu" : "rouge"}`;
-  opponentCorner.querySelector(".fight-portrait").alt = `Portrait illustré de ${fight.opponent.name}, coin ${playerIsBlue ? "rouge" : "bleu"}`;
+  playerCorner.dataset.corner = playerCornerTheme;
+  opponentCorner.dataset.corner = opponentCornerTheme;
+  playerCorner.querySelector(".fight-portrait").alt = `Portrait illustré de ${state.profile.firstName}, coin ${cornerLabel(playerCornerTheme)}`;
+  opponentCorner.querySelector(".fight-portrait").alt = `Portrait illustré de ${fight.opponent.name}, coin ${cornerLabel(opponentCornerTheme)}`;
   document.querySelector("#fight-week-label").textContent = `${tournamentName} · Semaine ${state.week}`;
   document.querySelector("#fight-round").textContent = fight.phase === "finished" ? "Fin · 3 rounds" : `Round ${fight.round} / 3`;
   document.querySelector("#fight-player-name").textContent = state.profile.firstName;
-  document.querySelector("#fight-player-meta").textContent = `${state.profile.nickname ? `« ${state.profile.nickname} » · ` : ""}${state.profile.weightClass} · Coin ${playerIsBlue ? "bleu" : "rouge"}`;
+  document.querySelector("#fight-player-meta").textContent = `${state.profile.nickname ? `« ${state.profile.nickname} » · ` : ""}${state.profile.weightClass} · Coin ${cornerLabel(playerCornerTheme)}`;
   document.querySelector("#fight-opponent-name").textContent = fight.opponent.name;
-  document.querySelector("#fight-opponent-meta").textContent = `« ${fight.opponent.nickname} » · ${fight.opponent.weightClass || state.profile.weightClass} · Coin ${playerIsBlue ? "rouge" : "bleu"}`;
+  document.querySelector("#fight-opponent-meta").textContent = `« ${fight.opponent.nickname} » · ${fight.opponent.weightClass || state.profile.weightClass} · Coin ${cornerLabel(opponentCornerTheme)}`;
   document.querySelector("#fight-player-energy").textContent = `${Math.max(0, fight.playerEnergy)}%`;
   document.querySelector("#fight-opponent-energy").textContent = `${Math.max(0, fight.opponentEnergy)}%`;
   document.querySelector("#fight-player-energy-bar").style.width = `${Math.max(0, fight.playerEnergy)}%`;
@@ -3427,29 +3787,33 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   const meta = fightState.careerMeta || {};
   const opponent = meta.opponent || { name: view.fighters.opponent.name, nickname: "", weightClass: state.profile.weightClass, style: view.fighters.opponent.style };
   const tournamentName = meta.isRecreationalSparring ? "Sparring d’évaluation · Rémy « Le Tank »" : meta.tournamentId ? state.activeTournament?.name || tournamentDefs.find(item => item.id === meta.tournamentId)?.name || "Tournoi amateur" : (state.scheduledFight?.event?.name || "Gala amateur");
-  const playerIsBlue = state.profile.corner === "blue";
+  const playerCornerTheme = state.profile.corner;
+  const playerIsBlue = playerCornerTheme === "blue";
+  const opponentCornerTheme = opposingCorner(playerCornerTheme);
   const playerCorner = document.querySelector(".player-corner");
   const opponentCorner = document.querySelector(".opponent-corner");
   playerCorner.classList.toggle("blue-corner", playerIsBlue);
   playerCorner.classList.toggle("red-corner", !playerIsBlue);
   opponentCorner.classList.toggle("red-corner", playerIsBlue);
   opponentCorner.classList.toggle("blue-corner", !playerIsBlue);
+  playerCorner.dataset.corner = playerCornerTheme;
+  opponentCorner.dataset.corner = opponentCornerTheme;
   const playerPortrait = document.querySelector(".player-corner .portrait-crop");
   playerPortrait.style.setProperty("--portrait-index", String(state.profile.portraitId || 0));
   const playerPortraitImage = document.querySelector("#fight-player-portrait");
   playerPortraitImage.src = portraitAsset(state.profile.sex);
-  playerPortraitImage.alt = `Portrait de ${state.profile.firstName}, coin ${playerIsBlue ? "bleu" : "rouge"}`;
+  playerPortraitImage.alt = `Portrait de ${state.profile.firstName}, coin ${cornerLabel(playerCornerTheme)}`;
   const opponentPortrait = document.querySelector("#fight-opponent-portrait");
   opponentPortrait.src = opponentPortraitAsset();
-  opponentPortrait.alt = `Portrait de ${opponent.name}, coin ${playerIsBlue ? "rouge" : "bleu"}`;
+  opponentPortrait.alt = `Portrait de ${opponent.name}, coin ${cornerLabel(opponentCornerTheme)}`;
   configureRingImages();
 
   document.querySelector("#fight-week-label").textContent = `${tournamentName} · semaine ${state.week}`;
   document.querySelector("#fight-round").textContent = view.status.finished ? (meta.isRecreationalSparring ? "Sparring terminé" : "Combat terminé") : view.phase === "corner" ? `${view.round === 1 ? "Briefing" : "Entre les rounds"} · round ${view.round} / 3` : `Round ${view.round} / 3 · échange ${view.currentExchange.number} / ${view.format.exchangesPerRound}`;
   document.querySelector("#fight-player-name").textContent = state.profile.firstName;
-  document.querySelector("#fight-player-meta").textContent = `${state.profile.nickname ? `« ${state.profile.nickname} » · ` : ""}${state.profile.weightClass} · coin ${playerIsBlue ? "bleu" : "rouge"}`;
+  document.querySelector("#fight-player-meta").textContent = `${state.profile.nickname ? `« ${state.profile.nickname} » · ` : ""}${state.profile.weightClass} · coin ${cornerLabel(playerCornerTheme)}`;
   document.querySelector("#fight-opponent-name").textContent = opponent.name;
-  document.querySelector("#fight-opponent-meta").textContent = `${opponent.nickname ? `« ${opponent.nickname} » · ` : ""}${opponent.weightClass || state.profile.weightClass} · coin ${playerIsBlue ? "rouge" : "bleu"}`;
+  document.querySelector("#fight-opponent-meta").textContent = `${opponent.nickname ? `« ${opponent.nickname} » · ` : ""}${opponent.weightClass || state.profile.weightClass} · coin ${cornerLabel(opponentCornerTheme)}`;
   document.querySelector("#fight-player-energy").textContent = `${Math.round(view.fighters.player.energy)}%`;
   document.querySelector("#fight-opponent-energy").textContent = `${Math.round(view.fighters.opponent.energy)}%`;
   document.querySelector("#fight-player-energy-bar").style.width = `${view.fighters.player.energy}%`;
@@ -3461,7 +3825,7 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   document.querySelector("#fight-head-status").textContent = fightDamageLabel(view.fighters.player.head, "head");
   document.querySelector("#fight-body-status").textContent = fightDamageLabel(view.fighters.player.body, "body");
   const stage = document.querySelector("#fight-ring-stage");
-  stage.dataset.playerCorner = playerIsBlue ? "blue" : "red";
+  stage.dataset.playerCorner = playerCornerTheme;
   stage.dataset.distance = view.ring.distance;
   stage.dataset.position = view.ring.position === "center" ? "center" : `${view.ring.position === "corner" ? "corner" : "ropes"}-${view.ring.pressured || "player"}`;
 
@@ -3684,7 +4048,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   state.currentWeightKg = defaultCompetitionWeight(category);
   state.migrationPending = false;
   ensureCareerCalendar();
-  document.body.classList.toggle("theme-blue", corner === "blue");
+  applyCareerTheme();
   Object.keys(combatLabels).forEach(key => { state.combatStats[key] = BASE_COMBAT_STAT + styles[style].bonuses[key] + draftStats[key]; });
   state.journal = [{ week: 1, text: `${state.profile.firstName} commence au statut récréatif. Choisis un emploi et active le premier mois de GYM pour lancer le parcours.` }];
   render();
@@ -3744,6 +4108,34 @@ document.querySelector("#division-migration-form")?.addEventListener("submit", e
   showToast("Division et catégorie enregistrées");
 });
 document.querySelector("#division-migration-dialog")?.addEventListener("cancel", event => event.preventDefault());
+
+document.querySelector("#developer-code-form")?.addEventListener("submit", event => {
+  event.preventDefault();
+  const input = document.querySelector("#developer-code-input");
+  const error = document.querySelector("#developer-code-error");
+  if (input?.value !== DEV_UNLOCK_CODE) {
+    if (error) error.textContent = "Code invalide.";
+    input?.focus();
+    return;
+  }
+  document.querySelector("#developer-code-dialog")?.close();
+  openDeveloperTestMenu();
+});
+document.querySelector("#developer-code-close")?.addEventListener("click", () => document.querySelector("#developer-code-dialog")?.close());
+document.querySelector("#developer-test-close")?.addEventListener("click", () => document.querySelector("#developer-test-dialog")?.close());
+document.querySelector("#developer-test-options")?.addEventListener("click", event => {
+  const preset = event.target.closest("[data-developer-preset]");
+  if (preset) loadDeveloperPreset(preset.dataset.developerPreset);
+});
+document.querySelector("#developer-corner-options")?.addEventListener("click", event => {
+  const corner = event.target.closest("[data-developer-corner]");
+  if (corner) applyDeveloperCorner(corner.dataset.developerCorner);
+});
+document.querySelector("#developer-tool-options")?.addEventListener("click", event => {
+  const tool = event.target.closest("[data-developer-tool]");
+  if (tool) runDeveloperTool(tool.dataset.developerTool);
+});
+document.querySelector("#developer-return-career")?.addEventListener("click", restoreDeveloperReturnCareer);
 
 document.querySelector("#action-grid").addEventListener("click", event => {
   const button = event.target.closest(".action-card");

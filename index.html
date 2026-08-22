@@ -284,6 +284,34 @@
       </div>
     </dialog>
 
+    <dialog id="developer-code-dialog" class="service-dialog developer-dialog" aria-labelledby="developer-code-title">
+      <form id="developer-code-form" class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Accès restreint</p><h2 id="developer-code-title">Code requis</h2></div><button id="developer-code-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
+        <label class="developer-code-label">Code<input id="developer-code-input" inputmode="numeric" autocomplete="off" maxlength="3" required /></label>
+        <p id="developer-code-error" class="form-error" aria-live="polite"></p>
+        <div class="service-actions"><button class="primary-button" type="submit">Continuer</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="developer-test-dialog" class="service-dialog developer-dialog" aria-labelledby="developer-test-title">
+      <div class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Mode test</p><h2 id="developer-test-title">Profils de test</h2></div><button id="developer-test-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
+        <p class="service-lead">Charger un profil ne supprime pas ta carrière actuelle : elle peut être restaurée depuis ce menu.</p>
+        <div id="developer-test-options" class="coach-menu-grid"></div>
+        <section class="developer-tool-section" aria-labelledby="developer-tool-title">
+          <h3 id="developer-tool-title">Outils rapides</h3>
+          <p>Ces raccourcis servent uniquement à tester la carrière en cours.</p>
+          <div id="developer-tool-options" class="coach-menu-grid"></div>
+        </section>
+        <section class="developer-corner-section" aria-labelledby="developer-corner-title">
+          <h3 id="developer-corner-title">Couleurs de coin</h3>
+          <p>Applique une couleur sans charger de profil de test.</p>
+          <div id="developer-corner-options" class="coach-menu-grid"></div>
+        </section>
+        <div class="service-actions"><button id="developer-return-career" class="secondary-button" type="button" hidden>Revenir à ma carrière</button></div>
+      </div>
+    </dialog>
+
     <dialog id="private-dialog" class="service-dialog" aria-labelledby="private-dialog-title">
       <form id="private-form" method="dialog" class="service-card">
         <div class="service-heading"><div><p class="eyebrow">Coaching privé</p><h2 id="private-dialog-title">Choisir un spécialiste</h2></div><button class="dialog-close" value="cancel" aria-label="Fermer" formnovalidate>×</button></div>

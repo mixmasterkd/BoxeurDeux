@@ -514,7 +514,7 @@ test("débloque les vacances payées après huit semaines dans le même emploi",
 
   const vacation = page.locator('[data-action="vacation"]');
   await expect(vacation).toBeDisabled();
-  await expect(vacation).toContainText("Vacances payées dans 1 semaine");
+  await expect(vacation).toContainText("Prochaine semaine de vacances dans 1 semaine");
   await page.locator('[data-action="work"]').click();
   await page.locator("#advance-week").click();
   await expect(page.locator("#summary-dialog")).toBeVisible();
@@ -525,13 +525,129 @@ test("débloque les vacances payées après huit semaines dans le même emploi",
   await expect(vacation).toBeEnabled();
   const moneyBeforeVacation = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state.money);
   await vacation.click();
+  await page.locator('[data-action="rest"]').click();
+  await page.locator('[data-action="gym"]').click();
+  await page.locator('[data-action="video"]').click();
+  await expect(page.locator("#plan-count")).toContainText("3 / 3 actions · + vacances");
   await page.locator("#advance-week").click();
   await expect(page.locator("#summary-dialog")).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
   expect(saved.money).toBe(moneyBeforeVacation + 100);
-  expect(saved.jobVacationClaimedAtTenure).toBe(8);
+  expect(saved.jobVacationEarnedAtTenure).toBe(8);
+  expect(saved.vacationBankWeeks).toBe(0);
   expect(saved.missedWorkWeeks).toBe(0);
   await expect(page.locator("#summary-content")).toContainText("Vacances payées");
+});
+
+test("verse l’indemnité de vacances de 4 % lors d’un congédiement avec une banque active", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    week: 2,
+    money: 250,
+    jobId: "courier",
+    missedWorkWeeks: 2,
+    jobTenureWeeks: 8,
+    jobVacationEarnedAtTenure: 8,
+    vacationBankWeeks: 1,
+    jobWagesEarned: 1000,
+    initialGymRequired: false,
+  }));
+
+  await page.locator('[data-action="rest"]').click();
+  await page.locator("#advance-week").click();
+  await expect(page.locator("#summary-content")).toContainText("Indemnité de vacances : +40 $");
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.money).toBe(290);
+  expect(saved.jobId).toBeNull();
+  expect(saved.vacationBankWeeks).toBe(0);
+});
+
+test("ouvre le menu de test caché depuis la tuile à venir et restaure la carrière", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({ money: 333, gymWeeks: 4, initialGymRequired: false }));
+  const hiddenTile = page.locator('[data-action="drug-sales"]');
+  await expect(hiddenTile).toBeVisible();
+  for (let click = 0; click < 5; click += 1) await hiddenTile.click();
+  await expect(page.locator("#developer-code-dialog")).toBeVisible();
+  await page.locator("#developer-code-input").fill("127");
+  await page.locator("#developer-code-form").press("Enter");
+  await expect(page.locator("#developer-code-error")).toHaveText("Code invalide.");
+  await page.locator("#developer-code-input").fill("128");
+  await page.locator("#developer-code-form").press("Enter");
+  await expect(page.locator("#developer-test-dialog")).toBeVisible();
+  await expect(page.locator("[data-developer-preset]")).toHaveCount(8);
+  await page.locator('[data-developer-tool="funds"]').click();
+  let saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.money).toBe(9999);
+  await page.locator('[data-developer-tool="recover"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.energy).toBe(100);
+  expect(saved.fatigue).toBe(0);
+  expect(saved.injury).toBe(0);
+  await page.locator('[data-developer-tool="next-week"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.week).toBe(2);
+  await page.locator('[data-developer-corner="purple"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.profile.corner).toBe("purple");
+  await page.locator('[data-developer-corner="pink"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.profile.corner).toBe("pink");
+  await page.locator('[data-developer-preset="bronze-ready"]').click();
+
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.week).toBe(15);
+  expect(saved.amateurRecord.wins + saved.amateurRecord.losses).toBe(5);
+  expect(saved.profile.lastName).toBe("Test");
+
+  for (let click = 0; click < 5; click += 1) await page.locator('[data-action="drug-sales"]').click();
+  await page.locator("#developer-code-input").fill("128");
+  await page.locator("#developer-code-form").press("Enter");
+  await page.locator('[data-developer-preset="pro-ready"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.careerStatus).toBe("professional");
+  expect(saved.professionalRecord.wins).toBe(6);
+  expect(saved.profile.corner).toBe("green");
+
+  for (let click = 0; click < 5; click += 1) await page.locator('[data-action="drug-sales"]').click();
+  await page.locator("#developer-code-input").fill("128");
+  await page.locator("#developer-code-form").press("Enter");
+  await expect(page.locator("#developer-return-career")).toBeVisible();
+  await page.locator("#developer-return-career").click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.money).toBe(9999);
+  expect(saved.profile.lastName).toBe("Amateur");
+  expect(saved.profile.corner).toBe("pink");
+  expect(saved.week).toBe(2);
+});
+
+test("évite la double paie, limite le repos inutile et rétablit le rythme de boxe", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    jobId: "courier",
+    vacationBankWeeks: 1,
+    jobTenureWeeks: 8,
+    gymWeeks: 4,
+    initialGymRequired: false,
+  }));
+  await page.locator('[data-action="work"]').click();
+  await expect(page.locator('[data-action="vacation"]')).toBeDisabled();
+  await expect(page.locator('[data-action="vacation"]')).toContainText("remplacent le travail");
+
+  await openStoredCareer(page, amateurSnapshot({
+    energy: 100,
+    fatigue: 0,
+    injury: 0,
+    injuryWeeks: 0,
+    boxingInactivityWeeks: 3,
+    gymWeeks: 4,
+    initialGymRequired: false,
+  }));
+  await expect(page.locator('[data-action="rest"]')).toBeDisabled();
+  await expect(page.locator('[data-action="rest"]')).toContainText("déjà frais et intact");
+  await expect(page.locator("#action-limit-help")).toContainText("Rythme faible");
+  await expect(page.locator("#action-pips span")).toHaveCount(1);
+  await page.locator('[data-action="gym"]').click();
+  await page.locator("#advance-week").click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.boxingInactivityWeeks).toBe(0);
 });
 
 test("met en avant les montées de niveau et les congédiements", async ({ page }) => {
@@ -720,7 +836,7 @@ test("choisit un emploi, reçoit sa paie et perd le poste après trois absences"
 
   await continueToNextWeek();
   for (let absence = 1; absence <= 3; absence += 1) {
-    await page.locator('[data-action="rest"]').click();
+    await page.locator('[data-action="home-bag"]').click();
     await page.locator("#advance-week").click();
     await expect(page.locator("#summary-dialog")).toBeVisible();
     saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
