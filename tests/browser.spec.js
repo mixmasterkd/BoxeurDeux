@@ -124,6 +124,8 @@ async function startTacticalFight(page) {
   await expect(page.locator("#fight-score")).toHaveText("—");
   await expect(page.locator("#fight-judge-cards")).toBeHidden();
   await expect(page.locator("#fight-judge-cards")).toBeEmpty();
+  await expect(page.locator("#fight-round-dynamic")).toContainText("Dynamique du round");
+  await expect(page.locator("#fight-round-dynamic")).toContainText("ce n’est pas une carte de juge");
   await expect(page.locator("#fight-opponent-tell")).not.toHaveText("Tendance inconnue");
 }
 
@@ -430,6 +432,9 @@ test("fait passer Rémy « Le Tank » du parcours récréatif au statut amateur"
   await expect(page.locator("#fight-score-label")).toHaveText("Sparring non comptabilisé");
   await expect(page.locator("#fight-status")).toHaveText("Sparring terminé");
   await expect(page.locator("#fight-instruction")).not.toContainText(/Victoire|Défaite/);
+  await expect(page.locator("#fight-instruction .sparring-debrief")).toBeVisible();
+  await expect(page.locator("#fight-instruction .sparring-debrief")).toContainText("Ce que Rémy veut te montrer");
+  await expect(page.locator("#fight-instruction .sparring-debrief")).toContainText("À essayer au prochain combat");
   await page.locator("#fight-instruction button.primary-button", { hasText: "Voir le parcours récréatif" }).click();
   await expect(page.locator("#calendar-dialog")).toBeVisible();
   await expect(page.locator("#turn-amateur")).toBeVisible();

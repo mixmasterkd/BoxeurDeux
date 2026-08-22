@@ -327,9 +327,24 @@ h2 { font-size: 1.65rem; }
 .fight-round-track > span strong { color: var(--ink); font: 800 .95rem "Barlow Condensed"; }
 .fight-round-track > span.current { border-color: var(--gold); color: var(--gold); }
 .fight-round-track > span.completed { border-color: var(--green); color: var(--green); }
+.fight-round-dynamic { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px 12px; margin: -5px 0 10px; padding: 9px 10px; border: 1px solid var(--line); background: #101210; }
+.fight-round-dynamic > div:first-child { min-width: 0; }
+.fight-round-dynamic span, .fight-round-dynamic small { display: block; color: var(--muted); font-size: .58rem; letter-spacing: .06em; line-height: 1.35; text-transform: uppercase; }
+.fight-round-dynamic strong { display: block; margin-top: 2px; font: 800 .92rem/1.1 "Barlow Condensed"; text-transform: uppercase; }
+.fight-round-dynamic small { grid-column: 1 / -1; letter-spacing: 0; text-transform: none; }
+.fight-dynamic-pips { display: flex; align-items: center; gap: 4px; }
+.fight-dynamic-pips span { width: 12px; height: 8px; border: 1px solid #555a54; background: #202420; }
+.fight-dynamic-pips span.active.player { border-color: var(--green); background: var(--green); }
+.fight-dynamic-pips span.active.opponent { border-color: #ff7966; background: #ff7966; }
 .fight-instruction { min-height: 50px; color: #d4d1ca; text-align: center; font-size: .82rem; }
 .fight-instruction .primary-button { display: block; width: min(280px, 100%); margin: 14px auto 0; }
 .fight-round-summary { display: inline-block; margin: 5px 0; color: var(--gold); font-size: .7rem; font-weight: 700; }
+.sparring-debrief { width: min(620px, 100%); margin: 14px auto 0; padding: 13px; border: 1px solid var(--gold); background: #111311; text-align: left; }
+.sparring-debrief h3 { margin: 0 0 10px; color: var(--gold); font: 800 1.1rem "Barlow Condensed"; text-transform: uppercase; }
+.sparring-debrief > div + div { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.sparring-debrief strong { color: var(--green); font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; }
+.sparring-debrief > div + div strong { color: var(--gold); }
+.sparring-debrief ul { margin: 5px 0 0; padding-left: 18px; color: #d4d1ca; font-size: .73rem; line-height: 1.4; }
 .fight-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .fight-choices button { min-height: 86px; padding: 12px; border: 1px solid var(--line); color: var(--ink); background: var(--panel); cursor: pointer; text-align: left; }
 .fight-choices button:hover { border-color: var(--gold); }
@@ -413,6 +428,15 @@ h2 { font-size: 1.65rem; }
 .summary-money .spent { color: #ff7966; }
 .summary-section { margin-top: 10px; }
 .summary-section ul { margin: 8px 0 0; padding-left: 18px; color: #d4d1ca; font-size: .78rem; line-height: 1.6; }
+.summary-alerts { margin: 10px 0; padding: 14px; border: 1px solid var(--line); background: #171917; }
+.summary-alerts h3 { margin: 0 0 8px; color: var(--muted); font-size: .67rem; letter-spacing: .08em; text-transform: uppercase; }
+.summary-alert { display: grid; grid-template-columns: 27px minmax(0, 1fr); gap: 9px; align-items: start; margin-top: 7px; padding: 9px; border-left: 4px solid var(--line); background: #111311; }
+.summary-alert-icon { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid currentColor; border-radius: 50%; font-weight: 900; }
+.summary-alert p { margin: 0; color: #d4d1ca; font-size: .75rem; line-height: 1.4; }
+.summary-alert p strong { display: block; margin-bottom: 1px; font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; }
+.summary-alert.critical { border-left-color: #ff7966; color: #ff7966; }
+.summary-alert.warning { border-left-color: var(--gold); color: var(--gold); }
+.summary-alert.positive { border-left-color: var(--green); color: var(--green); }
 .week-choice-list { display: grid; gap: 8px; margin-top: 10px; }
 .week-choice-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 66px; padding: 10px 12px; border: 1px solid var(--line); color: var(--ink); background: #111311; cursor: pointer; text-align: left; }
 .week-choice-card:hover:not(:disabled), .week-choice-card:focus-visible { border-color: var(--gold); }

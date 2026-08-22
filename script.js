@@ -229,6 +229,7 @@ const INITIAL_STATE = {
   initialGymRequired: true,
   recreationalTrainingWeeks: 0,
   recreationalSparringStatus: "training",
+  remyLesson: "",
   scheduledFight: null,
   calendar: null,
   bookings: [],
@@ -613,6 +614,7 @@ function normalizeCareerState(source) {
   normalized.recreationalSparringStatus = sparringStates.includes(source.recreationalSparringStatus)
     ? source.recreationalSparringStatus
     : normalized.careerStatus === "amateur_pending" ? "completed" : "training";
+  normalized.remyLesson = safeText(source.remyLesson, "", 240);
   const inferredStartDate = /^\d{4}-\d{2}-\d{2}$/.test(source.careerStartDate || "")
     ? source.careerStartDate
     : normalized.calendar?.epoch || (normalized.careerStatus === "recreational" ? RECREATIONAL_START_DATE : "2026-01-05");
@@ -2953,6 +2955,31 @@ function endWeek(events) {
   }
 }
 
+function weeklyAlertTone(event) {
+  const text = String(event || "").toLocaleLowerCase("fr-CA");
+  if (/congédi|blessure|ko\b|tko\b|annul|expir|insuffisant|impossible|suspend|disqualif/.test(text)) return "critical";
+  if (/fatigue|rythme faible|rythme fragile|absence|risque|renouvel|dernière semaine|attention|avertissement/.test(text)) return "warning";
+  if (/niveau|vacances payées|offre confirmée|nouvel emploi|emploi actif|récupér|débloqu|sparring|tournoi/.test(text)) return "positive";
+  return "info";
+}
+
+function renderWeeklyAlerts(events) {
+  const labels = {
+    critical: ["À corriger", "!"],
+    warning: ["À surveiller", "!"],
+    positive: ["Bonne nouvelle", "✓"],
+  };
+  const highlights = events
+    .map(text => ({ text, tone: weeklyAlertTone(text) }))
+    .filter(item => item.tone !== "info")
+    .slice(0, 4);
+  if (!highlights.length) return "";
+  return `<section class="summary-alerts" aria-label="Alertes de la semaine"><h3>À surveiller</h3>${highlights.map(({ text, tone }) => {
+    const [label, icon] = labels[tone];
+    return `<div class="summary-alert ${tone}"><span class="summary-alert-icon" aria-hidden="true">${icon}</span><p><strong>${label}</strong>${escapeHTML(text)}</p></div>`;
+  }).join("")}</section>`;
+}
+
 function executePlan() {
   const validation = planValidation();
   if (!validation.valid) return showToast(validation.reason);
@@ -3005,7 +3032,7 @@ function executePlan() {
   weeklyPlan = [];
   render();
   document.querySelector("#summary-title").textContent = `Bilan de la semaine ${endingWeek}`;
-  document.querySelector("#summary-content").innerHTML = `<div class="summary-money"><div><span>Argent gagné</span><strong class="earned">+${totals.earned} $</strong></div><div><span>Argent dépensé</span><strong class="spent">−${totals.spent} $</strong></div></div><div class="summary-section"><h3>Changements nets</h3><ul>${changes.map(change => `<li>${change}</li>`).join("") || "<li>Aucun changement</li>"}</ul></div><div class="summary-section"><h3>Événements</h3><ul>${events.map(event => `<li>${escapeHTML(event)}</li>`).join("") || "<li>Aucun imprévu cette semaine.</li>"}</ul></div>`;
+  document.querySelector("#summary-content").innerHTML = `<div class="summary-money"><div><span>Argent gagné</span><strong class="earned">+${totals.earned} $</strong></div><div><span>Argent dépensé</span><strong class="spent">−${totals.spent} $</strong></div></div>${renderWeeklyAlerts(events)}<div class="summary-section"><h3>Changements nets</h3><ul>${changes.map(change => `<li>${change}</li>`).join("") || "<li>Aucun changement</li>"}</ul></div><div class="summary-section"><h3>Événements</h3><ul>${events.map(event => `<li>${escapeHTML(event)}</li>`).join("") || "<li>Aucun imprévu cette semaine.</li>"}</ul></div>`;
   document.querySelector("#summary-dialog").showModal();
 }
 
@@ -3141,7 +3168,9 @@ async function startFight() {
     tournamentRound: scheduled.tournamentRound,
     bookingId: scheduled.bookingId || null,
     isRecreationalSparring,
+    remyLesson: !isRecreationalSparring ? state.remyLesson : "",
   };
+  if (!isRecreationalSparring && state.remyLesson) state.remyLesson = "";
   const stage = document.querySelector("#fight-ring-stage");
   stage.dataset.cue = "neutral";
   stage.classList.remove("show-impact");
@@ -3853,6 +3882,62 @@ function momentumLabel(fight) {
   return "Équilibrée";
 }
 
+function renderFightRoundDynamic(view) {
+  const container = document.querySelector("#fight-round-dynamic");
+  if (!container) return;
+  const momentum = clamp(Number(view.ring?.momentum || 0), -2, 2);
+  const direction = momentum > 0 ? "player" : momentum < 0 ? "opponent" : "even";
+  const label = momentum >= 1.5 ? "Ton coin garde l'initiative récente" : momentum >= .5 ? "Tu reprends légèrement l'initiative" : momentum <= -1.5 ? "L'adversaire impose la séquence récente" : momentum <= -.5 ? "L'adversaire prend légèrement l'initiative" : "Les derniers échanges sont partagés";
+  const activeCount = Math.abs(Math.round(momentum));
+  const pips = Array.from({ length: 5 }, (_, index) => {
+    const distanceFromCenter = direction === "player" ? index - 2 : 2 - index;
+    const active = direction !== "even" && distanceFromCenter > 0 && distanceFromCenter <= activeCount;
+    return `<span class="${active ? `active ${direction}` : ""}" aria-hidden="true"></span>`;
+  }).join("");
+  container.innerHTML = `<div><span>Dynamique du round</span><strong>${escapeHTML(label)}</strong></div><div class="fight-dynamic-pips" aria-label="${escapeHTML(label)}">${pips}</div><small>Indicateur de rythme : ce n’est pas une carte de juge.</small>`;
+}
+
+function recordSparringExchange(beforeView, transition) {
+  const meta = fightState?.careerMeta;
+  if (!meta?.isRecreationalSparring) return;
+  const action = BoxeurCombat.ACTIONS[transition.result.actionId];
+  const exchange = beforeView.currentExchange || {};
+  meta.sparringObservations = (meta.sparringObservations || []).concat({
+    actionId: transition.result.actionId,
+    actionLabel: action?.label || transition.result.actionId,
+    intention: exchange.intention || "la séquence adverse",
+    situation: exchange.situation || "la situation du ring",
+    position: beforeView.ring?.position || "center",
+    energy: Number(beforeView.fighters?.player?.energy || 0),
+    side: transition.result.side,
+    playerImpact: Number(transition.result.playerImpact || 0),
+    opponentImpact: Number(transition.result.opponentImpact || 0),
+  }).slice(-12);
+}
+
+function buildRemySparringDebrief(fight) {
+  const notes = fight.careerMeta?.sparringObservations || [];
+  const positive = notes.filter(note => note.side === "player" && note.playerImpact >= note.opponentImpact);
+  const underPressure = notes.filter(note => ["ropes", "corner"].includes(note.position));
+  const exits = underPressure.filter(note => ["pivot_exit", "clinch", "compact_cover", "retake_center"].includes(note.actionId));
+  const aggressiveMisses = notes.filter(note => /Entrée agressive|Combinaison rapide|Accélération/.test(note.intention) && note.side === "opponent");
+  const tiredRisks = notes.filter(note => note.energy < 38 && ["power_hook", "finish_pressure", "fast_combination", "body_attack"].includes(note.actionId));
+  const strengths = [];
+  const adjustments = [];
+  if (exits.length) strengths.push("Tu as cherché une sortie ou cassé le rythme sous pression : c’est le bon réflexe près des câbles.");
+  if (positive.length) strengths.push(`Au moins ${positive.length} échange${positive.length > 1 ? "s" : ""} a montré que tes choix peuvent retourner la séquence quand la lecture est bonne.`);
+  if (!strengths.length) strengths.push("Tu as vu que chaque intention adverse laisse une fenêtre de réponse : lire avant de frapper compte autant que forcer l’échange.");
+  if (underPressure.length > exits.length) adjustments.push("Quand Rémy te pousse vers les câbles, privilégie le pivot de sortie, la couverture compacte ou le clinch avant de lancer une grosse attaque.");
+  if (aggressiveMisses.length) adjustments.push("Face à une entrée agressive, essaie garde haute, pivot ou contre-attaque : attaquer en même temps reste plus risqué.");
+  if (tiredRisks.length) adjustments.push("Avec peu d’énergie, le jab prudent, le pas de retrait ou le clinch préservent mieux ta lucidité qu’une combinaison lourde.");
+  if (!adjustments.length) adjustments.push("Au prochain combat, compare l’intention annoncée avec la distance et la position : une bonne réponse contextuelle vaut plus qu’un coup puissant répété.");
+  return {
+    strengths: strengths.slice(0, 2),
+    adjustments: adjustments.slice(0, 2),
+    lesson: adjustments[0],
+  };
+}
+
 function opponentPortraitAsset() {
   const opponentCorner = state.profile.corner === "blue" ? "rouge" : "bleu";
   if (state.profile.sex === "female") return `assets/boxeuse-coin-${opponentCorner}.webp`;
@@ -3915,8 +4000,9 @@ function renderFightCoach() {
   }
   panel.hidden = false;
   const pending = fightState.coach.pending;
+  const remyLesson = fightState.careerMeta?.remyLesson;
   document.querySelector("#fight-coach-title").textContent = fightState.round === 1 ? "Directive avant le combat" : `Pause du coach avant le round ${fightState.round}`;
-  document.querySelector("#fight-coach-analysis").textContent = `${pending.observation} Lecture proposée : ${pending.prediction}. Confiance ${pending.confidence}.`;
+  document.querySelector("#fight-coach-analysis").textContent = `${pending.observation} Lecture proposée : ${pending.prediction}. Confiance ${pending.confidence}.${remyLesson && fightState.round === 1 ? ` Rappel de Rémy : ${remyLesson}` : ""}`;
   choices.innerHTML = BoxeurCombat.getCoachOptions(fightState).map(option => `<button type="button" data-coach-option="${option.id}"><strong>${escapeHTML(option.label)}${option.recommended ? " · conseillé" : ""}</strong><span>${escapeHTML(option.description)} Compromis : ${escapeHTML(option.tradeoff)}</span></button>`).join("");
 }
 
@@ -3980,6 +4066,7 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
     const label = completed ? `${view.format.exchangesPerRound} échanges` : current ? `${view.exchange}/${view.format.exchangesPerRound}` : "À venir";
     return `<span class="${completed ? "completed" : current ? "current" : ""}">Round ${index + 1}<strong>${label}</strong></span>`;
   }).join("");
+  renderFightRoundDynamic(view);
 
   const scoreLabel = document.querySelector("#fight-score-label");
   const score = document.querySelector("#fight-score");
@@ -4019,8 +4106,10 @@ function chooseFightCoachDirective(optionId) {
 function playRound(actionId) {
   if (!fightState || fightState.phase !== "exchange") return;
   try {
+    const beforeView = BoxeurCombat.getPublicState(fightState);
     const transition = BoxeurCombat.resolveExchange(fightState, actionId);
     fightState = transition.state;
+    recordSparringExchange(beforeView, transition);
     triggerFightVisual(transition.result);
     if (fightState.status.finished) finishFight();
     else renderFight(transition.result.text);
@@ -4087,6 +4176,8 @@ function finishFight() {
   const methodLabel = isRecreationalSparring ? "Sparring terminé" : fightResult.method === "decision" ? `${fightResult.label} (${fightResult.decision})` : `${won ? "Victoire" : "Défaite"} par ${fightResult.label}`;
   const journalPrefix = isRecreationalSparring ? "Sparring d’évaluation" : "Combat amateur";
   const sparringJournal = "Rémy termine son évaluation et confirme que le passage amateur est disponible.";
+  const sparringDebrief = isRecreationalSparring ? buildRemySparringDebrief(fightState) : null;
+  if (sparringDebrief) state.remyLesson = sparringDebrief.lesson;
   state.journal.unshift({ week: state.week, text: `${journalPrefix} : ${isRecreationalSparring ? sparringJournal : `${methodLabel} contre ${meta.opponent?.name || fightState.fighters.opponent.name}.`}${tournamentNote ? ` ${tournamentNote}` : ""}${injuryEvent}` });
   if (unlockedFourthAction) state.journal.unshift({ week: state.week, text: "Dix combats amateurs disputés : le programme hebdomadaire passe définitivement à quatre actions." });
   const booking = state.bookings.find(item => item.id === meta.bookingId);
@@ -4104,7 +4195,8 @@ function finishFight() {
   persistCareer();
   renderFight(`${methodLabel}.`);
   const instruction = document.querySelector("#fight-instruction");
-  instruction.innerHTML = `<p><strong>${escapeHTML(methodLabel)}</strong><br>${isRecreationalSparring ? "Rémy a terminé son évaluation. Tu peux passer amateur maintenant, ou continuer à t’entraîner jusqu’à la semaine 10." : meta.tournamentId ? escapeHTML(tournamentNote || "Le tableau est mis à jour.") : "Expérience, réputation, fatigue et état physique ont été mis à jour."}${injuryEvent ? `<br>${escapeHTML(injuryEvent.trim())}` : ""}</p>`;
+  const sparringReport = sparringDebrief ? `<section class="sparring-debrief" aria-labelledby="sparring-debrief-title"><h3 id="sparring-debrief-title">Ce que Rémy veut te montrer</h3><div><strong>À garder</strong><ul>${sparringDebrief.strengths.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div><div><strong>À essayer au prochain combat</strong><ul>${sparringDebrief.adjustments.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div></section>` : "";
+  instruction.innerHTML = `<p><strong>${escapeHTML(methodLabel)}</strong><br>${isRecreationalSparring ? "Rémy a terminé son évaluation. Tu peux passer amateur maintenant, ou continuer à t’entraîner jusqu’à la semaine 10." : meta.tournamentId ? escapeHTML(tournamentNote || "Le tableau est mis à jour.") : "Expérience, réputation, fatigue et état physique ont été mis à jour."}${injuryEvent ? `<br>${escapeHTML(injuryEvent.trim())}` : ""}</p>${sparringReport}`;
   const closeButton = document.createElement("button");
   closeButton.className = "primary-button";
   closeButton.type = "button";
