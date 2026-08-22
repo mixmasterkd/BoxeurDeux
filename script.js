@@ -140,11 +140,17 @@ const privateCoaches = [
   { id: "dubois", type: "physical", name: "Victor Dubois", nickname: "Haute Performance", targets: ["power", "cardio"], price: 325, sessions: 6, reward: 3, fatigue: 5, fitness: 8, morale: 2 },
 ];
 
+const jobs = Object.freeze([
+  { id: "convenience", title: "Commis de dépanneur", schedule: "Horaire souple", wage: 75, energy: -14, fatigue: 10, morale: -1, injury: 0, detail: "La solution la moins payante, mais la plus facile à concilier avec le camp." },
+  { id: "courier", title: "Coursier local", schedule: "Quarts variables", wage: 100, energy: -20, fatigue: 16, morale: -3, injury: 1, detail: "Une meilleure paie avec plus de kilomètres et de fatigue dans les jambes." },
+  { id: "warehouse", title: "Manutention de nuit", schedule: "Quart exigeant", wage: 130, energy: -27, fatigue: 23, morale: -5, injury: 3, detail: "La paie la plus élevée, au prix d’une lourde dépense physique." },
+]);
+
 const INITIAL_STATE = {
   profile: null,
   combatStats: { technique: BASE_COMBAT_STAT, power: BASE_COMBAT_STAT, cardio: BASE_COMBAT_STAT, defense: BASE_COMBAT_STAT },
   week: 1,
-  money: 180,
+  money: 220,
   energy: 72,
   fitness: 25,
   morale: 68,
@@ -179,6 +185,9 @@ const INITIAL_STATE = {
   goldenPlacement: null,
   olympicCompleted: false,
   pendingWeekEvent: null,
+  jobId: null,
+  missedWorkWeeks: 0,
+  jobAttendanceWeek: 0,
   workStreak: 0,
   sponsorAvailableWeek: 1,
   supplementWeek: 1,
@@ -271,10 +280,11 @@ const actions = [
   { id: "eat", category: "recovery", icon: "+", title: "Bien manger", detail: "35 $ · +12 énergie · +4 forme · +2 moral", cost: 35, changes: { money: -35, energy: 12, fitness: 4, morale: 2 }, message: "Un bon repas nourrit la récupération autant que le moral." },
   { id: "physio", category: "recovery", icon: "T", title: "Physiothérapie", detail: "55 $ · −16 risque · +8 énergie · +2 forme · accélère la guérison", cost: 55, changes: { money: -55, injury: -16, injuryWeeks: -1, energy: 8, fitness: 2 }, message: "Le traitement du physiothérapeute calme les douleurs avant qu'elles ne s'installent." },
   { id: "spa", category: "recovery", icon: "R", title: "Spa et récupération", detail: "65 $ · +38 énergie · −20 risque · +6 moral", cost: 65, changes: { money: -65, energy: 38, injury: -20, morale: 6 }, message: "Le protocole de récupération remet le corps et la tête en état." },
-  { id: "work", category: "career", icon: "$", title: "Travailler", detail: "+70 $ au départ · −22 énergie · +18 fatigue · −4 moral", changes: { money: 70, energy: -22, morale: -4 }, message: "Un quart de travail paie les factures, mais laisse les jambes lourdes." },
+  { id: "work", category: "career", icon: "$", title: "Travailler", detail: "Emploi requis · la paie et la fatigue dépendent du poste", requiresJob: true, message: "Un quart de travail paie les factures, mais laisse les jambes lourdes." },
   { id: "promotion", category: "career", icon: "M", title: "Promotion locale", detail: "20 $ · +8 réputation · +3 moral · −10 énergie", cost: 20, changes: { money: -20, reputation: 8, morale: 3, energy: -10 }, message: "Quelques apparitions locales font circuler ton nom dans le quartier." },
   { id: "family", category: "career", icon: "F", title: "Temps avec les proches", detail: "+9 moral · +6 énergie", changes: { morale: 9, energy: 6 }, message: "Une soirée avec les proches remet la carrière en perspective." },
   { id: "sponsor", category: "career", icon: "$+", title: "Petite commandite", detail: "+85 $ · +2 réputation · −12 énergie · −2 moral · délai de 4 semaines", requiresReputation: 30, changes: { money: 85, reputation: 2, morale: -2, energy: -12 }, message: "Une entreprise locale finance une partie du camp en échange d'une apparition promotionnelle." },
+  { id: "drug-sales", category: "career", icon: "!", title: "Vente de stupéfiants", detail: "À venir · risques judiciaires et semaines de détention dans une future version", future: true, message: "Cette activité n’est pas encore disponible." },
 ];
 
 const actionFatigue = { gym: 12, private: 10, sparring: 22, roadwork: 14, heavybag: 15, video: 4, "strength-power": 18, "strength-circuit": 16, rest: -20, eat: 2, physio: -10, spa: -25, work: 18, promotion: 6, family: -4, sponsor: 8 };
@@ -428,7 +438,8 @@ function normalizeCareerState(source) {
   const boundedStats = {
     week: [1, 99999], money: [0, 9999999], energy: [0, 100], fitness: [0, 100], morale: [0, 100], reputation: [0, 100],
     injury: [0, 100], fatigue: [0, 100], injuryWeeks: [0, 52], experience: [0, 10000000], level: [1, 999], levelPoints: [0, 9999],
-    gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], workStreak: [0, 3], sponsorAvailableWeek: [1, 99999],
+    gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
+    missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999],
     supplementWeek: [1, 99999], avoidanceWeeks: [0, 999], lastFightWeek: [0, 99999], injuryStartedWeek: [0, 99999],
   };
   Object.entries(boundedStats).forEach(([key, [min, max]]) => { normalized[key] = safeNumber(source[key], base[key] ?? min, min, max); });
@@ -441,6 +452,8 @@ function normalizeCareerState(source) {
   normalized.olympicCompleted = Boolean(source.olympicCompleted);
   normalized.pendingWeekEvent = betweenWeekEvents.some(event => event.id === source.pendingWeekEvent) ? source.pendingWeekEvent : null;
   normalized.levelNotice = source.levelNotice ? safeText(source.levelNotice, "", 120) : null;
+  normalized.jobId = jobs.some(job => job.id === source.jobId) ? source.jobId : null;
+  if (!normalized.jobId) normalized.missedWorkWeeks = 0;
   normalized.supplementsUsed = Array.isArray(source.supplementsUsed) ? [...new Set(source.supplementsUsed.filter(id => strengthGymProducts.some(product => product.id === id)))].slice(0, MAX_SUPPLEMENTS_PER_WEEK) : [];
   if (normalized.supplementWeek !== normalized.week) {
     normalized.supplementWeek = normalized.week;
@@ -573,6 +586,16 @@ function careerWeekDate(weekday = 0) {
   if (!globalThis.BoxeurCalendar) return null;
   ensureCareerCalendar();
   return BoxeurCalendar.dateForCareerWeek(state.calendar.epoch, state.week, weekday);
+}
+
+function formatCareerDate(value, options = {}) {
+  if (!value) return "Date inconnue";
+  return new Intl.DateTimeFormat("fr-CA", {
+    day: "numeric",
+    month: options.long ? "long" : "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T12:00:00Z`));
 }
 
 function activeBookings() {
@@ -1189,17 +1212,6 @@ function professionalEligibility() {
   return { eligible: false, reason: `Termine un parcours majeur ou dispute encore ${20 - count} combat${20 - count > 1 ? "s" : ""}` };
 }
 
-function expandMobileSection(selector) {
-  if (!window.matchMedia("(max-width: 800px)").matches) return;
-  const section = document.querySelector(selector);
-  if (!section) return;
-  section.classList.remove("mobile-collapsed");
-  const toggle = section.querySelector(".mobile-section-toggle");
-  toggle?.setAttribute("aria-expanded", "true");
-  const stateLabel = toggle?.querySelector(".toggle-state");
-  if (stateLabel) stateLabel.textContent = "Masquer";
-}
-
 function renderFights() {
   ensureCareerCalendar();
   ensureDueTournamentActive();
@@ -1270,7 +1282,10 @@ function renderFights() {
       const advantage = event.homeAdvantage ? " · légère aide du coin à domicile" : "";
       return `<article class="calendar-event ${eventClass}${booked ? " booked" : ""}"><div class="calendar-event-head"><span class="calendar-event-type">${type}</span><span class="calendar-event-badge">3 juges</span></div><h3>${escapeHTML(event.name)}</h3><p>${venue}${advantage}. Aucune pesée à gérer.</p><div class="calendar-event-meta"><span>${weightClassLabel(state.profile.weightClass, state.profile.sex)}</span><span>${event.scope === "regional" ? "Transport et hébergement requis" : "Aucuns frais"}</span><span>Vendredi ou samedi</span></div><div class="calendar-event-actions">${buttons}</div></article>`;
     }).join("");
-    return `<section class="calendar-date-group"><div class="calendar-date"><strong>${escapeHTML(formatDate(date))}</strong><span>${events.length} événement${events.length > 1 ? "s" : ""}</span></div><div class="calendar-day-events">${eventCards}</div></section>`;
+    const eventWeek = safeNumber(events[0]?.careerWeek, state.week, 1, 99999);
+    const weeksAway = eventWeek - state.week;
+    const relativeWeek = weeksAway <= 0 ? "cette semaine" : weeksAway === 1 ? "dans 1 semaine" : `dans ${weeksAway} semaines`;
+    return `<section class="calendar-date-group"><div class="calendar-date"><strong>${escapeHTML(formatDate(date))}</strong><span class="calendar-week-reference">Semaine ${eventWeek} · ${relativeWeek}</span><span>${events.length} événement${events.length > 1 ? "s" : ""}</span></div><div class="calendar-day-events">${eventCards}</div></section>`;
   }).join("") || '<div class="amateur-closed"><strong>Aucun événement annoncé</strong><p>Le calendrier sera prolongé à la prochaine semaine.</p></div>';
 
   if (fightCount > 5 && state.tournaments.bronze === "pending") state.tournaments.bronze = "missed";
@@ -1296,7 +1311,6 @@ function renderFights() {
   const pro = professionalEligibility();
   const blocked = Boolean(state.scheduledFight || state.activeTournament);
   proTransition.innerHTML = `<div><strong>Passer professionnel</strong><p>${pro.reason}${blocked && pro.eligible ? " · Termine ou annule d’abord le combat programmé." : ""}</p></div><button id="turn-pro" class="primary-button" type="button" ${!pro.eligible || blocked ? "disabled" : ""}>Passer professionnel</button>`;
-  if (amateurFightCount() === 0 || state.scheduledFight || state.activeTournament) expandMobileSection(".calendar-panel");
 }
 
 function projectedMoney() {
@@ -1305,9 +1319,14 @@ function projectedMoney() {
   }, 0);
 }
 
+function currentJob() {
+  return jobs.find(job => job.id === state.jobId) || null;
+}
+
 function actionRequirementLock(action) {
   if (!action) return "Action inconnue";
   if (action.future) return "Bientôt disponible";
+  if (action.id === "work" && !currentJob()) return "Choisis d’abord un emploi dans le panneau Emploi";
   if (action.requiresPrivateProgram && !state.privateProgram) return "Commence un programme avec un coach";
   if (action.id === "private") {
     const coach = privateCoaches.find(item => item.id === state.privateProgram?.coachId);
@@ -1326,9 +1345,9 @@ function actionRequirementLock(action) {
 }
 
 function actionConditionLock(action) {
-  if (action.id === "work" && state.energy < 30) return "Au moins 30 % d’énergie requis pour travailler";
+  const job = action.id === "work" ? currentJob() : null;
+  if (action.id === "work" && state.energy < Math.max(30, Math.abs(job?.energy || 0) + 8)) return "Énergie insuffisante pour ce quart de travail";
   if (action.id === "work" && state.fatigue >= 75) return "Fatigue trop élevée : repose-toi avant de retravailler";
-  if (action.id === "work" && state.workStreak >= 3) return "Trois semaines travaillées : une semaine sans travail est obligatoire";
   if (action.category === "training" && state.energy < 28) return "Énergie trop basse pour bien t’entraîner";
   if (action.category === "training" && state.fitness < 18) return "Forme physique trop basse : récupère d’abord";
   if (action.category === "training" && state.morale < 25) return "Moral trop bas : le camp ne peut pas être productif";
@@ -1364,7 +1383,7 @@ function recommendedActionIds() {
   if (state.morale <= 35) add("family");
   if (state.injuryWeeks > 0) add(state.money >= 55 ? "physio" : "rest");
   if (state.injury >= 30) add(state.money >= 55 ? "physio" : "rest");
-  if (state.money < GYM_PRICE) add("work");
+  if (state.money < GYM_PRICE && currentJob()) add("work");
   if (fightDistance <= 2) add("video");
   if (recommendations.length < 2 && state.energy > 35 && state.fatigue < 55 && !state.injuryWeeks) {
     add(state.gymWeeks > 0 ? "gym" : "roadwork");
@@ -1391,7 +1410,8 @@ function renderActions() {
       const duePrice = privateCoach ? privateCourseDuePrice(privateCoach) : 0;
       const progressDetail = action.progressStat ? ` · ${state.trainingProgress[action.progressStat]}/10 vers +1 ${combatLabels[action.progressStat].toLowerCase()}` : "";
       const work = action.id === "work" ? workOutcome() : null;
-      const actionDetail = work ? `+${work.money} $ cette semaine · −22 énergie · +18 fatigue · −${Math.abs(work.morale)} moral` : action.detail;
+      const job = action.id === "work" ? currentJob() : null;
+      const actionDetail = work && job ? `${job.title} · +${work.money} $ · ${work.energy} énergie · +${work.fatigue} fatigue · ${work.morale} moral${work.injury ? ` · +${work.injury} risque` : ""}` : action.detail;
       const detail = privateCoach ? `${combatLabels[state.privateProgram.target]} · séance ${state.privateProgram.sessionsCompleted + 1} / ${privateCoach.sessions} · ${duePrice ? `${duePrice} $` : "déjà payée"} · +10 XP` : `${actionDetail}${progressDetail}`;
       return `<button class="action-card${action.future ? " future" : ""}${selected ? " selected" : ""}${isRecommended ? " recommended" : ""}" type="button" data-action="${action.id}" ${lock ? "disabled" : ""} aria-pressed="${selected}">
         <span class="action-icon" aria-hidden="true">${action.icon}</span><h3>${action.title}</h3><p>${detail}</p>
@@ -1494,20 +1514,95 @@ function renderPrivateCoaching() {
   }
 }
 
+function renderEmployment() {
+  const employment = document.querySelector("#employment");
+  if (!employment) return;
+  const job = currentJob();
+  if (!job) {
+    employment.innerHTML = `<div class="coaching-heading"><span>Aucun emploi</span><small>Choisis un poste pour débloquer l’action « Travailler » dans Carrière et finances.</small></div><button id="open-job-menu" class="primary-button" type="button">Choisir un emploi</button>`;
+    return;
+  }
+  const absenceNote = state.missedWorkWeeks === 0
+    ? "Présence en règle"
+    : state.missedWorkWeeks === 1
+      ? "1 absence · deux chances restantes"
+      : "2 absences · prochain quart manqué : congédiement";
+  employment.innerHTML = `<div class="private-program employment-program"><span>Emploi actif · ${escapeHTML(job.schedule)}</span><strong>${escapeHTML(job.title)} · ${job.wage} $ par quart</strong><small>${escapeHTML(job.detail)} ${absenceNote}.</small><button id="open-job-menu" class="secondary-button" type="button">Changer d’emploi</button></div>`;
+}
+
+function openJobMenu() {
+  const activeJob = currentJob();
+  document.querySelector("#job-options").innerHTML = jobs.map(job => `<button class="coach-card${job.id === activeJob?.id ? " selected" : ""}" type="button" data-select-job="${job.id}" aria-pressed="${job.id === activeJob?.id}"><strong>${escapeHTML(job.title)}</strong><span>${job.wage} $ · ${escapeHTML(job.schedule)}</span><small>${job.energy} énergie · +${job.fatigue} fatigue · ${job.morale} moral${job.injury ? ` · +${job.injury} risque` : ""}<br>${escapeHTML(job.detail)}</small></button>`).join("");
+  document.querySelector("#job-dialog").showModal();
+}
+
+function selectJob(jobId) {
+  const job = jobs.find(item => item.id === jobId);
+  if (!job) return;
+  const changed = state.jobId !== job.id;
+  state.jobId = job.id;
+  state.missedWorkWeeks = 0;
+  if (changed) state.journal.unshift({ week: state.week, text: `${state.profile.firstName} accepte un emploi : ${job.title}, ${job.wage} $ par quart travaillé.` });
+  document.querySelector("#job-dialog").close();
+  render();
+  showToast(`${job.title} · action Travailler débloquée`);
+}
+
+function settleJobAttendance(worked, events, week, excused = false) {
+  if (state.jobAttendanceWeek === week) return;
+  state.jobAttendanceWeek = week;
+  const job = currentJob();
+  if (!job) {
+    state.missedWorkWeeks = 0;
+    return;
+  }
+  if (worked) {
+    if (state.missedWorkWeeks > 0) {
+      const note = `${job.title} : ta présence remet le dossier d’assiduité en règle.`;
+      events.push(note);
+      state.journal.unshift({ week, text: note });
+    }
+    state.missedWorkWeeks = 0;
+    return;
+  }
+  if (excused || state.injuryWeeks > 0) {
+    const note = `${job.title} : absence justifiée par ${excused ? "le tournoi" : "la blessure"}; ton emploi est protégé.`;
+    events.push(note);
+    state.journal.unshift({ week, text: note });
+    return;
+  }
+  state.missedWorkWeeks += 1;
+  if (state.missedWorkWeeks >= 3) {
+    const note = `${job.title} : congédiement après trois semaines consécutives sans quart travaillé.`;
+    events.push(note);
+    state.journal.unshift({ week, text: note });
+    state.jobId = null;
+    state.missedWorkWeeks = 0;
+    state.workStreak = 0;
+    return;
+  }
+  const remaining = 3 - state.missedWorkWeeks;
+  const note = `${job.title} : ${state.missedWorkWeeks === 1 ? "première absence" : "dernier avertissement"}. Il reste ${remaining} absence${remaining > 1 ? "s" : ""} avant le congédiement.`;
+  events.push(note);
+  state.journal.unshift({ week, text: note });
+}
+
 function workOutcome() {
-  const streakWages = [70, 60, 45];
-  const baseWage = streakWages[Math.min(state.workStreak, streakWages.length - 1)];
-  const fatiguePenalty = state.fatigue >= 65 ? .72 : state.fatigue >= 45 ? .86 : 1;
-  const energyPenalty = state.energy < 45 ? .82 : 1;
-  const wage = Math.max(25, Math.round(baseWage * fatiguePenalty * energyPenalty));
-  const moraleLoss = 4 + (state.workStreak >= 2 ? 3 : 0) + (state.fatigue >= 70 ? 2 : 0);
-  return { money: wage, energy: -22, fatigue: actionFatigue.work, morale: -moraleLoss, injury: state.fatigue >= 70 ? 3 : 0 };
+  const job = currentJob();
+  if (!job) return null;
+  return {
+    money: job.wage,
+    energy: job.energy,
+    fatigue: job.fatigue,
+    morale: job.morale,
+    injury: job.injury + (state.fatigue >= 70 ? 2 : 0),
+  };
 }
 
 function actionChangesFor(item) {
   const action = actions.find(candidate => candidate.id === item.actionId);
   if (!action) return {};
-  if (action.id === "work") return workOutcome();
+  if (action.id === "work") return workOutcome() || {};
   if (action.id === "private") {
     const coach = privateCoaches.find(item => item.id === state.privateProgram?.coachId);
     if (!coach) return {};
@@ -1598,7 +1693,8 @@ function renderPlan() {
       const currentProgress = action.progressStat ? state.trainingProgress[action.progressStat] || 0 : 0;
       const progressDetail = action.progressStat ? currentProgress >= 9 ? ` · cette séance donne +1 ${combatLabels[action.progressStat].toLowerCase()}` : ` · progression prévue : ${currentProgress + 1}/10` : "";
       const work = action.id === "work" ? workOutcome() : null;
-      const actionDetail = work ? `+${work.money} $ cette semaine · −22 énergie · +18 fatigue · −${Math.abs(work.morale)} moral` : action.detail;
+      const job = action.id === "work" ? currentJob() : null;
+      const actionDetail = work && job ? `${job.title} · +${work.money} $ · ${work.energy} énergie · +${work.fatigue} fatigue · ${work.morale} moral${work.injury ? ` · +${work.injury} risque` : ""}` : action.detail;
       const detail = coach ? `${combatLabels[state.privateProgram.target]} · ${duePrice ? `${duePrice} $` : "séance déjà payée"} · cours ${state.privateProgram.sessionsCompleted + 1} / ${coach.sessions}` : `${actionDetail}${progressDetail}`;
       return `<div class="plan-row"><span class="plan-order">${index + 1}</span><div class="plan-row-copy"><strong>${action.title}</strong><small>${detail}</small></div><div class="plan-row-actions"><button class="plan-remove" type="button" data-remove="${action.id}">Retirer</button></div></div>`;
     }).join("");
@@ -1627,6 +1723,11 @@ function render() {
   renderFighter();
   document.querySelector("#money-spotlight").textContent = `${state.money} $`;
   document.querySelector("#week").textContent = String(state.week).padStart(2, "0");
+  const weekStartDate = careerWeekDate(0);
+  const weekEndDate = careerWeekDate(6);
+  const topDate = document.querySelector("#top-date");
+  topDate.textContent = formatCareerDate(weekStartDate);
+  topDate.setAttribute("aria-label", `Semaine du ${formatCareerDate(weekStartDate, { long: true })} au ${formatCareerDate(weekEndDate, { long: true })}`);
   const topEnergy = document.querySelector("#top-energy");
   topEnergy.textContent = `E:${state.energy}%`;
   topEnergy.setAttribute("aria-label", `Énergie ${state.energy} %`);
@@ -1661,6 +1762,7 @@ function render() {
   renderMembership();
   renderStrengthMembership();
   renderPrivateCoaching();
+  renderEmployment();
   renderFights();
   renderActions();
   renderPlan();
@@ -1891,8 +1993,9 @@ function executePlan() {
   }
   const workedThisWeek = weeklyPlan.some(item => item.actionId === "work");
   state.workStreak = workedThisWeek ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
+  settleJobAttendance(workedThisWeek, events, endingWeek);
   if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = endingWeek + SPONSOR_COOLDOWN_WEEKS;
-  if (workedThisWeek && state.workStreak >= 3) events.push("Tu enchaînes les semaines de travail : la fatigue réduit ton rendement et ta fraîcheur au camp.");
+  if (workedThisWeek && state.workStreak >= 3) events.push("Tu enchaînes les semaines de travail : ta fraîcheur au camp commence à souffrir.");
   endWeek(events);
   if (state.level > levelBefore && state.levelNotice) events.unshift(state.levelNotice);
   const changes = [];
@@ -1919,8 +2022,11 @@ function applyPreFightPlan() {
     showToast(validation.reason);
     return false;
   }
-  if (!weeklyPlan.length) return true;
   const events = [];
+  if (!weeklyPlan.length) {
+    settleJobAttendance(false, events, state.week);
+    return true;
+  }
   const totals = planEffects();
   const privateCoachThisWeek = weeklyPlan.some(item => item.actionId === "private") ? privateCoaches.find(coach => coach.id === state.privateProgram?.coachId) : null;
   weeklyPlan.forEach(item => {
@@ -1938,6 +2044,7 @@ function applyPreFightPlan() {
   const worked = weeklyPlan.some(item => item.actionId === "work");
   if (weeklyPlan.some(item => item.actionId === "video")) state.preFightStudyWeek = state.week;
   state.workStreak = worked ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
+  settleJobAttendance(worked, events, state.week);
   if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = state.week + SPONSOR_COOLDOWN_WEEKS;
   weeklyPlan = [];
   if (events.length) state.journal.unshift({ week: state.week, text: `Préparation du gala : ${events.join(" ")}` });
@@ -2312,6 +2419,7 @@ function closeTournamentBoard() {
   document.querySelector("#tournament-dialog").close();
   if (state.activeTournament?.status === "completed") {
     const events = [state.activeTournament.summary];
+    settleJobAttendance(false, events, state.week, true);
     state.activeTournament = null;
     weeklyPlan = [];
     endWeek(events);
@@ -2946,6 +3054,7 @@ function finishFight() {
     restoreDeferredGalaAfterTournamentBout();
   } else {
     const weekTransitionEvents = [];
+    settleJobAttendance(false, weekTransitionEvents, state.week);
     weeklyPlan = [];
     endWeek(weekTransitionEvents);
   }
@@ -3105,6 +3214,18 @@ document.querySelector("#action-grid").addEventListener("click", event => {
 document.querySelector("#private-coaching").addEventListener("click", event => {
   if (event.target.closest("#open-coach-menu")) openCoachMenu();
 });
+
+document.querySelector("#employment").addEventListener("click", event => {
+  if (event.target.closest("#open-job-menu")) openJobMenu();
+});
+
+document.querySelector("#job-options").addEventListener("click", event => {
+  const job = event.target.closest("[data-select-job]");
+  if (job) selectJob(job.dataset.selectJob);
+});
+
+document.querySelector("#job-dialog-close").addEventListener("click", () => document.querySelector("#job-dialog").close());
+document.querySelector("#job-dialog-cancel").addEventListener("click", () => document.querySelector("#job-dialog").close());
 
 document.querySelector("#private-coach-options").addEventListener("click", event => {
   const coach = event.target.closest("[data-select-private-coach]");

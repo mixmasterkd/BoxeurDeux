@@ -97,6 +97,7 @@
         <div class="week-block" aria-label="État de la semaine">
           <span class="week-label">Semaine</span>
           <strong id="week">01</strong>
+          <span id="top-date" class="top-date">5 janv. 2026</span>
         </div>
         <div class="top-vitals" aria-label="Jauges rapides">
           <span id="top-energy" class="top-energy" aria-label="Énergie 72 %">E:72%</span>
@@ -199,6 +200,11 @@
         <div class="section-heading"><div><p class="eyebrow">Progression ciblée</p><h2 id="coaching-title">Coachs privés</h2></div><p>GYM de boxe : rabais de 10 $ sur les coachs de boxe. Gym de musculation : accès obligatoire aux préparateurs physiques.</p></div>
         <div id="private-coaching" class="private-coaching"></div>
       </section>
+
+      <section class="coaching-panel employment-panel" aria-labelledby="employment-title">
+        <div class="section-heading"><div><p class="eyebrow">Carrière et finances</p><h2 id="employment-title">Emploi</h2></div><p>Un quart travaillé occupe une action. Les emplois plus payants demandent davantage d’énergie.</p></div>
+        <div id="employment" class="private-coaching"></div>
+      </section>
         </div>
       </div>
 
@@ -281,6 +287,15 @@
         <div id="private-dialog-effect" class="service-effect"></div>
         <div class="service-actions"><button class="secondary-button" value="cancel" formnovalidate>Annuler</button><button id="private-confirm" class="primary-button" value="default" disabled>Payer le premier cours</button></div>
       </form>
+    </dialog>
+
+    <dialog id="job-dialog" class="service-dialog" aria-labelledby="job-dialog-title">
+      <div class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Carrière et finances</p><h2 id="job-dialog-title">Choisir un emploi</h2></div><button id="job-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
+        <p class="service-lead">La paie est versée seulement lorsque tu planifies l’action « Travailler ». Trois semaines d’absence consécutives entraînent un congédiement.</p>
+        <div id="job-options" class="coach-menu-grid"></div>
+        <div class="service-actions"><button id="job-dialog-cancel" class="secondary-button" type="button">Annuler</button></div>
+      </div>
     </dialog>
 
     <dialog id="summary-dialog" class="service-dialog summary-dialog" aria-labelledby="summary-title">

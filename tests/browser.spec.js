@@ -341,6 +341,9 @@ for (const profile of [
     await expect(page.locator("#fighter-meta")).toContainText(profile.weight);
     await expect(page.locator("#fighter-portrait-image")).toHaveAttribute("src", profile.portrait);
     await expect(page.locator("#amateur-record")).toHaveText("0 V · 0 D");
+    await expect(page.locator("#money-spotlight")).toHaveText("220 $");
+    await expect(page.locator("#top-date")).toHaveText(/\d{1,2}.+\d{4}/);
+    await expect(page.locator(".calendar-week-reference").first()).toContainText(/Semaine 1 · cette semaine/i);
 
     const savedProfile = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state.profile);
     expect(savedProfile.sex).toBe(profile.sex);
@@ -355,6 +358,13 @@ test("réserve un gala et joue un combat tactique complet avant de révéler les
   await createCareer(page, { sex: "female", firstName: "Jade", lastName: "Decision", style: "counter" });
   await bookCurrentGala(page);
   await startTacticalFight(page);
+
+  const viewport = page.viewportSize();
+  const coachBox = await page.locator("#fight-coach-choices [data-coach-option]").first().boundingBox();
+  expect(coachBox && coachBox.y + coachBox.height).toBeLessThanOrEqual(viewport.height);
+  await chooseCoachDirective(page);
+  const actionBox = await page.locator("#fight-choices [data-fight-action]").first().boundingBox();
+  expect(actionBox && actionBox.y + actionBox.height).toBeLessThanOrEqual(viewport.height);
 
   await completeFight(page);
 
@@ -389,6 +399,14 @@ test("reste utilisable à 390 × 844 px sans débordement et avec des actions ta
   }));
   expect(calendarMetrics.body).toBeLessThanOrEqual(calendarMetrics.viewport + 1);
   expect(calendarMetrics.document).toBeLessThanOrEqual(calendarMetrics.viewport + 1);
+
+  const calendarToggle = page.locator(".calendar-panel .mobile-section-toggle");
+  await expect(calendarToggle).toBeVisible();
+  await calendarToggle.click();
+  await expect(calendarToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#calendar-events")).toBeHidden();
+  await calendarToggle.click();
+  await expect(calendarToggle).toHaveAttribute("aria-expanded", "true");
 
   await bookCurrentGala(page);
   await startTacticalFight(page);
@@ -433,6 +451,60 @@ test("reste utilisable à 390 × 844 px sans débordement et avec des actions ta
   expect(finishedMetrics.body).toBeLessThanOrEqual(finishedMetrics.viewport + 1);
   expect(finishedMetrics.document).toBeLessThanOrEqual(finishedMetrics.viewport + 1);
   expect(finishedMetrics.dialog).toBeLessThanOrEqual(finishedMetrics.viewport + 1);
+});
+
+test("choisit un emploi, reçoit sa paie et perd le poste après trois absences", async ({ page }) => {
+  test.setTimeout(45_000);
+  await openFreshCareer(page);
+  await createCareer(page, { firstName: "Sam", lastName: "Travail" });
+
+  const workAction = page.locator('[data-action="work"]');
+  await expect(workAction).toBeDisabled();
+  await expect(workAction).toContainText("Choisis d’abord un emploi");
+  const futureAction = page.locator('[data-action="drug-sales"]');
+  await expect(futureAction).toBeDisabled();
+  await expect(futureAction).toContainText(/À venir|Bientôt disponible/);
+
+  await page.locator("#open-job-menu").click();
+  await expect(page.locator("#job-dialog")).toBeVisible();
+  await expect(page.locator("#job-options [data-select-job]")).toHaveCount(3);
+  await page.locator('[data-select-job="courier"]').click();
+  await expect(page.locator("#job-dialog")).not.toBeVisible();
+  await expect(workAction).toBeEnabled();
+  await expect(workAction).toContainText("100 $");
+
+  await workAction.click();
+  await page.locator("#advance-week").click();
+  await expect(page.locator("#summary-dialog")).toBeVisible();
+  await expect(page.locator("#summary-content")).toContainText("+100 $");
+  let saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.money).toBe(320);
+  expect(saved.jobId).toBe("courier");
+  expect(saved.missedWorkWeeks).toBe(0);
+
+  async function continueToNextWeek() {
+    await page.locator("#summary-close").click();
+    await expect(page.locator("#week-event-dialog")).toBeVisible();
+    await page.locator("#week-event-choices button:not([disabled])").first().click();
+    await expect(page.locator("#week-event-dialog")).not.toBeVisible();
+  }
+
+  await continueToNextWeek();
+  for (let absence = 1; absence <= 3; absence += 1) {
+    await page.locator('[data-action="family"]').click();
+    await page.locator("#advance-week").click();
+    await expect(page.locator("#summary-dialog")).toBeVisible();
+    saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+    if (absence < 3) {
+      expect(saved.jobId).toBe("courier");
+      expect(saved.missedWorkWeeks).toBe(absence);
+    } else {
+      expect(saved.jobId).toBeNull();
+      expect(saved.missedWorkWeeks).toBe(0);
+      await expect(page.locator("#summary-content")).toContainText("congédiement");
+    }
+    if (absence < 3) await continueToNextWeek();
+  }
 });
 
 test("migre une sauvegarde v3, recâble son combat réservé et impose le choix de division", async ({ page }) => {
