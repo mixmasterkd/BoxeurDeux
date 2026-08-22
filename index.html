@@ -158,26 +158,21 @@
 
       <div class="management-grid">
         <div class="management-column career-column">
-      <section class="fights-panel calendar-panel collapsible-section" data-mobile-open="true" aria-labelledby="calendar-title">
-        <button class="mobile-section-toggle" type="button" aria-expanded="true"><span>Calendrier des combats</span><span class="toggle-control"><small class="toggle-state">Masquer</small><span class="toggle-arrow" aria-hidden="true">⌃</span></span></button>
-        <div class="calendar-heading">
-          <div><p class="eyebrow">Saison amateur</p><h2 id="calendar-title">Calendrier des galas et tournois</h2></div>
-          <div class="calendar-heading-meta"><span id="calendar-date-label">Janvier · semaine 1</span><span id="amateur-fight-count">0 combat disputé</span></div>
-        </div>
-        <p class="calendar-lead">Les événements sont annoncés quelques semaines à l’avance. Lorsqu’ils ont lieu le même soir, il faut choisir.</p>
-        <p id="fight-avoidance-warning" class="avoidance-warning" hidden></p>
-        <div id="scheduled-fight" class="scheduled-fight"></div>
-        <div id="active-tournament" class="active-tournament"></div>
-        <div id="calendar-events" class="calendar-events" aria-live="polite"></div>
-        <details class="tournament-catalog">
-          <summary>Voir les parcours de tournoi</summary>
-          <div id="tournaments" class="tournament-grid"></div>
-        </details>
-        <div id="pro-transition" class="pro-transition"></div>
-      </section>
-        </div>
+          <section class="membership-panel calendar-launch-panel" aria-labelledby="calendar-launch-title">
+            <div class="membership-copy">
+              <p class="eyebrow">Progression compétitive</p>
+              <h2 id="calendar-launch-title">Calendrier des combats</h2>
+              <p id="calendar-launch-copy">Le parcours compétitif apparaîtra après le sparring d’évaluation.</p>
+            </div>
+            <div id="calendar-summary" class="membership-status"></div>
+            <button id="open-calendar" class="membership-button" type="button">Choisir un combat</button>
+          </section>
 
-        <div class="management-column camp-column">
+          <section class="coaching-panel employment-panel" aria-labelledby="employment-title">
+            <div class="section-heading"><div><p class="eyebrow">Carrière et finances</p><h2 id="employment-title">Emploi</h2></div><p>Un quart travaillé occupe une action. Les emplois plus payants demandent davantage d’énergie.</p></div>
+            <div id="employment" class="private-coaching"></div>
+          </section>
+
       <section class="membership-panel" aria-labelledby="membership-title">
         <div class="membership-copy">
           <p class="eyebrow">Accès au camp</p>
@@ -199,11 +194,6 @@
       <section class="coaching-panel" aria-labelledby="coaching-title">
         <div class="section-heading"><div><p class="eyebrow">Progression ciblée</p><h2 id="coaching-title">Coachs privés</h2></div><p>GYM de boxe : rabais de 10 $ sur les coachs de boxe. Gym de musculation : accès obligatoire aux préparateurs physiques.</p></div>
         <div id="private-coaching" class="private-coaching"></div>
-      </section>
-
-      <section class="coaching-panel employment-panel" aria-labelledby="employment-title">
-        <div class="section-heading"><div><p class="eyebrow">Carrière et finances</p><h2 id="employment-title">Emploi</h2></div><p>Un quart travaillé occupe une action. Les emplois plus payants demandent davantage d’énergie.</p></div>
-        <div id="employment" class="private-coaching"></div>
       </section>
         </div>
       </div>
@@ -295,6 +285,47 @@
         <p class="service-lead">La paie est versée seulement lorsque tu planifies l’action « Travailler ». Trois semaines d’absence consécutives entraînent un congédiement.</p>
         <div id="job-options" class="coach-menu-grid"></div>
         <div class="service-actions"><button id="job-dialog-cancel" class="secondary-button" type="button">Annuler</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="membership-dialog" class="service-dialog" aria-labelledby="membership-dialog-title">
+      <div class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">GYM de boxe</p><h2 id="membership-dialog-title">Choisir un abonnement</h2></div><button id="membership-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
+        <p id="membership-dialog-copy" class="service-lead">Le GYM est le centre de l’entraînement de boxe : mitaines, défense, cours de groupe et sparring.</p>
+        <div id="membership-options" class="coach-menu-grid"></div>
+        <div class="service-actions"><button id="membership-dialog-cancel" class="secondary-button" type="button">Fermer</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="strength-membership-dialog" class="service-dialog" aria-labelledby="strength-membership-dialog-title">
+      <div class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Préparation physique</p><h2 id="strength-membership-dialog-title">Choisir un forfait</h2></div><button id="strength-membership-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
+        <p class="service-lead">Le gym de musculation débloque les exercices, la boutique et les préparateurs physiques. Pour le calendrier du jeu, un mois représente quatre semaines.</p>
+        <div id="strength-membership-options" class="coach-menu-grid"></div>
+        <div class="service-actions"><button id="strength-membership-dialog-cancel" class="secondary-button" type="button">Fermer</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="calendar-dialog" class="calendar-dialog" aria-labelledby="calendar-title">
+      <div class="calendar-dialog-card">
+        <div class="service-heading">
+          <div><p id="calendar-dialog-eyebrow" class="eyebrow">Saison amateur</p><h2 id="calendar-title">Calendrier des galas et tournois</h2></div>
+          <button id="calendar-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button>
+        </div>
+        <div class="calendar-heading-meta"><span id="calendar-date-label">Septembre · semaine 1</span><span id="amateur-fight-count">0 combat disputé</span></div>
+        <p id="calendar-dialog-lead" class="calendar-lead">Les événements sont annoncés quelques semaines à l’avance. Lorsqu’ils ont lieu le même soir, il faut choisir.</p>
+        <section id="recreational-path" class="recreational-path" hidden aria-live="polite"></section>
+        <p id="fight-avoidance-warning" class="avoidance-warning" hidden></p>
+        <div id="scheduled-fight" class="scheduled-fight"></div>
+        <div id="active-tournament" class="active-tournament"></div>
+        <div id="calendar-events" class="calendar-events" aria-live="polite"></div>
+        <details class="tournament-catalog">
+          <summary>Voir les parcours de tournoi</summary>
+          <div id="tournaments" class="tournament-grid"></div>
+        </details>
+        <div id="amateur-transition" class="pro-transition" hidden></div>
+        <div id="pro-transition" class="pro-transition"></div>
+        <div class="service-actions calendar-dialog-actions"><button id="calendar-dialog-done" class="primary-button" type="button">Fermer le calendrier</button></div>
       </div>
     </dialog>
 

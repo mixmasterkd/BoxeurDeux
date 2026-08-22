@@ -1,11 +1,24 @@
 const CREATION_POINTS = 5;
 const BASE_COMBAT_STAT = 40;
 const GYM_PRICE = 110;
+const GYM_THREE_MONTH_PRICE = 285;
+const GYM_MONTH_WEEKS = 4;
+const GYM_THREE_MONTH_WEEKS = 12;
 const STRENGTH_GYM_PRICE = 95;
+const STRENGTH_GYM_THREE_MONTH_PRICE = 270;
+const STRENGTH_GYM_SIX_MONTH_PRICE = 510;
+const STRENGTH_GYM_YEAR_PRICE = 960;
+const STRENGTH_GYM_MONTH_WEEKS = 4;
+const STRENGTH_GYM_THREE_MONTH_WEEKS = 12;
+const STRENGTH_GYM_SIX_MONTH_WEEKS = 24;
+const STRENGTH_GYM_YEAR_WEEKS = 48;
 const PRIVATE_PRICE = 90;
 const TOURNAMENT_PREP_WEEKS = 4;
+const RECREATIONAL_START_DATE = "2026-09-07";
+const RECREATIONAL_SPARRING_WEEK = 6;
+const RECREATIONAL_MAX_WEEK = 10;
 const SAVE_KEY = "boxeur-deux-career-v2";
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 const MAX_SUPPLEMENTS_PER_WEEK = 2;
 const SPONSOR_COOLDOWN_WEEKS = 4;
 
@@ -146,11 +159,23 @@ const jobs = Object.freeze([
   { id: "warehouse", title: "Manutention de nuit", schedule: "Quart exigeant", wage: 130, energy: -27, fatigue: 23, morale: -5, injury: 3, detail: "La paie la plus élevée, au prix d’une lourde dépense physique." },
 ]);
 
+const REMY_TANK = Object.freeze({
+  id: "remy-le-tank",
+  name: "Rémy Gagnon",
+  nickname: "Le Tank",
+  style: "Pression contrôlée",
+  record: "Sparring d’évaluation",
+  difficulty: 45,
+  rating: 45,
+  stats: Object.freeze({ technique: 45, power: 50, cardio: 46, defense: 43 }),
+});
+
 const INITIAL_STATE = {
   profile: null,
   combatStats: { technique: BASE_COMBAT_STAT, power: BASE_COMBAT_STAT, cardio: BASE_COMBAT_STAT, defense: BASE_COMBAT_STAT },
   week: 1,
   money: 220,
+  careerStartDate: RECREATIONAL_START_DATE,
   energy: 72,
   fitness: 25,
   morale: 68,
@@ -169,7 +194,11 @@ const INITIAL_STATE = {
   boxingNeglectWeeks: 0,
   amateurRecord: { wins: 0, losses: 0, draws: 0 },
   professionalRecord: { wins: 0, losses: 0, draws: 0 },
-  careerStatus: "amateur",
+  careerStatus: "recreational",
+  introJobRequired: true,
+  initialGymRequired: true,
+  recreationalTrainingWeeks: 0,
+  recreationalSparringStatus: "training",
   scheduledFight: null,
   calendar: null,
   bookings: [],
@@ -267,8 +296,63 @@ const betweenWeekEvents = [
   },
 ];
 
+const recreationalBetweenWeekEvents = [
+  {
+    id: "rec-gym-routine",
+    title: "Les repères du GYM",
+    lead: "Tu commences à reconnaître les visages et les habitudes du gym. Une petite décision peut rendre les prochaines séances plus faciles.",
+    choices: [
+      { id: "arrive-early", title: "Arriver un peu plus tôt", detail: "Tu observes l’échauffement avant le cours.", effect: "+6 XP · −4 énergie", changes: { experience: 6, energy: -4 }, result: "Tu repars avec quelques repères simples sur la garde et le rythme." },
+      { id: "keep-fresh", title: "Garder de l’énergie", detail: "Tu rentres tôt pour récupérer.", effect: "+8 énergie · +2 moral", changes: { energy: 8, morale: 2 }, result: "Tu choisis la régularité plutôt que d’en faire trop dès le début." },
+      { id: "ask-question", title: "Poser une question au coach", detail: "Tu fais préciser une base qui te bloque.", effect: "+4 XP · +3 moral", changes: { experience: 4, morale: 3 }, result: "Le coach apprécie ta curiosité et reformule le geste simplement." },
+    ],
+  },
+  {
+    id: "rec-work-balance",
+    title: "Trouver son rythme",
+    lead: "Entre ton emploi et le GYM, la première routine se construit. Tu ajustes ton début de semaine.",
+    choices: [
+      { id: "protect-sleep", title: "Protéger ton sommeil", detail: "Tu refuses de remplir toutes tes soirées.", effect: "+12 énergie · −5 fatigue", changes: { energy: 12, fatigue: -5 }, result: "Tu attaques la semaine moins lourd, même si ton horaire reste simple." },
+      { id: "extra-effort", title: "Ajouter un petit effort", detail: "Tu allonges légèrement ton échauffement.", effect: "+5 XP · −7 énergie", changes: { experience: 5, energy: -7 }, result: "Tu gagnes un peu de confiance, sans brûler les étapes." },
+      { id: "call-home", title: "Prendre une soirée calme", detail: "Tu gardes du temps pour les proches.", effect: "+7 moral · +4 énergie", changes: { morale: 7, energy: 4 }, result: "Une soirée tranquille remet tes priorités en ordre." },
+    ],
+  },
+  {
+    id: "rec-sore-muscles",
+    title: "Les premières courbatures",
+    lead: "Tes épaules et tes jambes découvrent un rythme nouveau. Tu peux récupérer, bouger doucement ou forcer un peu.",
+    choices: [
+      { id: "easy-recovery", title: "Récupérer doucement", detail: "Marche, eau et étirements légers.", effect: "+10 énergie · −7 fatigue · −3 risque", changes: { energy: 10, fatigue: -7, injury: -3 }, result: "Tu laisses ton corps assimiler le travail plutôt que de lui demander trop vite." },
+      { id: "light-mobility", title: "Faire de la mobilité", detail: "Tu gardes le corps en mouvement.", effect: "+4 XP · +4 énergie · −3 fatigue", changes: { experience: 4, energy: 4, fatigue: -3 }, result: "La séance légère te donne de meilleures sensations sans te vider." },
+      { id: "push-on", title: "Passer au travers", detail: "Tu refuses de ralentir dès le départ.", effect: "+7 XP · −10 énergie · +4 risque", changes: { experience: 7, energy: -10, injury: 4 }, result: "Tu accumules de la pratique, mais le corps te rappelle qu’il apprend encore." },
+    ],
+  },
+  {
+    id: "rec-coach-tip",
+    title: "Un conseil qui reste",
+    lead: "Après une séance, le coach résume la boxe avec trois idées simples. Tu choisis celle que tu veux retenir cette semaine.",
+    choices: [
+      { id: "keep-guard", title: "Garder les mains hautes", detail: "Tu privilégies la sécurité et le calme.", effect: "+5 XP · +3 moral", changes: { experience: 5, morale: 3 }, result: "La phrase devient un réflexe : calme, garde, respiration." },
+      { id: "move-feet", title: "Bouger après le jab", detail: "Tu travailles le placement avant la vitesse.", effect: "+6 XP · −4 énergie", changes: { experience: 6, energy: -4 }, result: "Tu observes déjà mieux l’espace autour de toi." },
+      { id: "breathe", title: "Respirer et ralentir", detail: "Tu retiens surtout la gestion de l’effort.", effect: "+9 énergie · −4 fatigue", changes: { energy: 9, fatigue: -4 }, result: "Tu comprends qu’un bon rythme se construit aussi en récupérant." },
+    ],
+  },
+];
+
+const allBetweenWeekEvents = [...betweenWeekEvents, ...recreationalBetweenWeekEvents];
+
+function betweenWeekEventsForCurrentCareer() {
+  return isRecreationalCareer() ? recreationalBetweenWeekEvents : betweenWeekEvents;
+}
+
+function betweenWeekEventById(eventId) {
+  return allBetweenWeekEvents.find(event => event.id === eventId);
+}
+
 const actions = [
   { id: "gym", category: "training", icon: "T", title: "Travail aux mitaines", detail: "+12 XP · +5 forme · −18 énergie · +12 fatigue", progressStat: "technique", requiresGym: true, changes: { fitness: 5, energy: -18, injury: 3, experience: 12 }, message: "Le travail aux mitaines affine les gestes et les enchaînements." },
+  { id: "group-class", category: "training", icon: "G", title: "Cours de groupe", detail: "+10 XP · +4 forme · −15 énergie · +11 fatigue", requiresGym: true, changes: { fitness: 4, energy: -15, injury: 2, experience: 10, morale: 2 }, message: "Le cours de groupe donne des repères simples, du rythme et l’habitude du gym." },
+  { id: "home-bag", category: "training", icon: "D", title: "Sac au sous-sol", detail: "+6 XP · +2 forme · −12 énergie · +9 fatigue", changes: { fitness: 2, energy: -12, injury: 1, experience: 6 }, message: "Au sous-sol, le sac permet de garder les gestes de base quand le GYM n’est pas accessible." },
   { id: "private", category: "training", icon: "P", title: "Séance privée", detail: "Programme privé requis", requiresPrivateProgram: true, message: "Un cours privé fait avancer ton programme individuel." },
   { id: "sparring", category: "training", icon: "S", title: "Sparring", detail: "+18 XP · +4 forme · −24 énergie · +22 fatigue · +12 risque", requiresGym: true, changes: { experience: 18, fitness: 4, energy: -24, injury: 12, reputation: 2 }, message: "Les rounds de sparring donnent de l’expérience réelle, mais le corps encaisse." },
   { id: "roadwork", category: "training", icon: "C", title: "Course matinale", detail: "+9 XP · +5 forme · −16 énergie · +14 fatigue", changes: { fitness: 5, energy: -16, injury: 2, experience: 9 }, message: "La course construit la base physique nécessaire aux longs combats." },
@@ -287,7 +371,7 @@ const actions = [
   { id: "drug-sales", category: "career", icon: "!", title: "Vente de stupéfiants", detail: "À venir · risques judiciaires et semaines de détention dans une future version", future: true, message: "Cette activité n’est pas encore disponible." },
 ];
 
-const actionFatigue = { gym: 12, private: 10, sparring: 22, roadwork: 14, heavybag: 15, video: 4, "strength-power": 18, "strength-circuit": 16, rest: -20, eat: 2, physio: -10, spa: -25, work: 18, promotion: 6, family: -4, sponsor: 8 };
+const actionFatigue = { gym: 12, "group-class": 11, "home-bag": 9, private: 10, sparring: 22, roadwork: 14, heavybag: 15, video: 4, "strength-power": 18, "strength-circuit": 16, rest: -20, eat: 2, physio: -10, spa: -25, work: 18, promotion: 6, family: -4, sponsor: 8 };
 
 const strengthGymProducts = [
   { id: "protein-bar", label: "Barre protéinée", price: 10, effect: "+3 E · −1 Fa · +1 M", changes: { energy: 3, fatigue: -1, morale: 1 } },
@@ -416,7 +500,9 @@ function normalizeCareerState(source) {
       epoch: /^\d{4}-\d{2}-\d{2}$/.test(source.calendar.epoch || "") ? source.calendar.epoch : null,
       seed: safeText(source.calendar.seed, `${profile.firstName}-${profile.lastName}-${profile.sex}`, 120),
     } : null,
-    careerStatus: source.careerStatus === "professional" ? "professional" : "amateur",
+    careerStatus: ["professional", "amateur", "recreational", "amateur_pending"].includes(source.careerStatus)
+      ? source.careerStatus
+      : "amateur",
     combatStats: Object.fromEntries(Object.keys(combatLabels).map(key => [key, safeNumber(source.combatStats?.[key], base.combatStats[key], 0, 99)])),
     amateurRecord: normalizeRecord(source.amateurRecord, base.amateurRecord),
     professionalRecord: normalizeRecord(source.professionalRecord, base.professionalRecord),
@@ -439,7 +525,7 @@ function normalizeCareerState(source) {
     week: [1, 99999], money: [0, 9999999], energy: [0, 100], fitness: [0, 100], morale: [0, 100], reputation: [0, 100],
     injury: [0, 100], fatigue: [0, 100], injuryWeeks: [0, 52], experience: [0, 10000000], level: [1, 999], levelPoints: [0, 9999],
     gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
-    missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999],
+    missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999], recreationalTrainingWeeks: [0, 10],
     supplementWeek: [1, 99999], avoidanceWeeks: [0, 999], lastFightWeek: [0, 99999], injuryStartedWeek: [0, 99999],
   };
   Object.entries(boundedStats).forEach(([key, [min, max]]) => { normalized[key] = safeNumber(source[key], base[key] ?? min, min, max); });
@@ -450,10 +536,20 @@ function normalizeCareerState(source) {
   normalized.levelPoints = safeNumber(source.levelPoints, base.levelPoints, 0, 9999);
   normalized.goldenPlacement = [1, 2, 3].includes(Number(source.goldenPlacement)) ? Number(source.goldenPlacement) : null;
   normalized.olympicCompleted = Boolean(source.olympicCompleted);
-  normalized.pendingWeekEvent = betweenWeekEvents.some(event => event.id === source.pendingWeekEvent) ? source.pendingWeekEvent : null;
+  normalized.pendingWeekEvent = allBetweenWeekEvents.some(event => event.id === source.pendingWeekEvent) ? source.pendingWeekEvent : null;
   normalized.levelNotice = source.levelNotice ? safeText(source.levelNotice, "", 120) : null;
   normalized.jobId = jobs.some(job => job.id === source.jobId) ? source.jobId : null;
   if (!normalized.jobId) normalized.missedWorkWeeks = 0;
+  normalized.introJobRequired = normalized.careerStatus === "recreational" && Boolean(source.introJobRequired ?? !normalized.jobId);
+  normalized.initialGymRequired = normalized.careerStatus === "recreational" && Boolean(source.initialGymRequired ?? true);
+  const sparringStates = ["training", "ready", "completed"];
+  normalized.recreationalSparringStatus = sparringStates.includes(source.recreationalSparringStatus)
+    ? source.recreationalSparringStatus
+    : normalized.careerStatus === "amateur_pending" ? "completed" : "training";
+  const inferredStartDate = /^\d{4}-\d{2}-\d{2}$/.test(source.careerStartDate || "")
+    ? source.careerStartDate
+    : normalized.calendar?.epoch || (normalized.careerStatus === "recreational" ? RECREATIONAL_START_DATE : "2026-01-05");
+  normalized.careerStartDate = inferredStartDate;
   normalized.supplementsUsed = Array.isArray(source.supplementsUsed) ? [...new Set(source.supplementsUsed.filter(id => strengthGymProducts.some(product => product.id === id)))].slice(0, MAX_SUPPLEMENTS_PER_WEEK) : [];
   if (normalized.supplementWeek !== normalized.week) {
     normalized.supplementWeek = normalized.week;
@@ -521,7 +617,7 @@ function ensureCareerCalendar() {
   const throughWeek = Math.max(10, state.week + 8);
   const config = {
     seed: state.calendar?.seed || calendarSeedForCareer(),
-    epoch: state.calendar?.epoch || undefined,
+    epoch: state.calendar?.epoch || state.careerStartDate || RECREATIONAL_START_DATE,
     startWeek: 1,
     weeks: throughWeek,
   };
@@ -897,9 +993,10 @@ function renderFighter() {
   const nickname = profile.nickname ? ` « ${profile.nickname} »` : "";
   document.querySelector("#fighter-name").textContent = `${profile.firstName}${nickname} ${profile.lastName}`;
   const isProfessional = state.careerStatus === "professional";
+  const statusLabel = isProfessional ? "Professionnel" : isAwaitingAmateurTransition() ? "Prêt à passer amateur" : isRecreationalCareer() ? "Récréatif" : "Amateur";
   const campStatus = state.injuryWeeks > 0 ? ` · Blessé (${state.injuryWeeks} sem.)` : state.fatigue >= 75 ? " · Camp épuisé" : state.morale < 25 ? " · Moral fragile" : "";
   const divisionLabel = profile.sex === "female" ? "Division féminine" : "Division masculine";
-  document.querySelector("#fighter-meta").textContent = `${weightClassLabel(profile.weightClass, profile.sex)} · ${divisionLabel} · ${styles[profile.style].label} · ${isProfessional ? "Professionnel" : "Amateur"}${campStatus}`;
+  document.querySelector("#fighter-meta").textContent = `${weightClassLabel(profile.weightClass, profile.sex)} · ${divisionLabel} · ${styles[profile.style].label} · ${statusLabel}${campStatus}`;
   const portrait = document.querySelector("#fighter-portrait");
   const portraitImage = document.querySelector("#fighter-portrait-image");
   portrait?.style.setProperty("--portrait-index", String(profile.portraitId || 0));
@@ -909,7 +1006,7 @@ function renderFighter() {
   const record = state.amateurRecord;
   const amateurText = `${record.wins} V · ${record.losses} D${record.draws ? ` · ${record.draws} N historique${record.draws > 1 ? "s" : ""}` : ""}`;
   const pro = state.professionalRecord;
-  document.querySelector("#career-records").innerHTML = isProfessional ? `Montréal, QC <span class="dot">•</span> Bilan pro : ${pro.wins} V · ${pro.losses} D · ${pro.draws} N <span class="dot">•</span> Bilan amateur final : ${amateurText}` : `Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">${amateurText}</span>`;
+  document.querySelector("#career-records").innerHTML = isProfessional ? `Montréal, QC <span class="dot">•</span> Bilan pro : ${pro.wins} V · ${pro.losses} D · ${pro.draws} N <span class="dot">•</span> Bilan amateur final : ${amateurText}` : isRecreationalCareer() || isAwaitingAmateurTransition() ? `Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">À venir</span>` : `Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">${amateurText}</span>`;
   const medalTotals = Object.values(state.medals).reduce((totals, medals) => ({ bronze: totals.bronze + medals.bronze, silver: totals.silver + medals.silver, gold: totals.gold + medals.gold }), { bronze: 0, silver: 0, gold: 0 });
   const medalCount = medalTotals.bronze + medalTotals.silver + medalTotals.gold;
   document.querySelector("#career-medals").innerHTML = `<span>Médailles</span>${medalCount ? `<strong><i class="medal-dot bronze"></i>${medalTotals.bronze}<i class="medal-dot silver"></i>${medalTotals.silver}<i class="medal-dot gold"></i>${medalTotals.gold}</strong>` : "<em>Aucune pour l’instant</em>"}`;
@@ -924,6 +1021,9 @@ function renderFighter() {
     const tournament = tournamentDefs.find(item => item.id === state.activeTournament.id);
     nextFight.className = "fighter-next-fight";
     nextFight.textContent = `Prochaine compétition · ${tournament?.name || "Tournoi"} · semaine ${state.activeTournament.startWeek}`;
+  } else if (isAwaitingAmateurTransition()) {
+    nextFight.className = "fighter-next-fight due";
+    nextFight.textContent = "Étape suivante · passer amateur";
   } else {
     nextFight.className = "fighter-next-fight empty";
     nextFight.textContent = "Aucun combat programmé";
@@ -1212,14 +1312,108 @@ function professionalEligibility() {
   return { eligible: false, reason: `Termine un parcours majeur ou dispute encore ${20 - count} combat${20 - count > 1 ? "s" : ""}` };
 }
 
+function nextTournamentEvent() {
+  const currentDate = careerWeekDate(0);
+  return state.calendar?.events?.find(event => event.kind === "tournament" && event.endDate >= currentDate) || null;
+}
+
+function renderCalendarLaunch() {
+  const copy = document.querySelector("#calendar-launch-copy");
+  const summary = document.querySelector("#calendar-summary");
+  const button = document.querySelector("#open-calendar");
+  if (!copy || !summary || !button) return;
+  if (isAwaitingAmateurTransition()) {
+    copy.textContent = "Le sparring d’évaluation est terminé. Confirme le passage au circuit amateur pour continuer.";
+    summary.className = "membership-status active";
+    summary.innerHTML = "<strong>Prêt à passer amateur</strong>Le calendrier s’ouvrira dès ta confirmation";
+    button.textContent = "Passer amateur";
+    return;
+  }
+  if (isRecreationalCareer()) {
+    const sparringCompleted = state.recreationalSparringStatus === "completed";
+    const sparringDue = Boolean(state.scheduledFight?.isRecreationalSparring && state.week >= state.scheduledFight.week);
+    const remainingWeeks = Math.max(0, RECREATIONAL_SPARRING_WEEK - state.week);
+    if (sparringCompleted) {
+      copy.textContent = state.week >= RECREATIONAL_MAX_WEEK
+        ? "Le parcours récréatif se termine ici. Confirme le passage amateur pour poursuivre la carrière."
+        : "Rémy a terminé son évaluation. Tu peux passer amateur maintenant ou continuer à apprendre jusqu’à la semaine 10.";
+      summary.className = "membership-status active";
+      summary.innerHTML = `<strong>Passage amateur disponible</strong>${state.week >= RECREATIONAL_MAX_WEEK ? "Semaine 10 atteinte" : `Encore ${RECREATIONAL_MAX_WEEK - state.week} semaine${RECREATIONAL_MAX_WEEK - state.week > 1 ? "s" : ""} récréative${RECREATIONAL_MAX_WEEK - state.week > 1 ? "s" : ""} possibles`}`;
+      button.textContent = "Passer amateur";
+    } else {
+      copy.textContent = `Rémy « Le Tank » t’attend pour un sparring d’évaluation en semaine ${RECREATIONAL_SPARRING_WEEK}. Les cours de groupe et le GYM te préparent sans obligation de remplir dix semaines.`;
+      summary.className = `membership-status${sparringDue ? " active" : ""}`;
+      summary.innerHTML = sparringDue
+        ? `<strong>Sparring disponible</strong>Rémy « Le Tank » est prêt au GYM`
+        : `<strong>${state.recreationalTrainingWeeks} / 10 entraînements au GYM</strong>Rémy arrive dans ${remainingWeeks || 1} semaine${remainingWeeks === 1 ? "" : "s"}`;
+      button.textContent = sparringDue ? "Voir le sparring" : "Voir le parcours";
+    }
+    return;
+  }
+  const tournament = nextTournamentEvent();
+  copy.textContent = "Galas et tournois annoncés à l’avance. Choisis une seule date lorsqu’ils se chevauchent.";
+  summary.className = "membership-status active";
+  summary.innerHTML = tournament
+    ? `<strong>Prochain tournoi</strong>${escapeHTML(tournament.name)} · ${formatCareerDate(tournament.startDate)}`
+    : "<strong>Calendrier actif</strong>Les prochains galas arrivent bientôt";
+  button.textContent = "Choisir un combat";
+}
+
+function renderRecreationalCalendar(path, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition) {
+  const sparringCompleted = state.recreationalSparringStatus === "completed";
+  const isSparringDue = Boolean(state.scheduledFight?.isRecreationalSparring && state.week >= state.scheduledFight.week);
+  document.querySelector("#calendar-dialog-eyebrow").textContent = "Parcours récréatif";
+  document.querySelector("#calendar-title").textContent = "Vers le premier combat";
+  document.querySelector("#calendar-date-label").textContent = `${formatCareerDate(careerWeekDate(0))} · semaine ${state.week}`;
+  document.querySelector("#amateur-fight-count").textContent = "Bilan amateur à venir";
+  document.querySelector("#calendar-dialog-lead").textContent = sparringCompleted
+    ? "Le calendrier compétitif est prêt : tu peux encore rester récréatif jusqu’à la semaine 10 ou confirmer ton passage amateur."
+    : `Rémy « Le Tank » évalue tes bases en semaine ${RECREATIONAL_SPARRING_WEEK}.`;
+  path.hidden = false;
+  path.innerHTML = `<div><p class="eyebrow">Parcours des bases</p><strong>Rémy « Le Tank »</strong><p>${sparringCompleted ? "L’évaluation est terminée. Le coach te laisse continuer à apprendre tranquillement avant de passer amateur." : `Construis tes repères : ${state.recreationalTrainingWeeks}/10 entraînements au GYM complétés. Le sparring arrive en semaine ${RECREATIONAL_SPARRING_WEEK}, pas après dix semaines obligatoires.`}</p><div class="countdown-meter"><span style="width:${Math.min(RECREATIONAL_MAX_WEEK, state.week) * 10}%"></span></div></div><ul><li>Semaines 1 à 5 : emploi, premier abonnement et bases</li><li>Semaine 6 : sparring d’évaluation avec Rémy</li><li>Semaines 7 à 10 : choix de continuer ou de passer amateur</li></ul>`;
+  if (state.scheduledFight?.isRecreationalSparring) {
+    const opponent = scheduledOpponent();
+    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Sparring d’évaluation · GYM de boxe</p><strong>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</strong><p>${isSparringDue ? "Rémy est prêt. Trois rounds courts pour montrer tes bases; ce sparring ne comptera pas au bilan amateur." : `Prévu à la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isSparringDue ? `<div class="fight-notice-actions"><button id="start-fight" class="primary-button" type="button">Entrer dans le ring</button></div>` : ""}</div>`;
+  } else {
+    scheduled.innerHTML = "";
+  }
+  calendarContainer.innerHTML = "";
+  tournamentsContainer.innerHTML = "";
+  activeTournamentContainer.innerHTML = "";
+  proTransition.innerHTML = "";
+  amateurTransition.hidden = !sparringCompleted;
+  amateurTransition.innerHTML = sparringCompleted ? `<div><strong>Passer amateur</strong><p>${state.week >= RECREATIONAL_MAX_WEEK ? "La période récréative est terminée : confirme le passage pour poursuivre." : "Tu peux confirmer maintenant, ou garder le statut récréatif jusqu’à la semaine 10."}</p></div><button id="turn-amateur" class="primary-button" type="button">Passer amateur</button>` : "";
+}
+
+function renderAmateurTransition(path, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition) {
+  document.querySelector("#calendar-dialog-eyebrow").textContent = "Dernière étape";
+  document.querySelector("#calendar-title").textContent = "Ton premier statut amateur";
+  document.querySelector("#calendar-date-label").textContent = `${formatCareerDate(careerWeekDate(0))} · transition prête`;
+  document.querySelector("#amateur-fight-count").textContent = "Bilan amateur : 0 combat";
+  document.querySelector("#calendar-dialog-lead").textContent = "Le sparring avec Rémy « Le Tank » est terminé. Cette décision ouvre officiellement ton calendrier amateur.";
+  path.hidden = false;
+  path.innerHTML = `<div><p class="eyebrow">Évaluation complétée</p><strong>Rémy « Le Tank » a donné son feu vert.</strong><p>Appuie sur « Passer amateur » pour commencer une nouvelle semaine 1 et faire apparaître les galas et tournois.</p></div>`;
+  scheduled.innerHTML = "";
+  calendarContainer.innerHTML = "";
+  tournamentsContainer.innerHTML = "";
+  activeTournamentContainer.innerHTML = "";
+  proTransition.innerHTML = "";
+  amateurTransition.hidden = false;
+  amateurTransition.innerHTML = `<div><strong>Passer amateur</strong><p>Cette confirmation débloque les galas, les tournois et le calendrier compétitif.</p></div><button id="turn-amateur" class="primary-button" type="button">Passer amateur</button>`;
+}
+
 function renderFights() {
   ensureCareerCalendar();
   ensureDueTournamentActive();
+  scheduleRecreationalSparring();
+  renderCalendarLaunch();
   const scheduled = document.querySelector("#scheduled-fight");
   const calendarContainer = document.querySelector("#calendar-events");
   const tournamentsContainer = document.querySelector("#tournaments");
   const activeTournamentContainer = document.querySelector("#active-tournament");
   const proTransition = document.querySelector("#pro-transition");
+  const amateurTransition = document.querySelector("#amateur-transition");
+  const recreationalPath = document.querySelector("#recreational-path");
   const avoidanceWarning = document.querySelector("#fight-avoidance-warning");
   const fightCount = amateurFightCount();
   if (avoidanceWarning) {
@@ -1227,6 +1421,24 @@ function renderFights() {
     avoidanceWarning.textContent = state.avoidanceWeeks >= 6 ? "Avertissement du coach : les offres deviennent moins ambitieuses tant que tu évites les combats." : state.avoidanceWeeks >= 3 ? `Tu n’as pas combattu depuis ${state.avoidanceWeeks} semaines : ta réputation commence à baisser.` : "";
   }
   document.querySelector("#amateur-fight-count").textContent = `${fightCount} combat${fightCount > 1 ? "s" : ""} disputé${fightCount > 1 ? "s" : ""}`;
+
+  if (isAwaitingAmateurTransition()) {
+    if (avoidanceWarning) avoidanceWarning.hidden = true;
+    renderAmateurTransition(recreationalPath, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition);
+    return;
+  }
+
+  if (isRecreationalCareer()) {
+    if (avoidanceWarning) avoidanceWarning.hidden = true;
+    renderRecreationalCalendar(recreationalPath, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition);
+    return;
+  }
+
+  recreationalPath.hidden = true;
+  amateurTransition.hidden = true;
+  document.querySelector("#calendar-dialog-eyebrow").textContent = "Saison amateur";
+  document.querySelector("#calendar-title").textContent = "Calendrier des galas et tournois";
+  document.querySelector("#calendar-dialog-lead").textContent = "Les événements sont annoncés quelques semaines à l’avance. Lorsqu’ils ont lieu le même soir, il faut choisir.";
 
   if (state.careerStatus === "professional") {
     scheduled.innerHTML = "";
@@ -1323,8 +1535,35 @@ function currentJob() {
   return jobs.find(job => job.id === state.jobId) || null;
 }
 
+function isRecreationalCareer() {
+  return state.careerStatus === "recreational";
+}
+
+function isAwaitingAmateurTransition() {
+  return state.careerStatus === "amateur_pending";
+}
+
+function canPassAmateurCareer() {
+  return isAwaitingAmateurTransition() || (isRecreationalCareer() && state.recreationalSparringStatus === "completed");
+}
+
+function isRecreationalLimitReached() {
+  return isRecreationalCareer() && state.recreationalSparringStatus === "completed" && state.week >= RECREATIONAL_MAX_WEEK;
+}
+
+function actionIsVisibleForCareer(action) {
+  if (!action) return false;
+  if (isAwaitingAmateurTransition()) return false;
+  if (isRecreationalLimitReached()) return false;
+  if (!isRecreationalCareer()) return action.id !== "group-class";
+  const recreationalActions = ["gym", "group-class", "home-bag", "rest", "work"];
+  if (state.strengthGymWeeks > 0) recreationalActions.push("strength-power", "strength-circuit");
+  return recreationalActions.includes(action.id);
+}
+
 function actionRequirementLock(action) {
   if (!action) return "Action inconnue";
+  if (!actionIsVisibleForCareer(action)) return isAwaitingAmateurTransition() ? "Passe amateur pour reprendre la carrière" : "Cette action n’est pas disponible à ce statut";
   if (action.future) return "Bientôt disponible";
   if (action.id === "work" && !currentJob()) return "Choisis d’abord un emploi dans le panneau Emploi";
   if (action.requiresPrivateProgram && !state.privateProgram) return "Commence un programme avec un coach";
@@ -1396,8 +1635,17 @@ function recommendedActionIds() {
 
 function renderActions() {
   const recommended = recommendedActionIds();
-  document.querySelector("#action-grid").innerHTML = actionCategories.map((category, index) => {
-    const categoryActions = actions.filter(action => action.category === category.id && (!action.requiresPrivateProgram || state.privateProgram)).map((action, originalIndex) => ({
+  const visibleCategories = actionCategories.map(category => ({
+    ...category,
+    actions: actions.filter(action => action.category === category.id && (!action.requiresPrivateProgram || state.privateProgram) && actionIsVisibleForCareer(action)),
+  })).filter(category => category.actions.length);
+  if (!visibleCategories.length) {
+    const recreationalLimit = isRecreationalLimitReached();
+    document.querySelector("#action-grid").innerHTML = `<div class="career-transition-lock"><strong>${recreationalLimit ? "La période récréative est terminée." : "Le gym attend ta décision."}</strong><p>${recreationalLimit ? "Tu as atteint la semaine 10 après le sparring avec Rémy « Le Tank ». Ouvre le calendrier et appuie sur « Passer amateur » pour continuer." : "Le sparring avec Rémy « Le Tank » est terminé. Ouvre le calendrier et appuie sur « Passer amateur » pour continuer."}</p></div>`;
+    return;
+  }
+  document.querySelector("#action-grid").innerHTML = visibleCategories.map((category, index) => {
+    const categoryActions = category.actions.map((action, originalIndex) => ({
       action,
       originalIndex,
       priority: recommended.has(action.id) ? 0 : actionRequirementLock(action) ? 2 : 1,
@@ -1435,12 +1683,15 @@ function renderMembership() {
     button.disabled = true;
   } else {
     status.className = "membership-status";
-    status.innerHTML = "<strong>GYM de boxe expiré</strong>Entraînement et sparring verrouillés";
-    button.disabled = state.money < GYM_PRICE;
-    button.textContent = button.disabled ? `Il manque ${GYM_PRICE - state.money} $ pour s’abonner` : `S’abonner · ${GYM_PRICE} $ / 4 semaines`;
-    button.title = button.disabled ? `Il manque ${GYM_PRICE - state.money} $` : "";
+    const required = state.initialGymRequired;
+    status.innerHTML = required
+      ? "<strong>Premier abonnement requis</strong>Choisis le GYM de boxe avant de commencer le parcours récréatif"
+      : "<strong>GYM de boxe expiré</strong>Le sac au sous-sol reste disponible; les mitaines, cours et sparring attendent un renouvellement";
+    button.disabled = false;
+    button.textContent = required ? `Activer le premier mois · ${GYM_PRICE} $` : "Choisir un forfait";
+    button.title = "";
   }
-  services.innerHTML = state.gymWeeks > 0 ? `<div class="gym-exercise-heading"><strong>Exercices du GYM de boxe</strong><small>Disponibles dans Préparation et technique</small></div><div class="gym-exercise-grid">${gymExerciseCard("technique", "Travail aux mitaines")}${gymExerciseCard("defense", "Défense et esquives")}</div>` : `<div class="gym-locked-note">Abonne-toi pour débloquer les exercices de boxe.</div>`;
+  services.innerHTML = state.gymWeeks > 0 ? `<div class="gym-exercise-heading"><strong>Exercices du GYM de boxe</strong><small>${isRecreationalCareer() ? "Mitaines et cours de groupe pour bâtir les bases" : "Disponibles dans Préparation et technique"}</small></div><div class="gym-exercise-grid">${gymExerciseCard("technique", "Travail aux mitaines")}${!isRecreationalCareer() ? gymExerciseCard("defense", "Défense et esquives") : ""}</div>` : `<div class="gym-locked-note">Sans abonnement, le sac au sous-sol reste dans les tuiles de préparation.</div>`;
 }
 
 function gymExerciseCard(stat, label) {
@@ -1479,8 +1730,8 @@ function renderStrengthMembership() {
   } else {
     status.className = "membership-status";
     status.innerHTML = "<strong>Non abonné</strong>Exercices, boutique et préparateurs verrouillés";
-    button.disabled = state.money < STRENGTH_GYM_PRICE;
-    button.textContent = button.disabled ? `Il manque ${STRENGTH_GYM_PRICE - state.money} $` : `S’abonner · ${STRENGTH_GYM_PRICE} $ / 4 semaines`;
+    button.disabled = false;
+    button.textContent = "Choisir un forfait";
   }
   if (!services) return;
   const shop = strengthGymProducts.map(product => {
@@ -1519,7 +1770,8 @@ function renderEmployment() {
   if (!employment) return;
   const job = currentJob();
   if (!job) {
-    employment.innerHTML = `<div class="coaching-heading"><span>Aucun emploi</span><small>Choisis un poste pour débloquer l’action « Travailler » dans Carrière et finances.</small></div><button id="open-job-menu" class="primary-button" type="button">Choisir un emploi</button>`;
+    const required = state.introJobRequired;
+    employment.innerHTML = `<div class="coaching-heading"><span>${required ? "Premier emploi requis" : "Aucun emploi"}</span><small>${required ? "Choisis ton emploi de départ avant de passer ta première semaine." : "Tu peux rester sans emploi ou chercher un nouveau poste quand tu le souhaites."}</small></div><button id="open-job-menu" class="primary-button" type="button">${required ? "Choisir mon emploi de départ" : "Choisir un emploi"}</button>`;
     return;
   }
   const absenceNote = state.missedWorkWeeks === 0
@@ -1527,7 +1779,7 @@ function renderEmployment() {
     : state.missedWorkWeeks === 1
       ? "1 absence · deux chances restantes"
       : "2 absences · prochain quart manqué : congédiement";
-  employment.innerHTML = `<div class="private-program employment-program"><span>Emploi actif · ${escapeHTML(job.schedule)}</span><strong>${escapeHTML(job.title)} · ${job.wage} $ par quart</strong><small>${escapeHTML(job.detail)} ${absenceNote}.</small><button id="open-job-menu" class="secondary-button" type="button">Changer d’emploi</button></div>`;
+  employment.innerHTML = `<div class="private-program employment-program"><span>Emploi actif · ${escapeHTML(job.schedule)}</span><strong>${escapeHTML(job.title)} · ${job.wage} $ par quart</strong><small>${escapeHTML(job.detail)} ${absenceNote}.</small><div class="employment-actions"><button id="open-job-menu" class="secondary-button" type="button">Changer d’emploi</button><button id="quit-job" class="text-button" type="button">Quitter l’emploi</button></div></div>`;
 }
 
 function openJobMenu() {
@@ -1541,11 +1793,77 @@ function selectJob(jobId) {
   if (!job) return;
   const changed = state.jobId !== job.id;
   state.jobId = job.id;
+  state.introJobRequired = false;
   state.missedWorkWeeks = 0;
   if (changed) state.journal.unshift({ week: state.week, text: `${state.profile.firstName} accepte un emploi : ${job.title}, ${job.wage} $ par quart travaillé.` });
   document.querySelector("#job-dialog").close();
   render();
   showToast(`${job.title} · action Travailler débloquée`);
+}
+
+function quitJob() {
+  const job = currentJob();
+  if (!job) return;
+  if (!window.confirm(`Quitter ${job.title} ?\n\nTu pourras rester sans emploi ou en choisir un autre plus tard.`)) return;
+  state.journal.unshift({ week: state.week, text: `${state.profile.firstName} quitte son emploi : ${job.title}.` });
+  state.jobId = null;
+  state.missedWorkWeeks = 0;
+  state.workStreak = 0;
+  render();
+  showToast("Emploi quitté");
+}
+
+const gymPlans = Object.freeze([
+  { id: "monthly", label: "1 mois", weeks: GYM_MONTH_WEEKS, price: GYM_PRICE, detail: "4 semaines d’accès au GYM de boxe." },
+  { id: "three-months", label: "3 mois", weeks: GYM_THREE_MONTH_WEEKS, price: GYM_THREE_MONTH_PRICE, detail: "12 semaines d’accès · 45 $ d’économie sur trois mois." },
+]);
+
+const strengthGymPlans = Object.freeze([
+  { id: "monthly", label: "1 mois", weeks: STRENGTH_GYM_MONTH_WEEKS, price: STRENGTH_GYM_PRICE, detail: "4 semaines d’accès au gym de musculation." },
+  { id: "three-months", label: "3 mois", weeks: STRENGTH_GYM_THREE_MONTH_WEEKS, price: STRENGTH_GYM_THREE_MONTH_PRICE, detail: "12 semaines d’accès · 15 $ d’économie." },
+  { id: "six-months", label: "6 mois", weeks: STRENGTH_GYM_SIX_MONTH_WEEKS, price: STRENGTH_GYM_SIX_MONTH_PRICE, detail: "24 semaines d’accès · 60 $ d’économie." },
+  { id: "yearly", label: "1 an", weeks: STRENGTH_GYM_YEAR_WEEKS, price: STRENGTH_GYM_YEAR_PRICE, detail: "48 semaines d’accès · 180 $ d’économie." },
+]);
+
+function openMembershipMenu() {
+  if (state.gymWeeks > 0) return;
+  const initial = state.initialGymRequired;
+  const choices = initial ? gymPlans.filter(plan => plan.id === "monthly") : gymPlans;
+  document.querySelector("#membership-dialog-title").textContent = initial ? "Premier abonnement obligatoire" : "Renouveler le GYM de boxe";
+  document.querySelector("#membership-dialog-copy").textContent = initial
+    ? "Ton budget de départ couvre ce premier mois. Choisis ensuite un emploi pour financer la suite du camp."
+    : "Sans abonnement, le sac au sous-sol reste disponible. Les mitaines, cours et sparring demandent un accès actif au GYM.";
+  document.querySelector("#membership-options").innerHTML = choices.map(plan => `<button class="coach-card" type="button" data-gym-plan="${plan.id}" ${state.money < plan.price ? "disabled" : ""}><strong>${plan.label} · ${plan.price} $</strong><span>${plan.weeks} semaines d’accès</span><small>${plan.detail}${state.money < plan.price ? `<br>Il manque ${plan.price - state.money} $.` : ""}</small></button>`).join("");
+  document.querySelector("#membership-dialog").showModal();
+}
+
+function selectGymPlan(planId) {
+  const plan = gymPlans.find(item => item.id === planId);
+  if (!plan || state.gymWeeks > 0 || state.money < plan.price) return;
+  state.money -= plan.price;
+  state.gymWeeks = plan.weeks;
+  state.initialGymRequired = false;
+  state.journal.unshift({ week: state.week, text: `Abonnement GYM de boxe activé : ${plan.label.toLowerCase()} (${plan.weeks} semaines).` });
+  document.querySelector("#membership-dialog").close();
+  render();
+  showToast(`GYM actif · ${plan.weeks} semaines`);
+}
+
+function openStrengthMembershipMenu() {
+  if (state.strengthGymWeeks > 0) return;
+  document.querySelector("#strength-membership-options").innerHTML = strengthGymPlans.map(plan => `<button class="coach-card" type="button" data-strength-gym-plan="${plan.id}" ${state.money < plan.price ? "disabled" : ""}><strong>${plan.label} · ${plan.price} $</strong><span>${plan.weeks} semaines d’accès</span><small>${plan.detail}${state.money < plan.price ? `<br>Il manque ${plan.price - state.money} $.` : ""}</small></button>`).join("");
+  document.querySelector("#strength-membership-dialog").showModal();
+}
+
+function selectStrengthGymPlan(planId) {
+  const plan = strengthGymPlans.find(item => item.id === planId);
+  if (!plan || state.strengthGymWeeks > 0 || state.money < plan.price) return;
+  state.money -= plan.price;
+  state.strengthGymWeeks = plan.weeks;
+  state.journal.unshift({ week: state.week, text: `Abonnement gym de musculation activé : ${plan.label.toLowerCase()} (${plan.weeks} semaines).` });
+  document.querySelector("#strength-membership-dialog").close();
+  render();
+  showToast(`Musculation active · ${plan.weeks} semaines`);
 }
 
 function settleJobAttendance(worked, events, week, excused = false) {
@@ -1652,10 +1970,49 @@ function signed(value, suffix = "") {
   return `${value > 0 ? "+" : ""}${value}${suffix}`;
 }
 
+function scheduleRecreationalSparring(events = []) {
+  if (!isRecreationalCareer() || state.week < RECREATIONAL_SPARRING_WEEK || state.recreationalSparringStatus === "completed" || state.scheduledFight) return;
+  const scheduledWeek = Math.max(RECREATIONAL_SPARRING_WEEK, state.week + (state.injuryWeeks > 0 ? state.injuryWeeks : 0));
+  state.recreationalSparringStatus = "ready";
+  state.scheduledFight = {
+    id: REMY_TANK.id,
+    opponent: { ...REMY_TANK, stats: { ...REMY_TANK.stats }, weightClass: state.profile.weightClass },
+    tournamentId: null,
+    tournamentRound: null,
+    bookingId: null,
+    eventId: "recreational-sparring-remy",
+    event: { id: "recreational-sparring-remy", name: "Sparring d’évaluation · Rémy « Le Tank »", careerWeek: scheduledWeek },
+    week: scheduledWeek,
+    isRecreationalSparring: true,
+    travelEffects: { energy: 0, fatigue: 0 },
+    travelApplied: true,
+    fightSeed: freshFightSeed(`remy-le-tank-${state.profile.firstName}-${state.week}`),
+  };
+  const note = `Sparring d’évaluation disponible à partir de la semaine ${scheduledWeek} : Rémy « Le Tank » t’attend au GYM.`;
+  events.push(note);
+  state.journal.unshift({ week: state.week, text: note });
+}
+
+function advanceRecreationalTraining(events, week) {
+  if (!isRecreationalCareer()) return;
+  const trainedAtGym = weeklyPlan.some(item => ["gym", "group-class"].includes(item.actionId));
+  if (trainedAtGym && state.recreationalTrainingWeeks < RECREATIONAL_MAX_WEEK) {
+    state.recreationalTrainingWeeks += 1;
+    const note = `Parcours récréatif : ${state.recreationalTrainingWeeks}/10 entraînements au GYM de boxe.`;
+    events.push(note);
+    state.journal.unshift({ week, text: note });
+  }
+  scheduleRecreationalSparring(events);
+}
+
 function planValidation() {
   const tournamentDue = Boolean(state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek);
   const scheduledFightDue = Boolean(state.scheduledFight && state.week >= state.scheduledFight.week);
   if (state.pendingWeekEvent) return { valid: false, reason: "Choisis d’abord l’événement entre les semaines." };
+  if (isAwaitingAmateurTransition()) return { valid: false, reason: "Le sparring est terminé : ouvre le calendrier et appuie sur « Passer amateur »." };
+  if (isRecreationalLimitReached()) return { valid: false, reason: "La semaine 10 clôt le parcours récréatif : ouvre le calendrier et appuie sur « Passer amateur »." };
+  if (isRecreationalCareer() && state.introJobRequired && !currentJob()) return { valid: false, reason: "Choisis d’abord ton emploi de départ dans le panneau Emploi." };
+  if (isRecreationalCareer() && state.initialGymRequired && state.gymWeeks === 0) return { valid: false, reason: "Active d’abord le premier abonnement au GYM de boxe." };
   if (tournamentDue && state.injuryWeeks === 0) return { valid: false, reason: "Le tournoi a commencé : ouvre le tableau pour disputer le prochain combat." };
   if (!weeklyPlan.length && !scheduledFightDue) return { valid: false, reason: "Sélectionne au moins une action pour continuer." };
   if (weeklyPlan.length > weeklyActionLimit()) return { valid: false, reason: `Le plan dépasse la limite de ${weeklyActionLimit()} actions.` };
@@ -1721,6 +2078,8 @@ function render() {
   ensureCareerCalendar();
   ensureDueTournamentActive();
   renderFighter();
+  document.querySelector(".strength-membership-panel").hidden = isAwaitingAmateurTransition();
+  document.querySelector("#private-coaching").closest(".coaching-panel").hidden = isRecreationalCareer() || isAwaitingAmateurTransition();
   document.querySelector("#money-spotlight").textContent = `${state.money} $`;
   document.querySelector("#week").textContent = String(state.week).padStart(2, "0");
   const weekStartDate = careerWeekDate(0);
@@ -1745,7 +2104,7 @@ function render() {
   topMoney.setAttribute("aria-label", `Argent disponible ${state.money} dollars`);
   const actionLimit = weeklyActionLimit();
   const galaDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
-  document.querySelector("#action-limit-help").textContent = actionLimit === 0 ? "Le tournoi occupe toute la semaine : les décisions se prennent dans le hub de compétition." : galaDue ? `Le gala réserve une action : ${actionLimit} choix de camp restent disponibles avant le combat.` : actionLimit === 4 ? "Expérience acquise : compose maintenant un programme de quatre actions." : `Trois actions par semaine · la quatrième se débloque après ${Math.max(0, 10 - amateurFightCount())} combat${10 - amateurFightCount() > 1 ? "s" : ""}.`;
+  document.querySelector("#action-limit-help").textContent = isAwaitingAmateurTransition() ? "Le parcours est en pause : confirme le passage amateur dans le calendrier." : isRecreationalLimitReached() ? "La semaine 10 clôt le parcours récréatif : confirme le passage amateur dans le calendrier." : isRecreationalCareer() ? `Parcours récréatif : peu de choix, une base solide. Le sparring avec Rémy arrive en semaine ${RECREATIONAL_SPARRING_WEEK}.` : actionLimit === 0 ? "Le tournoi occupe toute la semaine : les décisions se prennent dans le hub de compétition." : galaDue ? `Le gala réserve une action : ${actionLimit} choix de camp restent disponibles avant le combat.` : actionLimit === 4 ? "Expérience acquise : compose maintenant un programme de quatre actions." : `Trois actions par semaine · la quatrième se débloque après ${Math.max(0, 10 - amateurFightCount())} combat${10 - amateurFightCount() > 1 ? "s" : ""}.`;
   const pips = document.querySelector("#action-pips");
   pips.innerHTML = Array.from({ length: actionLimit }, (_, index) => `<span class="pip ${index < weeklyPlan.length ? "active" : ""}"></span>`).join("");
   pips.setAttribute("aria-label", `${weeklyPlan.length} action${weeklyPlan.length > 1 ? "s" : ""} planifiée${weeklyPlan.length > 1 ? "s" : ""} sur ${actionLimit}`);
@@ -1892,7 +2251,8 @@ function endWeek(events) {
   state.week += 1;
   state.supplementWeek = state.week;
   state.supplementsUsed = [];
-  state.pendingWeekEvent = betweenWeekEvents[(state.week - 2) % betweenWeekEvents.length].id;
+  const weekEvents = betweenWeekEventsForCurrentCareer();
+  state.pendingWeekEvent = weekEvents[(state.week - 2) % weekEvents.length].id;
   state.energy = clamp(state.energy + 6);
   state.morale = clamp(state.morale - 1);
   state.fatigue = clamp(state.fatigue - (state.energy < 35 ? 4 : 6));
@@ -1929,7 +2289,9 @@ function endWeek(events) {
     state.morale = clamp(state.morale - 8);
     const cancelledBookingId = state.scheduledFight?.bookingId;
     const cancelledFight = state.scheduledFight ? ` Le combat prévu contre ${scheduledOpponent()?.name || "ton adversaire"} est annulé.` : "";
+    const wasRecreationalSparring = Boolean(state.scheduledFight?.isRecreationalSparring);
     state.scheduledFight = null;
+    if (wasRecreationalSparring) state.recreationalSparringStatus = "ready";
     const cancelledBooking = state.bookings.find(item => item.id === cancelledBookingId);
     if (cancelledBooking) cancelledBooking.status = "cancelled";
     summary = `Blessure au camp : ${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} de récupération obligatoire.${cancelledFight}`;
@@ -1994,6 +2356,7 @@ function executePlan() {
   const workedThisWeek = weeklyPlan.some(item => item.actionId === "work");
   state.workStreak = workedThisWeek ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
   settleJobAttendance(workedThisWeek, events, endingWeek);
+  advanceRecreationalTraining(events, endingWeek);
   if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = endingWeek + SPONSOR_COOLDOWN_WEEKS;
   if (workedThisWeek && state.workStreak >= 3) events.push("Tu enchaînes les semaines de travail : ta fraîcheur au camp commence à souffrir.");
   endWeek(events);
@@ -2056,7 +2419,7 @@ function continueAfterWeekTransition() {
 }
 
 function showBetweenWeekEvent() {
-  const event = betweenWeekEvents.find(item => item.id === state.pendingWeekEvent);
+  const event = betweenWeekEventById(state.pendingWeekEvent);
   if (!event) return continueAfterWeekTransition();
   document.querySelector("#week-event-title").textContent = event.title;
   document.querySelector("#week-event-lead").textContent = event.lead;
@@ -2069,7 +2432,7 @@ function showBetweenWeekEvent() {
 }
 
 function resolveBetweenWeekChoice(choiceId) {
-  const event = betweenWeekEvents.find(item => item.id === state.pendingWeekEvent);
+  const event = betweenWeekEventById(state.pendingWeekEvent);
   const choice = event?.choices.find(item => item.id === choiceId);
   if (!event || !choice) return;
   const cost = Math.max(0, -(choice.changes?.money || 0));
@@ -2095,6 +2458,7 @@ async function startFight() {
     applyChanges({ energy: state.scheduledFight.travelEffects?.energy || 0, fatigue: state.scheduledFight.travelEffects?.fatigue || 0 });
     state.scheduledFight.travelApplied = true;
   }
+  const isRecreationalSparring = Boolean(state.scheduledFight.isRecreationalSparring);
   const difficulty = opponentDifficulty(opponent);
   const opponentStats = opponent.stats || opponentStatsForRating(difficulty, opponent.style, opponent.id);
   if (!state.scheduledFight.fightSeed) state.scheduledFight.fightSeed = freshFightSeed(`${state.scheduledFight.id}-${state.week}`);
@@ -2109,8 +2473,8 @@ async function startFight() {
     kind: scheduled.tournamentId ? "tournament" : "local",
     tournamentId: scheduled.tournamentId,
     opponentDifficulty: difficulty,
-    exchangesPerRound: 5,
-    coachQuality: clamp(.60 + (coach?.reward || 0) * .035 + homeStudy, .55, .78),
+    exchangesPerRound: isRecreationalSparring ? 4 : 5,
+    coachQuality: clamp((isRecreationalSparring ? .58 : .60) + (coach?.reward || 0) * .035 + homeStudy, .55, .78),
     studyBonus: Math.max(campStudy, activeEffect?.readAccuracyBonus || 0, homeStudy),
     studyExchangeLimit: activeEffect?.exchangesRemaining,
     playerEffects: state.activeTournament?.competition?.activeEffects || [],
@@ -2140,6 +2504,7 @@ async function startFight() {
     tournamentId: scheduled.tournamentId || null,
     tournamentRound: scheduled.tournamentRound,
     bookingId: scheduled.bookingId || null,
+    isRecreationalSparring,
   };
   const stage = document.querySelector("#fight-ring-stage");
   stage.dataset.cue = "neutral";
@@ -2192,6 +2557,7 @@ function opponentForGala(event, slotIndex) {
 }
 
 function bookGalaEvent(eventId, slotIndex) {
+  if (state.careerStatus !== "amateur") return showToast("Passe amateur avant de réserver un gala.");
   ensureCareerCalendar();
   const event = state.calendar.events.find(item => item.id === eventId && item.kind === "gala");
   if (!event) return showToast("Ce gala n’est plus disponible.");
@@ -2223,6 +2589,7 @@ function bookGalaEvent(eventId, slotIndex) {
 }
 
 function bookTournamentEvent(eventId, travelOptionId) {
+  if (state.careerStatus !== "amateur") return showToast("Passe amateur avant de t’inscrire à un tournoi.");
   ensureCareerCalendar();
   const event = state.calendar.events.find(item => item.id === eventId && item.kind === "tournament");
   if (!event) return showToast("Ce tournoi n’est plus disponible.");
@@ -2333,6 +2700,26 @@ function turnProfessional() {
   state.journal.unshift({ week: state.week, text: `${state.profile.firstName} quitte définitivement le circuit amateur et passe professionnel.` });
   render();
   showToast("Carrière professionnelle commencée");
+}
+
+function beginAmateurCareer() {
+  if (!canPassAmateurCareer()) return;
+  const amateurEpoch = careerWeekDate(0);
+  state.careerStatus = "amateur";
+  state.week = 1;
+  state.careerStartDate = amateurEpoch;
+  state.calendar = null;
+  state.bookings = [];
+  state.scheduledFight = null;
+  state.pendingWeekEvent = null;
+  state.avoidanceWeeks = 0;
+  state.lastFightWeek = 0;
+  state.amateurRecord = { wins: 0, losses: 0, draws: 0 };
+  state.journal.unshift({ week: 1, text: `${state.profile.firstName} passe officiellement amateur. Le calendrier des galas et tournois est ouvert.` });
+  ensureCareerCalendar();
+  document.querySelector("#calendar-dialog")?.close();
+  render();
+  showToast("Statut amateur confirmé · semaine 1");
 }
 
 function renderTournamentBoard() {
@@ -2892,7 +3279,7 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   const view = BoxeurCombat.getPublicState(fightState);
   const meta = fightState.careerMeta || {};
   const opponent = meta.opponent || { name: view.fighters.opponent.name, nickname: "", weightClass: state.profile.weightClass, style: view.fighters.opponent.style };
-  const tournamentName = meta.tournamentId ? tournamentDefs.find(item => item.id === meta.tournamentId)?.name || "Tournoi amateur" : (state.scheduledFight?.event?.name || "Gala amateur");
+  const tournamentName = meta.isRecreationalSparring ? "Sparring d’évaluation · Rémy « Le Tank »" : meta.tournamentId ? tournamentDefs.find(item => item.id === meta.tournamentId)?.name || "Tournoi amateur" : (state.scheduledFight?.event?.name || "Gala amateur");
   const playerIsBlue = state.profile.corner === "blue";
   const playerCorner = document.querySelector(".player-corner");
   const opponentCorner = document.querySelector(".opponent-corner");
@@ -2911,7 +3298,7 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   configureRingImages();
 
   document.querySelector("#fight-week-label").textContent = `${tournamentName} · semaine ${state.week}`;
-  document.querySelector("#fight-round").textContent = view.status.finished ? "Combat terminé" : view.phase === "corner" ? `${view.round === 1 ? "Briefing" : "Entre les rounds"} · round ${view.round} / 3` : `Round ${view.round} / 3 · échange ${view.currentExchange.number} / ${view.format.exchangesPerRound}`;
+  document.querySelector("#fight-round").textContent = view.status.finished ? (meta.isRecreationalSparring ? "Sparring terminé" : "Combat terminé") : view.phase === "corner" ? `${view.round === 1 ? "Briefing" : "Entre les rounds"} · round ${view.round} / 3` : `Round ${view.round} / 3 · échange ${view.currentExchange.number} / ${view.format.exchangesPerRound}`;
   document.querySelector("#fight-player-name").textContent = state.profile.firstName;
   document.querySelector("#fight-player-meta").textContent = `${state.profile.nickname ? `« ${state.profile.nickname} » · ` : ""}${state.profile.weightClass} · coin ${playerIsBlue ? "bleu" : "rouge"}`;
   document.querySelector("#fight-opponent-name").textContent = opponent.name;
@@ -2948,17 +3335,17 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   const score = document.querySelector("#fight-score");
   const cards = document.querySelector("#fight-judge-cards");
   if (view.status.finished) {
-    scoreLabel.textContent = view.result.method === "decision" ? `Décision · ${view.format.judgeCount} juges` : "Arrêt du combat";
-    score.textContent = view.result.method === "decision" ? view.result.decision : view.result.label;
-    cards.hidden = !view.result.judgeCards;
-    cards.innerHTML = (view.result.judgeCards || []).map((card, index) => `<div class="judge-card ${card.winner === "player" ? "winner" : ""}"><span>Juge ${index + 1}</span><strong>${card.playerTotal}–${card.opponentTotal}</strong></div>`).join("");
+    scoreLabel.textContent = meta.isRecreationalSparring ? "Sparring non comptabilisé" : view.result.method === "decision" ? `Décision · ${view.format.judgeCount} juges` : "Arrêt du combat";
+    score.textContent = meta.isRecreationalSparring ? "—" : view.result.method === "decision" ? view.result.decision : view.result.label;
+    cards.hidden = meta.isRecreationalSparring || !view.result.judgeCards;
+    cards.innerHTML = meta.isRecreationalSparring ? "" : (view.result.judgeCards || []).map((card, index) => `<div class="judge-card ${card.winner === "player" ? "winner" : ""}"><span>Juge ${index + 1}</span><strong>${card.playerTotal}–${card.opponentTotal}</strong></div>`).join("");
   } else {
     scoreLabel.textContent = "Cartes cachées";
     score.textContent = "—";
     cards.hidden = true;
     cards.innerHTML = "";
   }
-  document.querySelector("#fight-status").textContent = view.status.finished ? view.result.label : view.phase === "corner" ? "Le coach donne ses directives" : "Décision tactique en cours";
+  document.querySelector("#fight-status").textContent = view.status.finished ? (meta.isRecreationalSparring ? "Sparring terminé" : view.result.label) : view.phase === "corner" ? "Le coach donne ses directives" : "Décision tactique en cours";
   const instruction = document.querySelector("#fight-instruction");
   instruction.innerHTML = `<p>${escapeHTML(view.phase === "corner" ? "Choisis entre une directive tactique, une adaptation contextuelle et la récupération." : message)}</p>`;
   const recent = view.history.filter(item => item.text).slice(-7);
@@ -3008,10 +3395,14 @@ function finishFight() {
   const fightResult = fightState.result;
   const won = fightResult.winner === "player";
   const result = won ? "Victoire" : "Défaite";
+  const isRecreationalSparring = Boolean(meta.isRecreationalSparring);
   const exposure = fightResult.exposure?.player || fightState.fighters.player.legacyExposure || 0;
   const fightFatigue = clamp(Math.round(8 + (100 - fightState.fighters.player.energy) * .14 + exposure * .25 - state.combatStats.cardio * .035), 8, 32);
   const injuryIncrease = clamp(Math.round(2 + exposure * .28 + (won ? 0 : 2) - (state.combatStats.defense - 40) * .025 + fightState.fighters.player.head * .025), 1, 15);
-  if (won) {
+  if (isRecreationalSparring) {
+    applyChanges({ experience: 14, morale: 3, injury: Math.max(1, Math.round(injuryIncrease * .65)), fatigue: Math.round(fightFatigue * .72) });
+    state.recreationalSparringStatus = "completed";
+  } else if (won) {
     state.amateurRecord.wins += 1;
     applyChanges({ reputation: meta.tournamentId ? 6 + (state.activeTournament?.currentRound || 0) : meta.reputationReward, experience: meta.experienceReward, morale: 7, injury: injuryIncrease, fatigue: fightFatigue });
   } else {
@@ -3022,17 +3413,17 @@ function finishFight() {
   state.lastFightWeek = state.week;
   state.avoidanceWeeks = 0;
   const score = fightResult.method === "decision" ? `décision ${fightResult.decision}` : `${fightResult.label} · R${fightResult.round || fightState.round}`;
-  const tournamentNote = resolveTournamentRound({ ...fightState, tournamentId: meta.tournamentId, opponent: meta.opponent }, result, fightResult.method, score);
-  const unlockedFourthAction = fightCountBefore < 10 && amateurFightCount() >= 10;
+  const tournamentNote = isRecreationalSparring ? "" : resolveTournamentRound({ ...fightState, tournamentId: meta.tournamentId, opponent: meta.opponent }, result, fightResult.method, score);
+  const unlockedFourthAction = !isRecreationalSparring && fightCountBefore < 10 && amateurFightCount() >= 10;
   let injuryEvent = "";
   if (!won && fightResult.method === "KO") {
     state.injuryWeeks = Math.max(state.injuryWeeks, 2);
     state.injuryStartedWeek = state.week;
-    injuryEvent = " Une récupération obligatoire de deux semaines suit le KO.";
+    injuryEvent = isRecreationalSparring ? " Le coach impose deux semaines de récupération après ce sparring exigeant." : " Une récupération obligatoire de deux semaines suit le KO.";
   } else if (!won && fightResult.method === "TKO") {
     state.injuryWeeks = Math.max(state.injuryWeeks, 1);
     state.injuryStartedWeek = state.week;
-    injuryEvent = " Une semaine de récupération obligatoire suit l’arrêt.";
+    injuryEvent = isRecreationalSparring ? " Le coach impose une semaine de récupération après ce sparring exigeant." : " Une semaine de récupération obligatoire suit l’arrêt.";
   } else {
     const acuteInjuryChance = clamp((state.injury - 58) / 160 + exposure / 240 + fightState.fighters.player.head / 600, 0, .38);
     if (!state.injuryWeeks && Math.random() < acuteInjuryChance) {
@@ -3043,8 +3434,10 @@ function finishFight() {
       injuryEvent = ` Une blessure impose ${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} de récupération.`;
     } else if (state.injury >= 55) injuryEvent = " Le corps sort marqué du combat.";
   }
-  const methodLabel = fightResult.method === "decision" ? `${fightResult.label} (${fightResult.decision})` : `${won ? "Victoire" : "Défaite"} par ${fightResult.label}`;
-  state.journal.unshift({ week: state.week, text: `Combat amateur : ${methodLabel} contre ${meta.opponent?.name || fightState.fighters.opponent.name}.${tournamentNote ? ` ${tournamentNote}` : ""}${injuryEvent}` });
+  const methodLabel = isRecreationalSparring ? "Sparring terminé" : fightResult.method === "decision" ? `${fightResult.label} (${fightResult.decision})` : `${won ? "Victoire" : "Défaite"} par ${fightResult.label}`;
+  const journalPrefix = isRecreationalSparring ? "Sparring d’évaluation" : "Combat amateur";
+  const sparringJournal = "Rémy termine son évaluation et confirme que le passage amateur est disponible.";
+  state.journal.unshift({ week: state.week, text: `${journalPrefix} : ${isRecreationalSparring ? sparringJournal : `${methodLabel} contre ${meta.opponent?.name || fightState.fighters.opponent.name}.`}${tournamentNote ? ` ${tournamentNote}` : ""}${injuryEvent}` });
   if (unlockedFourthAction) state.journal.unshift({ week: state.week, text: "Dix combats amateurs disputés : le programme hebdomadaire passe définitivement à quatre actions." });
   const booking = state.bookings.find(item => item.id === meta.bookingId);
   if (booking && !meta.tournamentId) booking.status = "completed";
@@ -3061,11 +3454,11 @@ function finishFight() {
   persistCareer();
   renderFight(`${methodLabel}.`);
   const instruction = document.querySelector("#fight-instruction");
-  instruction.innerHTML = `<p><strong>${escapeHTML(methodLabel)}</strong><br>${meta.tournamentId ? escapeHTML(tournamentNote || "Le tableau est mis à jour.") : "Expérience, réputation, fatigue et état physique ont été mis à jour."}${injuryEvent ? `<br>${escapeHTML(injuryEvent.trim())}` : ""}</p>`;
+  instruction.innerHTML = `<p><strong>${escapeHTML(methodLabel)}</strong><br>${isRecreationalSparring ? "Rémy a terminé son évaluation. Tu peux passer amateur maintenant, ou continuer à t’entraîner jusqu’à la semaine 10." : meta.tournamentId ? escapeHTML(tournamentNote || "Le tableau est mis à jour.") : "Expérience, réputation, fatigue et état physique ont été mis à jour."}${injuryEvent ? `<br>${escapeHTML(injuryEvent.trim())}` : ""}</p>`;
   const closeButton = document.createElement("button");
   closeButton.className = "primary-button";
   closeButton.type = "button";
-  closeButton.textContent = meta.tournamentId ? "Retour au tournoi" : "Retour au camp";
+  closeButton.textContent = meta.tournamentId ? "Retour au tournoi" : isRecreationalSparring ? "Voir le parcours récréatif" : "Retour au camp";
   closeButton.addEventListener("click", () => {
     document.querySelector("#fight-dialog").close();
     const wasTournament = Boolean(meta.tournamentId);
@@ -3075,7 +3468,8 @@ function finishFight() {
       openTournamentBoard();
     } else {
       render();
-      if (state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
+      if (isRecreationalSparring) setTimeout(() => document.querySelector("#calendar-dialog")?.showModal(), 0);
+      else if (state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
     }
     maybeShowDivisionMigration();
   });
@@ -3146,9 +3540,10 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   ensureCareerCalendar();
   document.body.classList.toggle("theme-blue", corner === "blue");
   Object.keys(combatLabels).forEach(key => { state.combatStats[key] = BASE_COMBAT_STAT + styles[style].bonuses[key] + draftStats[key]; });
-  state.journal = [{ week: 1, text: `${state.profile.firstName} rejoint le circuit amateur. La route commence ici.` }];
+  state.journal = [{ week: 1, text: `${state.profile.firstName} commence au statut récréatif. Choisis un emploi et active le premier mois de GYM pour lancer le parcours.` }];
   render();
-  showToast("Nouvelle carrière lancée");
+  openJobMenu();
+  showToast("Nouvelle carrière lancée · statut récréatif");
 });
 
 document.querySelector("#import-career-creation")?.addEventListener("click", () => document.querySelector("#import-career-file")?.click());
@@ -3217,6 +3612,7 @@ document.querySelector("#private-coaching").addEventListener("click", event => {
 
 document.querySelector("#employment").addEventListener("click", event => {
   if (event.target.closest("#open-job-menu")) openJobMenu();
+  if (event.target.closest("#quit-job")) quitJob();
 });
 
 document.querySelector("#job-options").addEventListener("click", event => {
@@ -3316,6 +3712,17 @@ document.querySelector("#tournament-recovery-choices").addEventListener("click",
 document.querySelector("#pro-transition").addEventListener("click", event => {
   if (event.target.closest("#turn-pro")) turnProfessional();
 });
+document.querySelector("#amateur-transition").addEventListener("click", event => {
+  if (event.target.closest("#turn-amateur")) beginAmateurCareer();
+});
+
+document.querySelector("#open-calendar").addEventListener("click", () => document.querySelector("#calendar-dialog")?.showModal());
+function closeCalendarDialog() {
+  document.querySelector("#calendar-dialog")?.close();
+  if (isRecreationalCareer() && state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
+}
+document.querySelector("#calendar-dialog-close").addEventListener("click", closeCalendarDialog);
+document.querySelector("#calendar-dialog-done").addEventListener("click", closeCalendarDialog);
 
 document.querySelector("#scheduled-fight").addEventListener("click", event => {
   if (event.target.closest("#start-fight")) startFight();
@@ -3352,27 +3759,21 @@ function setupMobileCollapsibles() {
   });
 }
 
-document.querySelector("#membership-button").addEventListener("click", () => {
-  if (state.gymWeeks > 0) return;
-  if (state.money < GYM_PRICE) return showToast("Pas assez d'argent pour le GYM de boxe.");
-  if (!window.confirm(`GYM de boxe\n\nCoût : ${GYM_PRICE} $\nDurée : 4 semaines\nInclut l'entraînement régulier et le sparring sans coût par séance.\n\nConfirmer ?`)) return;
-  state.money -= GYM_PRICE;
-  state.gymWeeks = 4;
-  state.journal.unshift({ week: state.week, text: "Ton abonnement au GYM de boxe est actif pour quatre semaines." });
-  render();
-  showToast("Abonnement activé");
+document.querySelector("#membership-button").addEventListener("click", openMembershipMenu);
+document.querySelector("#membership-options").addEventListener("click", event => {
+  const plan = event.target.closest("[data-gym-plan]");
+  if (plan) selectGymPlan(plan.dataset.gymPlan);
 });
+document.querySelector("#membership-dialog-close").addEventListener("click", () => document.querySelector("#membership-dialog").close());
+document.querySelector("#membership-dialog-cancel").addEventListener("click", () => document.querySelector("#membership-dialog").close());
 
-document.querySelector("#strength-membership-button").addEventListener("click", () => {
-  if (state.strengthGymWeeks > 0) return;
-  if (state.money < STRENGTH_GYM_PRICE) return showToast("Pas assez d'argent pour le gym de musculation.");
-  if (!window.confirm(`Gym de musculation\n\nCoût : ${STRENGTH_GYM_PRICE} $\nDurée : 4 semaines\nDébloque les exercices, la boutique et les préparateurs physiques.\n\nConfirmer ?`)) return;
-  state.money -= STRENGTH_GYM_PRICE;
-  state.strengthGymWeeks = 4;
-  state.journal.unshift({ week: state.week, text: "Ton abonnement au gym de musculation est actif pour quatre semaines." });
-  render();
-  showToast("Abonnement musculation activé");
+document.querySelector("#strength-membership-button").addEventListener("click", openStrengthMembershipMenu);
+document.querySelector("#strength-membership-options").addEventListener("click", event => {
+  const plan = event.target.closest("[data-strength-gym-plan]");
+  if (plan) selectStrengthGymPlan(plan.dataset.strengthGymPlan);
 });
+document.querySelector("#strength-membership-dialog-close").addEventListener("click", () => document.querySelector("#strength-membership-dialog").close());
+document.querySelector("#strength-membership-dialog-cancel").addEventListener("click", () => document.querySelector("#strength-membership-dialog").close());
 
 document.querySelector("#strength-gym-services").addEventListener("click", event => {
   const product = event.target.closest("[data-buy-supplement]")?.dataset.buySupplement;

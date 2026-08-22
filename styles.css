@@ -365,16 +365,9 @@ h2 { font-size: 1.65rem; }
 .plan-fight-actions[hidden] { display: none; }
 .advance-button[hidden] { display: none; }
 .advance-button { min-width: 260px; }
-.management-grid { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(390px, .82fr); align-items: start; gap: 22px; }
+.management-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 0; }
 .management-column { min-width: 0; }
 .management-column .tournament-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.camp-column .membership-panel { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
-.camp-column .membership-button { grid-column: 1 / -1; width: 100%; }
-.camp-column .membership-status { text-align: right; }
-.camp-column .gym-shop { grid-template-columns: 1fr; }
-.camp-column .gym-shop-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.camp-column .section-heading { align-items: flex-start; flex-direction: column; gap: 7px; }
-.camp-column .section-heading > p { max-width: none; text-align: left; }
 .weekly-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(350px, .58fr); align-items: start; gap: 22px; margin-top: 35px; }
 .weekly-layout .actions-section, .weekly-layout .plan-panel { margin-top: 0; }
 .weekly-layout .plan-panel { position: sticky; top: 82px; }
@@ -451,9 +444,6 @@ h2 { font-size: 1.65rem; }
   .action-grid { grid-template-columns: repeat(2, 1fr); }
   .panel, .fights-panel, .coaching-panel, .plan-panel { padding: 20px; }
   .panel-heading-actions { gap: 10px; }
-  .camp-column .membership-panel { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
-  .camp-column .membership-button { grid-column: 1 / -1; width: 100%; }
-  .camp-column .membership-status { text-align: left; }
   .opponent-grid { grid-template-columns: 1fr; }
   .tournament-grid { grid-template-columns: repeat(2, 1fr); }
   .management-column .tournament-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -845,4 +835,46 @@ h2 { font-size: 1.65rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .fight-ring-stage.show-impact .fight-impact-effect { animation: none; opacity: 0; }
+}
+
+/* V5 — parcours récréatif, calendrier compact et commandes sans débordement */
+.calendar-launch-panel { border-left-color: var(--red); }
+.calendar-launch-panel .membership-status { max-width: 260px; }
+.employment-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.employment-actions .text-button { min-height: 40px; padding-inline: 4px; }
+.career-transition-lock { padding: 18px; border: 1px solid var(--gold); background: rgba(221,182,94,.07); text-align: center; }
+.career-transition-lock strong { display: block; color: var(--gold); font: 800 1.35rem "Barlow Condensed"; text-transform: uppercase; }
+.career-transition-lock p { margin-top: 6px; color: var(--muted); font-size: .75rem; line-height: 1.45; }
+
+.calendar-dialog { width: min(1080px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 0; color: var(--ink); background: transparent; }
+.calendar-dialog::backdrop { background: rgba(0,0,0,.78); backdrop-filter: blur(5px); }
+.calendar-dialog-card { max-height: calc(100dvh - 24px); padding: 26px; overflow-y: auto; border: 1px solid var(--line); border-top: 4px solid var(--red); background: #171917; }
+.calendar-dialog-card > .calendar-heading-meta { margin: 12px 0 4px; text-align: left; }
+.calendar-dialog-actions { position: sticky; bottom: -26px; z-index: 3; margin: 18px -26px -26px; padding: 14px 26px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, #171917 35%); }
+.recreational-path { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .75fr); gap: 16px; margin-bottom: 16px; padding: 18px; border: 1px solid var(--gold); background: linear-gradient(145deg, rgba(221,182,94,.1), #111311 65%); }
+.recreational-path strong { display: block; color: var(--gold); font: 800 1.45rem "Barlow Condensed"; text-transform: uppercase; }
+.recreational-path p:not(.eyebrow) { margin-top: 6px; color: var(--muted); font-size: .76rem; line-height: 1.45; }
+.recreational-path ul { align-self: center; margin: 0; padding-left: 18px; color: var(--muted); font-size: .7rem; line-height: 1.55; }
+
+.fight-choices button, .fight-coach-choices button, .tournament-recovery-choices button { min-width: 0; overflow-wrap: anywhere; }
+.fight-choices button > *, .fight-coach-choices button > *, .tournament-recovery-choices button > * { min-width: 0; overflow-wrap: anywhere; word-break: normal; }
+
+@media (max-width: 760px) {
+  .calendar-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
+  .calendar-dialog-card { max-height: calc(100dvh - 12px); padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); }
+  .calendar-dialog-actions { bottom: calc(-16px - env(safe-area-inset-bottom)); margin: 16px -12px calc(-16px - env(safe-area-inset-bottom)); padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
+  .recreational-path { grid-template-columns: 1fr; gap: 10px; padding: 13px; }
+}
+
+@media (max-width: 560px) {
+  .calendar-launch-panel { grid-template-columns: minmax(0, 1fr) auto; }
+  .calendar-launch-panel .membership-button { grid-column: 1 / -1; }
+  .calendar-launch-panel .membership-status { max-width: 145px; }
+  .employment-panel .section-heading > p { display: block; color: var(--muted); font-size: .66rem; line-height: 1.35; text-align: left; }
+  .employment-program { min-width: 0; }
+  .employment-program strong, .employment-program small { overflow-wrap: anywhere; }
+  .employment-actions { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; }
+  .employment-actions button { width: 100%; min-width: 0; }
+  .fight-choices button { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
+  .fight-choices strong, .fight-choices span, .fight-choices em { overflow-wrap: anywhere; }
 }
