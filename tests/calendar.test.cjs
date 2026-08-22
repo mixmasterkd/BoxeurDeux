@@ -30,12 +30,14 @@ test("génère le même événement pour une semaine quel que soit l'horizon dem
   assert.deepEqual(partial, matching);
 });
 
-test("crée un gala local gratuit chaque samedi et un gala au gym par mois", () => {
+test("crée un gala local gratuit chaque samedi, davantage de choix au début et un gala au gym par mois", () => {
   const result = calendar.generateCalendar({ ...BASE_OPTIONS, startWeek: 1, weeks: 9, regionalGalaChance: 0 });
   const locals = result.events.filter(event => event.kind === "gala" && event.scope === "local");
+  const saturdayLocals = locals.filter(event => new Date(`${event.startDate}T00:00:00Z`).getUTCDay() === 6);
   const home = result.events.filter(event => event.scope === "home-gym");
-  assert.equal(locals.length, 9);
-  assert.ok(locals.every(event => new Date(`${event.startDate}T00:00:00Z`).getUTCDay() === 6));
+  assert.equal(new Set(saturdayLocals.map(event => event.careerWeek)).size, 9);
+  assert.ok(locals.length > 9);
+  assert.ok(locals.every(event => [5, 6].includes(new Date(`${event.startDate}T00:00:00Z`).getUTCDay())));
   assert.equal(home.length, 2); // Les samedis mensuels de janvier et février sont dans l'horizon.
   assert.ok(home.every(event => event.entryFee === 0 && event.weighInRequired === false));
 });
@@ -105,11 +107,12 @@ test("impose l'hôtel pour un tournoi éloigné", () => {
 test("reprogramme les circuits avancés après une première édition", () => {
   const events = calendar.generateEvents({ ...BASE_OPTIONS, startWeek: 1, weeks: 100, regionalGalaChance: 0 });
   const weeksFor = id => events.filter(event => event.kind === "tournament" && event.tournamentId === id).map(event => event.careerWeek);
-  assert.deepEqual(weeksFor("bronze"), [8]);
-  assert.deepEqual(weeksFor("silver"), [18]);
-  assert.deepEqual(weeksFor("golden"), [30, 50, 70, 90]);
-  assert.deepEqual(weeksFor("canadian"), [44, 68, 92]);
-  assert.deepEqual(weeksFor("olympic"), [60, 92]);
+  assert.deepEqual(weeksFor("bronze"), [16]);
+  assert.deepEqual(weeksFor("silver"), [32]);
+  assert.deepEqual(weeksFor("golden"), [46, 66, 86]);
+  assert.deepEqual(weeksFor("canadian"), [60, 84]);
+  assert.deepEqual(weeksFor("olympic"), [76]);
+  assert.deepEqual(weeksFor("regional-cup"), [11, 25, 39, 53, 67, 81, 95]);
 });
 
 test("admet aux Gants de bronze de 0 à 5 combats, jamais 6", () => {
@@ -122,6 +125,44 @@ test("admet aux Gants de bronze de 0 à 5 combats, jamais 6", () => {
   const refused = calendar.evaluateEligibility(bronze, { amateurRecord: { wins: 6, losses: 0, draws: 0 } });
   assert.equal(refused.eligible, false);
   assert.equal(refused.code, "too-many-fights");
+});
+
+test("admet aux Gants d'argent de 0 à 10 combats, jamais 11", () => {
+  const silverTemplate = calendar.DEFAULT_TOURNAMENT_SCHEDULE.find(item => item.id === "silver");
+  const silver = calendar.createTournamentEvent(silverTemplate, BASE_OPTIONS);
+  for (let fights = 0; fights <= 10; fights += 1) {
+    const result = calendar.evaluateEligibility(silver, { amateurRecord: { wins: fights, losses: 0, draws: 0 } });
+    assert.equal(result.eligible, true, `${fights} combats devrait être admissible`);
+  }
+  const refused = calendar.evaluateEligibility(silver, { amateurRecord: { wins: 11, losses: 0, draws: 0 } });
+  assert.equal(refused.eligible, false);
+  assert.equal(refused.code, "too-many-fights");
+});
+
+test("propose deux divisions d'un même tournoi extérieur et conserve la division choisie", () => {
+  const template = calendar.DEFAULT_TOURNAMENT_SCHEDULE.find(item => item.id === "regional-cup");
+  const event = calendar.createTournamentEvent({
+    ...template,
+    venue: { id: "laval", city: "Laval", region: "QC", travelTier: "mid" },
+  }, BASE_OPTIONS);
+  assert.equal(event.divisions.length, 2);
+  assert.equal(calendar.evaluateEligibility(event, { amateurRecord: { wins: 4, losses: 0, draws: 0 } }).code, "division-required");
+  assert.equal(calendar.evaluateEligibility(event, { amateurRecord: { wins: 10, losses: 0, draws: 0 } }, { divisionId: "novice" }).eligible, true);
+  assert.equal(calendar.evaluateEligibility(event, { amateurRecord: { wins: 11, losses: 0, draws: 0 } }, { divisionId: "novice" }).code, "too-many-fights");
+  assert.equal(calendar.evaluateEligibility(event, { amateurRecord: { wins: 9, losses: 0, draws: 0 } }, { divisionId: "open" }).code, "too-few-fights");
+  assert.equal(calendar.evaluateEligibility(event, { amateurRecord: { wins: 10, losses: 0, draws: 0 } }, { divisionId: "open" }).eligible, true);
+
+  const booking = calendar.createBooking({
+    event,
+    career: { money: 1000, careerStatus: "amateur", amateurRecord: { wins: 4, losses: 0, draws: 0 } },
+    existingBookings: [],
+    travelOptionId: "commute",
+    divisionId: "novice",
+  });
+  assert.equal(booking.ok, true);
+  assert.equal(booking.booking.event.divisionId, "novice");
+  assert.match(booking.booking.event.name, /Division Relève/);
+  assert.equal(calendar.checkInTournament(booking.booking, { amateurRecord: { wins: 4, losses: 0, draws: 0 } }).ok, true);
 });
 
 test("compte les nuls historiques et les combats réservés avant le check-in Bronze", () => {

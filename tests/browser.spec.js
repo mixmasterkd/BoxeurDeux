@@ -479,6 +479,94 @@ test("propose les quatre forfaits de musculation et débloque les exercices dès
   await expect(page.locator('[data-action="strength-circuit"]')).toBeVisible();
 });
 
+test("protège le budget du premier GYM de boxe contre les dépenses de musculation", async ({ page }) => {
+  await openFreshCareer(page);
+  await createCareer(page, { firstName: "Mia", lastName: "Budget" });
+  await page.locator('[data-select-job="convenience"]').click();
+  let saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.initialGymRequired).toBe(true);
+
+  await page.locator("#strength-membership-button").click();
+  await expect(page.locator('[data-strength-gym-plan="monthly"]')).toBeEnabled();
+  await expect(page.locator('[data-strength-gym-plan="six-months"]')).toBeDisabled();
+  await expect(page.locator("#strength-membership-dialog-copy")).toContainText("réservés pour le premier mois obligatoire du GYM de boxe");
+  await page.locator('[data-strength-gym-plan="monthly"]').click();
+
+  await expect(page.locator('[data-buy-supplement="protein-tub"]')).toBeDisabled();
+  await expect(page.locator("#strength-gym-services")).toContainText("réservés pour le premier mois du GYM de boxe");
+  await page.locator("#membership-button").click();
+  await page.locator('[data-gym-plan="monthly"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.money).toBe(15);
+  expect(saved.initialGymRequired).toBe(false);
+  expect(saved.gymWeeks).toBe(4);
+});
+
+test("débloque les vacances payées après huit semaines dans le même emploi", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    week: 2,
+    money: 250,
+    gymWeeks: 4,
+    jobId: "courier",
+    jobTenureWeeks: 7,
+    initialGymRequired: false,
+  }));
+
+  const vacation = page.locator('[data-action="vacation"]');
+  await expect(vacation).toBeDisabled();
+  await expect(vacation).toContainText("Vacances payées dans 1 semaine");
+  await page.locator('[data-action="work"]').click();
+  await page.locator("#advance-week").click();
+  await expect(page.locator("#summary-dialog")).toBeVisible();
+  await page.locator("#summary-close").click();
+  await expect(page.locator("#week-event-dialog")).toBeVisible();
+  await page.locator("#week-event-choices button:not([disabled])").first().click();
+
+  await expect(vacation).toBeEnabled();
+  const moneyBeforeVacation = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state.money);
+  await vacation.click();
+  await page.locator("#advance-week").click();
+  await expect(page.locator("#summary-dialog")).toBeVisible();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.money).toBe(moneyBeforeVacation + 100);
+  expect(saved.jobVacationClaimedAtTenure).toBe(8);
+  expect(saved.missedWorkWeeks).toBe(0);
+  await expect(page.locator("#summary-content")).toContainText("Vacances payées");
+});
+
+test("met en avant les montées de niveau et les congédiements", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({ experience: 95, gymWeeks: 4, initialGymRequired: false }));
+  await page.locator('[data-action="gym"]').click();
+  await page.locator("#advance-week").click();
+  await page.locator("#summary-close").click();
+  await expect(page.locator("#level-up-dialog")).toBeVisible();
+  await expect(page.locator("#level-up-title")).toContainText("Niveau 2 atteint");
+  await page.locator("#level-up-allocate").click();
+  await expect(page.locator("#level-dialog")).toBeVisible();
+});
+
+test("affiche les deux divisions du même tournoi extérieur et le conseil du coach abonné", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    week: 9,
+    money: 1000,
+    gymWeeks: 4,
+    amateurRecord: { wins: 4, losses: 0, draws: 0 },
+  }));
+  await page.locator("#open-calendar").click();
+  const regionalCup = page.locator(".calendar-event", { hasText: "Coupe régionale des clubs" });
+  await expect(regionalCup).toBeVisible();
+  await expect(regionalCup).toContainText("Division Relève");
+  await expect(regionalCup).toContainText("Division Ouverte");
+  await expect(regionalCup.locator(".calendar-coach-advice")).toContainText("Conseil du coach");
+  const noviceEntry = regionalCup.locator('[data-tournament-division="novice"]:not([disabled])').first();
+  await expect(noviceEntry).toBeVisible();
+  await noviceEntry.click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.bookings).toHaveLength(1);
+  expect(saved.bookings[0].event.divisionId).toBe("novice");
+  expect(saved.bookings[0].event.name).toContain("Division Relève");
+});
+
 test("réserve un gala et joue un combat tactique complet avant de révéler les trois cartes", async ({ page }) => {
   test.setTimeout(60_000);
   await openStoredCareer(page, amateurSnapshot({
@@ -643,6 +731,9 @@ test("choisit un emploi, reçoit sa paie et perd le poste après trois absences"
       expect(saved.jobId).toBeNull();
       expect(saved.missedWorkWeeks).toBe(0);
       await expect(page.locator("#summary-content")).toContainText("congédiement");
+      await page.locator("#summary-close").click();
+      await expect(page.locator("#job-loss-dialog")).toBeVisible();
+      await expect(page.locator("#job-loss-copy")).toContainText("Tu as perdu ton emploi");
     }
     if (absence < 3) await continueToNextWeek();
   }

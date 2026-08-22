@@ -136,6 +136,9 @@ h2 { font-size: 1.65rem; }
 .level-strip button { min-height: 38px; padding: 8px 12px; font-size: .68rem; }
 .level-notice { color: var(--gold) !important; font-weight: 800; line-height: 1.35; }
 .level-notice[hidden] { display: none; }
+.career-alert-dialog .service-card { border-top: 4px solid var(--gold); }
+.career-alert-dialog .service-lead { margin: 20px 0; font-size: .9rem; line-height: 1.55; }
+.job-loss-dialog .service-card { border-top-color: var(--red); }
 .combat-heading { margin: 28px 0 12px; padding-top: 22px; border-top: 1px solid var(--line); }
 .combat-heading .eyebrow { margin: 0; }
 .combat-heading span { color: var(--gold); font-size: .7rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
@@ -692,6 +695,7 @@ h2 { font-size: 1.65rem; }
 .calendar-event h3 { margin: 7px 0 5px; font-size: 1.25rem; }
 .calendar-event p { color: var(--muted); font-size: .71rem; line-height: 1.45; }
 .calendar-event-meta { display: flex; flex-wrap: wrap; gap: 5px 10px; margin: 12px 0; color: var(--gold); font-size: .62rem; font-weight: 700; text-transform: uppercase; }
+.calendar-coach-advice { margin: -3px 0 12px; padding: 8px 9px; border-left: 2px solid var(--green); color: var(--muted); background: rgba(108,183,137,.08); font-size: .68rem; line-height: 1.4; }
 .calendar-event-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: auto; }
 .calendar-event-actions button { min-width: 0; min-height: 44px; padding: 8px; font-size: .68rem; }
 .calendar-opponent-choice { display: grid; gap: 3px; text-align: left; }

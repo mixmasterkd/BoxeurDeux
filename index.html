@@ -268,6 +268,22 @@
       </div>
     </dialog>
 
+    <dialog id="level-up-dialog" class="service-dialog career-alert-dialog level-up-dialog" aria-labelledby="level-up-title">
+      <div class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Progression débloquée</p><h2 id="level-up-title">Niveau atteint</h2></div></div>
+        <p id="level-up-copy" class="service-lead"></p>
+        <div class="service-actions"><button id="level-up-later" class="secondary-button" type="button">Plus tard</button><button id="level-up-allocate" class="primary-button" type="button">Répartir mes points</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="job-loss-dialog" class="service-dialog career-alert-dialog job-loss-dialog" aria-labelledby="job-loss-title">
+      <div class="service-card">
+        <div class="service-heading"><div><p class="eyebrow">Carrière et finances</p><h2 id="job-loss-title">Emploi perdu</h2></div></div>
+        <p id="job-loss-copy" class="service-lead"></p>
+        <div class="service-actions"><button id="job-loss-acknowledge" class="primary-button" type="button">Compris</button></div>
+      </div>
+    </dialog>
+
     <dialog id="private-dialog" class="service-dialog" aria-labelledby="private-dialog-title">
       <form id="private-form" method="dialog" class="service-card">
         <div class="service-heading"><div><p class="eyebrow">Coaching privé</p><h2 id="private-dialog-title">Choisir un spécialiste</h2></div><button class="dialog-close" value="cancel" aria-label="Fermer" formnovalidate>×</button></div>
@@ -300,7 +316,7 @@
     <dialog id="strength-membership-dialog" class="service-dialog" aria-labelledby="strength-membership-dialog-title">
       <div class="service-card">
         <div class="service-heading"><div><p class="eyebrow">Préparation physique</p><h2 id="strength-membership-dialog-title">Choisir un forfait</h2></div><button id="strength-membership-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
-        <p class="service-lead">Le gym de musculation débloque les exercices, la boutique et les préparateurs physiques. Pour le calendrier du jeu, un mois représente quatre semaines.</p>
+        <p id="strength-membership-dialog-copy" class="service-lead">Le gym de musculation débloque les exercices, la boutique et les préparateurs physiques. Pour le calendrier du jeu, un mois représente quatre semaines.</p>
         <div id="strength-membership-options" class="coach-menu-grid"></div>
         <div class="service-actions"><button id="strength-membership-dialog-cancel" class="secondary-button" type="button">Fermer</button></div>
       </div>

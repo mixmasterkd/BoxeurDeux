@@ -21,11 +21,27 @@
   });
 
   const DEFAULT_TOURNAMENT_SCHEDULE = Object.freeze([
-    Object.freeze({ id: "bronze", name: "Gants de bronze", firstWeek: 8, rounds: 3, participants: 8, entryFee: 45, eligibility: Object.freeze({ type: "fight-count", min: 0, max: 5 }) }),
-    Object.freeze({ id: "silver", name: "Gants d'argent", firstWeek: 18, rounds: 3, participants: 8, entryFee: 60, eligibility: Object.freeze({ type: "fight-count", min: 6, max: 10 }) }),
-    Object.freeze({ id: "golden", name: "Gants dorés", firstWeek: 30, repeatEveryWeeks: 20, rounds: 3, participants: 8, entryFee: 80, eligibility: Object.freeze({ type: "fight-count", min: 10 }) }),
-    Object.freeze({ id: "canadian", name: "Championnat canadien", firstWeek: 44, repeatEveryWeeks: 24, rounds: 5, participants: 32, entryFee: 120, eligibility: Object.freeze({ type: "medal", tournamentId: "golden", medal: "gold" }) }),
-    Object.freeze({ id: "olympic", name: "Parcours olympique", firstWeek: 60, repeatEveryWeeks: 32, rounds: 5, participants: 32, entryFee: 150, eligibility: Object.freeze({ type: "medal", tournamentId: "canadian", medal: "gold" }) }),
+    // Les fenêtres donnent le temps d'alterner galas et récupération avant les grands rendez-vous.
+    Object.freeze({ id: "bronze", name: "Gants de bronze", firstWeek: 16, rounds: 3, participants: 8, entryFee: 45, eligibility: Object.freeze({ type: "fight-count", min: 0, max: 5 }) }),
+    Object.freeze({ id: "silver", name: "Gants d'argent", firstWeek: 32, rounds: 3, participants: 8, entryFee: 60, eligibility: Object.freeze({ type: "fight-count", min: 0, max: 10 }) }),
+    Object.freeze({ id: "golden", name: "Gants dorés", firstWeek: 46, repeatEveryWeeks: 20, rounds: 3, participants: 8, entryFee: 80, eligibility: Object.freeze({ type: "fight-count", min: 10 }) }),
+    Object.freeze({ id: "canadian", name: "Championnat canadien", firstWeek: 60, repeatEveryWeeks: 24, rounds: 5, participants: 32, entryFee: 120, eligibility: Object.freeze({ type: "medal", tournamentId: "golden", medal: "gold" }) }),
+    Object.freeze({ id: "olympic", name: "Parcours olympique", firstWeek: 76, repeatEveryWeeks: 32, rounds: 5, participants: 32, entryFee: 150, eligibility: Object.freeze({ type: "medal", tournamentId: "canadian", medal: "gold" }) }),
+    Object.freeze({
+      id: "regional-cup",
+      name: "Coupe régionale des clubs",
+      firstWeek: 11,
+      repeatEveryWeeks: 14,
+      rounds: 3,
+      participants: 8,
+      entryFee: 55,
+      independent: true,
+      baseDifficulty: 50,
+      divisions: Object.freeze([
+        Object.freeze({ id: "novice", label: "Division Relève · 0–10 combats", eligibility: Object.freeze({ type: "fight-count", min: 0, max: 10 }), difficultyOffset: -2 }),
+        Object.freeze({ id: "open", label: "Division Ouverte · 10 combats ou plus", eligibility: Object.freeze({ type: "fight-count", min: 10 }), difficultyOffset: 3 }),
+      ]),
+    }),
   ]);
 
   const LOCAL_VENUES = Object.freeze([
@@ -247,6 +263,14 @@
       careerWeek: template.firstWeek,
       rounds,
       participants: template.participants || 2 ** rounds,
+      independent: Boolean(template.independent),
+      baseDifficulty: Number.isFinite(Number(template.baseDifficulty)) ? Number(template.baseDifficulty) : null,
+      divisions: Array.isArray(template.divisions) ? template.divisions.map(division => ({
+        id: String(division.id),
+        label: String(division.label),
+        eligibility: { ...(division.eligibility || {}) },
+        difficultyOffset: Number(division.difficultyOffset) || 0,
+      })) : [],
       venue: { id: venue.id, name: venue.name || template.name, city: venue.city, region: venue.region },
       entryFee: Math.max(0, Number(template.entryFee || 0)),
       travelTier: venue.travelTier || template.travelTier || "local",
@@ -299,6 +323,18 @@
         venue: localVenue,
         name: `Gala local · ${localVenue.name}`,
       }));
+
+      // Les débuts de carrière offrent plus de choix, pas plus d'un combat possible par semaine.
+      if (week <= 12 && deterministicUnit(config.seed, `early-local-${week}`) < 0.68) {
+        const alternateVenue = deterministicPick(config.localVenues, config.seed, `early-local-venue-${week}`);
+        events.push(createGalaEvent({
+          scope: "local",
+          date: dateForCareerWeek(config.epoch, week, deterministicUnit(config.seed, `early-local-day-${week}`) < 0.5 ? 4 : 5),
+          careerWeek: week,
+          venue: alternateVenue,
+          name: `Gala local · ${alternateVenue.name}`,
+        }));
+      }
 
       if (deterministicUnit(config.seed, `regional-presence-${week}`) < config.regionalGalaChance) {
         const regionalVenue = deterministicPick(config.regionalVenues, config.seed, `regional-venue-${week}`);
@@ -411,10 +447,34 @@
     return count;
   }
 
+  function divisionForEvent(event, divisionId) {
+    if (!Array.isArray(event?.divisions) || !event.divisions.length) return null;
+    return event.divisions.find(division => division.id === divisionId) || null;
+  }
+
+  function eventForDivision(event, divisionId) {
+    if (!Array.isArray(event?.divisions) || !event.divisions.length) return event;
+    const division = divisionForEvent(event, divisionId);
+    if (!division) return null;
+    return {
+      ...event,
+      name: `${event.name} · ${division.label}`,
+      eligibility: { ...(division.eligibility || {}) },
+      divisions: [],
+      selectedDivision: { ...division, eligibility: { ...(division.eligibility || {}) } },
+      divisionId: division.id,
+      baseDifficulty: (Number(event.baseDifficulty) || 0) + (Number(division.difficultyOffset) || 0),
+    };
+  }
+
   function evaluateEligibility(event, career, options) {
     if (!event) return { eligible: false, code: "missing-event", reason: "Événement introuvable." };
     if (career?.careerStatus === "professional") return { eligible: false, code: "not-amateur", reason: "Le circuit amateur est fermé." };
-    const rule = event.eligibility || { type: "career-status", status: "amateur" };
+    const division = divisionForEvent(event, options?.divisionId);
+    if (Array.isArray(event.divisions) && event.divisions.length && !division) {
+      return { eligible: false, code: "division-required", reason: "Choisis une division de tournoi." };
+    }
+    const rule = division?.eligibility || event.eligibility || { type: "career-status", status: "amateur" };
     if (rule.type === "fight-count") {
       const count = Number.isFinite(Number(options?.fightCount))
         ? Math.max(0, Number(options.fightCount))
@@ -520,42 +580,45 @@
   function createBooking(input) {
     const event = input?.event;
     if (!event) return { ok: false, code: "missing-event", reason: "Événement introuvable." };
+    const bookedEvent = eventForDivision(event, input.divisionId);
+    if (!bookedEvent) return { ok: false, code: "division-required", reason: "Choisis une division de tournoi." };
     const duplicate = (input.existingBookings || []).find(booking => booking?.eventId === event.id && !["cancelled", "withdrawn"].includes(booking.status));
     if (duplicate) return { ok: false, code: "already-booked", reason: "Cet événement est déjà réservé.", booking: duplicate };
     if (input.currentDate) {
       parseIsoDate(input.currentDate);
-      if (input.currentDate > event.startDate) return { ok: false, code: "event-started", reason: "Cet événement a déjà commencé." };
-      if (event.kind === "tournament" && event.registrationDeadline && input.currentDate > event.registrationDeadline) {
+      if (input.currentDate > bookedEvent.startDate) return { ok: false, code: "event-started", reason: "Cet événement a déjà commencé." };
+      if (bookedEvent.kind === "tournament" && bookedEvent.registrationDeadline && input.currentDate > bookedEvent.registrationDeadline) {
         return { ok: false, code: "registration-closed", reason: "La période d'inscription est terminée." };
       }
     }
-    const eligibility = evaluateEligibility(event, input.career || {}, {
+    const eligibility = evaluateEligibility(bookedEvent, input.career || {}, {
       bookings: input.existingBookings,
       includeBookings: input.includeProjectedBookings !== false,
       fightCount: input.fightCount,
     });
     if (!eligibility.eligible) return { ok: false, ...eligibility };
-    const quote = quoteEventCost(event, input.travelOptionId, input.config);
+    const quote = quoteEventCost(bookedEvent, input.travelOptionId, input.config);
     if (!quote.valid) return { ok: false, ...quote };
-    const conflicts = findBookingConflicts(event, input.existingBookings, quote.travelOptionId, input.config);
+    const conflicts = findBookingConflicts(bookedEvent, input.existingBookings, quote.travelOptionId, input.config);
     if (conflicts.length) return { ok: false, code: "date-conflict", reason: "Un autre combat occupe cette date.", conflicts };
     const money = Math.max(0, Number(input.career?.money) || 0);
     if (money < quote.total) return { ok: false, code: "insufficient-funds", reason: `Il manque ${quote.total - money} $.`, quote };
-    const registeredOn = input.registeredOn || input.currentDate || event.registrationDeadline || event.startDate;
+    const registeredOn = input.registeredOn || input.currentDate || bookedEvent.registrationDeadline || bookedEvent.startDate;
     const booking = {
-      id: `booking-${event.id}`,
-      eventId: event.id,
-      event: JSON.parse(JSON.stringify(event)),
+      id: `booking-${bookedEvent.id}`,
+      eventId: bookedEvent.id,
+      divisionId: bookedEvent.divisionId || null,
+      event: JSON.parse(JSON.stringify(bookedEvent)),
       status: "registered",
       registeredOn,
       travelOptionId: quote.travelOptionId,
-      interval: bookingInterval(event, quote.travelOptionId, input.config),
-      payment: { total: quote.total, status: "paid", transactionId: `entry-${event.id}` },
+      interval: bookingInterval(bookedEvent, quote.travelOptionId, input.config),
+      payment: { total: quote.total, status: "paid", transactionId: `entry-${bookedEvent.id}` },
       travelEffects: quote.effects,
       eligibilityAtRegistration: eligibility,
       eligibilitySnapshot: null,
-      weighInStatus: event.weighInRequired ? "pending" : "not-required",
-      expectedBouts: event.kind === "tournament" ? event.rounds : 1,
+      weighInStatus: bookedEvent.weighInRequired ? "pending" : "not-required",
+      expectedBouts: bookedEvent.kind === "tournament" ? bookedEvent.rounds : 1,
       grandfathered: false,
     };
     return { ok: true, code: "booked", booking, quote, moneyDelta: -quote.total, moneyAfter: money - quote.total };
@@ -721,6 +784,8 @@
     nextTournamentPreview,
     amateurFightCount,
     projectedFightCountBefore,
+    divisionForEvent,
+    eventForDivision,
     evaluateEligibility,
     isBronzeEligible,
     travelOptionsForEvent,
