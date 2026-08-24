@@ -3142,7 +3142,18 @@ function v2OnboardingView(capsule = ensureV2PreviewCapsule()) {
     && onboarding.week === 1
     && baseStep?.id === "week-1-first-session"
     && plannerEntries.some(entry => entry?.activityId === "group-class");
-  const step = firstGroupClassPlanned
+  const firstRestPlanned = firstGroupClassPlanned
+    && plannerEntries.some(entry => entry?.activityId === "rest");
+  const step = firstGroupClassPlanned && !firstRestPlanned
+    ? {
+        id: "week-1-add-rest",
+        type: "recovery",
+        title: "Prévoir une journée de repos",
+        detail: "Va à la maison et ajoute une journée de repos pour apprendre à équilibrer entraînement et récupération.",
+        locationId: "home",
+        required: false,
+      }
+    : firstGroupClassPlanned
     ? {
         id: "week-1-review-program",
         type: "review-week",
@@ -3684,6 +3695,7 @@ function openV2Location(locationId) {
   const isBoxingGym = locationId === "boxing-gym" && window.BoxeurGymView;
   const isStrengthGym = locationId === "strength-gym" && window.BoxeurStrengthView;
   const isHome = locationId === "home" && window.BoxeurHomeView;
+  const career = v2CareerView();
   sheet.classList.toggle("v2-location-sheet-full", Boolean(isBoxingGym || isStrengthGym || isHome));
   sheet.classList.toggle("v2-location-sheet-strength", Boolean(isStrengthGym));
   sheet.innerHTML = isBoxingGym
@@ -3692,7 +3704,16 @@ function openV2Location(locationId) {
       ? window.BoxeurStrengthView.render(v2StrengthContext())
       : isHome
         ? window.BoxeurHomeView.render(v2HomeContext())
-        : window.BoxeurWorld.renderLocation(locationId, locationId === "work" ? v2WorkLocationContext() : v2CareerView());
+        : window.BoxeurWorld.renderLocation(locationId, locationId === "work" ? v2WorkLocationContext() : career);
+  if (["boxing-gym", "home", "work"].includes(locationId) && window.BoxeurWorld?.renderLocationGuide) {
+    const guide = window.BoxeurWorld.renderLocationGuide(career, locationId);
+    const guideTarget = isBoxingGym
+      ? sheet.querySelector(".v2-gym-dashboard")
+      : isHome
+        ? sheet.querySelector(".v2-home-dashboard")
+        : sheet.querySelector(".v2-location-card");
+    if (guide && guideTarget) guideTarget.insertAdjacentHTML("afterbegin", guide);
+  }
   activateV2LocationSheet(sheet, "[data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-close-location], button");
 }
 
@@ -8215,7 +8236,11 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
   const gymZone = event.target.closest("[data-v2-gym-zone]");
   if (gymZone) {
     if (gymZone.dataset.v2GymZone === "reception") openV2MembershipMenu();
-    else if (gymZone.dataset.v2GymZone === "coach") document.querySelector("#v2-world [data-v2-coach-session]")?.focus();
+    else if (gymZone.dataset.v2GymZone === "coach") {
+      const coachSession = document.querySelector("#v2-world [data-v2-coach-session]");
+      coachSession?.scrollIntoView({ behavior: "smooth", block: "center" });
+      coachSession?.focus({ preventScroll: true });
+    }
     else if (gymZone.dataset.v2GymZone === "training") {
       v2ComposerSelection = [];
       renderV2Composer();

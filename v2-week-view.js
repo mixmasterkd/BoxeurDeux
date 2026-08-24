@@ -103,7 +103,6 @@
   function renderLauncher(rawContext) {
     const context = normalizeContext(rawContext);
     const quickDisabled = context.quick.available ? "" : ' disabled aria-disabled="true"';
-    const confirmDisabled = context.confirm.available ? "" : ' disabled aria-disabled="true"';
     const reason = context.confirm.reason || context.quick.reason;
     return `<section class="v2-week-launcher" data-v2-week-zone="${context.capacity.zone}" aria-labelledby="v2-week-launcher-title">
       <div class="v2-week-launcher-heading"><div><p class="eyebrow">Semaine ${context.week} · plan modifiable</p><h3 id="v2-week-launcher-title">Bâtis ta semaine</h3></div><span>${context.plan.items.length} choix</span></div>
@@ -111,8 +110,7 @@
       ${compactPlanMarkup(context)}
       <div class="v2-week-launcher-actions">
         <button type="button" class="secondary-button" data-v2-week-quick${quickDisabled}>${escapeHTML(context.quick.label)}</button>
-        <button type="button" class="secondary-button" data-v2-week-detailed>Voir ou modifier</button>
-        <button type="button" class="primary-button" data-v2-week-confirm${confirmDisabled}>${escapeHTML(context.confirm.label)}</button>
+        <button type="button" class="primary-button" data-v2-week-detailed>Confirmer semaine</button>
       </div>
       ${reason ? `<p class="v2-week-blocker" role="status">${escapeHTML(reason)}</p>` : ""}
     </section>`;

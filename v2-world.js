@@ -82,7 +82,74 @@
     return { title: "Choisir la prochaine occasion", detail: "Consulte les galas et tournois annoncés sans remplir ton horaire trop loin d’avance.", locationId: "arena" };
   }
 
-  function renderObjectiveCard(currentObjective) {
+  function locationLabel(locationId) {
+    if (locationId === "map") return "la carte";
+    return LOCATIONS.find(location => location.id === locationId)?.label || "le lieu indiqué";
+  }
+
+  function guideInstruction(currentObjective, currentLocationId) {
+    if (currentObjective.actionMode === "review-and-confirm") {
+      return "Ton cours est dans ton programme. Tu peux l’ouvrir pour le vérifier ou confirmer la semaine lorsque tu es prêt.";
+    }
+    const destination = locationLabel(currentObjective.locationId);
+    if (currentLocationId === "map") {
+      return `Sur la carte, appuie sur « ${destination} » pour poursuivre cette étape.`;
+    }
+    if (currentLocationId !== currentObjective.locationId) {
+      return `Retourne à la carte, puis appuie sur « ${destination} » pour poursuivre cette étape.`;
+    }
+    if (currentObjective.type === "membership" && currentLocationId === "boxing-gym") {
+      return "Dans le GYM, appuie sur « Accueil », puis choisis le premier abonnement.";
+    }
+    if (currentObjective.type === "objective" && currentLocationId === "boxing-gym") {
+      return "Dans le GYM, va voir l’entraîneur et ajoute le cours récréatif à ta semaine.";
+    }
+    if (currentObjective.type === "recovery" && currentLocationId === "home") {
+      return "À la maison, appuie sur « Journée de repos », puis ajoute-la à ta semaine.";
+    }
+    if (currentObjective.type === "job" && currentLocationId === "work") {
+      return "Dans le lieu de travail, appuie sur « Choisir mon emploi », puis sélectionne ton premier poste.";
+    }
+    if (currentObjective.type === "sparring" && currentLocationId === "boxing-gym") {
+      return "Dans le GYM, va au ring et commence le sparring pédagogique avec Rémy.";
+    }
+    if (currentObjective.type === "transition" && currentLocationId === "boxing-gym") {
+      return "Dans le GYM, retourne voir l’entraîneur pour confirmer ton passage amateur.";
+    }
+    return `Suis les indications de ${destination} pour poursuivre cette étape.`;
+  }
+
+  function guideAction(currentObjective, currentLocationId) {
+    if (currentObjective.actionMode === "review-and-confirm") {
+      return `<div class="v2-onboarding-actions"><button class="primary-button" type="button" data-v2-week-handoff>Confirmer semaine</button></div>`;
+    }
+    if (currentLocationId !== currentObjective.locationId) {
+      return currentObjective.locationId === "map"
+        ? ""
+        : `<button class="primary-button" type="button" data-v2-location="${escapeHTML(currentObjective.locationId)}">M’y rendre</button>`;
+    }
+    if (currentObjective.type === "membership" && currentLocationId === "boxing-gym") {
+      return `<button class="primary-button" type="button" data-v2-gym-zone="reception">Aller à l’accueil</button>`;
+    }
+    if (currentObjective.type === "objective" && currentLocationId === "boxing-gym") {
+      return `<button class="primary-button" type="button" data-v2-gym-zone="coach">Voir le cours récréatif</button>`;
+    }
+    if (currentObjective.type === "recovery" && currentLocationId === "home") {
+      return `<button class="primary-button" type="button" data-v2-home-action="rest">Ajouter une journée de repos</button>`;
+    }
+    if (currentObjective.type === "job" && currentLocationId === "work") {
+      return `<button class="primary-button" type="button" data-v2-open-job-menu>Choisir mon emploi</button>`;
+    }
+    if (currentObjective.type === "sparring" && currentLocationId === "boxing-gym") {
+      return `<button class="primary-button" type="button" data-v2-remy-sparring>Faire le sparring pédagogique</button>`;
+    }
+    if (currentObjective.type === "transition" && currentLocationId === "boxing-gym") {
+      return `<button class="primary-button" type="button" data-v2-amateur-transition>Voir l’entraîneur</button>`;
+    }
+    return "";
+  }
+
+  function renderObjectiveCard(currentObjective, currentLocationId = "map") {
     const hasDestination = LOCATIONS.some(location => location.id === currentObjective.locationId);
     const destination = hasDestination
       ? `<button class="primary-button" type="button" data-v2-location="${escapeHTML(currentObjective.locationId)}">M’y rendre</button>`
@@ -97,17 +164,22 @@
     const progressLabel = currentObjective.week >= currentObjective.remyWeek
       ? `Rémy · semaine ${currentObjective.remyWeek}`
       : `Semaine ${currentObjective.week} sur ${currentObjective.remyWeek}`;
-    const actions = currentObjective.actionMode === "review-and-confirm"
-      ? `<div class="v2-onboarding-actions"><button class="secondary-button" type="button" data-v2-week-handoff>Voir mon programme</button><button class="primary-button" type="button" data-v2-week-confirm>Confirmer et vivre la semaine</button></div>`
-      : destination;
-    return `<section class="v2-objective-card v2-onboarding-card ${requirementClass}" data-v2-onboarding-step="${escapeHTML(currentObjective.id)}">
+    const actions = guideAction(currentObjective, currentLocationId);
+    const instruction = guideInstruction(currentObjective, currentLocationId);
+    const locationClass = currentLocationId === "map" ? "" : " v2-location-guide";
+    return `<section class="v2-objective-card v2-onboarding-card ${requirementClass}${locationClass}" data-v2-onboarding-step="${escapeHTML(currentObjective.id)}">
       <div class="v2-objective-heading"><p class="eyebrow">Guide récréatif</p><span class="v2-objective-requirement ${requirementClass}">${requirement}</span></div>
       <div class="v2-onboarding-track" aria-label="Parcours guidé : semaine ${currentWeek} sur ${currentObjective.remyWeek} avant le sparring de Rémy">
         <div><span>Semaine 1</span><strong>${escapeHTML(progressLabel)}</strong><span>Rémy · semaine ${currentObjective.remyWeek}</span></div>
         <progress max="${currentObjective.remyWeek}" value="${currentWeek}">${currentWeek}/${currentObjective.remyWeek}</progress>
       </div>
-      <h3>${escapeHTML(currentObjective.title)}</h3><p>${escapeHTML(currentObjective.detail)}</p>${actions}
+      <h3>${escapeHTML(currentObjective.title)}</h3><p>${escapeHTML(currentObjective.detail)}</p><p class="v2-guide-instruction"><strong>Comment faire :</strong> ${escapeHTML(instruction)}</p>${actions}
     </section>`;
+  }
+
+  function renderLocationGuide(career, locationId) {
+    const currentObjective = objective(career);
+    return currentObjective.onboarding ? renderObjectiveCard(currentObjective, locationId) : "";
   }
 
   function isFirstJobRequired(career) {
@@ -241,7 +313,7 @@
       </section>
       <aside class="v2-now-panel" aria-label="Situation actuelle">
         <div class="v2-now-time"><span>Semaine</span><strong>${String(career.week || 1).padStart(2, "0")}</strong><small><span>${escapeHTML(dateLabel)}</span><b class="v2-now-money" aria-label="Argent disponible ${escapeHTML(moneyLabel)}">${escapeHTML(moneyLabel)}</b></small></div>
-        ${renderObjectiveCard(currentObjective)}
+        ${renderObjectiveCard(currentObjective, "map")}
         <section class="v2-readiness-card ${prep.tone}"><span>État de préparation</span><strong>${escapeHTML(prep.label)}</strong><p>${escapeHTML(prep.detail)}</p><div class="v2-vitals"><span>Énergie <b>${Math.round(career.energy || 0)} %</b></span><span>Fatigue <b>${Math.round(career.fatigue || 0)} %</b></span></div></section>
         <section class="v2-appointment-card"><span>Prochain rendez-vous</span><strong>${escapeHTML(nextAppointment(career))}</strong><button type="button" data-v2-open-calendar>Voir les sept prochains jours</button></section>
       </aside>
@@ -261,5 +333,5 @@
     return `<div class="v2-location-card" data-location="${location.id}"><div><p class="eyebrow">${objectiveHere ? "Destination recommandée" : "Lieu du quartier"}</p><h2>${escapeHTML(location.label)}</h2><p>${escapeHTML(location.detail)}</p></div><div class="v2-location-status"><span>État du lieu</span><strong>${escapeHTML(locationStatus(location, career))}</strong></div>${workContent}<p class="v2-location-preview-note">${previewNote}</p><button class="secondary-button" type="button" data-v2-close-location>Retour à la carte</button></div>`;
   }
 
-  return Object.freeze({ LOCATIONS, preparation, onboardingObjective, objective, isFirstJobRequired, nextAppointment, locationStatus, render, renderLocation });
+  return Object.freeze({ LOCATIONS, preparation, onboardingObjective, objective, renderObjectiveCard, renderLocationGuide, isFirstJobRequired, nextAppointment, locationStatus, render, renderLocation });
 });

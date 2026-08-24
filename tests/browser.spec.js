@@ -170,6 +170,12 @@ async function completeFight(page) {
   await expect(completionButton, "un combat amateur doit se terminer en au plus 18 décisions (3 briefings et 15 échanges)").toBeVisible();
 }
 
+async function confirmWeekFromLauncher(page) {
+  await page.locator(".v2-week-launcher [data-v2-week-detailed]").click();
+  await expect(page.locator(".v2-week-plan")).toBeVisible();
+  await page.locator(".v2-week-plan [data-v2-week-confirm]").click();
+}
+
 function amateurSnapshot(overrides = {}) {
   const state = {
     profile: {
@@ -607,7 +613,7 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   await expect(restAction).toHaveAttribute("aria-pressed", "true");
   await page.locator("[data-v2-leave-home]").click();
 
-  await page.locator(".v2-week-launcher [data-v2-week-confirm]").click();
+  await confirmWeekFromLauncher(page);
   await expect(page.locator(".v2-week-summary")).toBeVisible();
   await expect(page.locator(".v2-week-summary")).toContainText("Paie");
   await expect(page.locator(".v2-week-summary")).toContainText("+100 $");
@@ -715,7 +721,7 @@ test("réduit progressivement la capacité après l’inactivité sans retirer d
   await page.locator("#resume-load").click();
 
   const finishWeek = async () => {
-    await page.locator(".v2-week-launcher [data-v2-week-confirm]").click();
+    await confirmWeekFromLauncher(page);
     await expect(page.locator(".v2-week-summary")).toBeVisible();
     const result = await page.evaluate(() => ({
       main: JSON.parse(localStorage.getItem("boxeur-deux-career-v2")),
@@ -818,7 +824,7 @@ test("retire le travail, congédie après trois absences puis attend 1 à 3 sema
     await page.locator("[data-v2-toggle-work]").click();
     await expect(page.locator(".v2-work-management")).toContainText("aucune paie");
     await page.locator("[data-v2-close-location]").click();
-    await page.locator(".v2-week-launcher [data-v2-week-confirm]").click();
+    await confirmWeekFromLauncher(page);
     await expect(page.locator(".v2-week-summary")).toBeVisible();
     await expect(page.locator(".v2-week-summary")).toContainText(expectedAbsences < 2 ? "Première absence" : expectedAbsences === 2 ? "Dernier avertissement" : "Emploi perdu");
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
@@ -846,7 +852,7 @@ test("retire le travail, congédie après trois absences puis attend 1 à 3 sema
   await expect(page.getByRole("button", { name: /Entrer : Emploi/ })).toHaveAccessibleName(/Candidature en cours/);
 
   for (let elapsed = 1; elapsed <= 3; elapsed += 1) {
-    await page.locator(".v2-week-launcher [data-v2-week-confirm]").click();
+    await confirmWeekFromLauncher(page);
     await expect(page.locator(".v2-week-summary")).toBeVisible();
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
     if (elapsed < 3) {
@@ -1324,13 +1330,59 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
   await page.locator("#job-options [data-select-job]").first().click();
   await expect(jobDialog).toBeHidden();
 
-  const guideCard = page.locator(".v2-onboarding-card");
+  const guideCard = page.locator(".v2-now-panel > .v2-onboarding-card");
   await expect(guideCard).toContainText("T’inscrire au GYM de boxe");
   await expect(guideCard).toContainText("Obligatoire");
+  await expect(guideCard).toContainText("Sur la carte, appuie sur « GYM de boxe »");
+  const launcherConfirmation = page.locator(".v2-week-launcher [data-v2-week-detailed]");
+  await expect(launcherConfirmation).toHaveText("Confirmer semaine");
+  const launcherActions = await page.locator(".v2-week-launcher-actions").evaluate(element => {
+    const quick = element.querySelector("[data-v2-week-quick]").getBoundingClientRect();
+    const confirm = element.querySelector("[data-v2-week-detailed]").getBoundingClientRect();
+    return { quickTop: quick.top, confirmTop: confirm.top, confirmWidth: confirm.width, containerWidth: element.getBoundingClientRect().width };
+  });
+  expect(launcherActions.confirmTop).toBeLessThanOrEqual(launcherActions.quickTop + 1);
+  expect(launcherActions.confirmWidth).toBeLessThan(launcherActions.containerWidth);
   await guideCard.locator('[data-v2-location="boxing-gym"]').click();
   await expect(page.locator(".v2-gym-view")).toBeVisible();
+  const gymTutorial = page.locator(".v2-gym-dashboard > .v2-onboarding-card");
+  await expect(gymTutorial).toContainText("T’inscrire au GYM de boxe");
+  await expect(gymTutorial).toContainText("Dans le GYM, appuie sur « Accueil »");
+  await expect(gymTutorial).toContainText("Obligatoire");
+    const guideTop = await gymTutorial.evaluate(element => element.getBoundingClientRect().top);
+    const weekPlanTop = await page.locator(".v2-gym-week-plan").evaluate(element => element.getBoundingClientRect().top);
+    const preparationTop = await page.locator(".v2-gym-readiness").evaluate(element => element.getBoundingClientRect().top);
+    const membershipTop = await page.locator(".v2-gym-membership").evaluate(element => element.getBoundingClientRect().top);
+    expect(guideTop).toBeLessThan(weekPlanTop);
+    expect(guideTop).toBeLessThan(preparationTop);
+    expect(guideTop).toBeLessThan(membershipTop);
   await expect(page.locator(".v2-gym-access-lock")).toContainText("Inscription requise");
-  await page.locator('[data-v2-gym-zone="reception"]').first().click();
+
+  await page.locator("[data-v2-leave-gym]").click();
+  await page.locator('[data-v2-location="home"]').first().click();
+  const homeTutorial = page.locator(".v2-home-dashboard > .v2-onboarding-card");
+  await expect(homeTutorial).toHaveAttribute("data-v2-onboarding-step", "purchase-initial-membership");
+  await expect(homeTutorial).toContainText("Retourne à la carte, puis appuie sur « GYM de boxe »");
+  const homeGuideTop = await homeTutorial.evaluate(element => element.getBoundingClientRect().top);
+  const homeWeekPlanTop = await page.locator(".v2-home-week-plan").evaluate(element => element.getBoundingClientRect().top);
+  const homeConditionTop = await page.locator(".v2-home-condition").evaluate(element => element.getBoundingClientRect().top);
+  expect(homeGuideTop).toBeLessThan(homeWeekPlanTop);
+  expect(homeGuideTop).toBeLessThan(homeConditionTop);
+  await homeTutorial.locator('[data-v2-location="boxing-gym"]').click();
+  await expect(gymTutorial).toContainText("Dans le GYM, appuie sur « Accueil »");
+
+  await page.locator("[data-v2-leave-gym]").click();
+  await page.locator('[data-v2-location="work"]').first().click();
+  const workTutorial = page.locator(".v2-location-card > .v2-onboarding-card");
+  await expect(workTutorial).toHaveAttribute("data-v2-onboarding-step", "purchase-initial-membership");
+  await expect(workTutorial).toContainText("Retourne à la carte, puis appuie sur « GYM de boxe »");
+  const workGuideTop = await workTutorial.evaluate(element => element.getBoundingClientRect().top);
+  const workHeadingTop = await page.locator(".v2-location-card > div").first().evaluate(element => element.getBoundingClientRect().top);
+  expect(workGuideTop).toBeLessThan(workHeadingTop);
+  await workTutorial.locator('[data-v2-location="boxing-gym"]').click();
+  await expect(gymTutorial).toContainText("Dans le GYM, appuie sur « Accueil »");
+
+  await gymTutorial.locator('[data-v2-gym-zone="reception"]').click();
 
   const membershipDialog = page.locator("#membership-dialog");
   await expect(membershipDialog).toBeVisible();
@@ -1342,38 +1394,53 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
   await expect(membershipDialog).toBeHidden();
   await expect(page.locator("[data-v2-coach-session]")).toBeEnabled();
   await expect(page.locator(".v2-gym-path")).toContainText("Rémy « Le Tank »");
+  await expect(gymTutorial).toContainText("Faire une première séance");
+  await gymTutorial.locator('[data-v2-gym-zone="coach"]').click();
+  await expect(page.locator("[data-v2-coach-session]")).toBeFocused();
 
   await page.locator("[data-v2-leave-gym]").click();
-  await expect(page.locator(".v2-onboarding-card")).toContainText("Faire une première séance");
-  await expect(page.locator(".v2-onboarding-card")).toContainText("Facultatif");
+  await expect(guideCard).toContainText("Faire une première séance");
+  await expect(guideCard).toContainText("Facultatif");
 
-  await page.locator('.v2-onboarding-card [data-v2-location="boxing-gym"]').click();
+  await guideCard.locator('[data-v2-location="boxing-gym"]').click();
   await page.locator("[data-v2-coach-session]").click();
-  await page.locator("[data-v2-leave-gym]").click();
-  await expect(page.locator(".v2-onboarding-card")).toContainText("Ta première séance est planifiée");
-  await expect(page.locator(".v2-onboarding-card")).toContainText("Rien n’est encore appliqué");
-  await expect(page.locator(".v2-onboarding-card [data-v2-week-handoff]")).toHaveText("Voir mon programme");
-  await expect(page.locator(".v2-onboarding-card [data-v2-week-confirm]")).toHaveText("Confirmer et vivre la semaine");
+  await expect(gymTutorial).toContainText("Prévoir une journée de repos");
+  await expect(gymTutorial).toContainText("Va à la maison");
+  await gymTutorial.locator('[data-v2-location="home"]').click();
+  await expect(homeTutorial).toHaveAttribute("data-v2-onboarding-step", "week-1-add-rest");
+  await expect(homeTutorial).toContainText("À la maison, appuie sur « Journée de repos »");
+  await homeTutorial.locator('[data-v2-home-action="rest"]').click();
+  await expect(homeTutorial).toContainText("Ta première séance est planifiée");
+  await expect(homeTutorial).toContainText("Rien n’est encore appliqué");
+  await expect(homeTutorial.locator("[data-v2-week-handoff]")).toHaveText("Confirmer semaine");
+  await expect(homeTutorial.locator("[data-v2-week-confirm]")).toHaveCount(0);
+  const guideButtonWidth = await homeTutorial.locator("[data-v2-week-handoff]").evaluate(element => ({
+    button: element.getBoundingClientRect().width,
+    container: element.parentElement.getBoundingClientRect().width,
+  }));
+  expect(guideButtonWidth.button).toBeGreaterThanOrEqual(guideButtonWidth.container - 1);
 
-  await page.locator(".v2-onboarding-card [data-v2-week-handoff]").click();
+  await homeTutorial.locator("[data-v2-week-handoff]").click();
   await expect(page.locator(".v2-week-plan")).toBeVisible();
   await expect(page.locator(".v2-week-engine-note")).toContainText("seront résolues seulement lorsque tu confirmeras");
   await page.locator("[data-v2-week-plan-close]").first().click();
-  await page.locator(".v2-onboarding-card [data-v2-week-confirm]").click();
+  await expect(guideCard).toContainText("Ta première séance est planifiée");
+  await guideCard.locator("[data-v2-week-handoff]").click();
+  await page.locator(".v2-week-plan [data-v2-week-confirm]").click();
   await expect(page.locator(".v2-week-summary")).toBeVisible();
   await expect(page.locator(".v2-week-summary-guide")).toContainText("Comment lire ton premier bilan");
   await expect(page.locator("[data-v2-week-summary-close]")).toHaveText("Continuer vers la semaine 2");
   const storedAfterConfirmation = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
   expect(storedAfterConfirmation.previewRuntime.onboardingState.completedObjectiveIds).toEqual(["week-1-first-session"]);
   await page.locator("[data-v2-week-summary-close]").click();
-  await expect(page.locator(".v2-onboarding-card")).toContainText("Essayer un cours de groupe");
+  await expect(guideCard).toContainText("Essayer un cours de groupe");
 
   await page.reload({ waitUntil: "domcontentloaded" });
   const storedAfterReload = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
   expect(storedAfterReload.previewRuntime.onboardingState.completedObjectiveIds).toEqual(["week-1-first-session"]);
   await expect(page.locator("#resume-dialog")).toBeVisible();
   await page.locator("#resume-load").click();
-  await expect(page.locator(".v2-onboarding-card")).toContainText("Essayer un cours de groupe");
+  await expect(guideCard).toContainText("Essayer un cours de groupe");
 
   await page.locator('[data-v2-nav="fighter"]').click();
   await expect(page.locator(".v2-fighter-view")).toBeVisible();
@@ -1412,7 +1479,7 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
   await page.locator("[data-v2-amateur-transition]").click();
 
   await expect(page.locator("#v2-world")).toBeVisible();
-  await expect(page.locator(".v2-onboarding-card")).toHaveCount(0);
+  await expect(page.locator(".v2-now-panel > .v2-onboarding-card")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Entrer : Aréna/ })).toHaveAccessibleName(/Événements disponibles/);
   const storedAmateur = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
   expect(storedAmateur.state.careerStatus).toBe("amateur");
@@ -1428,7 +1495,7 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
   expect(plannedPractice.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "sparring" && !entry.metadata?.completed)).toBe(true);
   const beforePracticeTime = plannedPractice.timeState;
   await page.locator("[data-v2-leave-gym]").click();
-  await page.locator("[data-v2-week-confirm]").click();
+  await confirmWeekFromLauncher(page);
   await expect(page.locator("#fight-dialog")).toBeVisible();
   await expect(page.locator("#fight-week-label")).toContainText("Sparring technique");
   await completeFight(page);
@@ -1446,7 +1513,7 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
   expect(afterPractice.capsule.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "sparring" && entry.metadata?.completed)).toBe(true);
 
   await page.locator("[data-v2-leave-gym]").click();
-  await page.locator("[data-v2-week-confirm]").click();
+  await confirmWeekFromLauncher(page);
   await expect(page.locator(".v2-week-summary")).toBeVisible();
   afterPractice = await page.evaluate(() => ({
     career: JSON.parse(localStorage.getItem("boxeur-deux-career-v2")),
@@ -1702,7 +1769,7 @@ test("compose la semaine à la Maison et joue à la V1 sans faire avancer le tem
   expect(beforeConfirmation.capsule.timeState).toEqual(beforeClassic.timeState);
 
   await page.locator("[data-v2-leave-home]").click();
-  await page.locator("[data-v2-week-confirm]").click();
+  await confirmWeekFromLauncher(page);
   await expect(page.locator(".v2-week-summary")).toBeVisible();
   const afterConfirmation = await page.evaluate(() => ({
     main: JSON.parse(localStorage.getItem("boxeur-deux-career-v2")),
@@ -2263,7 +2330,7 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   expect(mobileCloseButton && mobileCloseButton.height).toBeGreaterThanOrEqual(44);
 
   await page.locator("[data-v2-close-fighter]").click();
-  await page.locator("[data-v2-week-confirm]").click();
+  await confirmWeekFromLauncher(page);
   await expect(page.locator(".v2-week-summary")).toBeVisible();
 
   const afterConfirmation = await page.evaluate(() => ({

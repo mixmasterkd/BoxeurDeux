@@ -21,7 +21,7 @@ test("normalise la capacité hebdomadaire et déduit une zone lisible", () => {
   });
 });
 
-test("le lanceur montre l'énergie restante et les trois décisions de planification", () => {
+test("le lanceur montre l'énergie restante et mène au bâtisseur avant la confirmation", () => {
   const html = view.renderLauncher({
     week: 4,
     capacity: {
@@ -44,13 +44,14 @@ test("le lanceur montre l'énergie restante et les trois décisions de planifica
   assert.match(html, /<progress max="120" value="73" aria-label="Énergie restante de la semaine : 73 sur 120">/);
   assert.match(html, /47 énergie réservée/);
   assert.match(html, /2 choix/);
-  assert.match(html, /data-v2-week-quick/);
   assert.match(html, /data-v2-week-detailed/);
-  assert.match(html, /data-v2-week-confirm/);
+  assert.match(html, /Confirmer semaine/);
+  assert.match(html, /data-v2-week-quick/);
+  assert.doesNotMatch(html, /data-v2-week-confirm/);
   assert.doesNotMatch(html, /data-v2-week-handoff/);
 });
 
-test("le plan rapide reste modifiable et résume les activités déjà choisies", () => {
+test("le plan rapide reste disponible et le lanceur mène au bâtisseur avant la confirmation", () => {
   const html = view.renderLauncher({
     quick: {
       label: "Appliquer mon plan rapide",
@@ -73,11 +74,11 @@ test("le plan rapide reste modifiable et résume les activités déjà choisies"
   assert.match(html, /\+8/);
   assert.match(html, /Cuisine[\s\S]*Prévu/);
   assert.match(html, /\+1 autre activité/);
-  assert.match(html, /Voir ou modifier/);
+  assert.match(html, /Confirmer semaine/);
 });
 
-test("désactive séparément le plan rapide et la confirmation avec une explication accessible", () => {
-  const quickBlocked = view.renderLauncher({
+test("le plan rapide peut être bloqué et la confirmation reste dans le bâtisseur", () => {
+  const launcher = view.renderLauncher({
     quick: { available: false, reason: "Choisis d’abord ton emploi." },
     confirm: { available: true },
   });
@@ -85,9 +86,10 @@ test("désactive séparément le plan rapide et la confirmation avec une explica
     confirm: { available: false, reason: "Le plan dépasse ton énergie disponible." },
   });
 
-  assert.match(quickBlocked, /data-v2-week-quick disabled aria-disabled="true"/);
-  assert.doesNotMatch(quickBlocked, /data-v2-week-confirm disabled/);
-  assert.match(quickBlocked, /role="status">Choisis d’abord ton emploi\./);
+  assert.match(launcher, /data-v2-week-quick disabled aria-disabled="true"/);
+  assert.match(launcher, /data-v2-week-detailed/);
+  assert.doesNotMatch(launcher, /data-v2-week-confirm/);
+  assert.match(launcher, /role="status">Choisis d’abord ton emploi\./);
 
   assert.match(confirmBlocked, /data-v2-week-confirm disabled aria-disabled="true"/);
   assert.match(confirmBlocked, /role="status">Le plan dépasse ton énergie disponible\./);

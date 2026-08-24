@@ -749,6 +749,10 @@ body.v2-preview #v2-world[hidden] {
   animation: v2-sheet-enter .22s ease-out both;
 }
 
+.v2-location-card > .v2-location-guide {
+  order: -1;
+}
+
 .v2-location-card > div:first-child h2 {
   margin-top: 2px;
   font-size: clamp(2.25rem, 5vw, 3.8rem);
@@ -1456,6 +1460,10 @@ body.v2-preview #v2-world[hidden] {
   min-height: 44px;
   padding-inline: 10px;
   white-space: normal;
+}
+
+.v2-onboarding-actions [data-v2-week-handoff] {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 640px) {

@@ -274,6 +274,10 @@
   gap: 10px;
 }
 
+.v2-home-dashboard > .v2-location-guide {
+  order: -40;
+}
+
 .v2-home-now,
 .v2-home-condition,
 .v2-home-week-plan,

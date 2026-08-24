@@ -292,6 +292,10 @@
   gap: 10px;
 }
 
+.v2-gym-dashboard > .v2-location-guide {
+  order: -40;
+}
+
 .v2-gym-readiness,
 .v2-gym-coach-card,
 .v2-gym-sparring-card,

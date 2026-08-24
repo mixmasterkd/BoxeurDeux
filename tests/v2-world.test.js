@@ -115,6 +115,37 @@ test("affiche textuellement le caractère obligatoire ou facultatif et la progre
   assert.match(optional, /<progress max="6" value="4">4\/6<\/progress>/);
 });
 
+test("conserve la même étape du guide et adapte seulement l’instruction au lieu actuel", () => {
+  const career = baseCareer({
+    gymWeeks: 0,
+    v2Onboarding: { mode: "guided", week: 1, remyWeek: 6 },
+    v2OnboardingStep: {
+      id: "purchase-initial-membership",
+      type: "membership",
+      title: "T’inscrire au GYM de boxe",
+      detail: "Le premier abonnement est obligatoire.",
+      locationId: "boxing-gym",
+      required: true,
+    },
+  });
+  const map = world.renderLocationGuide(career, "map");
+  const gym = world.renderLocationGuide(career, "boxing-gym");
+  const home = world.renderLocationGuide(career, "home");
+  const work = world.renderLocationGuide(career, "work");
+
+  for (const html of [map, gym, home, work]) {
+    assert.match(html, /data-v2-onboarding-step="purchase-initial-membership"/);
+    assert.match(html, /T’inscrire au GYM de boxe/);
+  }
+  assert.match(map, /Sur la carte, appuie sur « GYM de boxe »/);
+  assert.match(map, /data-v2-location="boxing-gym">M’y rendre/);
+  assert.match(gym, /Dans le GYM, appuie sur « Accueil »/);
+  assert.match(gym, /data-v2-gym-zone="reception">Aller à l’accueil/);
+  assert.match(home, /Retourne à la carte, puis appuie sur « GYM de boxe »/);
+  assert.match(home, /data-v2-location="boxing-gym">M’y rendre/);
+  assert.match(work, /Retourne à la carte, puis appuie sur « GYM de boxe »/);
+});
+
 test("propose de revoir ou confirmer la première semaine une fois la séance planifiée", () => {
   const html = world.render(baseCareer({
     v2Onboarding: { mode: "guided", week: 1, remyWeek: 6 },
@@ -129,9 +160,30 @@ test("propose de revoir ou confirmer la première semaine une fois la séance pl
     },
   }));
 
-  assert.match(html, /data-v2-week-handoff>Voir mon programme/);
-  assert.match(html, /data-v2-week-confirm>Confirmer et vivre la semaine/);
+  assert.match(html, /data-v2-week-handoff>Confirmer semaine/);
+  assert.doesNotMatch(html, /data-v2-week-confirm/);
   assert.doesNotMatch(html, /data-v2-location="map"/);
+});
+
+test("guide la journée de repos depuis la maison avec la même action que la zone repos", () => {
+  const career = baseCareer({
+    v2Onboarding: { mode: "guided", week: 1, remyWeek: 6 },
+    v2OnboardingStep: {
+      id: "week-1-add-rest",
+      type: "recovery",
+      title: "Prévoir une journée de repos",
+      detail: "Équilibre entraînement et récupération.",
+      locationId: "home",
+      required: false,
+    },
+  });
+  const map = world.renderLocationGuide(career, "map");
+  const home = world.renderLocationGuide(career, "home");
+
+  assert.match(map, /Sur la carte, appuie sur « Maison »/);
+  assert.match(map, /data-v2-location="home">M’y rendre/);
+  assert.match(home, /À la maison, appuie sur « Journée de repos »/);
+  assert.match(home, /data-v2-home-action="rest">Ajouter une journée de repos/);
 });
 
 test("ignore une étape terminée ou exemptée et conserve les anciens contextes", () => {
