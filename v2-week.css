@@ -1,0 +1,219 @@
+/* Semaine rapide V2 — composant isolé de l’interface historique. */
+
+.v2-week-launcher {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid rgba(221, 182, 94, .4);
+  border-radius: 15px;
+  background: linear-gradient(145deg, rgba(221, 182, 94, .13), rgba(255, 255, 255, .035));
+}
+
+.v2-week-launcher h3,
+.v2-week-plan h2,
+.v2-week-summary h2 {
+  margin: 0;
+  line-height: 1.03;
+}
+
+.v2-week-mode-status,
+.v2-week-blocker,
+.v2-week-launcher p {
+  margin: 0;
+}
+
+.v2-week-mode-status {
+  color: #d8d6cf;
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+.v2-week-mode-status strong {
+  color: #fff;
+}
+
+.v2-week-launcher-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.v2-week-launcher-actions button {
+  width: 100%;
+  min-height: 46px;
+}
+
+.v2-week-blocker {
+  padding: 9px 10px;
+  border-left: 3px solid #efb35f;
+  color: #ffe1b6;
+  background: rgba(239, 179, 95, .09);
+  font-size: .75rem;
+  line-height: 1.35;
+}
+
+.v2-week-plan,
+.v2-week-summary {
+  display: grid;
+  gap: 16px;
+  width: min(680px, 100%);
+  max-height: min(760px, calc(100dvh - 30px));
+  margin: auto;
+  padding: clamp(18px, 3vw, 30px);
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 18px;
+  color: #f5f2e9;
+  background: #141716;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .48);
+}
+
+.v2-week-plan > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.v2-week-plan > header > button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  color: #eee9dd;
+  background: transparent;
+}
+
+.v2-week-plan-items,
+.v2-week-summary-changes,
+.v2-week-summary-events ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v2-week-plan-items li,
+.v2-week-summary-events li {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  border-left: 4px solid #818783;
+  background: rgba(255, 255, 255, .045);
+}
+
+.v2-week-plan-items li.positive,
+.v2-week-summary-events li.positive {
+  border-color: #79c99e;
+}
+
+.v2-week-plan-items li.warning,
+.v2-week-summary-events li.warning {
+  border-color: #efb35f;
+}
+
+.v2-week-plan-items li.critical,
+.v2-week-summary-events li.critical {
+  border-color: #f07167;
+}
+
+.v2-week-plan-items span,
+.v2-week-summary-events span {
+  color: #cfccc4;
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+.v2-week-tradeoff,
+.v2-week-engine-note {
+  margin: 0;
+  padding: 11px 12px;
+  line-height: 1.4;
+}
+
+.v2-week-tradeoff {
+  border: 1px solid rgba(239, 179, 95, .25);
+  color: #f5dfbd;
+  background: rgba(239, 179, 95, .07);
+}
+
+.v2-week-engine-note {
+  color: #c9c7c0;
+  font-size: .75rem;
+  background: rgba(255, 255, 255, .035);
+}
+
+.v2-week-plan > footer,
+.v2-week-summary-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.v2-week-plan > footer button,
+.v2-week-summary-actions button {
+  min-height: 46px;
+}
+
+.v2-week-summary-changes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.v2-week-summary-changes li {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .04);
+}
+
+.v2-week-summary-changes li.positive strong { color: #92ddb4; }
+.v2-week-summary-changes li.warning strong { color: #f4c77f; }
+.v2-week-summary-changes li.critical strong { color: #ff928a; }
+
+.v2-week-summary-changes span {
+  color: #c9c7c0;
+  font-size: .7rem;
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .v2-week-launcher {
+    padding: 14px;
+  }
+
+  .v2-week-plan,
+  .v2-week-summary {
+    width: 100%;
+    max-height: calc(100dvh - 12px);
+    padding: 18px 14px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 15px 15px 0 0;
+  }
+
+  .v2-week-plan > footer,
+  .v2-week-summary-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: grid;
+    padding: 10px 0 calc(4px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, #141716 22%);
+  }
+
+  .v2-week-summary-changes {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-week-launcher *,
+  .v2-week-plan *,
+  .v2-week-summary * {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

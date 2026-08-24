@@ -9,6 +9,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="v2-world.css" />
+    <link rel="stylesheet" href="v2-gym.css" />
+    <link rel="stylesheet" href="v2-home.css" />
+    <link rel="stylesheet" href="v2-week.css" />
   </head>
   <body>
     <section id="creation-screen" class="creation-screen" aria-labelledby="creation-title">
@@ -86,6 +90,8 @@
     </dialog>
 
     <main id="game" class="game-shell hidden">
+      <section id="v2-world" class="v2-world" hidden aria-label="Carte de carrière V2"></section>
+
       <header class="topbar">
         <div class="brand">
           <span class="brand-mark" aria-hidden="true">B2</span>
@@ -480,6 +486,15 @@
     <script src="career-calendar.js"></script>
     <script src="tournament-engine.js"></script>
     <script src="combat-engine.js"></script>
+    <script src="career-time-engine.js"></script>
+    <script src="career-v2-migration.js"></script>
+    <script src="v2-training-engine.js"></script>
+    <script src="v2-recovery-engine.js"></script>
+    <script src="v2-week-engine.js"></script>
+    <script src="v2-gym-view.js"></script>
+    <script src="v2-home-view.js"></script>
+    <script src="v2-week-view.js"></script>
+    <script src="v2-world.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

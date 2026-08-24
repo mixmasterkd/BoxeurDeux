@@ -11,6 +11,8 @@ const MIME_TYPES = Object.freeze({
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
   ".png": "image/png",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
@@ -413,6 +415,268 @@ for (const profile of [
     expect(savedProfile.portraitId).toBe(1);
   });
 }
+
+test("cadre les trois portraits masculins et féminins sans déformation sur ordinateur et mobile", async ({ page }) => {
+  await openFreshCareer(page);
+
+  const assertPortraitGeometry = async expectedAsset => {
+    await expect(page.locator("#creation-portraits .portrait-option")).toHaveCount(3);
+    const metrics = await page.locator("#creation-portraits .portrait-option").evaluateAll(buttons => buttons.map((button, index) => {
+      const preview = button.querySelector(".portrait-option-preview");
+      const image = preview.querySelector("img");
+      const previewBox = preview.getBoundingClientRect();
+      const imageBox = image.getBoundingClientRect();
+      return {
+        index,
+        source: image.getAttribute("src"),
+        previewWidth: previewBox.width,
+        previewHeight: previewBox.height,
+        imageWidth: imageBox.width,
+        imageHeight: imageBox.height,
+        imageLeft: imageBox.left,
+        imageTop: imageBox.top,
+        previewLeft: previewBox.left,
+        previewTop: previewBox.top,
+      };
+    }));
+    for (const metric of metrics) {
+      expect(metric.source).toContain(expectedAsset);
+      expect(metric.previewWidth).toBeGreaterThan(80);
+      expect(metric.previewHeight).toBeGreaterThanOrEqual(126);
+      expect(Math.abs(metric.imageWidth / metric.previewWidth - 3)).toBeLessThan(.03);
+      expect(Math.abs(metric.imageHeight / metric.imageWidth - 2 / 3)).toBeLessThan(.03);
+      expect(Math.abs(metric.imageTop - metric.previewTop)).toBeLessThan(2);
+      expect(Math.abs(metric.imageLeft - (metric.previewLeft - metric.index * metric.previewWidth))).toBeLessThan(3);
+      expect(metric.imageHeight).toBeGreaterThan(metric.previewHeight);
+    }
+    const width = await page.evaluate(() => ({ body: document.body.scrollWidth, viewport: window.innerWidth }));
+    expect(width.body).toBeLessThanOrEqual(width.viewport + 1);
+  };
+
+  await assertPortraitGeometry("portraits-hommes.webp");
+  await page.locator("#fighter-sex").selectOption("female");
+  await assertPortraitGeometry("portraits-femmes.webp");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await assertPortraitGeometry("portraits-femmes.webp");
+  await page.locator("#fighter-sex").selectOption("male");
+  await assertPortraitGeometry("portraits-hommes.webp");
+  for (const button of await page.locator("#creation-portraits .portrait-option").all()) {
+    expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(128);
+  }
+});
+
+test("explique et verrouille le GYM V2 avant l’inscription", async ({ page }) => {
+  await page.route("https://fonts.googleapis.com/**", route => route.abort());
+  await page.route("https://fonts.gstatic.com/**", route => route.abort());
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  const snapshot = amateurSnapshot({
+    careerStatus: "recreational",
+    gymWeeks: 0,
+    money: 75,
+    jobId: "courier",
+    introJobRequired: false,
+  });
+  await page.evaluate(value => {
+    localStorage.clear();
+    localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
+  }, snapshot);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).first().click();
+
+  await expect(page.locator("#v2-gym-membership-lock-reason")).toContainText("Inscription requise");
+  await expect(page.locator(".v2-gym-membership.inactive")).toContainText("Forfait 1 mois");
+  await expect(page.locator(".v2-gym-membership.inactive")).toContainText("110 $");
+  await expect(page.locator(".v2-gym-membership.inactive")).toContainText("Solde");
+  await expect(page.locator(".v2-gym-membership.inactive")).toContainText("Cours de groupe récréatif");
+  await expect(page.locator("#v2-gym-membership-lock-reason")).toContainText("sac au sous-sol");
+
+  const lockedHotspots = page.locator('.v2-gym-hotspot[aria-disabled="true"]');
+  await expect(lockedHotspots).toHaveCount(7);
+  const reception = page.locator('.v2-gym-hotspot[data-v2-gym-zone="reception"]');
+  await expect(reception).not.toHaveAttribute("aria-disabled", "true");
+  await lockedHotspots.first().focus();
+  await expect(lockedHotspots.first()).toBeFocused();
+  await lockedHotspots.first().dispatchEvent("click");
+  await expect(page.locator(".v2-session-composer")).toHaveCount(0);
+
+  const signup = page.locator('.v2-gym-membership [data-v2-gym-zone="reception"]');
+  expect((await signup.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  const fit = await page.locator(".v2-gym-view").evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth + 1);
+  expect(fit.documentWidth).toBeLessThanOrEqual(fit.viewportWidth + 1);
+  await signup.click();
+  await expect(page.locator("#membership-dialog")).toBeVisible();
+});
+
+test("guide la première semaine V2 puis alterne semaine rapide et semaine hybride sans toucher à la sauvegarde principale", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.route("https://fonts.googleapis.com/**", route => route.abort());
+  await page.route("https://fonts.gstatic.com/**", route => route.abort());
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  const snapshot = amateurSnapshot({
+    careerStatus: "recreational",
+    careerStartDate: "2026-09-07",
+    week: 1,
+    money: 220,
+    jobId: null,
+    jobsHeldCount: 0,
+    introJobRequired: true,
+    gymWeeks: 0,
+    initialGymRequired: true,
+    recreationalTrainingWeeks: 0,
+    recreationalSparringStatus: "training",
+  });
+  await page.evaluate(value => {
+    localStorage.clear();
+    localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
+  }, snapshot);
+  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+
+  const mainBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
+  await expect(page.locator(".v2-week-launcher")).toContainText("Mode rapide recommandé");
+  await expect(page.locator("[data-v2-week-quick]")).toBeDisabled();
+  await expect(page.locator(".v2-week-blocker")).toContainText("emploi de départ");
+
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await expect(page.locator(".v2-work-management.required")).toContainText("Choisis ton premier emploi");
+  await page.locator("[data-v2-open-job-menu]").click();
+  await expect(page.locator("#job-dialog")).toBeVisible();
+  await page.locator('#job-options [data-select-job="courier"]').click();
+  await expect(page.locator("#job-dialog")).not.toBeVisible();
+  await expect(page.getByRole("button", { name: /Entrer : Emploi/ })).toHaveAccessibleName(/Emploi actif/);
+
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  await expect(page.locator(".v2-gym-membership.inactive")).toContainText("Inscription requise");
+  await page.locator('.v2-gym-membership [data-v2-gym-zone="reception"]').click();
+  await expect(page.locator("#membership-dialog")).toBeVisible();
+  await page.locator('#membership-options [data-gym-plan="monthly"]').click();
+  await expect(page.locator("#membership-dialog")).not.toBeVisible();
+  await expect(page.locator(".v2-gym-membership")).toContainText("Abonnement actif");
+  await page.locator("[data-v2-leave-gym]").click();
+
+  await expect(page.locator("[data-v2-week-quick]")).toBeEnabled();
+  await page.locator("[data-v2-week-quick]").click();
+  await expect(page.locator(".v2-week-plan")).toBeVisible();
+  await expect(page.locator(".v2-week-plan")).toContainText("Coursier local");
+  await expect(page.locator(".v2-week-plan")).toContainText("2 séances productives");
+  await page.locator("[data-v2-week-confirm]").click();
+  await expect(page.locator(".v2-week-summary")).toBeVisible();
+  await expect(page.locator(".v2-week-summary")).toContainText("Paie");
+  await expect(page.locator(".v2-week-summary")).toContainText("+100 $");
+
+  let capsule = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(capsule.timeState.clock.week).toBe(2);
+  expect(capsule.previewRuntime.career.money).toBe(210);
+  expect(capsule.previewRuntime.career.gymWeeks).toBe(3);
+  expect(capsule.previewRuntime.career.jobTenureWeeks).toBe(1);
+  expect(capsule.previewRuntime.career.jobWagesEarned).toBe(100);
+  expect(capsule.previewRuntime.weeklySummaries[0].mode).toBe("quick");
+  expect(capsule.previewRuntime.weeklySummaries[0].counts.training).toBe(2);
+  await page.locator("[data-v2-week-summary-close]").click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("[data-v2-week-detailed]").click();
+  await expect(page.locator(".v2-week-launcher")).toContainText("Mode détaillé");
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await page.locator("[data-v2-work-shift]").click();
+  await expect(page.locator(".v2-work-management")).toContainText("Quart terminé cette semaine");
+  await expect(page.locator(".v2-work-management .primary-button")).toBeDisabled();
+  await page.locator("[data-v2-close-location]").click();
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  await page.locator("[data-v2-coach-session]").scrollIntoViewIfNeeded();
+  await page.locator("[data-v2-coach-session]").click();
+  await expect(page.locator(".v2-session-result")).toBeVisible();
+  await page.locator("[data-v2-leave-gym]").click();
+  await expect(page.locator("[data-v2-week-handoff]")).toBeVisible();
+  await page.locator("[data-v2-week-handoff]").click();
+  await expect(page.locator(".v2-week-plan")).toContainText("Quart déjà terminé");
+  await expect(page.locator(".v2-week-plan")).toContainText("1 déjà faite");
+  const mobilePlanFit = await page.locator(".v2-week-plan").evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(mobilePlanFit.scrollWidth).toBeLessThanOrEqual(mobilePlanFit.clientWidth + 1);
+  expect(mobilePlanFit.documentWidth).toBeLessThanOrEqual(mobilePlanFit.viewportWidth + 1);
+  for (const button of await page.locator(".v2-week-plan button").all()) {
+    expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  }
+  await page.locator("[data-v2-week-confirm]").click();
+  await expect(page.locator(".v2-week-summary")).toBeVisible();
+  capsule = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(capsule.timeState.clock.week).toBe(3);
+  expect(capsule.previewRuntime.weeklySummaries[0].mode).toBe("hybrid");
+  expect(capsule.previewRuntime.weeklySummaries[0].budget.usedBefore.trainingSessions).toBe(1);
+  expect(capsule.previewRuntime.weeklySummaries[0].counts.training).toBe(1);
+  expect(capsule.previewRuntime.career.money).toBe(310);
+  expect(capsule.previewRuntime.career.jobTenureWeeks).toBe(2);
+  expect(capsule.previewRuntime.career.jobWagesEarned).toBe(200);
+
+  await page.locator("[data-v2-week-summary-close]").click();
+  await page.evaluate(() => {
+    const key = "boxeur-deux-career-v2-v2-preview";
+    const stored = JSON.parse(localStorage.getItem(key));
+    stored.timeState = BoxeurTime.advanceTime(stored.timeState, 14, () => 0.5);
+    stored.previewRuntime.weekMode = "detailed";
+    localStorage.setItem(key, JSON.stringify(stored));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+  await expect(page.locator("[data-v2-week-handoff]")).toBeVisible();
+  await page.locator("[data-v2-week-handoff]").click();
+  await expect(page.locator(".v2-week-plan")).toContainText("Quart simulé");
+  await expect(page.locator(".v2-week-plan")).toContainText("2 séances productives");
+  await expect(page.locator(".v2-week-plan")).not.toContainText("Quart non effectué");
+  await page.locator("[data-v2-week-confirm]").click();
+  await expect(page.locator(".v2-week-summary")).toBeVisible();
+  capsule = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(capsule.timeState.clock.week).toBe(4);
+  expect(capsule.previewRuntime.career.money).toBe(410);
+  expect(capsule.previewRuntime.career.jobTenureWeeks).toBe(3);
+  expect(capsule.previewRuntime.career.jobWagesEarned).toBe(300);
+
+  await page.locator("[data-v2-week-summary-close]").click();
+  await page.evaluate(() => {
+    const key = "boxeur-deux-career-v2-v2-preview";
+    const stored = JSON.parse(localStorage.getItem(key));
+    stored.timeState = BoxeurTime.advanceTime(stored.timeState, 20, () => 0.5);
+    stored.previewRuntime.weekMode = "detailed";
+    localStorage.setItem(key, JSON.stringify(stored));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+  await page.getByRole("button", { name: /Entrer : Maison/ }).click();
+  await expect(page.locator('[data-v2-home-action="advance"]')).toBeDisabled();
+  await expect(page.locator("#v2-home-action-advance-help")).toContainText("Confier le reste au coach");
+  await page.locator("[data-v2-leave-home]").click();
+  await page.locator("[data-v2-week-handoff]").click();
+  await expect(page.locator(".v2-week-plan")).toContainText("Quart non effectué");
+  await expect(page.locator(".v2-week-plan")).toContainText("Temps insuffisant");
+  await page.locator("[data-v2-week-confirm]").click();
+  await expect(page.locator(".v2-week-summary")).toContainText("Quart manqué");
+  await expect(page.locator(".v2-week-summary")).toContainText("Abonnement expiré");
+  capsule = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(capsule.timeState.clock.week).toBe(5);
+  expect(capsule.previewRuntime.career.money).toBe(410);
+  expect(capsule.previewRuntime.career.jobTenureWeeks).toBe(3);
+  expect(capsule.previewRuntime.career.jobWagesEarned).toBe(300);
+  expect(capsule.previewRuntime.career.gymWeeks).toBe(0);
+  expect(capsule.previewRuntime.settledWeeks).toEqual([1, 2, 3, 4]);
+
+  const mainAfter = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
+  expect(mainAfter.state).toEqual(mainBefore.state);
+  expect(mainAfter.weeklyPlan).toEqual(mainBefore.weeklyPlan);
+});
 
 test("fait passer Rémy « Le Tank » du parcours récréatif au statut amateur", async ({ page }) => {
   test.setTimeout(60_000);
@@ -848,6 +1112,293 @@ test("reste utilisable à 390 × 844 px sans débordement et avec des actions ta
   expect(finishedMetrics.body).toBeLessThanOrEqual(finishedMetrics.viewport + 1);
   expect(finishedMetrics.document).toBeLessThanOrEqual(finishedMetrics.viewport + 1);
   expect(finishedMetrics.dialog).toBeLessThanOrEqual(finishedMetrics.viewport + 1);
+});
+
+test("cadre l’aperçu de la carte V2 sur ordinateur et téléphone sans toucher à la carrière", async ({ page }) => {
+  test.setTimeout(75_000);
+  await page.route("https://fonts.googleapis.com/**", route => route.abort());
+  await page.route("https://fonts.gstatic.com/**", route => route.abort());
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  const original = amateurSnapshot({
+    profile: { firstName: "Carte", lastName: "V2", sex: "female", weightClass: "W57", style: "balanced", corner: "pink" },
+    jobId: "courier",
+    gymWeeks: 3,
+  });
+  await page.evaluate(snapshot => {
+    localStorage.clear();
+    localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(snapshot));
+  }, original);
+  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+
+  await expect(page.locator("body")).toHaveClass(/v2-preview/);
+  await expect(page.locator("#v2-world")).toBeVisible();
+  await expect(page.locator("#v2-world .v2-map-hotspot")).toHaveCount(5);
+  await expect(page.locator("#v2-world .v2-map-canvas img")).toHaveJSProperty("complete", true);
+  await expect(page.locator("#v2-world h2").first()).toContainText("Carte");
+  await expect(page.locator("#game > .topbar")).toBeHidden();
+  const mainSaveBeforeV2Interactions = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
+
+  const desktopMap = await page.locator(".v2-map-canvas").boundingBox();
+  expect(desktopMap.width / desktopMap.height).toBeGreaterThan(1.6);
+  const gymOpener = page.getByRole("button", { name: /Entrer : GYM de boxe/ }).first();
+  await gymOpener.click();
+  const locationSheet = page.locator(".v2-location-sheet");
+  await expect(locationSheet).toBeVisible();
+  await expect(locationSheet).toHaveAttribute("role", "dialog");
+  await expect(locationSheet).toHaveAttribute("aria-modal", "true");
+  expect(await locationSheet.evaluate(sheet => {
+    const label = sheet.getAttribute("aria-labelledby");
+    return Boolean(label && document.getElementById(label)?.textContent.trim());
+  })).toBe(true);
+  expect(await page.locator(".v2-world-layout").evaluate(element => element.inert)).toBe(true);
+  const gymDialogButtons = locationSheet.locator("button:not([disabled])");
+  await gymDialogButtons.last().focus();
+  await page.keyboard.press("Tab");
+  await expect(gymDialogButtons.first()).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(locationSheet).toBeHidden();
+  await expect(gymOpener).toBeFocused();
+  expect(await page.locator(".v2-world-layout").evaluate(element => element.inert)).toBe(false);
+  await gymOpener.click();
+  await expect(page.locator(".v2-gym-view")).toBeVisible();
+  await expect(page.locator(".v2-gym-view")).toContainText(/travail aux mitaines/i);
+  await expect(page.locator(".v2-gym-floor img")).toHaveJSProperty("complete", true);
+
+  await page.locator("[data-v2-coach-session]").click();
+  await expect(page.locator(".v2-session-result")).toBeVisible();
+  await expect(page.locator(".v2-session-result")).toContainText("seront assimilés pendant la récupération");
+  let v2Capsule = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(v2Capsule.timeState.clock.absoluteSlot).toBe(1);
+  expect(v2Capsule.timeState.condition.energy).toBeLessThan(original.state.energy);
+  expect(Object.values(v2Capsule.timeState.stimulus).some(value => value > 0)).toBe(true);
+
+  await page.locator("[data-v2-result-close]").click();
+  await page.locator("[data-v2-compose-session]").click();
+  await expect(page.locator("[data-v2-confirm-session]")).toBeDisabled();
+  await page.locator('[data-v2-exercise="jump-rope"]').click();
+  await expect(page.locator("[data-v2-confirm-session]")).toBeDisabled();
+  await page.locator('[data-v2-exercise="mitt-work"]').click();
+  await expect(page.locator("[data-v2-confirm-session]")).toBeEnabled();
+  await page.locator("[data-v2-confirm-session]").click();
+  await expect(page.locator(".v2-session-result")).toBeVisible();
+  v2Capsule = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(v2Capsule.timeState.clock.absoluteSlot).toBe(2);
+  await page.locator("[data-v2-leave-gym]").click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.locator(".v2-map-canvas img").evaluate(image => image.currentSrc)).toContain("carte-quartier-v2-mobile.jpg");
+  const mobileMetrics = await page.evaluate(() => ({
+    body: document.body.scrollWidth,
+    document: document.documentElement.scrollWidth,
+    viewport: window.innerWidth,
+    currentImage: document.querySelector(".v2-map-canvas img").currentSrc,
+  }));
+  expect(mobileMetrics.body).toBeLessThanOrEqual(mobileMetrics.viewport + 1);
+  expect(mobileMetrics.document).toBeLessThanOrEqual(mobileMetrics.viewport + 1);
+  expect(mobileMetrics.currentImage).toContain("carte-quartier-v2-mobile.jpg");
+  const mobileMap = await page.locator(".v2-map-canvas").boundingBox();
+  expect(mobileMap.height / mobileMap.width).toBeGreaterThan(0.98);
+  expect(mobileMap.height / mobileMap.width).toBeLessThan(1.02);
+  const objectiveButton = await page.locator(".v2-objective-card [data-v2-location]").boundingBox();
+  expect(objectiveButton && objectiveButton.y).toBeLessThan(844);
+  for (const button of await page.locator(".v2-map-hotspot, .v2-world-nav button").all()) {
+    const box = await button.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(44);
+  }
+
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  await expect.poll(() => page.locator(".v2-gym-floor img").evaluate(image => image.currentSrc)).toContain("gym-boxe-v2-mobile.jpg");
+  await expect(page.locator(".v2-gym-hotspot")).toHaveCount(8);
+  const gymMetrics = await page.locator(".v2-gym-view").evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(gymMetrics.scrollWidth).toBeLessThanOrEqual(gymMetrics.clientWidth + 1);
+  for (const button of await page.locator(".v2-gym-hotspot").all()) {
+    const box = await button.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.locator("[data-v2-coach-session]").scrollIntoViewIfNeeded();
+  const mobileCoachButton = await page.locator("[data-v2-coach-session]").boundingBox();
+  expect(mobileCoachButton && mobileCoachButton.height).toBeGreaterThanOrEqual(44);
+  await page.locator("[data-v2-leave-gym]").click();
+
+  await page.getByRole("button", { name: /Entrer : Maison/ }).click();
+  await expect(page.locator(".v2-home-view")).toBeVisible();
+  await expect(page.locator(".v2-home-hotspot")).toHaveCount(4);
+  await expect.poll(() => page.locator(".v2-home-scene img").evaluate(image => image.currentSrc)).toContain("maison-v2-mobile.jpg");
+  const mobileHomeScene = await page.locator(".v2-home-scene").boundingBox();
+  expect(mobileHomeScene.height / mobileHomeScene.width).toBeGreaterThan(0.98);
+  expect(mobileHomeScene.height / mobileHomeScene.width).toBeLessThan(1.02);
+  const homeMetrics = await page.locator(".v2-home-view").evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(homeMetrics.scrollWidth).toBeLessThanOrEqual(homeMetrics.clientWidth + 1);
+  for (const button of await page.locator(".v2-home-hotspot").all()) {
+    const box = await button.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(43.9);
+  }
+  const firstHomeAction = await page.locator(".v2-home-actions [data-v2-home-action]").first().boundingBox();
+  expect(firstHomeAction && firstHomeAction.y + firstHomeAction.height).toBeLessThanOrEqual(844);
+  const kitchenHotspot = page.locator('[data-v2-home-zone="kitchen"]');
+  await expect(kitchenHotspot).toHaveAttribute("aria-disabled", "true");
+  expect(await kitchenHotspot.getAttribute("disabled")).toBeNull();
+  await kitchenHotspot.focus();
+  await expect(kitchenHotspot).toBeFocused();
+  await kitchenHotspot.dispatchEvent("click");
+  await expect(page.locator(".v2-home-view")).toBeVisible();
+
+  const beforeSleep = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  await page.locator('.v2-home-actions [data-v2-home-action="sleep"]').click();
+  await expect(page.locator(".v2-home-result")).toBeVisible();
+  await expect(page.locator(".v2-home-result")).toContainText("Progression permanente");
+  const afterSleep = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(afterSleep.timeState.clock.absoluteSlot).toBe(3);
+  expect(Object.values(afterSleep.timeState.stats).reduce((sum, value) => sum + value, 0))
+    .toBeGreaterThan(Object.values(beforeSleep.timeState.stats).reduce((sum, value) => sum + value, 0));
+  expect(Object.values(afterSleep.timeState.stimulus).reduce((sum, value) => sum + value, 0))
+    .toBeLessThan(Object.values(beforeSleep.timeState.stimulus).reduce((sum, value) => sum + value, 0));
+  await page.locator("[data-v2-home-result-close]").click();
+  await expect(page.locator(".v2-home-view")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".v2-location-sheet")).toBeHidden();
+  await expect(page.getByRole("button", { name: /Entrer : Maison/ }).first()).toBeFocused();
+
+  for (const viewport of [
+    { width: 360, height: 800 },
+    { width: 844, height: 390 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const fit = await page.evaluate(() => ({
+      body: document.body.scrollWidth,
+      document: document.documentElement.scrollWidth,
+      viewport: window.innerWidth,
+    }));
+    expect(fit.body, `débordement du body à ${viewport.width} × ${viewport.height}`).toBeLessThanOrEqual(fit.viewport + 1);
+    expect(fit.document, `débordement du document à ${viewport.width} × ${viewport.height}`).toBeLessThanOrEqual(fit.viewport + 1);
+  }
+
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
+  expect(stored).toEqual(mainSaveBeforeV2Interactions);
+  expect(stored.state.amateurRecord).toEqual(original.state.amateurRecord);
+  expect(stored.state.money).toBe(original.state.money);
+});
+
+test("ouvre le menu développeur depuis Travail en V2 et restaure la vraie carrière", async ({ page }) => {
+  test.setTimeout(45_000);
+  await page.route("https://fonts.googleapis.com/**", route => route.abort());
+  await page.route("https://fonts.gstatic.com/**", route => route.abort());
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  const original = amateurSnapshot({
+    profile: { firstName: "Vraie", lastName: "Carrière", sex: "female", weightClass: "W57", corner: "pink" },
+    careerStatus: "recreational",
+    careerStartDate: "2026-09-07",
+    week: 3,
+    money: 333,
+    energy: 38,
+    fatigue: 62,
+    gymWeeks: 2,
+    jobId: "courier",
+    recreationalTrainingWeeks: 2,
+    recreationalSparringStatus: "training",
+  });
+  await page.evaluate(snapshot => {
+    localStorage.clear();
+    localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(snapshot));
+  }, original);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  const secretTile = page.getByRole("button", { name: "Vente de stupéfiants — À venir" });
+  await expect(secretTile).toBeVisible();
+  await expect(secretTile).toContainText("Vente de stupéfiants");
+  await expect(secretTile).toContainText("À venir");
+  expect((await secretTile.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  const workFit = await page.locator('.v2-location-card[data-location="work"]').evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(workFit.scrollWidth).toBeLessThanOrEqual(workFit.clientWidth + 1);
+  expect(workFit.documentWidth).toBeLessThanOrEqual(workFit.viewportWidth + 1);
+  for (let activation = 0; activation < 5; activation += 1) await secretTile.click();
+
+  await expect(page.locator("#developer-code-dialog")).toBeVisible();
+  await page.locator("#developer-code-input").fill("128");
+  await page.locator("#developer-code-form").press("Enter");
+  await expect(page.locator("#developer-test-dialog")).toBeVisible();
+  await expect(page.locator("[data-developer-preset]")).toHaveCount(8);
+
+  await page.locator('[data-developer-tool="funds"]').click();
+  await expect(page.locator("#v2-world")).toContainText("9999 $");
+  await page.locator('[data-developer-tool="recover"]').click();
+  await expect(page.locator(".v2-vitals")).toContainText("100 %");
+  await expect(page.locator(".v2-vitals")).toContainText("0 %");
+  let capsule = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(capsule.timeState.condition.energy).toBe(100);
+  expect(capsule.timeState.condition.fatigue).toBe(0);
+
+  await page.locator('[data-developer-preset="bronze-ready"]').click();
+  await expect(page.locator(".v2-test-mode-banner")).toBeVisible();
+  await expect(page.locator(".v2-test-mode-banner")).toContainText("Mode test actif");
+  await expect(page.locator(".v2-test-mode-banner")).toContainText("Alex Test");
+  await expect(page.locator("[data-v2-restore-career]")).toBeVisible();
+  const bannerFit = await page.locator(".v2-test-mode-banner").evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(bannerFit.scrollWidth).toBeLessThanOrEqual(bannerFit.clientWidth + 1);
+  capsule = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(capsule.legacySnapshot.state.profile.lastName).toBe("Test");
+  expect(capsule.legacySnapshot.state.week).toBe(15);
+
+  await page.locator("[data-v2-restore-career]").click();
+  await expect(page.locator(".v2-test-mode-banner")).toHaveCount(0);
+  const restored = await page.evaluate(() => ({
+    main: JSON.parse(localStorage.getItem("boxeur-deux-career-v2")),
+    capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")),
+    active: localStorage.getItem("boxeur-deux-career-v2-dev-active"),
+    backup: localStorage.getItem("boxeur-deux-career-v2-dev-return"),
+    overflow: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - window.innerWidth,
+  }));
+  expect(restored.main.state.profile.firstName).toBe("Vraie");
+  expect(restored.main.state.profile.lastName).toBe("Carrière");
+  expect(restored.main.state.money).toBe(9999);
+  expect(restored.main.state.energy).toBe(100);
+  expect(restored.capsule.legacySnapshot.state.profile.lastName).toBe("Carrière");
+  expect(restored.active).toBeNull();
+  expect(restored.backup).toBeNull();
+  expect(restored.overflow).toBeLessThanOrEqual(1);
+});
+
+test("bloque clairement l’entraînement V2 pendant un repos médical", async ({ page }) => {
+  await page.route("https://fonts.googleapis.com/**", route => route.abort());
+  await page.route("https://fonts.gstatic.com/**", route => route.abort());
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  const injured = amateurSnapshot({
+    gymWeeks: 3,
+    injury: 55,
+    injuryWeeks: 2,
+  });
+  await page.evaluate(snapshot => {
+    localStorage.clear();
+    localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(snapshot));
+  }, injured);
+  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  await expect(page.locator(".v2-gym-readiness")).toContainText("Repos médical");
+  await expect(page.locator("[data-v2-coach-session]")).toBeDisabled();
+  await expect(page.locator("[data-v2-compose-session]")).toBeDisabled();
+  await expect(page.locator('[data-v2-gym-zone="heavy-bag"]')).toBeDisabled();
+  await expect(page.locator(".v2-gym-hotspot-reception")).toBeEnabled();
 });
 
 test("choisit un emploi, reçoit sa paie et perd le poste après trois absences", async ({ page }) => {
