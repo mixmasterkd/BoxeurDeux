@@ -59,6 +59,7 @@
       detail: step.detail || "Suis le repère proposé pour avancer sans devoir tout planifier.",
       locationId: validLocation ? locationId : "boxing-gym",
       required: step.required === true,
+      actionMode: String(step.actionMode || ""),
       onboarding: true,
       week,
       remyWeek,
@@ -96,13 +97,16 @@
     const progressLabel = currentObjective.week >= currentObjective.remyWeek
       ? `Rémy · semaine ${currentObjective.remyWeek}`
       : `Semaine ${currentObjective.week} sur ${currentObjective.remyWeek}`;
+    const actions = currentObjective.actionMode === "review-and-confirm"
+      ? `<div class="v2-onboarding-actions"><button class="secondary-button" type="button" data-v2-week-handoff>Voir mon programme</button><button class="primary-button" type="button" data-v2-week-confirm>Confirmer et vivre la semaine</button></div>`
+      : destination;
     return `<section class="v2-objective-card v2-onboarding-card ${requirementClass}" data-v2-onboarding-step="${escapeHTML(currentObjective.id)}">
       <div class="v2-objective-heading"><p class="eyebrow">Guide récréatif</p><span class="v2-objective-requirement ${requirementClass}">${requirement}</span></div>
       <div class="v2-onboarding-track" aria-label="Parcours guidé : semaine ${currentWeek} sur ${currentObjective.remyWeek} avant le sparring de Rémy">
         <div><span>Semaine 1</span><strong>${escapeHTML(progressLabel)}</strong><span>Rémy · semaine ${currentObjective.remyWeek}</span></div>
         <progress max="${currentObjective.remyWeek}" value="${currentWeek}">${currentWeek}/${currentObjective.remyWeek}</progress>
       </div>
-      <h3>${escapeHTML(currentObjective.title)}</h3><p>${escapeHTML(currentObjective.detail)}</p>${destination}
+      <h3>${escapeHTML(currentObjective.title)}</h3><p>${escapeHTML(currentObjective.detail)}</p>${actions}
     </section>`;
   }
 

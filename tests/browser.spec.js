@@ -487,14 +487,14 @@ test("explique et verrouille le GYM V2 avant l’inscription", async ({ page }) 
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).first().click();
 
   await expect(page.locator("#v2-gym-membership-lock-reason")).toContainText("Inscription requise");
-  await expect(page.locator(".v2-gym-membership.inactive")).toContainText("Forfait 1 mois");
+  await expect(page.locator(".v2-gym-membership.inactive")).toContainText("1 mois · ou 3 mois à rabais");
   await expect(page.locator(".v2-gym-membership.inactive")).toContainText("110 $");
   await expect(page.locator(".v2-gym-membership.inactive")).toContainText("Solde");
   await expect(page.locator(".v2-gym-membership.inactive")).toContainText("Cours de groupe récréatif");
   await expect(page.locator("#v2-gym-membership-lock-reason")).toContainText("sac au sous-sol");
 
   const lockedHotspots = page.locator('.v2-gym-hotspot[aria-disabled="true"]');
-  await expect(lockedHotspots).toHaveCount(7);
+  await expect(lockedHotspots).toHaveCount(3);
   const reception = page.locator('.v2-gym-hotspot[data-v2-gym-zone="reception"]');
   await expect(reception).not.toHaveAttribute("aria-disabled", "true");
   await lockedHotspots.first().focus();
@@ -598,7 +598,7 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   await restItem.locator("[data-v2-week-remove]").click();
   await expect(page.locator(".v2-week-plan")).not.toContainText("Journée de repos");
   const capacityAfterRemoval = Number(await page.locator(".v2-week-plan progress").getAttribute("value"));
-  expect(capacityAfterRemoval).toBeGreaterThan(capacityBeforeRemoval);
+  expect(capacityAfterRemoval).toBe(capacityBeforeRemoval);
   await page.locator("[data-v2-week-plan-close]").first().click();
 
   await page.getByRole("button", { name: /Entrer : Maison/ }).click();
@@ -631,21 +631,30 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   await page.locator("[data-v2-week-plan-close]").first().click();
 
   const beforeManualDraft = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")).timeState);
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await page.locator("[data-v2-toggle-work]").click();
+  await expect(page.locator("[data-v2-toggle-work]")).toContainText("Ajouter le travail à ma semaine");
+  await page.locator("[data-v2-close-location]").click();
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   await page.locator("[data-v2-coach-session]").scrollIntoViewIfNeeded();
   await page.locator("[data-v2-coach-session]").click();
   await expect(page.locator(".v2-gym-view")).toContainText("Cours de groupe");
   await expect(page.locator(".v2-gym-week-plan")).toContainText("Cours de groupe");
   await page.locator('.v2-gym-week-plan [data-v2-location-remove]').click();
-  await expect(page.locator(".v2-gym-week-plan")).toHaveCount(0);
+  await expect(page.locator(".v2-gym-week-plan")).toContainText("Aucune activité du GYM n’est encore planifiée");
   await expect(page.locator("[data-v2-coach-session]")).toHaveAttribute("aria-pressed", "false");
   await page.locator("[data-v2-coach-session]").click();
   await expect(page.locator(".v2-gym-week-plan")).toContainText("Cours de groupe");
   await page.locator("[data-v2-leave-gym]").click();
 
+  const manualPlanner = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")).previewRuntime.weekPlanner);
+  expect(manualPlanner.limits.recreationalPhysicalActivities).toBe(2);
+  expect(manualPlanner.entries.filter(entry => entry.physical).map(entry => entry.activityId)).toEqual(["group-class"]);
   await page.getByRole("button", { name: /Entrer : Maison/ }).click();
-  await page.locator('.v2-home-actions [data-v2-home-action="home-quick"]').click();
-  await expect(page.locator('.v2-home-actions [data-v2-home-action="home-quick"]')).toHaveAttribute("aria-pressed", "true");
+  const homeQuick = page.locator('.v2-home-actions [data-v2-home-action="home-quick"]');
+  await homeQuick.click();
+  await expect(page.locator(".v2-home-week-plan")).toContainText("Entraînement maison rapide");
+  await expect(homeQuick).toBeDisabled();
   await page.locator("[data-v2-leave-home]").click();
 
   const afterManualDraft = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")).timeState);
@@ -669,10 +678,10 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   capsule = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
   expect(capsule.timeState.clock.week).toBe(3);
   expect(capsule.previewRuntime.weeklySummaries[0].counts.training).toBe(2);
-  expect(capsule.previewRuntime.weeklySummaries[0].counts.work).toBe(1);
-  expect(capsule.previewRuntime.career.money).toBe(310);
-  expect(capsule.previewRuntime.career.jobTenureWeeks).toBe(2);
-  expect(capsule.previewRuntime.career.jobWagesEarned).toBe(200);
+  expect(capsule.previewRuntime.weeklySummaries[0].counts.work).toBe(0);
+  expect(capsule.previewRuntime.career.money).toBe(210);
+  expect(capsule.previewRuntime.career.jobTenureWeeks).toBe(1);
+  expect(capsule.previewRuntime.career.jobWagesEarned).toBe(100);
 
   const mainAfter = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
   expect(mainAfter.state.week).toBe(capsule.timeState.clock.week);
@@ -683,6 +692,60 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   expect(mainAfter.state.recreationalTrainingWeeks).toBe(capsule.previewRuntime.trainingSessions);
   expect(mainAfter.state.amateurRecord).toEqual(mainBefore.state.amateurRecord);
   expect(mainAfter.weeklyPlan).toEqual(mainBefore.weeklyPlan);
+});
+
+test("réduit progressivement la capacité après l’inactivité sans retirer de statistiques", async ({ page }) => {
+  test.setTimeout(45_000);
+  await page.route("https://fonts.googleapis.com/**", route => route.abort());
+  await page.route("https://fonts.gstatic.com/**", route => route.abort());
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  const snapshot = amateurSnapshot({
+    careerStatus: "amateur",
+    fitness: 68,
+    trainingRhythmPenalty: 0,
+    jobId: "courier",
+    gymWeeks: 4,
+    initialGymRequired: false,
+  });
+  await page.evaluate(value => {
+    localStorage.clear();
+    localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
+  }, snapshot);
+  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+
+  const finishWeek = async () => {
+    await page.locator(".v2-week-launcher [data-v2-week-confirm]").click();
+    await expect(page.locator(".v2-week-summary")).toBeVisible();
+    const result = await page.evaluate(() => ({
+      main: JSON.parse(localStorage.getItem("boxeur-deux-career-v2")),
+      capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")),
+    }));
+    result.summaryText = await page.locator(".v2-week-summary").textContent();
+    await page.locator("[data-v2-week-summary-close]").click();
+    return result;
+  };
+
+  let result = await finishWeek();
+  expect(result.capsule.previewRuntime.career.trainingRhythmPenalty).toBe(1);
+  expect(result.main.state.fitness).toBe(68);
+  expect(result.summaryText).toContain("Rythme fragile");
+  await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("max", "45");
+
+  result = await finishWeek();
+  expect(result.capsule.previewRuntime.career.trainingRhythmPenalty).toBe(2);
+  expect(result.main.state.fitness).toBe(68);
+  expect(result.summaryText).toContain("Rythme faible");
+  expect(result.summaryText).toContain("sans diminution des statistiques");
+  await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("max", "40");
+
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  await page.locator("[data-v2-coach-session]").click();
+  await expect(page.locator(".v2-gym-week-plan")).toContainText("Séance de l’entraîneur");
+  await page.locator("[data-v2-leave-gym]").click();
+  result = await finishWeek();
+  expect(result.capsule.previewRuntime.career.trainingRhythmPenalty).toBe(1);
+  expect(result.main.state.fitness).toBe(68);
 });
 
 test("fait passer Rémy « Le Tank » du parcours récréatif au statut amateur", async ({ page }) => {
@@ -1283,10 +1346,30 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
   await page.locator("[data-v2-leave-gym]").click();
   await expect(page.locator(".v2-onboarding-card")).toContainText("Faire une première séance");
   await expect(page.locator(".v2-onboarding-card")).toContainText("Facultatif");
+
+  await page.locator('.v2-onboarding-card [data-v2-location="boxing-gym"]').click();
+  await page.locator("[data-v2-coach-session]").click();
+  await page.locator("[data-v2-leave-gym]").click();
+  await expect(page.locator(".v2-onboarding-card")).toContainText("Ta première séance est planifiée");
+  await expect(page.locator(".v2-onboarding-card")).toContainText("Rien n’est encore appliqué");
+  await expect(page.locator(".v2-onboarding-card [data-v2-week-handoff]")).toHaveText("Voir mon programme");
+  await expect(page.locator(".v2-onboarding-card [data-v2-week-confirm]")).toHaveText("Confirmer et vivre la semaine");
+
+  await page.locator(".v2-onboarding-card [data-v2-week-handoff]").click();
+  await expect(page.locator(".v2-week-plan")).toBeVisible();
+  await expect(page.locator(".v2-week-engine-note")).toContainText("seront résolues seulement lorsque tu confirmeras");
+  await page.locator("[data-v2-week-plan-close]").first().click();
+  await page.locator(".v2-onboarding-card [data-v2-week-confirm]").click();
+  await expect(page.locator(".v2-week-summary")).toBeVisible();
+  await expect(page.locator(".v2-week-summary-guide")).toContainText("Comment lire ton premier bilan");
+  await expect(page.locator("[data-v2-week-summary-close]")).toHaveText("Continuer vers la semaine 2");
+  await page.locator("[data-v2-week-summary-close]").click();
+  await expect(page.locator(".v2-onboarding-card")).toContainText("Essayer un cours de groupe");
+
   await page.locator('[data-v2-nav="fighter"]').click();
   await expect(page.locator(".v2-fighter-view")).toBeVisible();
   await expect(page.locator('.v2-fighter-stat [role="progressbar"]')).toHaveCount(4);
-  await expect(page.locator(".v2-fighter-identity dd.money")).toContainText("110 $");
+  await expect(page.locator(".v2-fighter-identity dd.money")).toContainText("185 $");
 });
 
 test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis confirme le statut amateur", async ({ page }) => {
@@ -1424,9 +1507,8 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   await page.locator("[data-v2-compose-session]").click();
   await expect(page.locator('[data-v2-exercise="sparring"]')).toHaveCount(0);
   await expect(page.locator("[data-v2-confirm-session]")).toBeDisabled();
-  await page.locator('[data-v2-exercise="jump-rope"]').click();
-  await expect(page.locator("[data-v2-confirm-session]")).toBeEnabled();
-  await page.locator('[data-v2-exercise="mitt-work"]').click();
+  await page.locator('[data-v2-session-preset="technique"]').click();
+  await expect(page.locator('.v2-session-structure .complete')).toHaveCount(3);
   await expect(page.locator("[data-v2-confirm-session]")).toBeEnabled();
   await page.locator("[data-v2-confirm-session]").click();
   await expect(page.locator(".v2-gym-view")).toBeVisible();
@@ -1463,7 +1545,7 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
 
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   await expect.poll(() => page.locator(".v2-gym-floor img").evaluate(image => image.currentSrc)).toContain("gym-boxe-v2-mobile.jpg");
-  await expect(page.locator(".v2-gym-hotspot")).toHaveCount(8);
+  await expect(page.locator(".v2-gym-hotspot")).toHaveCount(4);
   const gymMetrics = await page.locator(".v2-gym-view").evaluate(element => ({
     scrollWidth: element.scrollWidth,
     clientWidth: element.clientWidth,
@@ -1584,7 +1666,8 @@ test("compose la semaine à la Maison et joue à la V1 sans faire avancer le tem
   const homeQuick = home.locator('.v2-home-actions [data-v2-home-action="home-quick"]');
   const capacityBefore = Number(await home.locator(".v2-home-week-plan meter").getAttribute("value"));
   await homeQuick.click();
-  await expect(homeQuick).toHaveAttribute("aria-pressed", "true");
+  await expect(homeQuick).toHaveAttribute("aria-pressed", "false");
+  await expect(home.locator(".v2-home-week-plan")).toContainText("Entraînement maison rapide");
   const capacityWithTraining = Number(await home.locator(".v2-home-week-plan meter").getAttribute("value"));
   expect(capacityWithTraining).toBeLessThan(capacityBefore);
 
@@ -1592,7 +1675,7 @@ test("compose la semaine à la Maison et joue à la V1 sans faire avancer le tem
   expect(afterTrainingDraft.timeState).toEqual(beforeClassic.timeState);
   expect(afterTrainingDraft.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "home-quick")).toBe(true);
 
-  await homeQuick.click();
+  await home.locator(".v2-home-planned-list", { hasText: "Entraînement maison rapide" }).getByRole("button", { name: "Retirer" }).click();
   await expect(homeQuick).toHaveAttribute("aria-pressed", "false");
   expect(Number(await home.locator(".v2-home-week-plan meter").getAttribute("value"))).toBe(capacityBefore);
   await homeQuick.click();
@@ -1733,7 +1816,7 @@ test("bloque clairement l’entraînement V2 pendant un repos médical", async (
   await expect(page.locator(".v2-gym-readiness.critical")).toContainText("Repos médical");
   await expect(page.locator("[data-v2-coach-session]")).toBeDisabled();
   await expect(page.locator("[data-v2-compose-session]")).toBeDisabled();
-  await expect(page.locator('[data-v2-gym-zone="heavy-bag"]')).toBeDisabled();
+  await expect(page.locator('[data-v2-gym-zone="training"]')).toBeDisabled();
   await expect(page.locator(".v2-gym-hotspot-reception")).toBeEnabled();
 });
 
@@ -2081,9 +2164,10 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   await expect(page.locator(".v2-strength-service", { hasText: "2 produits dans ton inventaire" })).toBeVisible();
 
   await page.locator('[data-v2-strength-activity="dynamic_warmup"]').first().click();
-  await page.locator('[data-v2-strength-activity="lower_body_strength"]').first().click();
-  await expect(page.locator(".v2-strength-selection")).toContainText("2 activités");
-  await expect(page.locator(".v2-strength-energy").first()).toContainText("92 % → 74 %");
+  await page.locator('[data-v2-strength-activity="upper_back_guard"]').first().click();
+  await page.locator('[data-v2-strength-activity="mobility_cooldown"]').first().click();
+  await expect(page.locator(".v2-strength-selection")).toContainText("3 activités");
+  await expect(page.locator(".v2-strength-energy").first()).toContainText("92 % → 76 %");
   await expect(page.locator("#v2-strength-week-energy-title")).toHaveText("Énergie restante de la semaine");
   await expect(page.locator(".v2-strength-selection")).toContainText("Fatigue après");
   await expect(page.locator("[data-v2-strength-confirm]")).toBeEnabled();
@@ -2118,12 +2202,12 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   await expect(inventoryView).toBeVisible();
   await expect(inventoryView).toContainText("Barre protéinée");
   await expect(inventoryView).toContainText("×2");
-  await expect(inventoryView).toContainText("Gain de barre");
+  await expect(inventoryView).toContainText("Le coût sera recalculé");
   const strengthEntryBeforeSupplement = plannedServices.previewRuntime.weekPlanner.entries.find(entry => entry.activityId === "strength-custom");
   await page.locator('[data-v2-inventory-item="protein-bar"]').click();
   const supplementReservation = page.locator(".v2-supplement-picker");
   await expect(supplementReservation).toBeVisible();
-  await expect(supplementReservation).toContainText(/la barre récupère 1 point/i);
+  await expect(supplementReservation).toContainText(/recalculé à partir du même effet/i);
   const strengthReservation = supplementReservation.locator(".v2-supplement-card", { hasText: "Séance de musculation personnalisée" });
   await strengthReservation.locator("[data-v2-plan-supplement-entry]").click();
   await expect(inventoryView).toContainText("Réservé cette semaine");

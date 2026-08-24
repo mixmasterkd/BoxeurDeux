@@ -7,22 +7,26 @@
   "use strict";
 
   const EXERCISES = Object.freeze([
-    Object.freeze({ id: "jump-rope", label: "Corde à danser", short: "Corde", detail: "Rythme, appuis et cardio.", energyCost: 5, durationMinutes: 15, fatigueGain: 3 }),
-    Object.freeze({ id: "shadow-boxing", label: "Shadow-boxing", short: "Shadow", detail: "Technique, fluidité et déplacements.", energyCost: 4, durationMinutes: 20, fatigueGain: 2 }),
-    Object.freeze({ id: "heavy-bag", label: "Sac lourd", short: "Sac", detail: "Enchaînements, puissance et gestion de l’effort.", energyCost: 7, durationMinutes: 25, fatigueGain: 5 }),
-    Object.freeze({ id: "mitt-work", label: "Travail aux mitaines", short: "Mitaines", detail: "Précision, réactions et consignes de l’entraîneur.", energyCost: 6, durationMinutes: 25, fatigueGain: 4 }),
-    Object.freeze({ id: "defense", label: "Défense et esquives", short: "Défense", detail: "Blocages, retraits, pivots et sorties des câbles.", energyCost: 5, durationMinutes: 20, fatigueGain: 3 }),
+    Object.freeze({ id: "jump-rope", label: "Corde à danser", short: "Corde", role: "preparation", roleLabel: "Préparation", gains: "Cardio · appuis", detail: "Rythme, appuis et cardio.", energyCost: 5, durationMinutes: 15, fatigueGain: 3 }),
+    Object.freeze({ id: "shadow-boxing", label: "Shadow-boxing", short: "Shadow", role: "work", roleLabel: "Travail principal", gains: "Technique · défense", detail: "Technique, fluidité et déplacements.", energyCost: 4, durationMinutes: 20, fatigueGain: 2 }),
+    Object.freeze({ id: "heavy-bag", label: "Sac lourd", short: "Sac", role: "work", roleLabel: "Travail principal", gains: "Puissance", detail: "Enchaînements, puissance et gestion de l’effort.", energyCost: 7, durationMinutes: 25, fatigueGain: 5 }),
+    Object.freeze({ id: "mitt-work", label: "Travail aux mitaines", short: "Mitaines", role: "work", roleLabel: "Travail principal", gains: "Technique · défense", detail: "Précision, réactions et consignes de l’entraîneur.", energyCost: 6, durationMinutes: 25, fatigueGain: 4 }),
+    Object.freeze({ id: "defense", label: "Défense et esquives", short: "Défense", role: "work", roleLabel: "Travail principal", gains: "Défense · technique", detail: "Blocages, retraits, pivots et sorties des câbles.", energyCost: 5, durationMinutes: 20, fatigueGain: 3 }),
+    Object.freeze({ id: "cooldown", label: "Retour au calme", short: "Récupération", role: "cooldown", roleLabel: "Retour au calme", gains: "Fatigue réduite", detail: "Respiration, mobilité légère et retour progressif au repos.", energyCost: 1, durationMinutes: 10, fatigueGain: -4 }),
   ]);
 
   const ZONES = Object.freeze([
-    Object.freeze({ id: "jump-rope", label: "Corde à danser", detail: "Échauffement et rythme" }),
-    Object.freeze({ id: "shadow-boxing", label: "Shadow-boxing", detail: "Appuis et technique" }),
-    Object.freeze({ id: "heavy-bag", label: "Sac lourd", detail: "Combinaisons et puissance" }),
-    Object.freeze({ id: "mitt-work", label: "Travail aux mitaines", detail: "Séance dirigée" }),
-    Object.freeze({ id: "defense", label: "Défense et esquives", detail: "Réactions et sorties" }),
-    Object.freeze({ id: "sparring", label: "Ring et sparring", detail: "Opposition contrôlée" }),
-    Object.freeze({ id: "coach", label: "Entraîneur", detail: "Séance préparée et conseils" }),
+    Object.freeze({ id: "coach", label: "Voir l’entraîneur", detail: "Séance préparée et conseils" }),
+    Object.freeze({ id: "training", label: "Zone d’entraînement", detail: "Bâtir une séance personnalisée" }),
+    Object.freeze({ id: "ring", label: "Ring", detail: "Sparring et oppositions" }),
     Object.freeze({ id: "reception", label: "Accueil", detail: "Abonnement au GYM" }),
+  ]);
+
+  const PRESETS = Object.freeze([
+    Object.freeze({ id: "technique", label: "Technique", detail: "Précision et enchaînements", exerciseIds: ["jump-rope", "shadow-boxing", "mitt-work", "cooldown"] }),
+    Object.freeze({ id: "power", label: "Puissance", detail: "Impact au sac", exerciseIds: ["jump-rope", "heavy-bag", "cooldown"] }),
+    Object.freeze({ id: "cardio", label: "Cardio de boxe", detail: "Rythme et volume", exerciseIds: ["jump-rope", "mitt-work", "cooldown"] }),
+    Object.freeze({ id: "defense", label: "Défense", detail: "Esquives et sorties", exerciseIds: ["jump-rope", "shadow-boxing", "defense", "cooldown"] }),
   ]);
 
   function escapeHTML(value) {
@@ -55,6 +59,7 @@
     const weekCapacity = raw.weekCapacity && typeof raw.weekCapacity === "object" ? raw.weekCapacity : {};
     const weekPlan = raw.weekPlan && typeof raw.weekPlan === "object" ? raw.weekPlan : {};
     const sparring = raw.sparring && typeof raw.sparring === "object" ? raw.sparring : {};
+    const clock = raw.clock && typeof raw.clock === "object" ? raw.clock : {};
     const careerStatus = raw.careerStatus === "recreational" ? "recreational" : raw.careerStatus === "professional" ? "professional" : "amateur";
     const preparationTone = ["positive", "steady", "warning", "critical"].includes(condition.preparationTone)
       ? condition.preparationTone
@@ -65,6 +70,12 @@
         firstName: profile.firstName || "Boxeur",
       },
       careerStatus,
+      careerStatusLabel: raw.careerStatusLabel || (careerStatus === "professional" ? "Professionnel" : careerStatus === "amateur" ? "Amateur" : "Récréatif"),
+      clock: {
+        week: wholeNumber(clock.week, 1, 1, 99999),
+        dayLabel: clock.dayLabel || "Lundi · matin",
+        dateLabel: clock.dateLabel || "date à confirmer",
+      },
       condition: {
         preparationLabel: condition.preparationLabel || "Correcte",
         preparationDetail: condition.preparationDetail || "Une séance équilibrée demeure raisonnable aujourd’hui.",
@@ -82,6 +93,7 @@
         durationMinutes: wholeNumber(coach.durationMinutes, 60, 0, 240),
         available: coach.available !== false,
         planned: coach.planned === true,
+        plannedCount: wholeNumber(coach.plannedCount, coach.planned ? 1 : 0, 0, 2),
         notice: coach.notice || "",
       },
       privateTrainer: {
@@ -129,6 +141,7 @@
         ? raw.selectedExercises.filter((id, index, list) => EXERCISES.some(exercise => exercise.id === id) && list.indexOf(id) === index).slice(0, EXERCISES.length)
         : [],
       draftDurationMinutes: wholeNumber(raw.draftDurationMinutes, 0, 0, 240),
+      draftWeekCost: wholeNumber(raw.draftWeekCost, 0, 0, 100),
     };
   }
 
@@ -158,9 +171,9 @@
     return `<section class="v2-gym-path v2-gym-path-recreational" aria-labelledby="v2-remy-title">
       <p class="eyebrow">Parcours récréatif</p>
       <h3 id="v2-remy-title">En route vers Rémy « Le Tank »</h3>
-      <p class="v2-gym-path-progress"><strong>${progress}/${context.recreational.targetWeeks}</strong> entraînements possibles complétés</p>
+      <p class="v2-gym-path-progress"><strong>${progress}/${context.recreational.targetWeeks}</strong> semaines d’initiation avec entraînement</p>
       <p class="v2-gym-group-class"><strong>Cours de groupe :</strong> inclus au parcours récréatif avec une inscription active au GYM.</p>
-      <p>${escapeHTML(detail)}</p>
+      <p id="v2-gym-sparring-reason">${escapeHTML(detail)}</p>
       ${action}
     </section>`;
   }
@@ -217,29 +230,36 @@
     const buttonLabel = sparring.available
       ? context.sparring.planned ? "Retirer de ma semaine" : "Ajouter à ma semaine"
       : "Sparring verrouillé";
-    return `<section class="v2-gym-sparring-card ${sparring.available ? "available" : "locked"}" id="v2-gym-sparring-card" data-v2-sparring-state="${sparring.status}" aria-labelledby="v2-gym-sparring-title">
+    return `<article class="v2-gym-sparring-card v2-gym-action-card ${sparring.available ? "available" : "locked"}" id="v2-gym-sparring-card" data-v2-sparring-state="${sparring.status}" aria-labelledby="v2-gym-sparring-title" tabindex="-1">
       <p class="eyebrow">Activité distincte</p>
       <h3 id="v2-gym-sparring-title">Sparring</h3>
       <p>Une opposition interactive avec un partenaire. Le sparring ne fait jamais partie d’une séance personnalisée.</p>
       <div class="v2-gym-sparring-state" id="v2-gym-sparring-reason" role="note"><span aria-hidden="true">${sparring.available ? "✓" : "🔒"}</span><div><strong>${escapeHTML(sparring.label)}</strong><p>${escapeHTML(sparring.detail)}</p></div></div>
       <button type="button" class="${sparring.available ? "primary-button" : "secondary-button"}" data-v2-sparring-activity="cta"${disabled}>${buttonLabel}</button>
-    </section>`;
+    </article>`;
   }
 
   function renderWeekPlan(context) {
-    if (!context.weekPlan.entries.length) return "";
-    return `<section class="v2-gym-week-plan" aria-labelledby="v2-gym-week-plan-title"><div><p class="eyebrow">Déjà dans la semaine</p><h3 id="v2-gym-week-plan-title">Activités du GYM planifiées</h3></div><ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>−${entry.cost} énergie</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul></section>`;
+    const entries = context.weekPlan.entries.length
+      ? `<ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} énergie` : "Aucun coût d’énergie"}</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
+      : `<p class="v2-place-plan-empty">Aucune activité du GYM n’est encore planifiée.</p>`;
+    return `<section class="v2-gym-week-plan v2-place-week-plan${context.weekCapacity.remaining <= 0 ? " full" : ""}" aria-labelledby="v2-gym-week-plan-title" aria-live="polite">
+      <div class="v2-place-week-plan-heading"><div><p class="eyebrow">Planification</p><h3 id="v2-gym-week-plan-title">Programme de la semaine</h3></div><strong>${context.weekCapacity.remaining} / ${context.weekCapacity.total}</strong></div>
+      <meter min="0" max="${context.weekCapacity.total}" value="${context.weekCapacity.remaining}" aria-label="Énergie hebdomadaire restante : ${context.weekCapacity.remaining} sur ${context.weekCapacity.total}">${context.weekCapacity.remaining} sur ${context.weekCapacity.total}</meter>
+      <p><strong>${context.weekCapacity.remaining > 0 ? `${context.weekCapacity.remaining} énergie encore disponible` : "Énergie hebdomadaire épuisée"}</strong> · ${context.weekCapacity.used} déjà réservée · les choix restent modifiables avant la confirmation.</p>
+      ${entries}
+    </section>`;
   }
 
   function render(rawContext) {
     const context = normalizeContext(rawContext);
     const sparring = sparringState(context);
     const zones = ZONES.map(zone => {
-      const isSparring = zone.id === "sparring";
+      const isRing = zone.id === "ring";
       const recreationalBlocked = context.careerStatus === "recreational" && !["coach", "reception"].includes(zone.id);
       const medicallyBlocked = context.membership.active && context.condition.trainingBlocked && !["coach", "reception"].includes(zone.id);
       const membershipBlocked = !context.membership.active && zone.id !== "reception";
-      const sparringBlocked = isSparring && !sparring.available;
+      const sparringBlocked = isRing && !sparring.available;
       const disabled = sparringBlocked
         ? " disabled aria-disabled=\"true\" aria-describedby=\"v2-gym-sparring-reason\""
         : membershipBlocked
@@ -259,11 +279,15 @@
         ? ` Indisponible : ${context.condition.trainingBlockedReason}`
         : "";
       const lock = membershipBlocked || sparringBlocked || recreationalBlocked ? `<span class="v2-gym-hotspot-lock" aria-hidden="true">🔒</span>` : "";
-      const actionAttribute = isSparring ? `data-v2-sparring-activity="hotspot" aria-controls="v2-gym-sparring-card"` : `data-v2-gym-zone="${zone.id}"`;
+      const actionAttribute = `data-v2-gym-zone="${zone.id}"${isRing ? ` aria-controls="v2-gym-sparring-card"` : ""}`;
       return `<button type="button" class="v2-gym-hotspot v2-gym-hotspot-${zone.id}" ${actionAttribute} aria-label="${escapeHTML(zone.label)}. ${escapeHTML(zone.detail)}${escapeHTML(reason)}"${disabled}><strong>${escapeHTML(zone.label)}</strong><small>${escapeHTML(zone.detail)}</small>${lock}</button>`;
     }).join("");
     const coachDisabled = context.coach.available && context.membership.active ? "" : " disabled aria-disabled=\"true\"";
-    const coachButtonLabel = context.coach.planned ? "Retirer de ma semaine" : "Ajouter à ma semaine";
+    const coachButtonLabel = context.coach.planned
+      ? "Retirer de ma semaine"
+      : context.coach.plannedCount > 0
+        ? "Ajouter une 2e séance"
+        : "Ajouter à ma semaine";
     const coachButtonClass = context.coach.planned ? "secondary-button" : "primary-button";
     const privateTrainerDisabled = context.privateTrainer.available ? "" : " disabled aria-disabled=\"true\" aria-describedby=\"v2-gym-private-trainer-reason\"";
     const composerDisabled = context.careerStatus === "recreational" || context.condition.trainingBlocked || !context.membership.active ? " disabled aria-disabled=\"true\"" : "";
@@ -281,14 +305,36 @@
       context.careerStatus === "recreational" ? "Sparring après Rémy et le passage amateur" : "Sparring comme activité distincte",
       ...(context.careerStatus === "recreational" ? ["Cours de groupe récréatif"] : []),
     ];
+    const customReason = context.careerStatus === "recreational"
+      ? "La composition libre se débloque après le passage amateur."
+      : !context.membership.active
+        ? "Un abonnement actif est requis."
+        : context.condition.trainingBlocked ? context.condition.trainingBlockedReason : "Choisis précisément les exercices et la charge de ta séance.";
+    const privateReason = context.privateTrainer.available
+      ? context.privateTrainer.detail
+      : context.careerStatus === "recreational"
+        ? "Les programmes privés se débloquent après le passage amateur."
+        : "Un abonnement actif est requis.";
+    const advancedActions = context.careerStatus === "recreational" ? "" : `
+      <article class="v2-gym-action-card${composerDisabled ? " locked" : ""}" aria-labelledby="v2-gym-custom-title">
+        <div class="v2-gym-action-heading"><span>Personnalisé</span><small>Contrôle complet</small></div>
+        <h3 id="v2-gym-custom-title">Bâtir ma séance</h3><p>${escapeHTML(customReason)}</p>
+        <button type="button" class="secondary-button" data-v2-compose-session${composerDisabled}>Choisir mes exercices</button>
+      </article>
+      <article class="v2-gym-action-card${privateTrainerDisabled ? " locked" : ""}" aria-labelledby="v2-gym-private-title">
+        <div class="v2-gym-action-heading"><span>Spécialisé</span><small>Service payant</small></div>
+        <h3 id="v2-gym-private-title">${escapeHTML(context.privateTrainer.name)}</h3><p id="v2-gym-private-trainer-reason">${escapeHTML(privateReason)}</p>
+        <button type="button" class="secondary-button" data-v2-boxing-trainer${privateTrainerDisabled}>${escapeHTML(context.privateTrainer.actionLabel)}</button>
+      </article>
+      ${renderSparringCard(context)}`;
 
-    return `<div class="v2-gym-view" data-career-status="${context.careerStatus}" data-membership-active="${context.membership.active}">
-      <header class="v2-gym-header">
-        <div><p class="eyebrow">GYM de boxe</p><h2>Bienvenue au GYM, ${escapeHTML(context.profile.firstName)}</h2></div>
+    return `<div class="v2-gym-view v2-place-view" data-career-status="${context.careerStatus}" data-membership-active="${context.membership.active}">
+      <header class="v2-gym-header v2-place-header">
+        <div><p class="eyebrow">GYM de boxe</p><h2>Bienvenue au GYM, ${escapeHTML(context.profile.firstName)}</h2><p class="v2-place-meta">${escapeHTML(context.careerStatusLabel)} · Semaine ${context.clock.week} · ${escapeHTML(context.clock.dayLabel)} · ${escapeHTML(context.clock.dateLabel)}</p></div>
         <button type="button" class="secondary-button" data-v2-leave-gym>Retour à la carte</button>
       </header>
-      <div class="v2-gym-layout">
-        <section class="v2-gym-floor" aria-labelledby="v2-gym-floor-title">
+      <div class="v2-gym-layout v2-place-layout">
+        <section class="v2-gym-floor v2-place-scene" aria-labelledby="v2-gym-floor-title">
           <h3 id="v2-gym-floor-title" class="sr-only">Zones interactives du GYM</h3>
           <picture>
             <source media="(max-width: 640px)" srcset="assets/gym-boxe-v2-mobile.jpg">
@@ -297,14 +343,9 @@
           <div class="v2-gym-hotspots">${zones}</div>
           ${membershipLock}
         </section>
-        <aside class="v2-gym-dashboard" aria-label="Séance et état actuel">
-          <section class="v2-gym-readiness weekly">
-            <span>Énergie restante de la semaine</span><strong>${context.weekCapacity.remaining}/${context.weekCapacity.total}</strong>
-            <progress max="${context.weekCapacity.total}" value="${context.weekCapacity.remaining}" aria-label="Énergie hebdomadaire restante : ${context.weekCapacity.remaining} sur ${context.weekCapacity.total}">${context.weekCapacity.remaining}/${context.weekCapacity.total}</progress>
-            <p>${context.weekCapacity.used} déjà réservée. Les choix restent modifiables avant la confirmation.</p>
-          </section>
+        <aside class="v2-gym-dashboard v2-place-dashboard" aria-label="Séance et état actuel">
           ${renderWeekPlan(context)}
-          <section class="v2-gym-readiness ${context.condition.preparationTone}">
+          <section class="v2-gym-readiness v2-place-condition ${context.condition.preparationTone}">
             <span>Préparation</span><strong>${escapeHTML(context.condition.preparationLabel)}</strong>
             <p>${escapeHTML(context.condition.preparationDetail)}</p>
             <div class="v2-gym-meters">
@@ -313,21 +354,24 @@
               <span>Temps disponible <b>${context.condition.availableMinutes} min</b></span>
             </div>
           </section>
-          <section class="v2-gym-coach-card" aria-labelledby="v2-gym-coach-title">
-            <p class="eyebrow">Préparée par ${escapeHTML(context.coach.name)}</p>
-            <h3 id="v2-gym-coach-title">${escapeHTML(context.coach.sessionTitle)}</h3>
-            <p>${escapeHTML(context.coach.sessionSummary)}</p>
-            <p class="v2-gym-session-duration"><strong>${context.coach.durationMinutes} minutes</strong> · adaptée à ton état actuel</p>
-            ${coachNotice}
-            <button type="button" class="${coachButtonClass}" data-v2-coach-session aria-pressed="${context.coach.planned}"${coachDisabled}>${coachButtonLabel}</button>
-            <button type="button" class="secondary-button" data-v2-compose-session${composerDisabled}>Composer puis ajouter</button>
-            <div class="v2-gym-private-trainer"><strong>${escapeHTML(context.privateTrainer.name)}</strong><small id="v2-gym-private-trainer-reason">${escapeHTML(context.privateTrainer.available ? context.privateTrainer.detail : context.careerStatus === "recreational" ? "Les programmes privés se débloquent après le passage amateur." : "Un abonnement actif est requis.")}</small><button type="button" class="secondary-button" data-v2-boxing-trainer${privateTrainerDisabled}>${escapeHTML(context.privateTrainer.actionLabel)}</button></div>
+          <section class="v2-gym-actions-panel v2-place-card v2-place-actions" aria-labelledby="v2-gym-actions-title">
+            <div class="v2-gym-actions-heading"><p class="eyebrow">Activités du GYM</p><h3 id="v2-gym-actions-title">Choisis comment t’entraîner</h3><p>${context.careerStatus === "recreational" ? "Commence simplement avec le cours de groupe proposé par l’entraîneur." : "Utilise la recommandation rapide ou prends le contrôle de ta séance."}</p></div>
+            <div class="v2-gym-action-list">
+              <article class="v2-gym-coach-card v2-gym-action-card recommended" aria-labelledby="v2-gym-coach-title">
+                <div class="v2-gym-action-heading"><span>Recommandé</span><small>${context.coach.durationMinutes} min</small></div>
+                <p class="eyebrow">Préparée par ${escapeHTML(context.coach.name)}</p>
+                <h3 id="v2-gym-coach-title">${escapeHTML(context.coach.sessionTitle)}</h3>
+                <p>${escapeHTML(context.coach.sessionSummary)}</p>
+                ${coachNotice}
+                <button type="button" class="${coachButtonClass}" data-v2-coach-session aria-pressed="${context.coach.planned}"${coachDisabled}>${coachButtonLabel}</button>
+              </article>
+              ${advancedActions}
+            </div>
           </section>
-          ${renderSparringCard(context)}
-          <section class="v2-gym-membership ${context.membership.active ? "active" : "inactive"}">
+          <section class="v2-gym-membership v2-place-card ${context.membership.active ? "active" : "inactive"}">
             <span>Réception du GYM</span><strong>${escapeHTML(context.membership.active ? context.membership.label : "Inscription requise")}</strong><p>${escapeHTML(context.membership.detail)}</p>
             <ul class="v2-gym-access-preview" aria-label="${context.membership.active ? "Activités comprises" : "Activités déverrouillées après l’inscription"}">${accessItems.map(item => `<li><span aria-hidden="true">${context.membership.active ? "✓" : "🔒"}</span>${escapeHTML(item)}</li>`).join("")}</ul>
-            <div class="v2-gym-membership-price"><span>Forfait 1 mois</span><strong>${context.membership.monthlyPrice} $</strong><small>${escapeHTML(priceDetail)}</small></div>
+            <div class="v2-gym-membership-price"><span>1 mois · ou 3 mois à rabais</span><strong>${context.membership.monthlyPrice} $</strong><small>${escapeHTML(priceDetail)}</small></div>
             <button type="button" class="${context.membership.active ? "secondary-button" : "primary-button"}" data-v2-gym-zone="reception" aria-label="${escapeHTML(`${membershipButton}. ${priceDetail}`)}">${escapeHTML(membershipButton)}</button>
           </section>
           ${recreationalPath(context)}
@@ -344,13 +388,22 @@
     const energyCost = selectedActivities.reduce((sum, exercise) => sum + exercise.energyCost, 0);
     const fatigueGain = selectedActivities.reduce((sum, exercise) => sum + exercise.fatigueGain, 0);
     const projectedEnergy = Math.max(0, context.condition.energy - energyCost);
-    const projectedFatigue = Math.min(100, context.condition.fatigue + fatigueGain);
+    const projectedFatigue = Math.max(0, Math.min(100, context.condition.fatigue + fatigueGain));
+    const hasPreparation = selectedActivities.some(exercise => exercise.role === "preparation");
+    const hasWork = selectedActivities.some(exercise => exercise.role === "work");
+    const hasCooldown = selectedActivities.some(exercise => exercise.role === "cooldown");
+    const structureReady = hasPreparation && hasWork && hasCooldown;
+    const projectedWeekEnergy = Math.max(0, context.weekCapacity.remaining - context.draftWeekCost);
+    const presets = PRESETS.map(preset => {
+      const active = preset.exerciseIds.length === selected.length && preset.exerciseIds.every(id => selected.includes(id));
+      return `<button type="button" class="v2-session-preset${active ? " selected" : ""}" data-v2-session-preset="${preset.id}" aria-pressed="${active}"${membershipLocked || context.condition.trainingBlocked ? " disabled aria-disabled=\"true\"" : ""}><strong>${escapeHTML(preset.label)}</strong><small>${escapeHTML(preset.detail)}</small></button>`;
+    }).join("");
     const exerciseButtons = EXERCISES.map(exercise => {
       const isSelected = selected.includes(exercise.id);
       const lacksEnergy = !isSelected && exercise.energyCost > projectedEnergy;
       const disabled = membershipLocked || context.condition.trainingBlocked || lacksEnergy ? " disabled aria-disabled=\"true\"" : "";
       const stateLabel = isSelected ? "Sélectionnée · toucher pour retirer" : lacksEnergy ? "Énergie insuffisante" : `Ajouter · −${exercise.energyCost} énergie`;
-      return `<button type="button" class="v2-exercise-choice${isSelected ? " selected" : ""}" data-v2-exercise="${exercise.id}" aria-pressed="${isSelected}" aria-label="${escapeHTML(`${exercise.label}. ${stateLabel}`)}"${disabled}><span class="v2-exercise-heading-row"><strong>${escapeHTML(exercise.label)}</strong><b>−${exercise.energyCost} E</b></span><small>${escapeHTML(exercise.detail)}</small><em>${exercise.durationMinutes} min · ${escapeHTML(stateLabel)}</em></button>`;
+      return `<button type="button" class="v2-exercise-choice${isSelected ? " selected" : ""}" data-v2-exercise="${exercise.id}" aria-pressed="${isSelected}" aria-label="${escapeHTML(`${exercise.label}. ${exercise.roleLabel}. ${stateLabel}`)}"${disabled}><span class="v2-exercise-heading-row"><strong>${escapeHTML(exercise.label)}</strong><b>${exercise.energyCost > 0 ? `−${exercise.energyCost} E` : `+${Math.abs(exercise.fatigueGain)} récup.`}</b></span><small><span>${escapeHTML(exercise.roleLabel)}</span> · ${escapeHTML(exercise.gains)}</small><small>${escapeHTML(exercise.detail)}</small><em>${exercise.durationMinutes} min · ${escapeHTML(stateLabel)}</em></button>`;
     }).join("");
     const blocks = selected.length
       ? selected.map((id, index) => {
@@ -361,13 +414,15 @@
 
     return `<section class="v2-session-composer" aria-labelledby="v2-composer-title">
       <header><div><p class="eyebrow">Séance personnalisée</p><h2 id="v2-composer-title">Bâtis ta séance avec ton énergie</h2></div><button type="button" data-v2-close-composer aria-label="Fermer le compositeur">Fermer</button></header>
-      <p>Ajoute librement les activités qui t’intéressent. Chaque choix réduit immédiatement l’énergie projetée; retirer une activité la remet dans la réserve.</p>
+      <p>Utilise un modèle spécialisé ou compose librement. Une séance complète garde une préparation, un travail principal et un retour au calme.</p>
       ${membershipLocked ? `<p class="v2-composer-membership-note" role="status"><strong>Inscription requise.</strong> Retourne à la réception pour débloquer les activités du GYM.</p>` : ""}
-      <section class="v2-composer-energy" aria-label="Énergie disponible pendant la composition" aria-live="polite"><div><span>Énergie pour cette séance</span><strong>${projectedEnergy} %</strong></div><progress max="100" value="${projectedEnergy}">${projectedEnergy} %</progress><p>${context.condition.energy} % au départ · ${energyCost ? `−${energyCost} points dépensés` : "aucune dépense choisie"}</p></section>
+      <section class="v2-composer-energy" aria-label="Énergie disponible pendant la composition" aria-live="polite"><div><span>Énergie restante de la semaine</span><strong>${projectedWeekEnergy} / ${context.weekCapacity.total}</strong></div><progress max="${context.weekCapacity.total}" value="${projectedWeekEnergy}">${projectedWeekEnergy}/${context.weekCapacity.total}</progress><p>${context.weekCapacity.remaining} disponible avant cette séance · coût estimé ${context.draftWeekCost}</p><div><span>Énergie physique après la séance</span><strong>${projectedEnergy} %</strong></div></section>
+      <section class="v2-session-presets" aria-labelledby="v2-session-presets-title"><div><p class="eyebrow">Modèles rapides</p><h3 id="v2-session-presets-title">Choisir une spécialisation</h3></div><div>${presets}</div></section>
       <div class="v2-composer-state" aria-live="polite"><strong>${selected.length} activité${selected.length > 1 ? "s" : ""}</strong><span>Durée prévue : ${context.draftDurationMinutes} min</span><span>Énergie après : ${projectedEnergy} %</span><span>Fatigue après : ${projectedFatigue} %</span></div>
+      <ul class="v2-session-structure" aria-label="Structure minimale de la séance"><li class="${hasPreparation ? "complete" : "missing"}"><span aria-hidden="true">${hasPreparation ? "✓" : "○"}</span> Préparation</li><li class="${hasWork ? "complete" : "missing"}"><span aria-hidden="true">${hasWork ? "✓" : "○"}</span> Travail principal</li><li class="${hasCooldown ? "complete" : "missing"}"><span aria-hidden="true">${hasCooldown ? "✓" : "○"}</span> Retour au calme</li></ul>
       <ol class="v2-session-blocks" aria-label="Activités choisies">${blocks}</ol>
       <div class="v2-exercise-grid" aria-label="Exercices disponibles">${exerciseButtons}</div>
-      <footer><button type="button" class="secondary-button" data-v2-close-composer>Annuler</button><button type="button" class="primary-button" data-v2-confirm-session${selected.length >= 1 && !context.condition.trainingBlocked && !membershipLocked ? "" : " disabled aria-disabled=\"true\""}>Ajouter à ma semaine</button></footer>
+      <footer><button type="button" class="secondary-button" data-v2-close-composer>Annuler</button><button type="button" class="primary-button" data-v2-confirm-session${structureReady && !context.condition.trainingBlocked && !membershipLocked ? "" : " disabled aria-disabled=\"true\""}>Ajouter à ma semaine</button></footer>
     </section>`;
   }
 
@@ -399,5 +454,5 @@
     </section>`;
   }
 
-  return Object.freeze({ EXERCISES, ZONES, normalizeContext, render, renderComposer, renderResult });
+  return Object.freeze({ EXERCISES, ZONES, PRESETS, normalizeContext, render, renderComposer, renderResult });
 });

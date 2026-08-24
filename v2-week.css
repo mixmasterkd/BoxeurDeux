@@ -431,3 +431,29 @@
     animation-iteration-count: 1 !important;
   }
 }
+.v2-week-summary-guide {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid rgba(113, 167, 197, .42);
+  border-left: 4px solid var(--blue, #71a7c5);
+  border-radius: 12px;
+  background: rgba(113, 167, 197, .09);
+}
+
+.v2-week-summary-guide h3 {
+  margin: 4px 0 7px;
+  color: #f6f1e7;
+  font: 800 1.28rem/1 "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+}
+
+.v2-week-summary-guide p,
+.v2-week-summary-guide strong {
+  display: block;
+  margin: 0;
+  color: #c9d5d9;
+  font-size: .72rem;
+  line-height: 1.5;
+}
+
+.v2-week-summary-guide strong { margin-top: 8px; color: #a8d1e8; }

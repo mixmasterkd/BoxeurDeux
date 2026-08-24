@@ -97,28 +97,28 @@ test("compose librement plus de trois activités sans plafond artificiel", () =>
 
 test("l'aperçu met immédiatement à jour énergie, fatigue et stimuli sans mutation", () => {
   const state = freshState({ condition: { energy: 80, fatigue: 10 } });
-  const selection = ["dynamic_warmup", "lower_body_strength", "boxing_core"];
+  const selection = ["dynamic_warmup", "lower_body_strength", "boxing_core", "mobility_cooldown"];
   const before = JSON.stringify(state);
   const preview = strength.previewDraft(state, selection, ACTIVE_GYM);
 
   assert.equal(preview.ok, true);
   assert.equal(preview.canConfirm, true);
-  assert.equal(preview.totals.durationMinutes, 45);
-  assert.equal(preview.totals.energyCost, 26);
-  assert.equal(preview.totals.fatigueDelta, 15);
-  assert.deepEqual(preview.totals.stimulus, { technique: 0, power: 4.4, cardio: 2.2, defense: 1.4 });
+  assert.equal(preview.totals.durationMinutes, 55);
+  assert.equal(preview.totals.energyCost, 29);
+  assert.equal(preview.totals.fatigueDelta, 12);
+  assert.deepEqual(preview.totals.stimulus, { technique: 0, power: 4.4, cardio: 2.2, defense: 1.7 });
   assert.deepEqual(preview.projected, {
-    energy: 54,
-    fatigue: 25,
-    stimulus: { technique: 0, power: 4.4, cardio: 2.2, defense: 1.4 },
+    energy: 51,
+    fatigue: 22,
+    stimulus: { technique: 0, power: 4.4, cardio: 2.2, defense: 1.7 },
   });
   assert.equal(JSON.stringify(state), before);
-  assert.deepEqual(selection, ["dynamic_warmup", "lower_body_strength", "boxing_core"]);
+  assert.deepEqual(selection, ["dynamic_warmup", "lower_body_strength", "boxing_core", "mobility_cooldown"]);
 });
 
 test("les suppléments ajustent seulement l'effort immédiat de musculation", () => {
   const state = freshState({ condition: { energy: 80, fatigue: 10 } });
-  const selection = ["dynamic_warmup", "lower_body_strength", "boxing_core"];
+  const selection = ["dynamic_warmup", "lower_body_strength", "boxing_core", "mobility_cooldown"];
   const base = strength.previewSession(state, selection, ACTIVE_GYM);
   const adjusted = strength.previewSession(state, selection, {
     ...ACTIVE_GYM,
@@ -170,6 +170,19 @@ test("un échauffement ou un retour au calme seul ne constitue pas une séance d
   assert.equal(cooldown.code, "WORK_ACTIVITY_REQUIRED");
 });
 
+test("une séance personnalisée exige préparation, travail principal et retour au calme", () => {
+  const state = freshState();
+  const withoutWarmup = strength.previewDraft(state, ["boxing_core", "mobility_cooldown"], ACTIVE_GYM);
+  const withoutCooldown = strength.previewDraft(state, ["dynamic_warmup", "boxing_core"], ACTIVE_GYM);
+  const complete = strength.previewDraft(state, ["dynamic_warmup", "boxing_core", "mobility_cooldown"], ACTIVE_GYM);
+
+  assert.equal(withoutWarmup.canConfirm, false);
+  assert.equal(withoutWarmup.code, "WARMUP_REQUIRED");
+  assert.equal(withoutCooldown.canConfirm, false);
+  assert.equal(withoutCooldown.code, "COOLDOWN_REQUIRED");
+  assert.equal(complete.canConfirm, true);
+});
+
 test("refuse les activités inconnues, les doublons, l'accès verrouillé et le repos médical", () => {
   assert.throws(
     () => strength.aggregateSelection(["lower_body_strength", "inconnue"]),
@@ -212,7 +225,7 @@ test("une séance complète produit une seule transition et aucun gain de statis
   const initial = freshState({ condition: { energy: 80, fatigue: 10 } });
   const outcome = strength.executeSession(
     initial,
-    ["dynamic_warmup", "lower_body_strength", "boxing_core"],
+    ["dynamic_warmup", "lower_body_strength", "boxing_core", "mobility_cooldown"],
     ACTIVE_GYM,
     fixedRng(),
   );
@@ -224,12 +237,12 @@ test("une séance complète produit une seule transition et aucun gain de statis
   assert.deepEqual(outcome.timeState.stats, initial.stats);
   assert.ok(outcome.timeState.stimulus.power > initial.stimulus.power);
   assert.equal(outcome.timeState.history.filter(event => event.type === "activity-completed").length, 1);
-  assert.deepEqual(outcome.result.activities, ["dynamic_warmup", "lower_body_strength", "boxing_core"]);
+  assert.deepEqual(outcome.result.activities, ["dynamic_warmup", "lower_body_strength", "boxing_core", "mobility_cooldown"]);
 });
 
 test("l'exécution reste pure et déterministe avec une source aléatoire injectable", () => {
   const initial = freshState();
-  const selection = ["rotational_power", "machine_conditioning", "mobility_cooldown"];
+  const selection = ["dynamic_warmup", "rotational_power", "machine_conditioning", "mobility_cooldown"];
   const context = { ...ACTIVE_GYM, sessionLabel: "Puissance et moteur" };
   const snapshots = [JSON.stringify(initial), JSON.stringify(selection), JSON.stringify(context)];
   const first = strength.executeSession(initial, selection, context, time.createSeededRng("force"));
@@ -252,7 +265,7 @@ test("la récupération assimile ensuite le stimulus selon le moteur temporel co
   });
   const trained = strength.executeSession(
     initial,
-    ["lower_body_strength", "posterior_chain"],
+    ["dynamic_warmup", "lower_body_strength", "posterior_chain", "mobility_cooldown"],
     ACTIVE_GYM,
     fixedRng(),
   ).timeState;

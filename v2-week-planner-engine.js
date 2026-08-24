@@ -15,13 +15,22 @@
    * demeure ainsi la seule autorité qui applique réellement une semaine.
    */
 
-  const SCHEMA_VERSION = 1;
+  const SCHEMA_VERSION = 2;
+  const LEGACY_SCHEMA_VERSION = 1;
   const STATE_KIND = "boxeur-v2-week-planner";
   const DEFAULT_WEEKLY_CAPACITY = 10;
-  const DEFAULT_RECREATIONAL_PHYSICAL_LIMIT = 3;
+  const DEFAULT_RECREATIONAL_PHYSICAL_LIMIT = 2;
   const DEFAULT_SUPPLEMENT_LIMIT = 2;
+  const REPEAT_GAIN_MULTIPLIER = 0.85;
   const MAX_ENTRIES = 64;
   const MAX_CAPACITY = 50;
+  const DEFAULT_FAMILY_LIMITS = deepFreeze({
+    group: 1,
+    boxing: 2,
+    strength: 2,
+    home: 2,
+    sparring: 1,
+  });
 
   const DAYS = deepFreeze([
     { id: "monday", label: "Lundi" },
@@ -170,6 +179,23 @@
       ? finiteNumber(input.fatigueGain == null ? defaults.fatigueGain : input.fatigueGain, 0, 0, 100)
         - finiteNumber(input.fatigueRelief == null ? defaults.fatigueRelief : input.fatigueRelief, 0, 0, 100)
       : finiteNumber(input.fatigueDelta, 0, -100, 100);
+    const metadata = clone(input.metadata == null ? defaults.metadata || {} : input.metadata);
+    const inferredFamily = category === "group-class"
+      ? "group"
+      : category === "boxing"
+        ? "boxing"
+        : category === "strength"
+          ? "strength"
+          : category === "sparring"
+            ? "sparring"
+            : category === "home" && explicitPhysical === true
+              ? "home"
+              : "";
+    const familyId = cleanId(metadata.familyId) || inferredFamily;
+    if (familyId) {
+      metadata.familyId = familyId;
+      metadata.programSignature = cleanId(metadata.programSignature) || `${familyId}:${id}`;
+    }
     return {
       activityId: id,
       label: String(input.label == null ? defaults.label == null ? id : defaults.label : input.label),
@@ -179,7 +205,7 @@
       capacityCost: wholeNumber(
         input.capacityCost == null ? defaults.capacityCost : input.capacityCost,
         1,
-        1,
+        0,
         MAX_CAPACITY,
       ),
       energyCost: roundTo(finiteNumber(
@@ -202,8 +228,47 @@
       allowedCareerStatuses: normalizeStatusList(
         input.allowedCareerStatuses == null ? defaults.allowedCareerStatuses : input.allowedCareerStatuses,
       ),
-      metadata: clone(input.metadata == null ? defaults.metadata || {} : input.metadata),
+      metadata,
     };
+  }
+
+  function normalizeFamilyLimits(value, careerStatus) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const limits = {};
+    Object.entries(DEFAULT_FAMILY_LIMITS).forEach(([familyId, defaultLimit]) => {
+      const recreationalHomeLimit = careerStatus === "recreational" && familyId === "home" ? 1 : defaultLimit;
+      limits[familyId] = wholeNumber(source[familyId], recreationalHomeLimit, 0, DAYS.length);
+    });
+    return limits;
+  }
+
+  function familyFor(activity) {
+    return cleanId(activity && activity.metadata && activity.metadata.familyId);
+  }
+
+  function programSignatureFor(activity) {
+    return cleanId(activity && activity.metadata && activity.metadata.programSignature);
+  }
+
+  function recalculateRepetition(entries) {
+    const next = clone(entries);
+    const groups = new Map();
+    next.forEach(entry => {
+      if (entry.preReserved || entry.physical !== true) return;
+      const signature = programSignatureFor(entry);
+      if (!signature) return;
+      if (!groups.has(signature)) groups.set(signature, []);
+      groups.get(signature).push(entry);
+    });
+    groups.forEach(group => {
+      group.sort((left, right) => left.dayIndex - right.dayIndex || left.id.localeCompare(right.id));
+      group.forEach((entry, index) => {
+        entry.metadata = clone(entry.metadata || {});
+        entry.metadata.repeatIndex = index + 1;
+        entry.metadata.gainMultiplier = index === 0 ? 1 : REPEAT_GAIN_MULTIPLIER;
+      });
+    });
+    return next;
   }
 
   function normalizeInventory(value) {
@@ -303,13 +368,14 @@
   function createPlanner(config = {}) {
     const source = config && typeof config === "object" ? config : {};
     const weekKey = cleanId(source.weekKey == null ? source.week : source.weekKey) || "untracked";
+    const careerStatus = normalizeCareerStatus(source.careerStatus);
     const capacityTotal = wholeNumber(
       source.capacity && typeof source.capacity === "object" ? source.capacity.total : source.capacity,
       DEFAULT_WEEKLY_CAPACITY,
       1,
       MAX_CAPACITY,
     );
-    const entries = workEntries(source.work, weekKey);
+    const entries = recalculateRepetition(workEntries(source.work, weekKey));
     if (new Set(entries.map(entry => entry.id)).size !== entries.length) {
       throw plannerError("DUPLICATE_ENTRY_ID", "Deux quarts de travail utilisent le même identifiant.");
     }
@@ -326,7 +392,7 @@
       status: "draft",
       mode: "manual",
       weekKey,
-      careerStatus: normalizeCareerStatus(source.careerStatus),
+      careerStatus,
       revision: 0,
       nextEntrySequence: 1,
       capacity: { total: capacityTotal },
@@ -338,6 +404,7 @@
           0,
           DAYS.length,
         ),
+        family: normalizeFamilyLimits(source.limits && source.limits.family, careerStatus),
       },
       supplements: normalizeSupplements(source.supplements),
       entries: clone(entries),
@@ -357,8 +424,31 @@
     return source;
   }
 
+  function migratePlannerState(source) {
+    if (!source || typeof source !== "object" || source.kind !== STATE_KIND) return source;
+    if (source.schemaVersion === SCHEMA_VERSION) return clone(source);
+    if (source.schemaVersion !== LEGACY_SCHEMA_VERSION) return source;
+    const next = clone(source);
+    next.schemaVersion = SCHEMA_VERSION;
+    next.careerStatus = normalizeCareerStatus(next.careerStatus);
+    next.limits = next.limits && typeof next.limits === "object" ? next.limits : {};
+    next.limits.recreationalPhysicalActivities = wholeNumber(
+      next.limits.recreationalPhysicalActivities,
+      DEFAULT_RECREATIONAL_PHYSICAL_LIMIT,
+      0,
+      DAYS.length,
+    );
+    next.limits.family = normalizeFamilyLimits(next.limits.family, next.careerStatus);
+    next.entries = recalculateRepetition((Array.isArray(next.entries) ? next.entries : []).map(entry => {
+      if (!entry || typeof entry !== "object") return entry;
+      const activity = normalizeActivity({ ...entry, id: entry.activityId });
+      return { ...entry, metadata: activity.metadata };
+    }));
+    return next;
+  }
+
   function restorePlanner(source) {
-    const state = clone(assertPlannerState(source));
+    const state = clone(assertPlannerState(migratePlannerState(source)));
     const validation = validatePlan(state);
     if (!validation.ok) {
       throw plannerError("INVALID_PLANNER_STATE", "Le planificateur sauvegardé contient un plan invalide.", validation.errors);
@@ -444,6 +534,20 @@
         };
       }
     }
+    const familyId = familyFor(activity);
+    if (familyId) {
+      const limit = wholeNumber(state.limits.family && state.limits.family[familyId], 0, 0, DAYS.length);
+      const count = state.entries.filter(entry => familyFor(entry) === familyId).length;
+      if (count >= limit) {
+        return {
+          ok: false,
+          code: "WEEKLY_FAMILY_LIMIT",
+          reason: `La limite hebdomadaire de la famille « ${familyId} » est atteinte.`,
+          activity,
+          family: { id: familyId, count, limit },
+        };
+      }
+    }
     let dayIndex;
     if (activity.physical) {
       const requested = options.day == null ? options.preferredDay : options.day;
@@ -513,11 +617,13 @@
       supplementId: null,
     };
     next.entries.push(entry);
+    next.entries = recalculateRepetition(next.entries);
+    const storedEntry = next.entries.find(candidate => candidate.id === entry.id);
     next.nextEntrySequence = generated.nextSequence;
     next.revision += 1;
     return {
       state: next,
-      result: { action: "added", entry: clone(entry), capacityReserved: entry.capacityCost },
+      result: { action: "added", entry: clone(storedEntry), capacityReserved: storedEntry.capacityCost },
       preview: previewPlan(next),
     };
   }
@@ -538,6 +644,7 @@
     }
     const next = clone(current);
     next.entries.splice(found.index, 1);
+    next.entries = recalculateRepetition(next.entries);
     next.revision += 1;
     return {
       state: next,
@@ -599,16 +706,18 @@
       supplementId: quote.activity.physical ? found.entry.supplementId : null,
     };
     base.entries.push(nextEntry);
+    base.entries = recalculateRepetition(base.entries);
+    const storedEntry = base.entries.find(candidate => candidate.id === nextEntry.id);
     base.revision = current.revision + 1;
     return {
       state: base,
       result: {
         action: "edited",
         before: clone(found.entry),
-        entry: clone(nextEntry),
-        capacityRefunded: Math.max(0, found.entry.capacityCost - nextEntry.capacityCost),
-        capacityAdded: Math.max(0, nextEntry.capacityCost - found.entry.capacityCost),
-        supplementRefunded: found.entry.supplementId && !nextEntry.supplementId
+        entry: clone(storedEntry),
+        capacityRefunded: Math.max(0, found.entry.capacityCost - storedEntry.capacityCost),
+        capacityAdded: Math.max(0, storedEntry.capacityCost - found.entry.capacityCost),
+        supplementRefunded: found.entry.supplementId && !storedEntry.supplementId
           ? found.entry.supplementId
           : null,
       },
@@ -824,6 +933,11 @@
       100,
     ));
     const reservationIds = entries.filter(entry => entry.supplementId).map(entry => entry.supplementId);
+    const familyCounts = entries.reduce((counts, entry) => {
+      const familyId = familyFor(entry);
+      if (familyId) counts[familyId] = (counts[familyId] || 0) + 1;
+      return counts;
+    }, {});
     const inventoryAvailable = { ...state.supplements.inventory };
     reservationIds.forEach(id => { inventoryAvailable[id] = Math.max(0, finiteNumber(inventoryAvailable[id]) - 1); });
     const perDay = DAYS.map(day => {
@@ -862,6 +976,11 @@
         fatigueZone: { value: projectedFatigue, ...fatigue },
       },
       totals,
+      families: Object.fromEntries(Object.entries(state.limits.family || {}).map(([familyId, limit]) => [familyId, {
+        used: familyCounts[familyId] || 0,
+        limit,
+        remaining: Math.max(0, limit - (familyCounts[familyId] || 0)),
+      }])),
       supplements: {
         weeklyLimit: state.supplements.weeklyLimit,
         alreadyUsed: state.supplements.alreadyUsed,
@@ -899,6 +1018,8 @@
     }
     const ids = new Set();
     const physicalDays = new Map();
+    const familyCounts = {};
+    const expectedRepetition = new Map(recalculateRepetition(state.entries).map(entry => [entry.id, entry.metadata || {}]));
     let recreationalPhysical = 0;
     const reservations = [];
     state.entries.forEach((entry, index) => {
@@ -948,6 +1069,14 @@
       if (!access.ok) errors.push(validationError(access.code, access.reason, { entryId: entry.id }));
       if (entry.physical) {
         recreationalPhysical += 1;
+        const familyId = familyFor(activity);
+        if (familyId) familyCounts[familyId] = (familyCounts[familyId] || 0) + 1;
+        const expectedMetadata = expectedRepetition.get(entry.id) || {};
+        if (programSignatureFor(activity)
+          && (Number(entry.metadata?.gainMultiplier) !== Number(expectedMetadata.gainMultiplier)
+            || Number(entry.metadata?.repeatIndex) !== Number(expectedMetadata.repeatIndex))) {
+          errors.push(validationError("INVALID_REPEAT_ADJUSTMENT", `La réduction de répétition de ${entry.id} est incohérente.`));
+        }
         if (physicalDays.has(dayIndex)) {
           errors.push(validationError("DAILY_PHYSICAL_LIMIT", "Deux activités physiques occupent la même journée.", {
             firstEntryId: physicalDays.get(dayIndex),
@@ -970,6 +1099,16 @@
       && recreationalPhysical > state.limits.recreationalPhysicalActivities) {
       errors.push(validationError("RECREATIONAL_PHYSICAL_LIMIT", "La limite physique récréative est dépassée."));
     }
+    Object.entries(familyCounts).forEach(([familyId, count]) => {
+      const limit = wholeNumber(state.limits.family && state.limits.family[familyId], 0, 0, DAYS.length);
+      if (count > limit) {
+        errors.push(validationError("WEEKLY_FAMILY_LIMIT", `La limite hebdomadaire de la famille « ${familyId} » est dépassée.`, {
+          familyId,
+          count,
+          limit,
+        }));
+      }
+    });
     if (state.careerStatus === "recreational" && reservations.length) {
       errors.push(validationError("SUPPLEMENTS_LOCKED", "Les suppléments sont verrouillés au statut récréatif."));
     }
@@ -1070,6 +1209,8 @@
     DEFAULT_WEEKLY_CAPACITY,
     DEFAULT_RECREATIONAL_PHYSICAL_LIMIT,
     DEFAULT_SUPPLEMENT_LIMIT,
+    DEFAULT_FAMILY_LIMITS,
+    REPEAT_GAIN_MULTIPLIER,
     MAX_ENTRIES,
     DAYS,
     ACTIVITY_CATEGORIES,

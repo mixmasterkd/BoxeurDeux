@@ -158,3 +158,20 @@ test("le bilan échappe les données et annonce les résultats importants", () =
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /data-v2-week-summary-close/);
 });
+
+test("explique le premier bilan guidé et annonce la semaine suivante", () => {
+  const html = view.renderSummary({
+    weekFrom: 1,
+    weekTo: 2,
+    title: "Bienvenue à la semaine 2",
+    guide: {
+      title: "Comment lire ton premier bilan",
+      detail: "Énergie et fatigue résument le coût du programme.",
+      next: "Le guide affichera l’objectif suivant.",
+    },
+    actionLabel: "Continuer vers la semaine 2",
+  });
+  assert.match(html, /v2-week-summary-guide/);
+  assert.match(html, /Comment lire ton premier bilan/);
+  assert.match(html, /Continuer vers la semaine 2/);
+});

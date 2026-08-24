@@ -20,7 +20,8 @@
   const SCHEMA_VERSION = 1;
   const MODES = Object.freeze(["detailed", "quick", "hybrid"]);
   const DEFAULT_BUDGET = Object.freeze({ trainingSessions: 3, shortRecoveries: 2 });
-  const DEFAULT_TRAINING_SLOTS = Object.freeze([1, 7, 13, 19]);
+  const DEFAULT_TRAINING_SLOTS = Object.freeze([2, 5, 8, 11, 14, 17, 20]);
+  const MAX_TRAINING_SESSIONS = BoxeurTime.DAYS.length;
   const IMPORTANT_KINDS = Object.freeze([
     "bout", "combat", "fight", "sparring", "tournament", "tournoi", "weigh-in", "weigh_in", "weighin",
   ]);
@@ -280,7 +281,7 @@
           budgetInput.trainingSessions,
           configuredTrainingCount,
           0,
-          DEFAULT_TRAINING_SLOTS.length,
+          MAX_TRAINING_SESSIONS,
         ),
       shortRecoveries: boundedInteger(
         budgetInput.shortRecoveries,
@@ -367,7 +368,7 @@
             budgetInput.trainingSessions,
             plannedTrainingCount,
             0,
-            DEFAULT_TRAINING_SLOTS.length,
+            MAX_TRAINING_SESSIONS,
           ),
         ),
         shortRecoveries: boundedInteger(
@@ -882,6 +883,7 @@
     SCHEMA_VERSION,
     MODES,
     DEFAULT_BUDGET,
+    MAX_TRAINING_SESSIONS,
     createWeekState,
     buildWeekPlan,
     isImportantAppointment,

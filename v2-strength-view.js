@@ -140,6 +140,7 @@
         available: quick.available !== false,
         reason: quick.reason || "",
         planned: quick.planned === true,
+        plannedCount: wholeNumber(quick.plannedCount, quick.planned ? 1 : 0, 0, 2),
       },
     };
   }
@@ -227,7 +228,7 @@
           const activity = BoxeurStrength.ACTIVITIES[id];
           return `<li><span>${escapeHTML(activity.label)}</span><button type="button" data-v2-strength-activity="${escapeHTML(id)}" aria-label="Retirer ${escapeHTML(activity.label)}">Retirer</button></li>`;
         }).join("")}</ol>`
-      : `<p class="v2-strength-selection-empty">Ajoute une activité. Il n'y a aucun nombre fixe de choix : ton énergie disponible détermine la longueur de la séance.</p>`;
+      : `<p class="v2-strength-selection-empty">Commence par l’échauffement, ajoute au moins un exercice principal, puis termine par la mobilité. Ton énergie détermine le volume entre les deux.</p>`;
     const warnings = preview.warnings.length
       ? `<ul class="v2-strength-warnings" aria-label="Avertissements">${preview.warnings.map(warning => `<li>${escapeHTML(warning)}</li>`).join("")}</ul>`
       : "";
@@ -263,7 +264,7 @@
 
   function renderWeekPlan(context) {
     if (!context.weekPlan.entries.length) return "";
-    return `<section class="v2-strength-week-plan" aria-labelledby="v2-strength-week-plan-title"><div><p class="eyebrow">Déjà dans la semaine</p><h3 id="v2-strength-week-plan-title">Séances de musculation planifiées</h3></div><ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>−${entry.cost} énergie</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà faite</em>`}</li>`).join("")}</ul></section>`;
+    return `<section class="v2-strength-week-plan" aria-labelledby="v2-strength-week-plan-title"><div><p class="eyebrow">Déjà dans la semaine</p><h3 id="v2-strength-week-plan-title">Séances de musculation planifiées</h3></div><ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} énergie` : "Aucun coût d’énergie"}</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà faite</em>`}</li>`).join("")}</ul></section>`;
   }
 
   function render(rawContext) {
@@ -279,7 +280,7 @@
       ${renderWeekPlan(context)}
       <section class="v2-strength-mobile-summary" aria-label="Résumé rapide de la séance" aria-live="polite"><span><strong>${context.selectedActivities.length} activité${context.selectedActivities.length > 1 ? "s" : ""}</strong><small>${context.preview.projected.energy} % énergie · ${context.preview.totals.durationMinutes} min</small></span><button type="button" class="primary-button" data-v2-strength-mobile-confirm${mobileConfirmDisabled}>Ajouter</button></section>
       <div class="v2-strength-layout">
-        <main class="v2-strength-main"><section class="v2-strength-catalogue" aria-labelledby="v2-strength-catalogue-title"><header><div><p class="eyebrow">Composition libre</p><h3 id="v2-strength-catalogue-title">Choisis selon ton énergie</h3></div><p>Chaque ajout met immédiatement à jour l'énergie, la fatigue et les stimuli prévus.</p><button type="button" class="secondary-button" data-v2-strength-quick aria-pressed="${context.quick.planned}"${context.quick.available ? "" : " disabled aria-disabled=\"true\""}>${context.quick.planned ? "Retirer la séance rapide" : "Ajouter la séance rapide"}</button>${context.quick.reason && !context.quick.available ? `<small>${escapeHTML(context.quick.reason)}</small>` : ""}</header><div class="v2-strength-activity-grid">${activities}</div></section>${renderMembershipPlans(context)}</main>
+        <main class="v2-strength-main"><section class="v2-strength-catalogue" aria-labelledby="v2-strength-catalogue-title"><header><div><p class="eyebrow">Composition libre</p><h3 id="v2-strength-catalogue-title">Choisis selon ton énergie</h3></div><p>Chaque ajout met immédiatement à jour l'énergie, la fatigue et les stimuli prévus.</p><button type="button" class="secondary-button" data-v2-strength-quick aria-pressed="${context.quick.planned}"${context.quick.available ? "" : " disabled aria-disabled=\"true\""}>${context.quick.planned ? "Retirer la séance rapide" : context.quick.plannedCount > 0 ? "Ajouter une 2e séance rapide" : "Ajouter la séance rapide"}</button>${context.quick.reason && !context.quick.available ? `<small>${escapeHTML(context.quick.reason)}</small>` : ""}</header><div class="v2-strength-activity-grid">${activities}</div></section>${renderMembershipPlans(context)}</main>
         <aside class="v2-strength-sidebar" aria-label="Séance et services">${renderSelection(context)}${renderServices(context)}</aside>
       </div>
     </div>`;

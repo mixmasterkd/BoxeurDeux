@@ -63,7 +63,7 @@ function strength(id, overrides = {}) {
 
 test("expose un noyau UMD/CommonJS et des vocabulaires immuables", () => {
   assert.equal(globalThis.BoxeurWeekPlanner, planner);
-  assert.equal(planner.SCHEMA_VERSION, 1);
+  assert.equal(planner.SCHEMA_VERSION, 2);
   assert.equal(planner.STATE_KIND, "boxeur-v2-week-planner");
   assert.equal(planner.DEFAULT_WEEKLY_CAPACITY, 10);
   assert.equal(planner.DAYS.length, 7);
@@ -121,7 +121,7 @@ test("place automatiquement une seule activité physique par jour sans que le tr
   const initial = fresh();
   const monday = planner.addActivity(initial, boxing("mitts"), { preferredDay: "monday" });
   const tuesday = planner.addActivity(monday.state, strength("legs"), { preferredDay: "monday" });
-  const wednesday = planner.addActivity(tuesday.state, boxing("bag"), { preferredDay: "lundi" });
+  const wednesday = planner.addActivity(tuesday.state, strength("back"), { preferredDay: "lundi" });
 
   assert.equal(monday.result.entry.day, "monday");
   assert.equal(tuesday.result.entry.day, "tuesday");
@@ -298,10 +298,67 @@ test("préserve des catégories et lieux explicites et refuse les vocabulaires a
   );
 });
 
+test("limite les familles plutôt que les boutons et réduit seulement la répétition exacte", () => {
+  let state = fresh({ work: null, capacity: 10 });
+  const coach = boxing("coach", {
+    metadata: { familyId: "boxing", programSignature: "boxing:coach-balanced" },
+  });
+  const first = planner.addActivity(state, coach, { day: "monday" });
+  const repeated = planner.addActivity(first.state, coach, { day: "tuesday" });
+
+  assert.equal(first.result.entry.metadata.gainMultiplier, 1);
+  assert.equal(repeated.result.entry.metadata.gainMultiplier, .85);
+  assert.equal(repeated.preview.families.boxing.used, 2);
+  assert.equal(repeated.preview.families.boxing.remaining, 0);
+  assert.throws(
+    () => planner.addActivity(repeated.state, boxing("custom", {
+      metadata: { familyId: "boxing", programSignature: "boxing:custom-different" },
+    })),
+    error => error.code === "WEEKLY_FAMILY_LIMIT",
+  );
+
+  const removed = planner.removeActivity(repeated.state, first.result.entry.id);
+  const survivor = removed.state.entries.find(entry => entry.id === repeated.result.entry.id);
+  assert.equal(survivor.metadata.gainMultiplier, 1, "la séance restante redevient la première de ce programme");
+});
+
+test("accepte une récupération à coût nul sans créer de capacité", () => {
+  const initial = fresh({ work: null, capacity: 5 });
+  const rest = planner.addActivity(initial, {
+    id: "rest",
+    label: "Journée de repos",
+    category: "recovery",
+    location: "home",
+    capacityCost: 0,
+    energyGain: 10,
+    fatigueDelta: -5,
+  });
+  assert.equal(rest.result.capacityReserved, 0);
+  assert.equal(rest.preview.capacity.used, 0);
+  assert.equal(rest.preview.capacity.remaining, 5);
+});
+
+test("migre un brouillon de schéma 1 en conservant ses choix", () => {
+  const added = planner.addActivity(fresh({ work: null }), boxing("legacy"));
+  const legacy = structuredClone(added.state);
+  legacy.schemaVersion = 1;
+  delete legacy.limits.family;
+  delete legacy.entries[0].metadata.familyId;
+  delete legacy.entries[0].metadata.programSignature;
+  delete legacy.entries[0].metadata.repeatIndex;
+  delete legacy.entries[0].metadata.gainMultiplier;
+
+  const restored = planner.restorePlanner(legacy);
+  assert.equal(restored.schemaVersion, 2);
+  assert.equal(restored.entries.length, 1);
+  assert.equal(restored.entries[0].metadata.familyId, "boxing");
+  assert.equal(restored.entries[0].metadata.gainMultiplier, 1);
+});
+
 test("réserve les suppléments sur des séances physiques avec stock, unicité et plafond hebdomadaire", () => {
   const first = planner.addActivity(fresh(), boxing("a"));
   const second = planner.addActivity(first.state, boxing("b"));
-  const third = planner.addActivity(second.state, boxing("c"));
+  const third = planner.addActivity(second.state, strength("c"));
   const one = planner.reserveSupplement(third.state, first.result.entry.id, "sports-drink");
   const duplicate = planner.reserveSupplement(one.state, first.result.entry.id, "sports-drink");
   const two = planner.reserveSupplement(one.state, second.result.entry.id, "protein-shake");

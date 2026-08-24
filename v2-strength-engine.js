@@ -52,9 +52,9 @@
   /*
    * Les coûts reprennent l'ordre de grandeur de la V1 (18 à 20 points pour une
    * séance simple), mais la V2 laisse le joueur construire un entraînement plus
-   * court ou plus long. Une composition typique de trois exercices coûte de 24
-   * à 36 points d'énergie. Choisir les huit reste possible seulement en arrivant
-   * frais et représente volontairement une très longue séance de 125 minutes.
+   * court ou plus long. Une composition personnalisée doit toutefois contenir
+   * un échauffement, au moins un exercice de travail et un retour au calme. La
+   * dépense d'énergie limite ensuite naturellement le volume utile.
    */
   const ACTIVITIES = deepFreeze({
     dynamic_warmup: {
@@ -451,19 +451,36 @@
       stimulus: clone(aggregate.totals.stimulus),
     };
     const hasWork = aggregate.activities.some(activity => activity.countsAsWork);
+    const hasWarmup = aggregate.activityIds.includes("dynamic_warmup");
+    const hasCooldown = aggregate.activityIds.includes("mobility_cooldown");
+    const hasCompleteStructure = hasWarmup && hasWork && hasCooldown;
     const warnings = [];
-    if (!aggregate.activityIds.includes("dynamic_warmup") && hasWork) warnings.push("Aucun échauffement choisi");
-    if (!aggregate.activityIds.includes("mobility_cooldown") && aggregate.totals.durationMinutes >= 40) warnings.push("Aucun retour au calme choisi");
+    if (!hasWarmup && hasWork) warnings.push("Ajoute un échauffement dynamique");
+    if (!hasCooldown && hasWork) warnings.push("Ajoute un retour au calme");
     if (projected.energy <= 20 && aggregate.activityIds.length) warnings.push("Très peu d'énergie restera après la séance");
     if (projected.fatigue >= 75) warnings.push("Fatigue élevée après la séance");
     if (aggregate.totals.durationMinutes > 90) warnings.push("Séance très longue : les gains seront soumis aux limites d'assimilation");
     return {
       ok: !issue,
-      canConfirm: !issue && hasWork,
-      code: issue ? issue.code : hasWork ? "READY" : "WORK_ACTIVITY_REQUIRED",
+      canConfirm: !issue && hasCompleteStructure,
+      code: issue
+        ? issue.code
+        : !hasWork
+          ? "WORK_ACTIVITY_REQUIRED"
+          : !hasWarmup
+            ? "WARMUP_REQUIRED"
+            : !hasCooldown
+              ? "COOLDOWN_REQUIRED"
+              : "READY",
       reason: issue
         ? issue.reason
-        : hasWork ? "La séance peut commencer." : "Ajoute au moins un exercice de travail physique.",
+        : !hasWork
+          ? "Ajoute au moins un exercice de travail physique."
+          : !hasWarmup
+            ? "Ajoute l’échauffement dynamique pour préparer la séance."
+            : !hasCooldown
+              ? "Ajoute la mobilité et le retour au calme pour terminer la séance."
+              : "La séance peut commencer.",
       access,
       aggregate,
       totals: aggregate.totals,

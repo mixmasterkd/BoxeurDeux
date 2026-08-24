@@ -18,7 +18,7 @@
   // le catalogue du GYM; l'énergie et la surcharge deviennent les vraies
   // limites. Les séances du coach conservent volontairement leur format court.
   const MIN_BLOCKS = 1;
-  const MAX_BLOCKS = 5;
+  const MAX_BLOCKS = 6;
   const SESSION_DURATION_PERIODS = 1;
   const MAX_PROJECTED_FATIGUE = 90;
   const MAX_PENDING_STIMULUS = 90;

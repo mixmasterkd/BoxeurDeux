@@ -24,7 +24,7 @@ test("expose le catalogue en CommonJS et sur globalThis avec le terme québécoi
   assert.equal(globalThis.BoxeurTraining, training);
   assert.equal(training.SCHEMA_VERSION, 1);
   assert.equal(training.MIN_BLOCKS, 1);
-  assert.equal(training.MAX_BLOCKS, 5);
+  assert.equal(training.MAX_BLOCKS, 6);
   assert.equal(training.EXERCISES.mitts.label, "Travail aux mitaines");
   assert.deepEqual(
     Object.keys(training.EXERCISES),
@@ -158,7 +158,7 @@ test("refuse l'absence d'abonnement, le manque d'énergie, la surcharge et les s
   );
 });
 
-test("la séance libre accepte les cinq activités et laisse l'énergie imposer la limite", () => {
+test("la séance libre accepte les activités du catalogue et laisse l'énergie imposer la limite", () => {
   const initial = freshState({ condition: { energy: 100, fatigue: 5 } });
   const allActivities = training.createCustomSession([
     "jump_rope",

@@ -8,15 +8,15 @@ La V2 doit préserver les carrières, l'économie, les compétitions et l'équil
 
 ### État d'implantation actuel
 
-La préversion reste disponible uniquement avec l'option de test `?v2=1`. Elle comprend maintenant l'horloge déterministe, la migration additive, la carte, le guide récréatif, le gym de boxe et sa séance libre limitée par l'énergie, le gym de musculation, les activités de la maison, la récupération, l'emploi initial, les entraîneurs privés, les suppléments, la fiche Boxeur et les quatre jauges de progression. Le menu caché peut lancer immédiatement un sparring ou un combat réel sans modifier la carrière testée.
+La préversion reste disponible uniquement avec l'option de test `?v2=1`. Elle comprend maintenant le planificateur à énergie hebdomadaire, l'horloge déterministe interne, la migration additive, la carte, le guide récréatif, le gym de boxe, le gym de musculation, les activités de la maison, la récupération, l'emploi initial, les entraîneurs privés, l'inventaire et les suppléments, la fiche Boxeur et les quatre jauges de progression. Le menu caché peut lancer immédiatement un sparring ou un combat réel sans modifier la carrière testée.
 
-La capsule conserve encore le détail de l'horloge, de l'historique et des charges en attente. Les champs durables nécessaires au reste du jeu — argent, abonnements, emploi, énergie, fatigue, statistiques fractionnaires, inventaire, programme privé et progression — sont synchronisés vers la sauvegarde principale afin de survivre au rechargement, à l'importation et à l'exportation. Avant d'activer la V2 par défaut, un orchestrateur unique devra toujours unifier la journée, la fin de semaine, les rendez-vous, le calendrier, Rémy, les combats et les tournois. Cette boucle globale est volontairement reportée jusqu'à ce que les moteurs de lieux soient suffisamment stables.
+La capsule conserve le détail de l'horloge, de l'historique et des charges en attente pour exécuter chaque programme de façon déterministe. Pour le joueur, la semaine et sa réserve d'énergie sont toutefois le contrat principal : il compose un brouillon modifiable, puis confirme volontairement la semaine. Les champs durables nécessaires au reste du jeu — argent, abonnements, emploi, rythme d'entraînement, énergie, fatigue, statistiques fractionnaires, inventaire, programme privé et progression — sont synchronisés vers la sauvegarde principale afin de survivre au rechargement, à l'importation et à l'exportation.
 
 ## Vision
 
 BoxeurDeux devient un jeu de carrière illustré dans lequel le joueur comprend naturellement où aller et quoi faire :
 
-> Carte vivante → entrer dans un lieu → faire une activité → le temps avance → récupérer et assimiler → atteindre le prochain rendez-vous → combattre.
+> Carte vivante → entrer dans les lieux → bâtir un programme → confirmer la semaine → récupérer et assimiler → atteindre le prochain rendez-vous → combattre.
 
 La profondeur demeure disponible, mais elle devient facultative. Un nouveau joueur peut suivre les recommandations de son entraîneur et avancer rapidement. Un joueur expérimenté peut composer ses séances, réserver des entraîneurs privés, gérer précisément sa récupération et prendre le contrôle tactique complet dans le ring.
 
@@ -24,7 +24,7 @@ Les principes directeurs sont les suivants :
 
 - une prochaine étape toujours visible;
 - un maximum de deux interactions pour lancer une activité ordinaire;
-- aucune planification hebdomadaire obligatoire;
+- une seule confirmation volontaire pour faire avancer la semaine;
 - de la profondeur par les choix et leurs compromis, pas par une multiplication de jauges;
 - une présentation d'abord visuelle, avec une solution textuelle accessible équivalente;
 - le même langage de boxe au gym, en sparring et en combat;
@@ -35,20 +35,17 @@ Les principes directeurs sont les suivants :
 
 ### 1.1 Remplacement des actions hebdomadaires
 
-Le compteur de trois ou quatre actions par semaine disparaît de l'expérience V2. Il est remplacé par une horloge de carrière comprenant :
+Le compteur de trois ou quatre actions disparaît de l'expérience V2. La ressource de décision principale devient une barre d'énergie hebdomadaire de 50 points. L'emploi actif est présélectionné et réserve sa part; chaque séance affiche son coût avant l'ajout. Le joueur visite ensuite les lieux, ajoute ou retire librement les activités du brouillon et appuie sur « Confirmer et vivre la semaine » lorsqu'il est satisfait.
 
-- la date;
-- le jour de la semaine;
-- une période simple : matin, après-midi ou soir;
-- les rendez-vous déjà engagés;
-- le temps nécessaire aux activités et aux déplacements;
-- la récupération nocturne et hebdomadaire.
+Le nombre de séances est limité par trois règles lisibles, plutôt que par un compteur arbitraire :
 
-Le joueur n'a pas à remplir un horaire complet. Lorsqu'il choisit une activité, le jeu indique sa durée et fait avancer l'horloge automatiquement. Le changement de semaine devient une conséquence naturelle du temps qui passe.
+- la réserve d'énergie restante;
+- une seule séance physique par journée lors de l'exécution interne;
+- les plafonds par famille : cours de groupe 1, boxe 2, musculation 2, maison 2 et sparring 1.
 
-La journée suit un contrat unique : le travail ou un rendez-vous peut occuper le jour, puis un seul entraînement physique principal peut être planifié le soir. Une séance au gym de boxe, une séance au gym de musculation, un entraînement au sous-sol, une séance privée ou un sparring utilisent tous cette même place; ils ne peuvent pas être empilés pour doubler la progression. Un combat ou un autre événement physique important bloque également tout entraînement supplémentaire ce jour-là.
+Le parcours récréatif reste volontairement plus simple : deux activités physiques au maximum, dont un seul entraînement maison. Le repos et le repas occupent une journée dans la simulation, mais ne retirent pas de points de la barre hebdomadaire. Les nuits demeurent automatiques et la semaine ne change jamais avant la confirmation du joueur.
 
-Les nuits sont automatiques et appliquent la récupération une seule fois. Le joueur ne clique donc pas sur « Dormir » chaque soir. Sa décision stratégique est plutôt de prendre une journée de repos, de choisir une charge plus légère ou de libérer une soirée.
+L'horloge détaillée — date, jour, périodes, rendez-vous, nuits et déplacements — reste la couche d'exécution interne. Elle empêche deux activités physiques le même jour, arrête la simulation avant une vraie décision et garantit qu'un même entraînement, salaire ou effet de récupération n'est appliqué qu'une fois.
 
 ### 1.2 Navigation rapide dans le temps
 
@@ -63,12 +60,12 @@ Le panneau « Maintenant » présente toujours :
 
 Deux rythmes sont proposés directement dans le panneau « Maintenant » :
 
-- **Suivre le plan rapide** : l'entraîneur présente un programme court, puis le jeu résout en un seul bilan le quart de travail, les séances autorisées et la récupération. La cible d'usage est de 20 à 45 secondes par semaine;
-- **Jouer la semaine en détail** : le joueur visite les lieux, peut effectuer son quart lui-même et choisit les soirées ou rendez-vous importants; les nuits et les périodes sans décision sont résolues automatiquement.
+- **Suivre le plan rapide** : crée un brouillon prudent et équilibré comprenant l'emploi, une séance adaptée au statut, une deuxième séance lorsque la réserve le permet et du repos;
+- **Voir ou modifier** : ouvre le même brouillon afin de retirer, remplacer ou compléter les choix en visitant les lieux.
 
-Après au moins une activité détaillée, « Confier le reste au coach » termine la même semaine en mode hybride. Les trois rythmes utilisent les mêmes primitives, coûts, plafonds de charge, salaires et règles de récupération. Le rapide n'accorde donc aucun multiplicateur caché et l'hybride ne répète jamais une séance ou une paie déjà exécutée.
+Le plan rapide ne confirme rien automatiquement et n'accorde aucun multiplicateur caché. Il sert de point de départ aux joueurs qui veulent avancer vite, tandis que la composition manuelle permet de répartir plus précisément les stimuli. Les deux chemins utilisent exactement les mêmes coûts, plafonds, salaires et règles de récupération.
 
-Avant la confirmation, le programme résume ce qui sera simulé. La simulation s'arrête avant un combat, une pesée, un tournoi ou tout rendez-vous qui demande une vraie décision. La fin de semaine applique les abonnements et les effets récurrents une seule fois.
+Avant la confirmation, le programme résume ce qui sera simulé et chaque lieu permet de retirer ses propres réservations. La simulation s'arrête avant un combat, une pesée, un tournoi ou tout rendez-vous qui demande une vraie décision. La fin de semaine applique les abonnements et les effets récurrents une seule fois.
 
 Le rapide et le détaillé ne sont pas deux économies différentes. Le travail planifié, la séance du soir et la récupération produisent les mêmes coûts et résultats dans les deux modes; seule la quantité de décisions manuelles change.
 
@@ -83,13 +80,13 @@ Une nouvelle carrière commence avec le statut récréatif et un guide progressi
 
 Le guide utilise une prochaine étape visible, le lieu pertinent mis en évidence et de courtes interventions de l'entraîneur. Il ne doit pas devenir une chaîne de fenêtres. Seuls les choix initiaux indispensables — abonnement et emploi — sont bloquants. Le calendrier amateur, le gym de musculation et le sparring ordinaire demeurent verrouillés jusqu'au passage amateur explicite; aucune semaine ne transforme automatiquement le boxeur en amateur.
 
-### 1.4 Rythme de compétiteur
+Après l'ajout du premier cours de groupe, le guide remplace l'objectif d'entraînement par deux commandes explicites : « Voir mon programme » et « Confirmer et vivre la semaine ». Il rappelle que le brouillon n'a encore produit aucun salaire, coût, fatigue ni progression. Le premier bilan explique ensuite les indicateurs principaux et annonce l'objectif de la semaine 2 avant de rendre la carte au joueur.
 
-L'ancien gain d'une action supplémentaire est converti en avantage cohérent :
+### 1.4 Rythme d'entraînement et niveau
 
-> Rythme de compétiteur — le boxeur récupère mieux et peut assimiler une charge productive supplémentaire.
+Une semaine sans entraînement ne retire jamais directement de statistiques. Chez les amateurs et les professionnels, elle fragilise plutôt le rythme : la prochaine barre passe de 50 à 45 points, puis à 40 après une deuxième semaine inactive. Chaque semaine comprenant un entraînement efface un palier. Ce rendement décroissant oblige à reprendre progressivement sans rendre le boxeur artificiellement trop faible.
 
-Cet avantage doit préserver approximativement la progression obtenue par l'ancienne quatrième action, sans recréer un compteur d'actions caché.
+La montée de niveau réduit légèrement le coût calculé des entraînements, avec un plafond conservateur. Elle permet donc un peu plus de volume au boxeur expérimenté sans recréer une quatrième action cachée ni bouleverser la progression historique.
 
 ## 2. Carte et lieux visitables
 
@@ -109,22 +106,20 @@ Le lieu recommandé est mis en évidence par l'entraîneur. Les lieux verrouill�
 
 Une vue « Liste des lieux » offre exactement les mêmes commandes pour le clavier, les lecteurs d'écran et les joueurs qui préfèrent une navigation rapide.
 
+Les intérieurs utilisent un gabarit commun sur ordinateur et téléphone : en-tête avec statut, semaine et date; scène interactive; panneau d'actions; programme hebdomadaire; état de récupération; puis services propres au lieu. Les images et les mécaniques restent distinctes, mais les cartes, la hiérarchie et la position des commandes sont cohérentes. Sur téléphone, les actions principales passent avant les détails et toutes les commandes tactiles conservent au moins 44 px de hauteur.
+
 ### 2.2 Gym de boxe
 
-Le gym de boxe est le centre de l'apprentissage. Sa scène intérieure peut comprendre :
+Le gym de boxe est le centre de l'apprentissage. Sa scène intérieure demeure lisible avec quatre zones principales :
 
 - l'entraîneur principal;
-- la corde à danser;
-- le miroir ou l'espace de shadow-boxing;
-- le sac lourd;
-- le sac de vitesse;
-- la zone de travail aux mitaines;
+- la zone d'entraînement;
 - le ring de sparring;
-- une zone d'échauffement et de retour au calme;
-- les entraîneurs privés présents dans ce gym;
 - le comptoir pour l'abonnement.
 
-Les objets sont des zones interactives, mais ils correspondent aussi à de vrais boutons accessibles. Il ne doit pas être nécessaire de chercher un petit point caché dans l'image.
+Ces zones correspondent à de vrais boutons accessibles et ouvrent les mêmes services que le panneau textuel. Les exercices individuels — corde à danser, shadow-boxing, sac lourd, mitaines, défense et retour au calme — sont choisis dans le compositeur plutôt que dispersés en petits points sur l'image.
+
+Le panneau principal présente la séance recommandée du coach en premier. Après le passage amateur, il ajoute la composition libre, l'entraîneur privé et le sparring. Pendant le statut récréatif, ces choix avancés sont retirés du panneau afin de garder seulement le cours de groupe et le parcours vers Rémy « Le Tank ».
 
 Le cours de groupe demeure exclusif au statut récréatif et disparaît une fois le passage amateur confirmé. Le sparring avec Rémy « Le Tank » demeure l'étape pédagogique qui ouvre le passage amateur.
 
@@ -154,9 +149,9 @@ La maison regroupe les activités qui ne nécessitent pas un autre lieu :
 - aperçu du calendrier;
 - entraînement de dépannage au sous-sol si aucun abonnement au gym de boxe n'est actif.
 
-L'entraînement au sous-sol reste volontairement limité. Il évite un blocage complet sans rendre l'abonnement au gym inutile.
+L'entraînement au sous-sol reste volontairement limité. Il évite un blocage complet sans rendre l'abonnement au gym inutile : son coût hebdomadaire est proche d'une séance en établissement, mais son stimulus et son encadrement sont moindres. Son avantage est l'absence d'abonnement, pas une progression supérieure.
 
-La nuit et le sommeil ne constituent pas une activité à sélectionner : ils sont résolus automatiquement par l'horloge. Une récupération active ou un entraînement au sous-sol compte toutefois comme l'unique activité physique principale du jour.
+La nuit et le sommeil ne constituent pas une activité à sélectionner : ils sont résolus automatiquement par l'horloge. Une journée de repos est un choix gratuit en énergie hebdomadaire, tandis qu'un entraînement au sous-sol réserve une vraie séance physique.
 
 ### 2.5 Identité des lieux et futurs camps professionnels
 
@@ -179,9 +174,9 @@ Ce modèle est conçu pour être réutilisé plus tard dans la carrière profess
 
 La V2 distingue clairement :
 
-- **Énergie** : les ressources disponibles aujourd'hui; elle baisse pendant les activités et remonte rapidement avec les repas, les pauses et le sommeil.
-- **Fatigue** : la charge persistante des derniers jours; elle s'accumule avec les activités exigeantes et descend plus lentement.
-- **Préparation** : un diagnostic calculé, pas une troisième ressource à remplir. Elle résume le cardio, le rythme récent, la fatigue, la santé, le moral et la qualité du camp.
+- **Énergie de la semaine** : le budget principal de planification, normalement 50 points. L'emploi et les entraînements la réservent; le joueur voit immédiatement ce qui reste.
+- **Énergie physique et fatigue** : l'état persistant du boxeur exécuté jour par jour en arrière-plan. Les lieux montrent leur projection afin d'expliquer les conséquences d'une séance.
+- **Préparation** : un diagnostic calculé, pas une ressource supplémentaire à remplir. Elle résume le cardio, le rythme récent, la fatigue, la santé, le moral et la qualité du camp.
 
 La préparation est affichée avec des mots — excellente, bonne, moyenne, fragile ou mauvaise — et une explication courte. Elle remplace la forme physique comme jauge indépendante afin d'éviter de pénaliser deux fois le boxeur pour la même cause.
 
@@ -195,7 +190,7 @@ Chaque activité d'entraînement produit :
 - parfois une usure ou un risque de blessure;
 - une durée.
 
-Le stimulus est assimilé pendant la récupération. Une séance exigeante correctement récupérée est productive. Une succession de séances exigeantes sans récupération augmente surtout la fatigue et l'usure, avec un rendement décroissant.
+Le stimulus est assimilé pendant la récupération. Une séance exigeante correctement récupérée est productive. Une succession de séances exigeantes sans récupération augmente surtout la fatigue et l'usure, avec un rendement décroissant. Répéter exactement le même programme une deuxième fois dans la semaine conserve 100 % de son coût, de sa fatigue, de son usure et de son risque, mais seulement 85 % de ses gains et de son XP. Retirer la première occurrence rend automatiquement le plein rendement à celle qui reste.
 
 Chaque statistique possède une jauge de progression visible de 0 à 100. Lorsque la jauge atteint 100, la statistique gagne `+1` et tout débordement demeure dans la jauge suivante. La séance ne donne jamais ce point immédiatement : elle crée du stimulus, puis la récupération l'assimile vers la jauge. Des plafonds et rendements décroissants empêchent d'obtenir plusieurs gains en répétant artificiellement la même charge.
 
@@ -239,7 +234,7 @@ Le joueur avancé peut composer librement une séance en ajoutant progressivemen
 - conditionnement;
 - mobilité et retour au calme.
 
-Il n'existe pas trois emplacements obligatoires. Une activité unique ou plusieurs activités différentes peuvent former la séance, jusqu'à la limite naturelle de l'énergie, du temps disponible et de la charge productive. La composition retire immédiatement l'énergie dans l'aperçu, sans la dépenser définitivement avant la confirmation, et affiche la durée, la fatigue prévue et les qualités travaillées. Une séance peut être confirmée en un seul bouton; elle ne se joue pas exercice par exercice sauf lorsqu'un exercice interactif facultatif existe.
+Il n'existe pas trois emplacements fixes. Au gym de boxe, jusqu'à six activités différentes peuvent former une séance libre, mais l'interface demande une préparation, au moins un travail principal et un retour au calme. Quatre modèles — technique, puissance, cardio de boxe et défense — offrent un raccourci sans avantage caché. Le gym de musculation conserve lui aussi sa structure minimale crédible. La composition projette immédiatement l'énergie hebdomadaire, l'énergie physique, la durée, la fatigue et les qualités travaillées, sans rien dépenser définitivement avant la confirmation. Une petite surcharge fixe empêche qu'une séance personnalisée soit toujours supérieure au plan rapide simplement parce qu'elle est optimisée.
 
 La personnalisation permet de cibler un besoin ou de moduler l'intensité. Elle ne doit jamais fournir un multiplicateur automatique supérieur à une bonne séance de l'entraîneur.
 
@@ -257,13 +252,13 @@ Les entraîneurs privés sont présents dans les lieux, avec :
 - type de séance offert;
 - relation avec le boxeur.
 
-Dans la première intégration, un programme comprend quatre séances et son prix complet est payé au choix de l'entraîneur. Technique et Défense se travaillent au gym de boxe; Puissance et Cardio au gym de musculation. Une seule séance privée peut être active et chaque cours consomme l'activité physique principale de la journée. Son raccord futur à l'agenda devra conserver exactement ce contrat et ne créer ni deuxième paiement ni deuxième progression.
+Dans la première intégration, un programme comprend quatre séances et son prix complet est payé au choix de l'entraîneur. Technique et Défense se travaillent au gym de boxe; Puissance et Cardio au gym de musculation. Une seule séance privée peut être active; chaque cours réserve l'énergie hebdomadaire de sa famille et une journée physique distincte lors de l'exécution. La progression exécutée par l'horloge est l'unique autorité : aucun état parallèle ne peut accorder une deuxième progression.
 
 La qualité et la spécialité d'un entraîneur privé augmentent seulement le stimulus ciblé d'une séance. Elles n'accordent jamais directement `+1` ou `+2` à une statistique et restent soumises aux mêmes plafonds, à l'assimilation et à la récupération que les autres entraînements.
 
 ### 3.6 Suppléments
 
-Les suppléments sont achetés à la boutique du gym de musculation et apparaissent dans le sac de l'onglet Boxeur. Le joueur peut en préparer au plus un avant une séance, pour un maximum de deux utilisations par semaine et une utilisation d'un même produit par semaine. Ils peuvent modifier modestement l'énergie, la fatigue ou la qualité de récupération, mais jamais l'XP, le stimulus ni une statistique. Si une séance échoue, la transaction entière est annulée et le produit demeure dans l'inventaire.
+Les suppléments sont achetés à la boutique du gym de musculation et apparaissent dans l'onglet Inventaire séparé de la fiche Boxeur. Le joueur peut en réserver au plus un par séance, pour un maximum de deux utilisations par semaine et une utilisation d'un même produit par semaine. La barre hebdomadaire est recalculée depuis le même effet d'énergie et de fatigue qui sera appliqué pendant la séance : aucun bonus arbitraire n'est ajouté une deuxième fois. Les produits ne modifient jamais directement l'XP, le stimulus ni une statistique. Si la semaine ou la séance échoue, la transaction entière est annulée et le produit demeure dans l'inventaire.
 
 ## 4. Agenda personnel et calendrier de compétition
 
@@ -618,7 +613,7 @@ Principes de conversion :
 - conserver l'identité, le sexe, les couleurs, les statistiques, le style, le niveau, l'XP, l'argent, la réputation, le bilan, les blessures, les abonnements, l'emploi, les vacances, les inscriptions et les résultats;
 - convertir la forme actuelle en données initiales de préparation sans modifier les statistiques permanentes;
 - convertir l'énergie et la fatigue existantes vers les nouvelles échelles avec des bornes sûres;
-- convertir l'action hebdomadaire en cours en état temporel cohérent ou terminer proprement l'ancienne semaine;
+- migrer un brouillon hebdomadaire antérieur vers le contrat courant, enrichir ses familles et répétitions, ou le reconstruire proprement s'il est invalide;
 - préserver les dates relatives des événements et tournois;
 - ne jamais créer de match nul dans un bilan amateur;
 - conserver les champs historiques nécessaires à l'importation, mais ne plus les utiliser comme source active après migration;
@@ -641,7 +636,7 @@ Une donnée sans réponse utile est supprimée ou gardée seulement dans la couc
 Les candidats déjà identifiés sont :
 
 - compteur de trois ou quatre actions hebdomadaires;
-- forme physique comme jauge indépendante;
+- perte directe de statistiques causée uniquement par une semaine inactive;
 - pénalités répétées provenant de la même fatigue;
 - vues distinctes qui dupliquent agenda et calendrier;
 - anciens choix généraux de round après validation du ring interactif;
@@ -656,7 +651,8 @@ La suppression est faite seulement après migration, tests et vérification qu'a
 
 La V2 conserve HTML, CSS et JavaScript sans nouvelle dépendance importante. Les responsabilités sont séparées :
 
-- **état de carrière** : temps, argent, emploi, abonnements, calendrier et progression;
+- **planificateur hebdomadaire pur** : brouillon, capacité, familles, répétitions, suppléments réservés et confirmation atomique;
+- **état de carrière** : temps interne, argent, emploi, abonnements, calendrier et progression;
 - **moteur d'entraînement** : séances, stimulus, énergie, fatigue et assimilation;
 - **moteur de combat** : échanges, positions, scores cachés, KO et arrêts;
 - **présentation** : carte, scènes, boutons, effets et annonces;
@@ -699,12 +695,12 @@ Le nouveau système doit démontrer que :
 1. Auditer les données, formules, écrans et champs de sauvegarde actuels.
 2. Mesurer l'équilibre et l'économie de référence avec des graines fixes.
 3. Centraliser la configuration sans changer le comportement.
-4. Ajouter la nouvelle horloge, l'énergie, la fatigue et la préparation derrière une option de test.
+4. Ajouter le planificateur hebdomadaire, l'horloge interne, l'énergie, la fatigue et la préparation derrière une option de test.
 5. Construire la carte et le panneau « Maintenant » avec une vue en liste équivalente.
 6. Verrouiller l'abonnement, l'emploi initial et le guide récréatif des semaines 1 à 6.
 7. Construire le gym de boxe, les séances et les quatre jauges avant la personnalisation avancée.
 8. Ajouter les entraîneurs privés, le gym de musculation et les activités de la maison.
-9. Unifier l'emploi courant, l'agenda personnel et le calendrier de compétition.
+9. Unifier le plan hebdomadaire, l'emploi courant et l'exécution déterministe, puis raccorder l'agenda et le calendrier de compétition.
 10. Prototyper le ring 5 × 5 en conservant l'ancien moteur comme référence.
 11. Intégrer le sparring pédagogique avec Rémy et la scène du coin.
 12. Adapter les galas, déplacements, pesées et tournois.
@@ -730,9 +726,12 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 ### Entraînement et récupération
 
 - La séance de l'entraîneur est compétitive face à une bonne séance personnalisée.
-- L'énergie et la fatigue ont des rôles distincts et compréhensibles.
+- L'énergie hebdomadaire, l'énergie physique et la fatigue ont des rôles distincts et compréhensibles.
 - La préparation explique clairement les facteurs qui l'améliorent ou la dégradent.
-- Une journée ne peut produire qu'une activité physique principale et les nuits ne demandent aucun clic de sommeil.
+- Le joueur peut modifier son brouillon dans le panneau de semaine et dans le bâtiment concerné jusqu'à sa confirmation.
+- L'exécution interne ne produit jamais deux activités physiques la même journée et les nuits ne demandent aucun clic de sommeil.
+- Deux semaines sans entraînement réduisent graduellement la prochaine réserve sans retirer de statistiques; une reprise efface un palier par semaine active.
+- Une répétition exacte garde tout son coût et accorde 85 % des gains à partir de la deuxième occurrence.
 - Les quatre jauges atteignent 100 avant d'accorder `+1`, avec leur débordement conservé.
 - Un entraîneur privé ne modifie jamais directement une statistique permanente.
 - Le sparring ne peut jamais être ajouté comme bloc d'une séance personnalisée.
@@ -767,6 +766,6 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 
 ## Décision de conception principale
 
-La V2 ne sera pas un planificateur détaillé ni un jeu de plateau. Elle sera une carrière illustrée pilotée par le temps et la récupération, avec deux niveaux d'engagement : suivre rapidement une séance ou un conseil efficace, ou ouvrir les choix avancés pour personnaliser son parcours.
+La V2 sera une carrière illustrée pilotée par une semaine simple à composer et par une exécution temporelle déterministe en arrière-plan. Le joueur choisit entre générer un plan rapide modifiable ou visiter les lieux pour répartir lui-même sa réserve; dans les deux cas, une seule confirmation fait avancer la semaine et produit le même équilibre.
 
 La suppression des anciens systèmes ne se fera qu'après avoir prouvé trois choses : la nouvelle mécanique est plus claire, elle conserve la fonction utile de l'ancienne et elle maintient l'équilibre mesuré du jeu.

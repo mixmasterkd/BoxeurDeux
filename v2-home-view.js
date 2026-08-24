@@ -140,7 +140,7 @@
   function entryActionId(entry) {
     if (typeof entry === "string") return canonicalActionId(entry);
     if (!entry || typeof entry !== "object") return "";
-    return canonicalActionId(entry.homeActionId || entry.actionId || entry.action || entry.id);
+    return canonicalActionId(entry.homeActionId || entry.activityId || entry.actionId || entry.action || entry.id);
   }
 
   function normalizePlan(rawPlan) {
@@ -205,7 +205,10 @@
 
   function normalizeAction(rawAction, definition, context) {
     const source = rawAction && typeof rawAction === "object" ? rawAction : {};
-    const planned = definition.plannable && (source.planned === true || context.plan.homeActionIds.includes(definition.id));
+    const hasExplicitPlannedState = Object.prototype.hasOwnProperty.call(source, "planned");
+    const planned = definition.plannable && (hasExplicitPlannedState
+      ? source.planned === true
+      : context.plan.homeActionIds.includes(definition.id));
     let available = rawAction !== false && source.available !== false;
     let reason = safeText(source.reason || source.disabledReason, "Cette option est indisponible pour le moment.", 260);
     if (definition.amateurOnly && context.careerStatus === "recreational") {
@@ -296,9 +299,13 @@
     const disabledAttributes = state.available ? "" : ' disabled aria-disabled="true"';
     const pressed = state.plannable ? ` aria-pressed="${state.planned ? "true" : "false"}"` : "";
     const planned = state.planned ? ' data-v2-home-planned="true"' : "";
-    const command = state.planned ? "Planifié pour la semaine" : state.command;
+    const command = state.planned
+      ? state.available ? "Planifié pour la semaine" : "Déjà planifié · limite atteinte"
+      : state.command;
     const help = state.available ? state.help : state.reason;
-    const accessibleLabel = state.planned ? `Retirer de la semaine : ${action.label}` : `${state.command} : ${action.label}`;
+    const accessibleLabel = state.planned
+      ? state.available ? `Retirer de la semaine : ${action.label}` : `Déjà planifié : ${action.label}`
+      : `${state.command} : ${action.label}`;
 
     return `<div class="v2-home-action${state.available ? "" : " unavailable"}${state.planned ? " planned" : ""}">
       <button type="button" data-v2-home-action="${action.id}" aria-label="${escapeHTML(accessibleLabel)}" aria-describedby="${helpId}"${planned}${pressed}${disabledAttributes}>
@@ -321,14 +328,14 @@
   function renderWeekPlan(context) {
     const capacity = context.weekCapacity;
     const planned = context.plan.entries.length
-      ? `<ul class="v2-home-planned-list" aria-label="Choix de la maison déjà planifiés">${context.plan.entries.map(entry => `<li><span>${escapeHTML(entry.label)}<small>−${entry.cost} énergie</small></span>${entry.removable ? `<button type="button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
+      ? `<ul class="v2-home-planned-list" aria-label="Choix de la maison déjà planifiés">${context.plan.entries.map(entry => `<li><span>${escapeHTML(entry.label)}<small>${entry.cost > 0 ? `−${entry.cost} énergie` : "Aucun coût d’énergie"}</small></span>${entry.removable ? `<button type="button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
       : `<p class="v2-home-plan-empty">Aucun choix de la maison n’est encore planifié.</p>`;
     const status = capacity.full ? "Énergie hebdomadaire épuisée" : `${capacity.remaining} énergie hebdomadaire encore disponible`;
     const meterMax = Math.max(1, capacity.allowed);
     const meterValue = Math.min(meterMax, capacity.remaining);
 
-    return `<section class="v2-home-week-plan${capacity.full ? " full" : ""}" aria-labelledby="v2-home-week-plan-title" aria-live="polite">
-      <div class="v2-home-week-plan-heading"><div><p class="eyebrow">Planification</p><h3 id="v2-home-week-plan-title">${capacity.full ? "Programme complet" : escapeHTML(context.plan.title)}</h3></div><strong>${capacity.remaining} / ${capacity.allowed}</strong></div>
+    return `<section class="v2-home-week-plan v2-place-week-plan${capacity.full ? " full" : ""}" aria-labelledby="v2-home-week-plan-title" aria-live="polite">
+      <div class="v2-home-week-plan-heading v2-place-week-plan-heading"><div><p class="eyebrow">Planification</p><h3 id="v2-home-week-plan-title">${capacity.full ? "Programme complet" : escapeHTML(context.plan.title)}</h3></div><strong>${capacity.remaining} / ${capacity.allowed}</strong></div>
       <meter min="0" max="${meterMax}" value="${meterValue}" aria-label="Énergie hebdomadaire restante : ${capacity.remaining} sur ${capacity.allowed}">${capacity.remaining} sur ${capacity.allowed}</meter>
       <p><strong>${escapeHTML(status)}</strong> · ${capacity.used} déjà réservée · ${escapeHTML(context.plan.note)}</p>${planned}
     </section>`;
@@ -339,13 +346,13 @@
     const hotspots = ZONES.map(zone => renderHotspot(zone, context)).join("");
     const actions = ACTION_GROUPS.map(group => renderActionGroup(group, context)).join("");
 
-    return `<div class="v2-home-view">
-      <header class="v2-home-header">
-        <div><p class="eyebrow">Maison · ${escapeHTML(context.careerStatusLabel)}</p><h2>Chez toi, ${escapeHTML(context.profile.firstName)}</h2></div>
+    return `<div class="v2-home-view v2-place-view">
+      <header class="v2-home-header v2-place-header">
+        <div><p class="eyebrow">Maison</p><h2>Chez toi, ${escapeHTML(context.profile.firstName)}</h2><p class="v2-place-meta">${escapeHTML(context.careerStatusLabel)} · Semaine ${context.clock.week} · ${escapeHTML(context.clock.dayLabel)} · ${escapeHTML(context.clock.dateLabel)}</p></div>
         <button type="button" class="secondary-button" data-v2-leave-home>Retour à la carte</button>
       </header>
-      <div class="v2-home-layout">
-        <section class="v2-home-scene" aria-labelledby="v2-home-scene-title">
+      <div class="v2-home-layout v2-place-layout">
+        <section class="v2-home-scene v2-place-scene" aria-labelledby="v2-home-scene-title">
           <h3 id="v2-home-scene-title" class="sr-only">Pièces interactives de la maison</h3>
           <picture>
             <source media="(max-width: 640px)" srcset="assets/maison-v2-mobile.jpg">
@@ -353,22 +360,18 @@
           </picture>
           <div class="v2-home-hotspots">${hotspots}</div>
         </section>
-        <aside class="v2-home-dashboard" aria-label="Programme et récupération">
-          <section class="v2-home-now" aria-labelledby="v2-home-now-title">
-            <p class="eyebrow">Repère calendrier</p><h3 id="v2-home-now-title">Semaine ${context.clock.week}</h3>
-            <p>${escapeHTML(context.clock.dayLabel)} · ${escapeHTML(context.clock.dateLabel)}</p>
-          </section>
-          <section class="v2-home-condition" aria-label="État de récupération actuel">
+        <aside class="v2-home-dashboard v2-place-dashboard" aria-label="Programme et récupération">
+          ${renderWeekPlan(context)}
+          <section class="v2-home-condition v2-place-condition" aria-label="État de récupération actuel">
             <div><span>Énergie</span><strong>${context.condition.energy} %</strong><meter min="0" max="100" value="${context.condition.energy}">${context.condition.energy} %</meter></div>
             <div><span>Fatigue</span><strong>${context.condition.fatigue} %</strong><meter min="0" max="100" value="${context.condition.fatigue}">${context.condition.fatigue} %</meter></div>
             <div><span>Charge à assimiler</span><strong>${context.condition.pendingLoad} %</strong><meter min="0" max="100" value="${context.condition.pendingLoad}">${context.condition.pendingLoad} %</meter></div>
           </section>
-          ${renderWeekPlan(context)}
-          <section class="v2-home-recommendation ${context.condition.recommendationTone}" aria-labelledby="v2-home-recommendation-title">
+          <section class="v2-home-recommendation v2-place-card ${context.condition.recommendationTone}" aria-labelledby="v2-home-recommendation-title">
             <p class="eyebrow">Conseil avant de planifier</p><h3 id="v2-home-recommendation-title">${escapeHTML(context.condition.recommendation)}</h3>
             <p>${escapeHTML(context.condition.recommendationDetail)}</p>
           </section>
-          <section class="v2-home-actions" aria-labelledby="v2-home-actions-title">
+          <section class="v2-home-actions v2-place-card v2-place-actions" aria-labelledby="v2-home-actions-title">
             <h3 id="v2-home-actions-title">Préparer ta semaine à la maison</h3>${actions}
           </section>
         </aside>

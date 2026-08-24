@@ -115,6 +115,25 @@ test("affiche textuellement le caractère obligatoire ou facultatif et la progre
   assert.match(optional, /<progress max="6" value="4">4\/6<\/progress>/);
 });
 
+test("propose de revoir ou confirmer la première semaine une fois la séance planifiée", () => {
+  const html = world.render(baseCareer({
+    v2Onboarding: { mode: "guided", week: 1, remyWeek: 6 },
+    v2OnboardingStep: {
+      id: "week-1-review-program",
+      type: "review-week",
+      title: "Ta première séance est planifiée",
+      detail: "Rien n’est encore appliqué.",
+      locationId: "map",
+      required: false,
+      actionMode: "review-and-confirm",
+    },
+  }));
+
+  assert.match(html, /data-v2-week-handoff>Voir mon programme/);
+  assert.match(html, /data-v2-week-confirm>Confirmer et vivre la semaine/);
+  assert.doesNotMatch(html, /data-v2-location="map"/);
+});
+
 test("ignore une étape terminée ou exemptée et conserve les anciens contextes", () => {
   const oldContext = baseCareer({ recreationalTrainingWeeks: 4 });
   assert.equal(world.onboardingObjective(oldContext), null);

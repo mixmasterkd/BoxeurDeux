@@ -218,6 +218,7 @@ const INITIAL_STATE = {
   boxingNeglectWeeks: 0,
   boxingInactivityWeeks: 0,
   boxingTrainingWeek: 0,
+  trainingRhythmPenalty: 0,
   amateurRecord: { wins: 0, losses: 0, draws: 0 },
   professionalRecord: { wins: 0, losses: 0, draws: 0 },
   careerStatus: "recreational",
@@ -579,7 +580,7 @@ function normalizeCareerState(source) {
   const boundedStats = {
     week: [1, 99999], money: [0, 9999999], energy: [0, 100], fitness: [0, 100], morale: [0, 100], reputation: [0, 100],
     injury: [0, 100], fatigue: [0, 100], injuryWeeks: [0, 52], experience: [0, 10000000], level: [1, 999], levelPoints: [0, 9999],
-    gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], boxingInactivityWeeks: [0, 999], boxingTrainingWeek: [0, 99999], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
+    gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], boxingInactivityWeeks: [0, 999], boxingTrainingWeek: [0, 99999], trainingRhythmPenalty: [0, 2], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
     missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999], initialJobLockedUntilWeek: [0, 99999], jobTenureWeeks: [0, 99999], jobsHeldCount: [0, 999], jobVacationEarnedAtTenure: [0, 99999], vacationBankWeeks: [0, MAX_PAID_VACATION_WEEKS], jobWagesEarned: [0, 9999999], recreationalTrainingWeeks: [0, 10],
     supplementWeek: [1, 99999], avoidanceWeeks: [0, 999], lastFightWeek: [0, 99999], injuryStartedWeek: [0, 99999],
   };
@@ -2863,6 +2864,7 @@ function v2PreviewFingerprint(career = state) {
     safeNumber(career.jobWagesEarned, 0, 0, 99999999),
     safeNumber(career.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS),
     safeNumber(career.missedWorkWeeks, 0, 0, 3),
+    safeNumber(career.trainingRhythmPenalty, 0, 0, 2),
     safeNumber(career.jobVacationEarnedAtTenure, 0, 0, 9999),
     career.jobApplication || null,
     safeNumber(career.recreationalTrainingWeeks, 0, 0, 999),
@@ -2911,6 +2913,7 @@ function createV2RuntimeCareer(source = state) {
     jobWagesEarned: safeNumber(source.jobWagesEarned, 0, 0, 99999999),
     vacationBankWeeks: safeNumber(source.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS),
     missedWorkWeeks: safeNumber(source.missedWorkWeeks, 0, 0, 3),
+    trainingRhythmPenalty: safeNumber(source.trainingRhythmPenalty, 0, 0, 2),
     jobVacationEarnedAtTenure: safeNumber(source.jobVacationEarnedAtTenure, 0, 0, 9999),
     jobReferenceBonus: source.jobReferenceBonus === true,
     jobApplication: source.jobApplication && typeof source.jobApplication === "object"
@@ -2975,6 +2978,7 @@ function normalizeV2PreviewRuntime(capsule) {
     jobWagesEarned: safeNumber(suppliedCareer.jobWagesEarned, defaults.jobWagesEarned, 0, 99999999),
     vacationBankWeeks: safeNumber(suppliedCareer.vacationBankWeeks, defaults.vacationBankWeeks, 0, MAX_PAID_VACATION_WEEKS),
     missedWorkWeeks: safeNumber(suppliedCareer.missedWorkWeeks, defaults.missedWorkWeeks, 0, 3),
+    trainingRhythmPenalty: safeNumber(suppliedCareer.trainingRhythmPenalty, defaults.trainingRhythmPenalty, 0, 2),
     jobVacationEarnedAtTenure: safeNumber(suppliedCareer.jobVacationEarnedAtTenure, defaults.jobVacationEarnedAtTenure, 0, 9999),
     jobReferenceBonus: suppliedCareer.jobReferenceBonus == null ? defaults.jobReferenceBonus : suppliedCareer.jobReferenceBonus === true,
     jobApplication: suppliedCareer.jobApplication && jobs.some(job => job.id === suppliedCareer.jobApplication.jobId)
@@ -3053,6 +3057,7 @@ function syncV2CapsuleToCareer(capsule) {
   state.jobWagesEarned = safeNumber(career.jobWagesEarned, state.jobWagesEarned, 0, 99999999);
   state.vacationBankWeeks = safeNumber(career.vacationBankWeeks, state.vacationBankWeeks, 0, MAX_PAID_VACATION_WEEKS);
   state.missedWorkWeeks = safeNumber(career.missedWorkWeeks, state.missedWorkWeeks, 0, 3);
+  state.trainingRhythmPenalty = safeNumber(career.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 2);
   state.jobVacationEarnedAtTenure = safeNumber(career.jobVacationEarnedAtTenure, state.jobVacationEarnedAtTenure, 0, 9999);
   state.jobReferenceBonus = career.jobReferenceBonus === true;
   state.jobApplication = career.jobApplication ? cloneData(career.jobApplication) : null;
@@ -3129,10 +3134,29 @@ function v2OnboardingSnapshot(capsule = ensureV2PreviewCapsule()) {
 function v2OnboardingView(capsule = ensureV2PreviewCapsule()) {
   const onboarding = v2OnboardingSnapshot(capsule);
   if (!onboarding || !window.BoxeurOnboarding) return null;
+  const baseStep = window.BoxeurOnboarding.getCurrentStep(onboarding);
+  const plannerEntries = Array.isArray(capsule?.previewRuntime?.weekPlanner?.entries)
+    ? capsule.previewRuntime.weekPlanner.entries
+    : [];
+  const firstGroupClassPlanned = onboarding.mode === "guided"
+    && onboarding.week === 1
+    && baseStep?.id === "week-1-first-session"
+    && plannerEntries.some(entry => entry?.activityId === "group-class");
+  const step = firstGroupClassPlanned
+    ? {
+        id: "week-1-review-program",
+        type: "review-week",
+        title: "Ta première séance est planifiée",
+        detail: "Rien n’est encore appliqué. Vérifie ton programme, puis confirme la semaine lorsque tu es satisfait de tes choix.",
+        locationId: "map",
+        required: false,
+        actionMode: "review-and-confirm",
+      }
+    : baseStep;
   return {
     state: onboarding,
     gates: window.BoxeurOnboarding.getGates(onboarding),
-    step: window.BoxeurOnboarding.getCurrentStep(onboarding),
+    step,
   };
 }
 
@@ -3272,6 +3296,11 @@ function v2GymContext() {
   return {
     profile: state.profile,
     careerStatus: state.careerStatus,
+    careerStatusLabel: state.careerStatus === "professional" ? "Professionnel" : state.careerStatus === "amateur" ? "Amateur" : "Récréatif",
+    clock: {
+      ...capsule.timeState.clock,
+      dateLabel: career.v2DateLabel,
+    },
     condition: {
       preparationLabel: prep.label,
       preparationDetail: prep.detail,
@@ -3289,6 +3318,7 @@ function v2GymContext() {
       durationMinutes: coachPreview.totals?.durationMinutes || 0,
       available: coachPlanState.planned === true || (coachPreview.ok && !trainingBlocked && coachPlanState.available),
       planned: coachPlanState.planned === true,
+      plannedCount: safeNumber(coachPlanState.plannedCount, 0, 0, 2),
       notice: trainingBlocked
         ? trainingBlockedReason
         : !coachPlanState.available
@@ -3694,7 +3724,9 @@ function v2InventoryContext() {
         description: item.detail,
         status: reservedEntry ? "prepared" : "stored",
         statusLabel: reservedEntry ? "Réservé cette semaine" : "Dans le sac",
-        note: reservedEntry ? `Associé à : ${reservedEntry.label}` : `Gain de barre : +${V2_SUPPLEMENT_CAPACITY_RELIEF[item.id] || 1} énergie hebdomadaire.`,
+        note: reservedEntry
+          ? `Associé à : ${reservedEntry.label} · ${reservedEntry.metadata?.supplementCapacityRelief || 0} point${Number(reservedEntry.metadata?.supplementCapacityRelief || 0) > 1 ? "s" : ""} libéré${Number(reservedEntry.metadata?.supplementCapacityRelief || 0) > 1 ? "s" : ""}.`
+          : "Le coût sera recalculé selon l’énergie et la fatigue de la séance choisie.",
         action: {
           id: "reserve-week",
           label: reservedEntry ? "Changer la réservation" : "Associer à une séance",
@@ -3738,7 +3770,7 @@ function openV2SupplementReservation(productId) {
   }).join("");
   sheet.dataset.originLocation = "inventory";
   sheet.classList.add("v2-location-sheet-full");
-  sheet.innerHTML = `<section class="v2-service-panel v2-supplement-picker" aria-labelledby="v2-inventory-reserve-title"><header><div><p class="eyebrow">${escapeHTML(product.label)} · ×${v2SupplementState(capsule).inventory[productId] || 0}</p><h2 id="v2-inventory-reserve-title">Choisis une séance</h2></div><button type="button" class="secondary-button" data-v2-inventory-reserve-close>Retour à l’inventaire</button></header><p>${escapeHTML(product.benefit)} La barre récupère ${V2_SUPPLEMENT_CAPACITY_RELIEF[productId] || 1} point${(V2_SUPPLEMENT_CAPACITY_RELIEF[productId] || 1) > 1 ? "s" : ""}; le produit sera consommé seulement à la confirmation.</p><div class="v2-supplement-grid">${choices}</div></section>`;
+  sheet.innerHTML = `<section class="v2-service-panel v2-supplement-picker" aria-labelledby="v2-inventory-reserve-title"><header><div><p class="eyebrow">${escapeHTML(product.label)} · ×${v2SupplementState(capsule).inventory[productId] || 0}</p><h2 id="v2-inventory-reserve-title">Choisis une séance</h2></div><button type="button" class="secondary-button" data-v2-inventory-reserve-close>Retour à l’inventaire</button></header><p>${escapeHTML(product.benefit)} Le coût hebdomadaire sera recalculé à partir du même effet appliqué pendant la séance; le produit sera consommé seulement à la confirmation.</p><div class="v2-supplement-grid">${choices}</div></section>`;
   activateV2LocationSheet(sheet, "[data-v2-plan-supplement-entry], [data-v2-inventory-reserve-close]");
 }
 
@@ -3763,11 +3795,22 @@ function unreserveV2PlannerSupplement(entryId) {
     const unreserved = window.BoxeurWeekPlanner.unreserveSupplement(plannerState, entryId);
     plannerState = unreserved.state;
     const current = plannerState.entries.find(item => item.id === entryId);
-    const restoredCost = safeNumber(current.metadata?.supplementBaseCapacityCost, current.capacityCost, 1, 100);
+    const restoredCost = safeNumber(current.metadata?.supplementBaseCapacityCost, current.capacityCost, 0, 100);
+    const restoredEnergy = safeNumber(current.metadata?.supplementBaseEnergyCost, current.energyCost, 0, 100, false);
+    const restoredFatigue = safeNumber(current.metadata?.supplementBaseFatigueDelta, current.fatigueDelta, -100, 100, false);
     const metadata = { ...current.metadata };
     delete metadata.supplementBaseCapacityCost;
+    delete metadata.supplementBaseEnergyCost;
+    delete metadata.supplementBaseFatigueDelta;
+    delete metadata.supplementBaseFatigueGain;
+    delete metadata.supplementBaseFatigueRelief;
     delete metadata.supplementCapacityRelief;
-    plannerState = window.BoxeurWeekPlanner.editActivity(plannerState, entryId, { capacityCost: restoredCost, metadata }).state;
+    plannerState = window.BoxeurWeekPlanner.editActivity(plannerState, entryId, {
+      capacityCost: restoredCost,
+      energyCost: restoredEnergy,
+      fatigueDelta: restoredFatigue,
+      metadata,
+    }).state;
     v2PlannerStore(capsule, plannerState);
     openV2Inventory();
     showToast("Réservation retirée · le produit reste dans l’inventaire.");
@@ -3802,6 +3845,7 @@ const V2_EXERCISE_TO_ENGINE = Object.freeze({
   "heavy-bag": "heavy_bag",
   "mitt-work": "mitts",
   defense: "defense_drills",
+  cooldown: "cooldown",
 });
 
 function v2TrainingContext() {
@@ -3898,9 +3942,10 @@ function v2WouldCrossWeek(timeState, duration = 1) {
   return timeState.clock.absoluteSlot + Math.max(1, Number(duration) || 1) >= weekEnd;
 }
 
-function v2WeekTrainingActivityCount(timeState) {
+function v2WeekTrainingActivityCount(timeState, weekNumber = timeState?.clock?.week) {
   if (!timeState?.clock || !Array.isArray(timeState.history) || !window.BoxeurTime) return 0;
-  const start = v2WeekStartSlot(timeState);
+  const week = safeNumber(weekNumber, timeState.clock.week, 1, 99999);
+  const start = (week - 1) * window.BoxeurTime.PERIODS_PER_WEEK;
   const end = start + window.BoxeurTime.PERIODS_PER_WEEK;
   return timeState.history.filter(event => (
     v2IsPrimaryPhysicalEvent(event)
@@ -3955,26 +4000,22 @@ function recordV2Work(runtime, weekNumber, grossWages, workShifts = 1) {
 }
 
 const V2_WEEK_CAPACITY_TOTAL = 50;
-const V2_WEEK_RULESET_VERSION = 3;
+const V2_WEEK_RULESET_VERSION = 4;
 const V2_WEEK_ACTIVITY_LIMITS = Object.freeze({
-  "group-class": 3,
-  "boxing-coach": 3,
-  "boxing-custom": 2,
-  "strength-quick": 2,
-  "strength-custom": 2,
-  "home-quick": 2,
-  "home-custom": 2,
+  "group-class": 1,
   rest: 2,
   meal: 1,
-  "private-training": 1,
   sparring: 1,
 });
-const V2_SUPPLEMENT_CAPACITY_RELIEF = Object.freeze({
-  "protein-bar": 1,
-  "sports-drink": 2,
-  "protein-shake": 1,
-  preworkout: 3,
+const V2_WEEK_FAMILY_LIMITS = Object.freeze({
+  group: 1,
+  boxing: 2,
+  strength: 2,
+  home: 2,
+  sparring: 1,
 });
+const V2_WEEK_TOGGLE_ACTIVITY_IDS = new Set(["group-class", "rest", "meal", "sparring"]);
+const V2_CUSTOM_SESSION_BASE_COST = 2;
 const V2_PLANNER_DAY_LABELS = Object.freeze({
   monday: "Lundi",
   tuesday: "Mardi",
@@ -3993,8 +4034,8 @@ function v2PlannerTrainingEfficiency() {
   return 1 - Math.min(.18, Math.max(0, Number(state.level || 1) - 1) * .015);
 }
 
-function v2PlannerLoadCost(energyCost, fatigueDelta, minimum = 4) {
-  const raw = 2 + Math.max(0, Number(energyCost) || 0) * .55 + Math.max(0, Number(fatigueDelta) || 0) * .3;
+function v2PlannerLoadCost(energyCost, fatigueDelta, minimum = 4, extraBaseCost = 0) {
+  const raw = 2 + Math.max(0, Number(extraBaseCost) || 0) + Math.max(0, Number(energyCost) || 0) * .55 + Math.max(0, Number(fatigueDelta) || 0) * .3;
   return Math.max(minimum, Math.round(raw * v2PlannerTrainingEfficiency()));
 }
 
@@ -4010,11 +4051,14 @@ function v2PlannerCapacityTotal(capsule, career, job) {
       + Math.max(0, 38 - Number(condition.energy || 0)) / 8,
   );
   const rhythmPenalty = isCompetitiveCareer()
-    ? Math.min(9, safeNumber(state.boxingInactivityWeeks, 0, 0, 999) * 3)
+    ? safeNumber(runtimeCareerTrainingRhythm(career), 0, 0, 2) * 5
     : 0;
   let total = Math.max(32, V2_WEEK_CAPACITY_TOTAL - conditionPenalty - rhythmPenalty);
-  if (hasWeakBoxingRhythm()) total = Math.min(total, v2PlannerWorkCost(job) + 14);
-  return Math.max(v2PlannerWorkCost(job) + 6, total);
+  return Math.max(v2PlannerWorkCost(job) + 10, total);
+}
+
+function runtimeCareerTrainingRhythm(career = v2CareerView()) {
+  return safeNumber(career?.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 2);
 }
 
 function v2PlannerSupplementConfig(capsule) {
@@ -4054,7 +4098,13 @@ function v2PlannerBaseConfig(capsule = ensureV2PreviewCapsule()) {
       locked: false,
     } : null,
     supplements: v2PlannerSupplementConfig(capsule),
-    limits: { recreationalPhysicalActivities: 3 },
+    limits: {
+      recreationalPhysicalActivities: 2,
+      family: {
+        ...V2_WEEK_FAMILY_LIMITS,
+        home: state.careerStatus === "recreational" ? 1 : V2_WEEK_FAMILY_LIMITS.home,
+      },
+    },
   };
 }
 
@@ -4072,7 +4122,7 @@ function v2PlannerSignature(capsule = ensureV2PreviewCapsule()) {
     state.level,
     Math.round(capsule.timeState.condition.energy),
     Math.round(capsule.timeState.condition.fatigue),
-    state.boxingInactivityWeeks,
+    runtimeCareerTrainingRhythm(runtime.career),
     supplementState?.inventory || {},
     supplementState?.weeklyUsage || {},
     runtime.career.v2TrainerState?.activeProgram || null,
@@ -4125,13 +4175,16 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       label: groupClass ? "Cours de groupe · fondamentaux" : custom ? "Séance de boxe personnalisée" : "Séance de l’entraîneur",
       source: custom ? "custom" : "coach",
     });
+    const familyId = groupClass ? "group" : "boxing";
+    const capacityExtraBase = custom ? V2_CUSTOM_SESSION_BASE_COST : 0;
+    const programSignature = `${familyId}:${aggregate.session.blocks.map(block => block.id).sort().join("+")}`;
     return {
       id,
       label: groupClass ? "Cours de groupe" : custom ? "Séance de boxe personnalisée" : "Séance de l’entraîneur",
       category: groupClass ? "group-class" : "boxing",
       location: "boxing-gym",
       physical: true,
-      capacityCost: v2PlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta),
+      capacityCost: v2PlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 4, capacityExtraBase),
       energyCost: aggregate.totals.energyCost,
       fatigueDelta: aggregate.totals.fatigueDelta,
       recreationalAllowed: groupClass,
@@ -4143,6 +4196,12 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
         xp: aggregate.totals.xp,
         wear: aggregate.totals.wear,
         injuryRisk: aggregate.totals.injuryRisk,
+        familyId,
+        programSignature,
+        capacityExtraBase,
+        capacityMinimum: 4,
+        fatigueGain: aggregate.totals.fatigueGain,
+        fatigueRelief: aggregate.totals.fatigueRelief,
       },
     };
   }
@@ -4151,13 +4210,22 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       ? ["dynamic_warmup", "machine_conditioning", "mobility_cooldown"]
       : Array.isArray(metadata.selection) ? metadata.selection : [];
     const aggregate = window.BoxeurStrength.aggregateSelection(selection);
+    if (id === "strength-custom") {
+      const hasWarmup = aggregate.activityIds.includes("dynamic_warmup");
+      const hasCooldown = aggregate.activityIds.includes("mobility_cooldown");
+      const hasWork = aggregate.activities.some(activity => activity.countsAsWork);
+      if (!hasWarmup || !hasWork || !hasCooldown) {
+        throw new Error("Une séance personnalisée doit contenir un échauffement, un exercice principal et un retour au calme.");
+      }
+    }
+    const capacityExtraBase = id === "strength-custom" ? V2_CUSTOM_SESSION_BASE_COST : 0;
     return {
       id,
       label: id === "strength-quick" ? "Séance de musculation rapide" : "Séance de musculation personnalisée",
       category: "strength",
       location: "strength-gym",
       physical: true,
-      capacityCost: v2PlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta),
+      capacityCost: v2PlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 4, capacityExtraBase),
       energyCost: aggregate.totals.energyCost,
       fatigueDelta: aggregate.totals.fatigueDelta,
       metadata: {
@@ -4166,6 +4234,12 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
         xp: aggregate.totals.xp,
         wear: aggregate.totals.wear,
         injuryRisk: aggregate.totals.injuryRisk,
+        familyId: "strength",
+        programSignature: `strength:${aggregate.activityIds.slice().sort().join("+")}`,
+        capacityExtraBase,
+        capacityMinimum: 4,
+        fatigueGain: aggregate.totals.fatigueGain,
+        fatigueRelief: aggregate.totals.fatigueRelief,
       },
     };
   }
@@ -4174,17 +4248,28 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
     if (id === "home-custom" && aggregate.selection.length === 0) {
       throw new Error("Choisis au moins une activité pour bâtir l’entraînement maison.");
     }
+    const capacityExtraBase = id === "home-custom" ? V2_CUSTOM_SESSION_BASE_COST : 0;
     return {
       id,
       label: id === "home-quick" ? "Entraînement maison rapide" : "Entraînement maison personnalisé",
       category: "home",
       location: "home",
       physical: true,
-      capacityCost: v2PlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 5),
+      capacityCost: v2PlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 5, capacityExtraBase),
       energyCost: aggregate.totals.energyCost,
       fatigueDelta: aggregate.totals.fatigueDelta,
       recreationalAllowed: id === "home-quick",
-      metadata: { plannerType: id, selection: aggregate.selection, xp: aggregate.totals.xp },
+      metadata: {
+        plannerType: id,
+        selection: aggregate.selection,
+        xp: aggregate.totals.xp,
+        familyId: "home",
+        programSignature: `home:${aggregate.selection.slice().sort().join("+")}`,
+        capacityExtraBase,
+        capacityMinimum: 5,
+        fatigueGain: aggregate.totals.fatigueGain,
+        fatigueRelief: aggregate.totals.fatigueRelief,
+      },
     };
   }
   if (id === "rest") {
@@ -4194,7 +4279,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: "recovery",
       location: "home",
       physical: false,
-      capacityCost: 4,
+      capacityCost: 0,
       energyGain: 10,
       fatigueDelta: -5,
       recreationalAllowed: true,
@@ -4208,7 +4293,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: "home",
       location: "home",
       physical: false,
-      capacityCost: 4,
+      capacityCost: 0,
       energyGain: 9,
       fatigueDelta: -2,
       recreationalAllowed: true,
@@ -4222,6 +4307,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
     const trainer = program ? window.BoxeurTrainer.getTrainer(program.trainerId) : null;
     if (!program || !trainer) throw new Error("Aucun programme privé n’est actif.");
     const location = v2TrainerLocationForTarget(program.target);
+    const familyId = location === "strength-gym" ? "strength" : "boxing";
     return {
       id,
       label: `Séance privée · ${trainer.label}`,
@@ -4231,7 +4317,18 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       capacityCost: v2PlannerLoadCost(trainer.energyCost, trainer.fatigue),
       energyCost: trainer.energyCost,
       fatigueDelta: trainer.fatigue,
-      metadata: { plannerType: id, programId: program.id, trainerId: trainer.id, target: program.target },
+      metadata: {
+        plannerType: id,
+        programId: program.id,
+        trainerId: trainer.id,
+        target: program.target,
+        familyId,
+        programSignature: `${familyId}:private:${trainer.id}:${program.target}`,
+        capacityExtraBase: 0,
+        capacityMinimum: 4,
+        fatigueGain: trainer.fatigue,
+        fatigueRelief: 0,
+      },
     };
   }
   if (id === "sparring") {
@@ -4244,7 +4341,16 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       capacityCost: v2PlannerLoadCost(18, 14, 12),
       energyCost: 18,
       fatigueDelta: 14,
-      metadata: { plannerType: id, completed: metadata.completed === true },
+      metadata: {
+        plannerType: id,
+        completed: metadata.completed === true,
+        familyId: "sparring",
+        programSignature: "sparring:technical",
+        capacityExtraBase: 0,
+        capacityMinimum: 12,
+        fatigueGain: 14,
+        fatigueRelief: 0,
+      },
     };
   }
   throw new Error("Cette activité n’est pas reconnue par le planificateur.");
@@ -4346,8 +4452,9 @@ function v2PlannerLocationEntries(plannerState, locationId) {
     .map(entry => ({
       id: entry.id,
       activityId: entry.activityId,
-      label: entry.label,
+      label: entry.metadata?.gainMultiplier < 1 ? `${entry.label} · gains 85 %` : entry.label,
       cost: entry.capacityCost,
+      gainMultiplier: safeNumber(entry.metadata?.gainMultiplier, 1, .5, 1, false),
       removable: !entry.locked && !entry.metadata?.completed,
     }));
 }
@@ -4357,23 +4464,29 @@ function v2PlannerActionState(activityId, metadata = {}) {
   const plannerState = ensureV2WeekPlanner(capsule);
   const access = v2PlannerActivityAccess(activityId);
   if (!access.available) return { ...access, planned: false, entryId: null };
-  const existing = plannerState.entries.find(entry => !entry.preReserved && entry.activityId === activityId);
-  if (existing) return { available: true, reason: "", planned: true, entryId: existing.id };
-  const max = V2_WEEK_ACTIVITY_LIMITS[activityId] || 1;
-  if (v2PlannerEntryCount(plannerState, activityId) >= max) {
-    return { available: false, reason: "Le maximum hebdomadaire de cette activité est atteint.", planned: false, entryId: null };
+  const existingEntries = plannerState.entries.filter(entry => !entry.preReserved && entry.activityId === activityId);
+  const existing = existingEntries[0] || null;
+  const toggleActivity = V2_WEEK_TOGGLE_ACTIVITY_IDS.has(activityId);
+  if (toggleActivity && existing) {
+    return { available: true, reason: "", planned: true, plannedCount: existingEntries.length, entryId: existing.id };
+  }
+  const max = V2_WEEK_ACTIVITY_LIMITS[activityId];
+  if (max != null && existingEntries.length >= max) {
+    return { available: false, reason: "Le maximum hebdomadaire de cette activité est atteint.", planned: existingEntries.length > 0, plannedCount: existingEntries.length, entryId: existing?.id || null };
   }
   try {
     const definition = v2PlannerActivityDefinition(activityId, metadata);
-    const physicalAlreadyDone = v2WeekTrainingActivityCount(capsule.timeState);
-    const physicalPlanned = plannerState.entries.filter(entry => entry.physical && !entry.metadata?.completed).length;
-    if (definition.physical && physicalAlreadyDone + physicalPlanned >= 4) {
-      return { available: false, reason: "La semaine contient déjà quatre activités physiques principales.", planned: false, entryId: null };
-    }
     const quote = window.BoxeurWeekPlanner.quoteActivity(plannerState, definition);
-    return { available: quote.ok, reason: quote.reason || "", planned: false, entryId: null, quote };
+    return {
+      available: quote.ok,
+      reason: quote.reason || "",
+      planned: false,
+      plannedCount: existingEntries.length,
+      entryId: existing?.id || null,
+      quote,
+    };
   } catch (error) {
-    return { available: false, reason: error.message || "Cette activité est indisponible.", planned: false, entryId: null };
+    return { available: false, reason: error.message || "Cette activité est indisponible.", planned: false, plannedCount: existingEntries.length, entryId: existing?.id || null };
   }
 }
 
@@ -4388,20 +4501,65 @@ function v2PlannerReserveSupplementOnState(plannerState, entryId, productId) {
     working = unreserved.state;
     const restoredEntry = working.entries.find(item => item.id === previousReservation.id);
     const restoredMetadata = { ...restoredEntry.metadata };
-    const restoredCost = safeNumber(restoredMetadata.supplementBaseCapacityCost, restoredEntry.capacityCost, 1, 100);
+    const restoredCost = safeNumber(restoredMetadata.supplementBaseCapacityCost, restoredEntry.capacityCost, 0, 100);
+    const restoredEnergy = safeNumber(restoredMetadata.supplementBaseEnergyCost, restoredEntry.energyCost, 0, 100, false);
+    const restoredFatigue = safeNumber(restoredMetadata.supplementBaseFatigueDelta, restoredEntry.fatigueDelta, -100, 100, false);
     delete restoredMetadata.supplementBaseCapacityCost;
+    delete restoredMetadata.supplementBaseEnergyCost;
+    delete restoredMetadata.supplementBaseFatigueDelta;
+    delete restoredMetadata.supplementBaseFatigueGain;
+    delete restoredMetadata.supplementBaseFatigueRelief;
     delete restoredMetadata.supplementCapacityRelief;
     working = window.BoxeurWeekPlanner.editActivity(working, restoredEntry.id, {
       capacityCost: restoredCost,
+      energyCost: restoredEnergy,
+      fatigueDelta: restoredFatigue,
       metadata: restoredMetadata,
     }).state;
   }
   const currentEntry = working.entries.find(item => item.id === entryId);
-  const baseCost = safeNumber(currentEntry.metadata?.supplementBaseCapacityCost, currentEntry.capacityCost, 1, 100);
-  const relief = safeNumber(V2_SUPPLEMENT_CAPACITY_RELIEF[productId], 1, 0, 10);
+  const product = window.BoxeurSupplements.CATALOG[productId];
+  if (!product) throw new Error("Ce supplément n’existe plus.");
+  const baseCost = safeNumber(currentEntry.metadata?.supplementBaseCapacityCost, currentEntry.capacityCost, 0, 100);
+  const baseEnergy = safeNumber(currentEntry.metadata?.supplementBaseEnergyCost, currentEntry.energyCost, 0, 100, false);
+  const baseFatigueGain = safeNumber(
+    currentEntry.metadata?.supplementBaseFatigueGain,
+    currentEntry.metadata?.fatigueGain ?? Math.max(0, currentEntry.fatigueDelta),
+    0,
+    100,
+    false,
+  );
+  const baseFatigueRelief = safeNumber(
+    currentEntry.metadata?.supplementBaseFatigueRelief,
+    currentEntry.metadata?.fatigueRelief ?? Math.max(0, -currentEntry.fatigueDelta),
+    0,
+    100,
+    false,
+  );
+  const adjustedEnergy = Math.round(baseEnergy * safeNumber(product.effects?.energyCostMultiplier, 1, .5, 1.5, false) * 100) / 100;
+  const adjustedFatigueGain = Math.round(baseFatigueGain * safeNumber(product.effects?.fatigueGainMultiplier, 1, .5, 1.5, false) * 100) / 100;
+  const adjustedFatigueRelief = Math.round((baseFatigueRelief + safeNumber(product.effects?.fatigueRelief, 0, 0, 20, false)) * 100) / 100;
+  const adjustedFatigueDelta = adjustedFatigueGain - adjustedFatigueRelief;
+  const adjustedCost = v2PlannerLoadCost(
+    adjustedEnergy,
+    adjustedFatigueDelta,
+    safeNumber(currentEntry.metadata?.capacityMinimum, 4, 1, 20),
+    safeNumber(currentEntry.metadata?.capacityExtraBase, 0, 0, 10),
+  );
+  const relief = Math.max(0, baseCost - adjustedCost);
   const edited = window.BoxeurWeekPlanner.editActivity(working, entryId, {
-    capacityCost: Math.max(1, baseCost - relief),
-    metadata: { ...currentEntry.metadata, supplementBaseCapacityCost: baseCost, supplementCapacityRelief: relief },
+    capacityCost: adjustedCost,
+    energyCost: adjustedEnergy,
+    fatigueDelta: adjustedFatigueDelta,
+    metadata: {
+      ...currentEntry.metadata,
+      supplementBaseCapacityCost: baseCost,
+      supplementBaseEnergyCost: baseEnergy,
+      supplementBaseFatigueDelta: currentEntry.fatigueDelta,
+      supplementBaseFatigueGain: baseFatigueGain,
+      supplementBaseFatigueRelief: baseFatigueRelief,
+      supplementCapacityRelief: relief,
+    },
   });
   working = edited.state;
   return window.BoxeurWeekPlanner.reserveSupplement(working, entryId, productId);
@@ -4413,24 +4571,22 @@ function addV2PlannerActivity(activityId, metadata = {}, options = {}) {
   const access = v2PlannerActivityAccess(activityId);
   if (!access.available) return showToast(access.reason);
   let plannerState = ensureV2WeekPlanner(capsule);
-  const max = V2_WEEK_ACTIVITY_LIMITS[activityId] || 1;
+  const max = V2_WEEK_ACTIVITY_LIMITS[activityId];
   const existing = plannerState.entries.find(entry => !entry.preReserved && entry.activityId === activityId);
   if (options.toggle === true && existing) return removeV2PlannerActivity(existing.id, { reopen: options.reopen });
-  if (v2PlannerEntryCount(plannerState, activityId) >= max) return showToast(`Cette activité est déjà planifiée au maximum ${max} fois cette semaine.`);
+  if (max != null && v2PlannerEntryCount(plannerState, activityId) >= max) return showToast(`Cette activité est déjà planifiée au maximum ${max} fois cette semaine.`);
   try {
     const definition = v2PlannerActivityDefinition(activityId, metadata);
-    const physicalAlreadyDone = v2WeekTrainingActivityCount(capsule.timeState);
-    const physicalPlanned = plannerState.entries.filter(entry => entry.physical && !entry.metadata?.completed).length;
-    if (definition.physical && physicalAlreadyDone + physicalPlanned >= 4) {
-      return showToast("La semaine contient déjà quatre activités physiques principales. Retire-en une avant d’en ajouter une autre.");
-    }
     const defaultDay = activityId === "rest" ? "sunday" : activityId === "meal" ? "wednesday" : undefined;
     const outcome = window.BoxeurWeekPlanner.addActivity(plannerState, definition, {
       preferredDay: options.preferredDay || defaultDay,
       source: options.source,
     });
     v2PlannerStore(capsule, outcome.state);
-    showToast(`${outcome.result.entry.label} ajouté à la semaine · −${outcome.result.capacityReserved} énergie hebdomadaire`);
+    const reservationLabel = outcome.result.capacityReserved > 0
+      ? `−${outcome.result.capacityReserved} énergie hebdomadaire`
+      : "aucun coût d’énergie hebdomadaire";
+    showToast(`${outcome.result.entry.label} ajouté à la semaine · ${reservationLabel}`);
     if (options.reopen) openV2Location(options.reopen);
     return outcome;
   } catch (error) {
@@ -4496,13 +4652,8 @@ function applyV2QuickWeekPlan() {
     candidates.push({ id: "group-class", day: "tuesday" }, { id: "rest", day: "sunday" });
   } else {
     candidates.push({ id: "boxing-coach", day: "tuesday" });
-    if (!hasWeakBoxingRhythm()) {
-      const job = jobs.find(item => item.id === v2CareerView().jobId);
-      if (v2CareerView().strengthGymWeeks > 0) candidates.push({ id: "strength-quick", day: "thursday" });
-      else if (job?.id === "warehouse") candidates.push({ id: "home-quick", day: "thursday" });
-      else candidates.push({ id: "boxing-coach", day: "thursday" });
-      if (!job) candidates.push({ id: "home-quick", day: "saturday" });
-    }
+    if (v2CareerView().strengthGymWeeks > 0) candidates.push({ id: "strength-quick", day: "thursday" });
+    else candidates.push({ id: "home-quick", day: "thursday" });
     candidates.push({ id: "rest", day: "sunday" });
   }
   const accepted = [];
@@ -4699,6 +4850,7 @@ function v2WeekViewContext() {
     recovery: "Récupération",
     home: "Maison",
   };
+  const rhythmPenalty = runtimeCareerTrainingRhythm(career);
   const items = preview.entries.map(entry => {
     const effects = [];
     if (entry.pay > 0) effects.push(`+${Math.round(entry.pay)} $ à la fin de la semaine`);
@@ -4706,6 +4858,7 @@ function v2WeekViewContext() {
     if (entry.energyCost > 0) effects.push(`−${Math.round(entry.energyCost)} énergie pendant l’activité`);
     if (entry.energyGain > 0) effects.push(`+${Math.round(entry.energyGain)} récupération`);
     if (entry.supplementId) effects.push(`${window.BoxeurSupplements.CATALOG[entry.supplementId]?.label || "Supplément"} réservé`);
+    if (entry.metadata?.gainMultiplier < 1) effects.push("Répétition exacte · 85 % des gains");
     if (entry.metadata?.completed) effects.push("Déjà joué cette semaine");
     return {
       id: entry.id,
@@ -4726,8 +4879,8 @@ function v2WeekViewContext() {
       spent: preview.capacity.used,
       zone,
       zoneLabel: preview.condition.fatigueZone.label,
-      detail: hasWeakBoxingRhythm()
-        ? "Rythme faible : reprends une activité de boxe cette semaine pour retrouver ta capacité normale."
+      detail: rhythmPenalty > 0
+        ? `Rythme ${rhythmPenalty >= 2 ? "faible" : "fragile"} : une semaine avec entraînement récupérera 5 points de capacité pour la suivante, sans retirer de statistiques.`
         : `À mesure que ton niveau monte, le coût des entraînements baisse légèrement, jusqu’à un plafond équilibré.`,
     },
     quick: {
@@ -4910,22 +5063,35 @@ function v2WeeklyCompletionEvents(result, runtime, previousWeek) {
   settleV2JobAttendance(runtime, ledger.workShifts > 0, events, previousWeek);
   advanceV2JobApplication(runtime, events, previousWeek);
   if (isCompetitiveCareer()) {
-    const rhythmEvents = [];
-    updateBoxingRhythm(rhythmEvents, previousWeek);
-    rhythmEvents.forEach(detail => events.push({
-      label: detail.startsWith("Rythme de boxe retrouvé") ? "Rythme retrouvé" : "Rythme de boxe",
-      detail,
-      tone: detail.startsWith("Rythme de boxe retrouvé") ? "positive" : "warning",
-    }));
-  }
-  if (result.summary.counts.training <= 0) {
-    state.fitness = clamp(state.fitness - 1);
-    events.push({ label: "Aucun entraînement", detail: "La forme physique baisse légèrement. Plusieurs semaines ainsi finiront par réduire la capacité du programme.", tone: "warning" });
+    const trained = v2WeekTrainingActivityCount(result.timeState, previousWeek) > 0;
+    const beforeRhythm = safeNumber(runtime.career.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 2);
+    const afterRhythm = trained ? Math.max(0, beforeRhythm - 1) : Math.min(2, beforeRhythm + 1);
+    runtime.career.trainingRhythmPenalty = afterRhythm;
+    state.trainingRhythmPenalty = afterRhythm;
+    if (trained && afterRhythm < beforeRhythm) {
+      events.push({
+        label: afterRhythm === 0 ? "Rythme retrouvé" : "Reprise progressive",
+        detail: afterRhythm === 0
+          ? "Une semaine active rétablit la capacité normale du prochain programme."
+          : "La reprise est amorcée : encore une semaine active permettra de retrouver toute la capacité.",
+        tone: "positive",
+      });
+    } else if (!trained) {
+      events.push({
+        label: afterRhythm >= 2 ? "Rythme faible" : "Rythme fragile",
+        detail: afterRhythm >= 2
+          ? "Deux semaines ou plus sans entraînement : la prochaine barre perd 10 points, sans diminution des statistiques."
+          : "Semaine sans entraînement : la prochaine barre perd 5 points, sans diminution des statistiques.",
+        tone: "warning",
+      });
+    }
+  } else if (result.summary.counts.training <= 0) {
+    events.push({ label: "Semaine sans entraînement", detail: "Aucune statistique n’est perdue pendant le parcours récréatif.", tone: "neutral" });
   }
   return events;
 }
 
-function v2WeekSummaryView(result, completionEvents = []) {
+function v2WeekSummaryView(result, completionEvents = [], options = {}) {
   const grossWages = result.summary.actions
     .filter(record => record.kind === "work")
     .reduce((sum, record) => sum + Math.max(0, Number(record.moneyDelta || 0)), 0);
@@ -4955,6 +5121,14 @@ function v2WeekSummaryView(result, completionEvents = []) {
       : "Le temps s’est arrêté avant une étape qui ne doit pas être décidée automatiquement.",
     changes,
     events,
+    ...(options.firstGuidedWeek === true ? {
+      guide: {
+        title: "Comment lire ton premier bilan",
+        detail: "Énergie et fatigue montrent le coût réel de ton programme. La progression assimilée indique ce que ton boxeur a retenu de ses entraînements.",
+        next: "En continuant, le guide affichera l’objectif de la semaine 2.",
+      },
+      actionLabel: "Continuer vers la semaine 2",
+    } : {}),
   };
 }
 
@@ -4971,6 +5145,29 @@ function v2PlannerSupplementAdjustment(supplementState, entry, totals, capsule) 
   });
   const applied = window.BoxeurSupplements.applyToSession(prepared.state, totals, { sessionId });
   return { state: applied.state, totals: applied.session, result: applied.result };
+}
+
+function v2PlannerGainMultiplier(entry) {
+  return safeNumber(entry?.metadata?.gainMultiplier, 1, .5, 1, false);
+}
+
+function v2PlannerScaledStimulus(stimulus, multiplier) {
+  return Object.fromEntries(Object.keys(combatLabels).map(key => [
+    key,
+    Math.round(Number(stimulus?.[key] || 0) * multiplier * 10000) / 10000,
+  ]));
+}
+
+function v2PlannerScaledBoxingSession(session, multiplier) {
+  if (multiplier >= 1) return session;
+  return {
+    ...cloneData(session),
+    blocks: session.blocks.map(block => ({
+      ...cloneData(block),
+      stimulus: v2PlannerScaledStimulus(block.stimulus, multiplier),
+      xp: Math.round(Number(block.xp || 0) * multiplier * 100) / 100,
+    })),
+  };
 }
 
 function v2PlannerGenericActivity(entry, label, totals, options = {}) {
@@ -5033,11 +5230,12 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, aggregate.totals, capsule);
     sideEffects.supplementState = adjusted.state;
     if (adjusted.result) sideEffects.supplements.push(adjusted.result);
+    const gainMultiplier = v2PlannerGainMultiplier(entry);
     return {
       kind: "training",
       plannerActivityId: entry.activityId,
       plannerEntryId: entry.id,
-      session: aggregate.session,
+      session: v2PlannerScaledBoxingSession(aggregate.session, gainMultiplier),
       context: { ...v2TrainingContext(), sessionAdjustment: adjusted.result ? adjusted.totals : null },
       budgetKind: "trainingSessions",
     };
@@ -5050,13 +5248,14 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, aggregate.totals, capsule);
     sideEffects.supplementState = adjusted.state;
     if (adjusted.result) sideEffects.supplements.push(adjusted.result);
+    const gainMultiplier = v2PlannerGainMultiplier(entry);
     return v2PlannerGenericActivity(entry, entry.label, {
       ...adjusted.totals,
-      stimulus: aggregate.totals.stimulus,
+      stimulus: v2PlannerScaledStimulus(aggregate.totals.stimulus, gainMultiplier),
     }, {
       engineId: `strength-gym-session:${aggregate.activityIds.join("-")}`,
       category: "strength-gym-training",
-      xpAward: aggregate.totals.xp,
+      xpAward: aggregate.totals.xp * gainMultiplier,
       wear: aggregate.totals.wear,
       injuryRiskPercent: aggregate.totals.injuryRisk,
     });
@@ -5066,13 +5265,14 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, aggregate.totals, capsule);
     sideEffects.supplementState = adjusted.state;
     if (adjusted.result) sideEffects.supplements.push(adjusted.result);
+    const gainMultiplier = v2PlannerGainMultiplier(entry);
     return v2PlannerGenericActivity(entry, entry.label, {
       ...adjusted.totals,
-      stimulus: aggregate.totals.stimulus,
+      stimulus: v2PlannerScaledStimulus(aggregate.totals.stimulus, gainMultiplier),
     }, {
       engineId: `home-session:${aggregate.selection.join("-")}`,
       category: "home-training",
-      xpAward: aggregate.totals.xp,
+      xpAward: aggregate.totals.xp * gainMultiplier,
     });
   }
   if (entry.activityId === "rest") {
@@ -5107,12 +5307,13 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     sideEffects.trainerState = outcome.state;
     sideEffects.progressionState = outcome.progressionState;
     sideEffects.privateSessions.push(outcome.result);
+    const gainMultiplier = v2PlannerGainMultiplier(entry);
     const totals = {
       energyCost: Math.max(0, -outcome.result.energyDelta),
       energyGain: 0,
       fatigueGain: Math.max(0, outcome.result.fatigueDelta),
       fatigueRelief: 0,
-      stimulus: outcome.result.progression.effectiveAccepted,
+      stimulus: v2PlannerScaledStimulus(outcome.result.progression.effectiveAccepted, gainMultiplier),
     };
     const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, totals, capsule);
     sideEffects.supplementState = adjusted.state;
@@ -5123,7 +5324,7 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     }, {
       engineId: `private-trainer:${sourceId}`,
       category: v2TrainerLocationForTarget(publicProgram.target) === "strength-gym" ? "strength-gym-training" : "boxing-gym-training",
-      xpAward: 4,
+      xpAward: 4 * gainMultiplier,
     });
     primitive.privateTarget = publicProgram.target;
     return primitive;
@@ -5201,7 +5402,7 @@ function buildV2PlannerExecution(capsule, plannerState) {
       weekStartSlot,
       weekEndSlot: weekStartSlot + window.BoxeurTime.PERIODS_PER_WEEK,
       budget: {
-        trainingSessions: Math.min(4, physicalAlreadyDone + physicalCount),
+        trainingSessions: Math.min(window.BoxeurWeek.MAX_TRAINING_SESSIONS, physicalAlreadyDone + physicalCount),
         shortRecoveries: 2,
         workShifts: entries.filter(entry => entry.kind === "work").length,
       },
@@ -5253,6 +5454,7 @@ function runV2AutomaticWeek() {
     }
     const committedSideEffects = replayV2PlannerSideEffects(capsule, execution.plannerEntries, executedEntryIds);
     const onboardingBeforeAdvance = v2OnboardingView(capsule);
+    const firstGuidedWeek = onboardingBeforeAdvance?.state.mode === "guided" && previousWeek === 1;
     if (onboardingBeforeAdvance?.state.mode === "guided") {
       applyV2OnboardingEvent({ type: window.BoxeurOnboarding.EVENT_TYPES.CLOSE_WEEK });
     }
@@ -5261,7 +5463,10 @@ function runV2AutomaticWeek() {
     runtime.career.experience += result.summary.xpAward;
     runtime.career.v2SupplementState = committedSideEffects.supplementState;
     runtime.career.v2TrainerState = committedSideEffects.trainerState;
-    runtime.career.progressionState = committedSideEffects.progressionState;
+    // BoxeurTime demeure l’unique source de progression exécutée. Le moteur
+    // d’entraîneur sert à calculer son stimulus ciblé, sans le créditer une
+    // seconde fois dans une jauge parallèle.
+    v2ProgressionSnapshot(capsule);
     if (result.summary.counts.work > 0 || result.summary.money.earned > 0) {
       const grossWages = result.summary.actions
         .filter(record => record.kind === "work")
@@ -5293,7 +5498,7 @@ function runV2AutomaticWeek() {
     if (!sheet) return;
     sheet.dataset.originLocation = "week";
     sheet.classList.remove("v2-location-sheet-full");
-    sheet.innerHTML = window.BoxeurWeekView.renderSummary(v2WeekSummaryView(result, completionEvents));
+    sheet.innerHTML = window.BoxeurWeekView.renderSummary(v2WeekSummaryView(result, completionEvents, { firstGuidedWeek }));
     activateV2LocationSheet(sheet, "[data-v2-week-summary-close]");
   } catch (error) {
     v2PreviewCapsule = beforeCapsule;
@@ -5710,7 +5915,7 @@ function executeV2PendingTraining(productId = null) {
 
 function runV2CoachSession() {
   const plannerId = state.careerStatus === "recreational" ? "group-class" : "boxing-coach";
-  addV2PlannerActivity(plannerId, {}, { toggle: true, reopen: "boxing-gym" });
+  addV2PlannerActivity(plannerId, {}, { toggle: plannerId === "group-class", reopen: "boxing-gym" });
 }
 
 const V2_HOME_ACTION_TO_ENGINE = Object.freeze({
@@ -5765,7 +5970,7 @@ function runV2HomeAction(viewActionId) {
     return;
   }
   if (!["rest", "home-quick", "meal"].includes(viewActionId)) return;
-  addV2PlannerActivity(viewActionId, {}, { toggle: true, reopen: "home" });
+  addV2PlannerActivity(viewActionId, {}, { toggle: ["rest", "meal"].includes(viewActionId), reopen: "home" });
 }
 
 function renderV2HomeComposer() {
@@ -5804,14 +6009,32 @@ function renderV2Composer() {
   if (!sheet || !window.BoxeurGymView || !window.BoxeurTraining) return;
   const engineIds = v2ComposerSelection.map(id => V2_EXERCISE_TO_ENGINE[id]).filter(Boolean);
   const durationMinutes = engineIds.reduce((sum, id) => sum + (window.BoxeurTraining.EXERCISES[id]?.durationMinutes || 0), 0);
+  let draftWeekCost = 0;
+  if (engineIds.length) {
+    const totals = engineIds.reduce((sum, id) => {
+      const exercise = window.BoxeurTraining.EXERCISES[id];
+      sum.energyCost += Number(exercise?.energyCost || 0);
+      sum.fatigueDelta += Number(exercise?.fatigueGain || 0) - Number(exercise?.fatigueRelief || 0);
+      return sum;
+    }, { energyCost: 0, fatigueDelta: 0 });
+    draftWeekCost = v2PlannerLoadCost(totals.energyCost, totals.fatigueDelta, 4, V2_CUSTOM_SESSION_BASE_COST);
+  }
   sheet.dataset.originLocation = "boxing-gym";
   sheet.classList.add("v2-location-sheet-full");
   sheet.innerHTML = window.BoxeurGymView.renderComposer({
     ...v2GymContext(),
     selectedExercises: v2ComposerSelection,
     draftDurationMinutes: durationMinutes,
+    draftWeekCost,
   });
   activateV2LocationSheet(sheet, "[data-v2-close-composer]");
+}
+
+function selectV2ComposerPreset(presetId) {
+  const preset = window.BoxeurGymView?.PRESETS?.find(item => item.id === presetId);
+  if (!preset) return;
+  v2ComposerSelection = [...preset.exerciseIds];
+  renderV2Composer();
 }
 
 function toggleV2ComposerExercise(exerciseId) {
@@ -5823,7 +6046,14 @@ function toggleV2ComposerExercise(exerciseId) {
 }
 
 function runV2CustomSession() {
-  if (v2ComposerSelection.length < 1 || !window.BoxeurTraining) return showToast("Choisis au moins une activité.");
+  if (!window.BoxeurTraining) return;
+  const selected = new Set(v2ComposerSelection);
+  const hasPreparation = selected.has("jump-rope");
+  const hasWork = ["shadow-boxing", "heavy-bag", "mitt-work", "defense"].some(id => selected.has(id));
+  const hasCooldown = selected.has("cooldown");
+  if (!hasPreparation || !hasWork || !hasCooldown) {
+    return showToast("Complète la préparation, le travail principal et le retour au calme avant d’ajouter la séance.");
+  }
   const blocks = v2ComposerSelection.map(id => V2_EXERCISE_TO_ENGINE[id]).filter(Boolean);
   const outcome = addV2PlannerActivity("boxing-custom", { blocks }, { reopen: "boxing-gym" });
   if (outcome) v2ComposerSelection = [];
@@ -7841,7 +8071,7 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     return;
   }
   if (event.target.closest("[data-v2-strength-quick]")) {
-    addV2PlannerActivity("strength-quick", {}, { toggle: true, reopen: "strength-gym" });
+    addV2PlannerActivity("strength-quick", {}, { reopen: "strength-gym" });
     return;
   }
   if (event.target.closest("[data-v2-strength-result-close]")) {
@@ -7919,6 +8149,11 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     renderV2Composer();
     return;
   }
+  const sessionPreset = event.target.closest("[data-v2-session-preset]");
+  if (sessionPreset) {
+    selectV2ComposerPreset(sessionPreset.dataset.v2SessionPreset);
+    return;
+  }
   const exercise = event.target.closest("[data-v2-exercise]");
   if (exercise) {
     toggleV2ComposerExercise(exercise.dataset.v2Exercise);
@@ -7954,10 +8189,10 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
   if (gymZone) {
     if (gymZone.dataset.v2GymZone === "reception") openV2MembershipMenu();
     else if (gymZone.dataset.v2GymZone === "coach") document.querySelector("#v2-world [data-v2-coach-session]")?.focus();
-    else {
-      v2ComposerSelection = Object.hasOwn(V2_EXERCISE_TO_ENGINE, gymZone.dataset.v2GymZone) ? [gymZone.dataset.v2GymZone] : [];
+    else if (gymZone.dataset.v2GymZone === "training") {
+      v2ComposerSelection = [];
       renderV2Composer();
-    }
+    } else if (gymZone.dataset.v2GymZone === "ring") document.querySelector("#v2-world #v2-gym-sparring-card")?.focus({ preventScroll: false });
     return;
   }
   const homeZone = event.target.closest("[data-v2-home-zone]");

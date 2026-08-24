@@ -160,12 +160,16 @@
       : "";
     const weekFrom = wholeNumber(raw.weekFrom, 1, 1, 99999);
     const weekTo = wholeNumber(raw.weekTo, weekFrom + 1, weekFrom, 99999);
+    const guide = raw.guide && typeof raw.guide === "object"
+      ? `<section class="v2-week-summary-guide" aria-labelledby="v2-week-summary-guide-title"><p class="eyebrow">Guide récréatif</p><h3 id="v2-week-summary-guide-title">${escapeHTML(raw.guide.title || "Comprendre le bilan")}</h3><p>${escapeHTML(raw.guide.detail || "Ce bilan résume les effets de la semaine.")}</p>${raw.guide.next ? `<strong>${escapeHTML(raw.guide.next)}</strong>` : ""}</section>`
+      : "";
     return `<section class="v2-week-summary" aria-labelledby="v2-week-summary-title" aria-live="polite">
       <p class="eyebrow">Semaine ${weekFrom} terminée</p><h2 id="v2-week-summary-title">${escapeHTML(raw.title || `Bienvenue à la semaine ${weekTo}`)}</h2>
       <p>${escapeHTML(raw.summary || "Ton plan, ton emploi et ta récupération ont été résolus.")}</p>
+      ${guide}
       <ul class="v2-week-summary-changes" aria-label="Changements de la semaine">${changesMarkup}</ul>
       ${eventsMarkup}
-      <div class="v2-week-summary-actions"><button type="button" class="primary-button" data-v2-week-summary-close>Retour à la carte</button></div>
+      <div class="v2-week-summary-actions"><button type="button" class="primary-button" data-v2-week-summary-close>${escapeHTML(raw.actionLabel || "Retour à la carte")}</button></div>
     </section>`;
   }
 

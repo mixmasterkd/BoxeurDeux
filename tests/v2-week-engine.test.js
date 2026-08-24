@@ -56,6 +56,7 @@ test("expose le même noyau pur en CommonJS et sur globalThis", () => {
   assert.equal(week.SCHEMA_VERSION, 1);
   assert.deepEqual(week.MODES, ["detailed", "quick", "hybrid"]);
   assert.deepEqual(week.DEFAULT_BUDGET, { trainingSessions: 3, shortRecoveries: 2 });
+  assert.equal(week.MAX_TRAINING_SESSIONS, 7);
 });
 
 test("une capsule migrée devient une enveloppe indépendante sans réécrire son snapshot de rollback", () => {
@@ -405,6 +406,33 @@ test("un plan fourni exécute une activité générique physique avec ses financ
   assert.equal(result.summary.actions[0].category, "home-training");
   assert.equal(result.summary.actions[0].primitive.detail.injuryRiskPercent, 12.4);
   assert.equal(result.timeState.history.some(event => event.weekPhysical === true), true);
+});
+
+test("un plan fourni peut exécuter cinq séances sur cinq journées distinctes", () => {
+  const entries = [2, 5, 8, 11, 14].map((startSlot, index) => ({
+    id: `physical-${index + 1}`,
+    kind: "activity",
+    startSlot,
+    physical: true,
+    activity: {
+      id: `light-session-${index + 1}`,
+      label: `Séance légère ${index + 1}`,
+      category: "training",
+      duration: 1,
+      energyCost: 1,
+      fatigueGain: 0,
+      stimulus: { technique: 0.2 },
+    },
+  }));
+  const result = week.runQuickWeek(
+    freshState({ condition: { energy: 100, fatigue: 0 } }),
+    { plan: suppliedPlan(entries, { trainingSessions: 5 }) },
+    fixedRng(),
+  );
+
+  assert.equal(result.status, "week-complete");
+  assert.equal(result.summary.counts.training, 5);
+  assert.equal(result.summary.budget.executed.trainingSessions, 5);
 });
 
 test("budgetKind rend une activité générique physique et impose une seule activité principale par jour", () => {

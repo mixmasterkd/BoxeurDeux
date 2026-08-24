@@ -42,6 +42,14 @@ test("expose la même API pure en CommonJS et dans le navigateur", () => {
   assert.equal(Object.isFrozen(homeView.ACTIONS), true);
 });
 
+test("emploie le gabarit partagé des lieux V2", () => {
+  const html = homeView.render(baseContext());
+  assert.match(html, /v2-home-view v2-place-view/);
+  assert.match(html, /v2-home-header v2-place-header/);
+  assert.match(html, /v2-home-dashboard v2-place-dashboard/);
+  assert.match(html, /v2-home-week-plan v2-place-week-plan/);
+});
+
 test("conserve les deux illustrations et les quatre hotspots interactifs", () => {
   const html = homeView.render(baseContext());
 
@@ -96,8 +104,23 @@ test("normalise le plan sans le modifier et marque clairement les choix déjà p
   assert.match(html, /aria-label="Énergie hebdomadaire restante : 1 sur 3"/);
   assert.match(html, /data-v2-home-action="rest"[^>]+data-v2-home-planned="true" aria-pressed="true"/);
   assert.match(html, /Planifié pour la semaine/);
-  assert.match(html, /Journée de repos rapide<small>−0 énergie<\/small>/);
+  assert.match(html, /Journée de repos rapide<small>Aucun coût d’énergie<\/small>/);
   assert.match(html, /data-v2-location-remove="home-rest-1"/);
+});
+
+test("reconnaît les activityId produits par le planificateur hebdomadaire", () => {
+  const plan = homeView.normalizePlan({
+    entries: [{ id: "plan-week-2-3", activityId: "home-quick", label: "Entraînement maison rapide", cost: 12 }],
+  });
+
+  assert.deepEqual(plan.homeActionIds, ["home-quick"]);
+  assert.deepEqual(plan.entries, [{
+    id: "plan-week-2-3",
+    actionId: "home-quick",
+    label: "Entraînement maison rapide",
+    cost: 12,
+    removable: true,
+  }]);
 });
 
 test("un programme complet bloque les nouveaux choix, mais pas le loisir ni un choix à retirer", () => {
