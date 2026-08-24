@@ -3160,6 +3160,22 @@ function v2OnboardingView(capsule = ensureV2PreviewCapsule()) {
   };
 }
 
+function v2CompletedOnboardingObjectiveId(onboarding, plannerEntries, executedEntryIds) {
+  if (!onboarding?.state || onboarding.state.mode !== "guided" || !window.BoxeurOnboarding) return null;
+  const objective = window.BoxeurOnboarding.getCurrentStep(onboarding.state);
+  if (objective?.type !== "objective" || onboarding.state.completedObjectiveIds.includes(objective.id)) return null;
+  const matchesObjective = {
+    "week-1-first-session": entry => entry.activityId === "group-class",
+    "week-2-group-class": entry => entry.activityId === "group-class",
+    "week-3-mitts": entry => entry.activityId === "boxing-custom" && entry.metadata?.blocks?.includes("mitts"),
+    "week-4-defense": entry => entry.activityId === "boxing-custom" && entry.metadata?.blocks?.includes("defense_drills"),
+  }[objective.id];
+  if (!matchesObjective) return null;
+  return plannerEntries.some(entry => executedEntryIds.has(entry.id) && matchesObjective(entry))
+    ? objective.id
+    : null;
+}
+
 function applyV2OnboardingEvent(event) {
   const capsule = ensureV2PreviewCapsule();
   const onboarding = v2OnboardingSnapshot(capsule);
@@ -5456,6 +5472,17 @@ function runV2AutomaticWeek() {
     const onboardingBeforeAdvance = v2OnboardingView(capsule);
     const firstGuidedWeek = onboardingBeforeAdvance?.state.mode === "guided" && previousWeek === 1;
     if (onboardingBeforeAdvance?.state.mode === "guided") {
+      const completedObjectiveId = v2CompletedOnboardingObjectiveId(
+        onboardingBeforeAdvance,
+        execution.plannerEntries,
+        executedEntryIds,
+      );
+      if (completedObjectiveId) {
+        applyV2OnboardingEvent({
+          type: window.BoxeurOnboarding.EVENT_TYPES.COMPLETE_OBJECTIVE,
+          objectiveId: completedObjectiveId,
+        });
+      }
       applyV2OnboardingEvent({ type: window.BoxeurOnboarding.EVENT_TYPES.CLOSE_WEEK });
     }
     capsule.timeState = result.timeState;

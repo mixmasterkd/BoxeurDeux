@@ -1307,10 +1307,10 @@ test("reste utilisable à 390 × 844 px sans débordement et avec des actions ta
 
 test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni le premier abonnement", async ({ page }) => {
   test.setTimeout(45_000);
-  await page.addInitScript(() => localStorage.clear());
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
   await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => localStorage.clear());
   await createCareer(page, { firstName: "Guide", lastName: "V2" });
 
   const jobDialog = page.locator("#job-dialog");
@@ -1363,7 +1363,16 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
   await expect(page.locator(".v2-week-summary")).toBeVisible();
   await expect(page.locator(".v2-week-summary-guide")).toContainText("Comment lire ton premier bilan");
   await expect(page.locator("[data-v2-week-summary-close]")).toHaveText("Continuer vers la semaine 2");
+  const storedAfterConfirmation = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(storedAfterConfirmation.previewRuntime.onboardingState.completedObjectiveIds).toEqual(["week-1-first-session"]);
   await page.locator("[data-v2-week-summary-close]").click();
+  await expect(page.locator(".v2-onboarding-card")).toContainText("Essayer un cours de groupe");
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  const storedAfterReload = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
+  expect(storedAfterReload.previewRuntime.onboardingState.completedObjectiveIds).toEqual(["week-1-first-session"]);
+  await expect(page.locator("#resume-dialog")).toBeVisible();
+  await page.locator("#resume-load").click();
   await expect(page.locator(".v2-onboarding-card")).toContainText("Essayer un cours de groupe");
 
   await page.locator('[data-v2-nav="fighter"]').click();
