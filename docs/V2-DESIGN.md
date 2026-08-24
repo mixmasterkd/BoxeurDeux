@@ -8,9 +8,9 @@ La V2 doit préserver les carrières, l'économie, les compétitions et l'équil
 
 ### État d'implantation actuel
 
-Le premier jalon est disponible uniquement avec l'option de test `?v2=1`. Il comprend l'horloge déterministe, la migration additive, la carte, le gym de boxe, les séances, la maison, la récupération, l'inscription initiale, le premier emploi et les trois rythmes de semaine : rapide, détaillé et hybride. Le menu de test caché est également utilisable depuis le lieu Emploi. Cette capsule ne remplace pas encore l'état principal de la carrière.
+La préversion reste disponible uniquement avec l'option de test `?v2=1`. Elle comprend maintenant l'horloge déterministe, la migration additive, la carte, le guide récréatif, le gym de boxe et sa séance libre limitée par l'énergie, le gym de musculation, les activités de la maison, la récupération, l'emploi initial, les entraîneurs privés, les suppléments, la fiche Boxeur et les quatre jauges de progression. Le menu caché peut lancer immédiatement un sparring ou un combat réel sans modifier la carrière testée.
 
-Avant d'activer la V2 par défaut, un orchestrateur unique doit relier cette horloge aux emplois, abonnements, blessures, rendez-vous, calendrier, Rémy, combats et tournois. L'ancien plan hebdomadaire demeure donc la source de vérité de l'interface actuelle jusqu'à cette étape; le retirer maintenant briserait des sauvegardes et plusieurs parcours encore actifs.
+La capsule conserve encore le détail de l'horloge, de l'historique et des charges en attente. Les champs durables nécessaires au reste du jeu — argent, abonnements, emploi, énergie, fatigue, statistiques fractionnaires, inventaire, programme privé et progression — sont synchronisés vers la sauvegarde principale afin de survivre au rechargement, à l'importation et à l'exportation. Avant d'activer la V2 par défaut, un orchestrateur unique devra toujours unifier la journée, la fin de semaine, les rendez-vous, le calendrier, Rémy, les combats et les tournois. Cette boucle globale est volontairement reportée jusqu'à ce que les moteurs de lieux soient suffisamment stables.
 
 ## Vision
 
@@ -46,6 +46,10 @@ Le compteur de trois ou quatre actions par semaine disparaît de l'expérience V
 
 Le joueur n'a pas à remplir un horaire complet. Lorsqu'il choisit une activité, le jeu indique sa durée et fait avancer l'horloge automatiquement. Le changement de semaine devient une conséquence naturelle du temps qui passe.
 
+La journée suit un contrat unique : le travail ou un rendez-vous peut occuper le jour, puis un seul entraînement physique principal peut être planifié le soir. Une séance au gym de boxe, une séance au gym de musculation, un entraînement au sous-sol, une séance privée ou un sparring utilisent tous cette même place; ils ne peuvent pas être empilés pour doubler la progression. Un combat ou un autre événement physique important bloque également tout entraînement supplémentaire ce jour-là.
+
+Les nuits sont automatiques et appliquent la récupération une seule fois. Le joueur ne clique donc pas sur « Dormir » chaque soir. Sa décision stratégique est plutôt de prendre une journée de repos, de choisir une charge plus légère ou de libérer une soirée.
+
 ### 1.2 Navigation rapide dans le temps
 
 Le panneau « Maintenant » présente toujours :
@@ -60,13 +64,26 @@ Le panneau « Maintenant » présente toujours :
 Deux rythmes sont proposés directement dans le panneau « Maintenant » :
 
 - **Suivre le plan rapide** : l'entraîneur présente un programme court, puis le jeu résout en un seul bilan le quart de travail, les séances autorisées et la récupération. La cible d'usage est de 20 à 45 secondes par semaine;
-- **Jouer la semaine en détail** : le joueur visite les lieux, peut effectuer son quart lui-même, compose ses séances et choisit sa récupération au fil des périodes.
+- **Jouer la semaine en détail** : le joueur visite les lieux, peut effectuer son quart lui-même et choisit les soirées ou rendez-vous importants; les nuits et les périodes sans décision sont résolues automatiquement.
 
 Après au moins une activité détaillée, « Confier le reste au coach » termine la même semaine en mode hybride. Les trois rythmes utilisent les mêmes primitives, coûts, plafonds de charge, salaires et règles de récupération. Le rapide n'accorde donc aucun multiplicateur caché et l'hybride ne répète jamais une séance ou une paie déjà exécutée.
 
 Avant la confirmation, le programme résume ce qui sera simulé. La simulation s'arrête avant un combat, une pesée, un tournoi ou tout rendez-vous qui demande une vraie décision. La fin de semaine applique les abonnements et les effets récurrents une seule fois.
 
-### 1.3 Rythme de compétiteur
+Le rapide et le détaillé ne sont pas deux économies différentes. Le travail planifié, la séance du soir et la récupération produisent les mêmes coûts et résultats dans les deux modes; seule la quantité de décisions manuelles change.
+
+### 1.3 Parcours récréatif guidé
+
+Une nouvelle carrière commence avec le statut récréatif et un guide progressif qui reste visible jusqu'au premier sparring pédagogique :
+
+- **semaine 1** : payer le premier abonnement obligatoire du gym de boxe, choisir l'emploi initial obligatoire, puis faire la première séance guidée;
+- **semaines 2 à 5** : découvrir graduellement le plan de l'entraîneur, les cours de groupe récréatifs, l'énergie, la fatigue et la journée de repos, sans ouvrir tous les systèmes à la fois;
+- **semaine 6** : effectuer le sparring pédagogique avec Rémy « Le Tank » dans l'interface de ring;
+- **semaines 6 à 10** : après Rémy, afficher clairement le bouton « Passer amateur » et laisser le joueur confirmer lui-même le changement de statut.
+
+Le guide utilise une prochaine étape visible, le lieu pertinent mis en évidence et de courtes interventions de l'entraîneur. Il ne doit pas devenir une chaîne de fenêtres. Seuls les choix initiaux indispensables — abonnement et emploi — sont bloquants. Le calendrier amateur, le gym de musculation et le sparring ordinaire demeurent verrouillés jusqu'au passage amateur explicite; aucune semaine ne transforme automatiquement le boxeur en amateur.
+
+### 1.4 Rythme de compétiteur
 
 L'ancien gain d'une action supplémentaire est converti en avantage cohérent :
 
@@ -111,6 +128,8 @@ Les objets sont des zones interactives, mais ils correspondent aussi à de vrais
 
 Le cours de groupe demeure exclusif au statut récréatif et disparaît une fois le passage amateur confirmé. Le sparring avec Rémy « Le Tank » demeure l'étape pédagogique qui ouvre le passage amateur.
 
+À la création d'une carrière, le premier abonnement au gym de boxe est obligatoire et son écran ne peut pas être fermé sans choisir l'offre initiale. Le budget de départ doit toujours permettre ce paiement avant tout achat facultatif. À sa première expiration, le renouvellement redevient facultatif et suit les règles normales d'abonnement.
+
 ### 2.3 Gym de musculation
 
 Le gym de musculation possède une identité distincte :
@@ -128,7 +147,7 @@ Les abonnements existants de 1, 3, 6 et 12 mois, avec rabais progressifs équili
 
 La maison regroupe les activités qui ne nécessitent pas un autre lieu :
 
-- dormir ou se reposer;
+- prendre une journée de repos;
 - manger et surveiller le poids lorsqu'une pesée est pertinente;
 - récupération active légère;
 - téléphone, messages et inscriptions;
@@ -136,6 +155,8 @@ La maison regroupe les activités qui ne nécessitent pas un autre lieu :
 - entraînement de dépannage au sous-sol si aucun abonnement au gym de boxe n'est actif.
 
 L'entraînement au sous-sol reste volontairement limité. Il évite un blocage complet sans rendre l'abonnement au gym inutile.
+
+La nuit et le sommeil ne constituent pas une activité à sélectionner : ils sont résolus automatiquement par l'horloge. Une récupération active ou un entraînement au sous-sol compte toutefois comme l'unique activité physique principale du jour.
 
 ### 2.5 Identité des lieux et futurs camps professionnels
 
@@ -176,6 +197,8 @@ Chaque activité d'entraînement produit :
 
 Le stimulus est assimilé pendant la récupération. Une séance exigeante correctement récupérée est productive. Une succession de séances exigeantes sans récupération augmente surtout la fatigue et l'usure, avec un rendement décroissant.
 
+Chaque statistique possède une jauge de progression visible de 0 à 100. Lorsque la jauge atteint 100, la statistique gagne `+1` et tout débordement demeure dans la jauge suivante. La séance ne donne jamais ce point immédiatement : elle crée du stimulus, puis la récupération l'assimile vers la jauge. Des plafonds et rendements décroissants empêchent d'obtenir plusieurs gains en répétant artificiellement la même charge.
+
 La présentation doit rester simple :
 
 - charge légère;
@@ -205,7 +228,7 @@ La séance recommandée doit être efficace et équilibrée. Le joueur qui ne ve
 
 ### 3.4 Séance personnalisée
 
-Le joueur avancé peut ajouter des blocs à une séance :
+Le joueur avancé peut composer librement une séance en ajoutant progressivement des activités :
 
 - corde à danser;
 - shadow-boxing;
@@ -213,13 +236,14 @@ Le joueur avancé peut ajouter des blocs à une séance :
 - sac de vitesse;
 - travail aux mitaines;
 - exercices défensifs;
-- sparring technique, léger ou intense;
 - conditionnement;
 - mobilité et retour au calme.
 
-La composition affiche en direct la durée, l'énergie requise, la charge, le stimulus prévu et le risque. Une séance peut être confirmée en un seul bouton; elle ne se joue pas exercice par exercice sauf lorsqu'un exercice interactif facultatif existe.
+Il n'existe pas trois emplacements obligatoires. Une activité unique ou plusieurs activités différentes peuvent former la séance, jusqu'à la limite naturelle de l'énergie, du temps disponible et de la charge productive. La composition retire immédiatement l'énergie dans l'aperçu, sans la dépenser définitivement avant la confirmation, et affiche la durée, la fatigue prévue et les qualités travaillées. Une séance peut être confirmée en un seul bouton; elle ne se joue pas exercice par exercice sauf lorsqu'un exercice interactif facultatif existe.
 
 La personnalisation permet de cibler un besoin ou de moduler l'intensité. Elle ne doit jamais fournir un multiplicateur automatique supérieur à une bonne séance de l'entraîneur.
+
+Le sparring n'est jamais un bloc du compositeur. Il se choisit comme une activité complète dans le ring, possède ses propres conditions de déverrouillage, remplace l'entraînement du soir et ne peut pas être ajouté à une séance pour contourner la limite quotidienne.
 
 ### 3.5 Entraîneurs privés
 
@@ -233,9 +257,13 @@ Les entraîneurs privés sont présents dans les lieux, avec :
 - type de séance offert;
 - relation avec le boxeur.
 
-Ils peuvent offrir du travail aux mitaines, une séance défensive, une étude d'adversaire, du sparring supervisé ou un bloc de préparation. Une réservation prend par défaut le prochain moment libre; un choix de date avancé demeure disponible.
+Dans la première intégration, un programme comprend quatre séances et son prix complet est payé au choix de l'entraîneur. Technique et Défense se travaillent au gym de boxe; Puissance et Cardio au gym de musculation. Une seule séance privée peut être active et chaque cours consomme l'activité physique principale de la journée. Son raccord futur à l'agenda devra conserver exactement ce contrat et ne créer ni deuxième paiement ni deuxième progression.
 
-Le rendez-vous apparaît ensuite dans l'agenda. Le prix est payé ou réservé selon une règle unique à définir pour tous les entraîneurs; il ne faut pas de comportements différents d'un écran à l'autre.
+La qualité et la spécialité d'un entraîneur privé augmentent seulement le stimulus ciblé d'une séance. Elles n'accordent jamais directement `+1` ou `+2` à une statistique et restent soumises aux mêmes plafonds, à l'assimilation et à la récupération que les autres entraînements.
+
+### 3.6 Suppléments
+
+Les suppléments sont achetés à la boutique du gym de musculation et apparaissent dans le sac de l'onglet Boxeur. Le joueur peut en préparer au plus un avant une séance, pour un maximum de deux utilisations par semaine et une utilisation d'un même produit par semaine. Ils peuvent modifier modestement l'énergie, la fatigue ou la qualité de récupération, mais jamais l'XP, le stimulus ni une statistique. Si une séance échoue, la transaction entière est annulée et le produit demeure dans l'inventaire.
 
 ## 4. Agenda personnel et calendrier de compétition
 
@@ -298,9 +326,11 @@ En amateur, il n'y a aucun match nul. Les combats locaux utilisent trois juges e
 
 ### 5.1 Emploi
 
-Le premier emploi demeure obligatoire au début de la carrière. Il fournit le revenu initial après que le budget de départ a permis de payer l'abonnement obligatoire du gym de boxe. Après une démission ou une perte d'emploi, retrouver un emploi est facultatif.
+Le premier emploi demeure obligatoire au début de la carrière. Sa fenêtre initiale n'offre ni fermeture ni annulation, ne se ferme pas par clic à l'extérieur ou avec la touche Échap et bloque l'avancement tant qu'un emploi n'a pas été choisi. L'emploi est ensuite proposé par défaut dans chaque semaine, mais le joueur peut le retirer avant de confirmer son programme. Retrouver un emploi après une perte demeure facultatif.
 
-Les quarts de travail sont inscrits automatiquement dans l'agenda. La paie et la fatigue normale sont simulées sans exiger un clic répétitif. En cas de conflit avec un combat, un déplacement ou une séance réservée, le jeu propose :
+La semaine de travail réserve automatiquement une partie de l'énergie hebdomadaire. La paie et la fatigue normale sont simulées sans exiger un clic répétitif. Retirer le travail rembourse cette énergie, supprime la paie et compte comme une absence. Une présence remet le dossier d'assiduité en règle; trois semaines consécutives sans travailler entraînent le congédiement et l'indemnité de vacances V1 applicable.
+
+En cas de conflit avec un combat, un déplacement ou une séance réservée, le jeu pourra proposer :
 
 - conserver le quart;
 - utiliser des vacances;
@@ -308,7 +338,7 @@ Les quarts de travail sont inscrits automatiquement dans l'agenda. La paie et la
 - manquer le quart;
 - quitter l'emploi.
 
-Les emplois mieux payés peuvent prendre plus de temps ou créer plus de fatigue. Le système d'entrevues cumulatives est conservé : les postes plus avantageux peuvent demander plusieurs rendez-vous, et une entrevue ne progresse que si elle a réellement lieu.
+Les emplois mieux payés créent davantage de fatigue hebdomadaire. Après une candidature, l'embauche est garantie après un délai automatique de une, deux ou trois semaines selon le poste. Le joueur n'a pas à dépenser une activité « entrevue » chaque semaine; la progression de la candidature est visible dans le lieu Emploi.
 
 ### 5.2 Vacances
 
@@ -347,6 +377,8 @@ Les quatre statistiques principales demeurent le langage central de la boxe :
 - Puissance;
 - Cardio;
 - Défense.
+
+Dans l'onglet Boxeur, chaque statistique affiche sa valeur permanente et sa propre jauge de progression de 0 à 100. Ces quatre jauges constituent l'unique progression d'entraînement visible : le stimulus en attente demeure interne, puis la récupération le transforme dans ces jauges. Atteindre 100 accorde `+1`, conserve le débordement et produit une annonce de montée claire.
 
 Le style demeure une identité du boxeur et modifie les préférences, les affinités de distance et l'exécution, sans devenir une statistique brute supplémentaire.
 
@@ -579,6 +611,8 @@ Les scènes sont validées au minimum en 1440 × 900, 1280 × 720, 390 × 844, 3
 
 La V2 doit ouvrir les sauvegardes actuelles sans supprimer de progression. La migration est versionnée, idempotente et testée sur plusieurs profils : récréatif, amateur débutant, tournoi actif, carrière avancée, sans emploi et profil professionnel de test.
 
+Pendant la transition, la V2 reste une préversion activée explicitement avec `?v2=1`. Sa capsule écrit uniquement les champs durables prévus dans la sauvegarde principale et conserve séparément son historique détaillé. L'ordinateur de la maison permet d'ouvrir la V1 dans un espace isolé qui ne fait pas avancer l'horloge V2. Une carrière déjà avancée ne repasse pas par l'abonnement et l'emploi bloquants destinés uniquement à une nouvelle carrière.
+
 Principes de conversion :
 
 - conserver l'identité, le sexe, les couleurs, les statistiques, le style, le niveau, l'XP, l'argent, la réputation, le bilan, les blessures, les abonnements, l'emploi, les vacances, les inscriptions et les résultats;
@@ -590,7 +624,7 @@ Principes de conversion :
 - conserver les champs historiques nécessaires à l'importation, mais ne plus les utiliser comme source active après migration;
 - exporter directement au nouveau format tout en important les anciennes versions.
 
-Une copie de sauvegarde ou un mécanisme de retour contrôlé doit être offert pendant la période de transition. Le nouveau moteur de combat reste derrière une option de test jusqu'à ce que la comparaison d'équilibre soit acceptée.
+La capsule additive et la sauvegarde principale servent de mécanisme de retour contrôlé pendant la transition. Le moteur de combat reste lançable directement par le menu développeur jusqu'à ce que son raccord complet au calendrier et la comparaison d'équilibre soient acceptés. La V1 ne sera retirée qu'après validation de la migration, des importations et exportations et de l'absence de progression doublée.
 
 ## 12. Suppression des systèmes inutiles ou obsolètes
 
@@ -667,17 +701,18 @@ Le nouveau système doit démontrer que :
 3. Centraliser la configuration sans changer le comportement.
 4. Ajouter la nouvelle horloge, l'énergie, la fatigue et la préparation derrière une option de test.
 5. Construire la carte et le panneau « Maintenant » avec une vue en liste équivalente.
-6. Construire le gym de boxe et les séances de l'entraîneur avant la personnalisation avancée.
-7. Ajouter les entraîneurs privés, le gym de musculation, la maison et l'emploi.
-8. Unifier l'agenda personnel et le calendrier de compétition.
-9. Prototyper le ring 5 × 5 en conservant l'ancien moteur comme référence.
-10. Intégrer le sparring pédagogique avec Rémy et la scène du coin.
-11. Adapter les galas, déplacements, pesées et tournois.
-12. Migrer et tester les sauvegardes.
-13. Comparer statistiquement les deux versions, puis ajuster.
-14. Retirer les systèmes obsolètes uniquement après la parité fonctionnelle.
-15. Valider ordinateur, téléphone, clavier, lecteur d'écran et mouvement réduit.
-16. Publier la V2, puis bâtir la carrière professionnelle sur ses systèmes de lieux, camps et combats.
+6. Verrouiller l'abonnement, l'emploi initial et le guide récréatif des semaines 1 à 6.
+7. Construire le gym de boxe, les séances et les quatre jauges avant la personnalisation avancée.
+8. Ajouter les entraîneurs privés, le gym de musculation et les activités de la maison.
+9. Unifier l'emploi courant, l'agenda personnel et le calendrier de compétition.
+10. Prototyper le ring 5 × 5 en conservant l'ancien moteur comme référence.
+11. Intégrer le sparring pédagogique avec Rémy et la scène du coin.
+12. Adapter les galas, déplacements, pesées et tournois.
+13. Migrer et tester les sauvegardes.
+14. Comparer statistiquement les deux versions, puis ajuster.
+15. Retirer les systèmes obsolètes uniquement après la parité fonctionnelle.
+16. Valider ordinateur, téléphone, clavier, lecteur d'écran et mouvement réduit.
+17. Publier la V2, puis bâtir la carrière professionnelle sur ses systèmes de lieux, camps et combats.
 
 Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouveau les sauvegardes ni perdre une carrière.
 
@@ -686,7 +721,9 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 ### Compréhension
 
 - Un nouveau joueur peut expliquer sa prochaine étape en moins de 30 secondes.
+- Une nouvelle carrière ne peut quitter l'inscription initiale sans abonnement au gym et emploi pour la semaine 1.
 - Il trouve Rémy, termine le sparring et voit comment passer amateur sans aide extérieure.
+- Le passage amateur reste une confirmation explicite après Rémy et n'arrive jamais automatiquement.
 - Tout verrouillage indique une cause et un bouton menant à la solution.
 - Une activité ordinaire se lance en deux interactions ou moins depuis la carte.
 
@@ -695,6 +732,10 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 - La séance de l'entraîneur est compétitive face à une bonne séance personnalisée.
 - L'énergie et la fatigue ont des rôles distincts et compréhensibles.
 - La préparation explique clairement les facteurs qui l'améliorent ou la dégradent.
+- Une journée ne peut produire qu'une activité physique principale et les nuits ne demandent aucun clic de sommeil.
+- Les quatre jauges atteignent 100 avant d'accorder `+1`, avec leur débordement conservé.
+- Un entraîneur privé ne modifie jamais directement une statistique permanente.
+- Le sparring ne peut jamais être ajouté comme bloc d'une séance personnalisée.
 - Aucune combinaison répétable ne produit une progression, une récupération ou de l'argent à l'infini.
 
 ### Combats
@@ -719,6 +760,7 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 ### Compatibilité
 
 - Toutes les sauvegardes de test migrent et peuvent être exportées puis réimportées.
+- La V1 demeure utilisable et son instantané de retour n'est jamais modifié par la capsule V2.
 - Les carrières récréatives, amateurs, en tournoi et avancées reprennent à un état cohérent.
 - Emplois, vacances, abonnements, blessures, argent, réputation, statistiques et bilans sont préservés.
 - Le reste du jeu ne dépend plus d'un champ ou d'un écran déclaré obsolète.

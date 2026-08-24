@@ -13,8 +13,12 @@
   }
 
   const SCHEMA_VERSION = 1;
-  const MIN_BLOCKS = 2;
-  const MAX_BLOCKS = 3;
+  // La séance personnalisée n'est plus un formulaire à trois blocs. Le joueur
+  // peut commencer avec une seule activité et en ajouter jusqu'à parcourir tout
+  // le catalogue du GYM; l'énergie et la surcharge deviennent les vraies
+  // limites. Les séances du coach conservent volontairement leur format court.
+  const MIN_BLOCKS = 1;
+  const MAX_BLOCKS = 5;
   const SESSION_DURATION_PERIODS = 1;
   const MAX_PROJECTED_FATIGUE = 90;
   const MAX_PENDING_STIMULUS = 90;
@@ -261,6 +265,10 @@
     if (cooldownCount > 1) {
       throw trainingError("DUPLICATE_COOLDOWN", "Une séance ne peut contenir qu'un retour au calme.");
     }
+    const duplicate = blocks.find((block, index) => blocks.findIndex(item => item.id === block.id) !== index);
+    if (duplicate) {
+      throw trainingError("DUPLICATE_EXERCISE", `L'activité « ${duplicate.label} » est déjà dans la séance.`);
+    }
     if (!blocks.some(block => Object.values(block.stimulus).some(value => value > 0))) {
       throw trainingError("EMPTY_TRAINING", "La séance doit contenir au moins un bloc d'entraînement.");
     }
@@ -279,7 +287,7 @@
       source,
       focus,
       focusLabel: FOCUS_LABELS[focus],
-      rationale: String(options.rationale || "Une séance courte composée au gym de boxe."),
+      rationale: String(options.rationale || "Une séance composée librement au gym de boxe, dans la limite de l'énergie disponible."),
       benefit: String(options.benefit || `Stimulus principalement orienté vers la ${FOCUS_LABELS[focus]}.`),
       tradeoff: String(options.tradeoff || "La spécialisation laisse nécessairement d'autres qualités moins travaillées."),
       blocks: blocks.map(block => clone(block)),
@@ -332,7 +340,7 @@
     return makeSession(
       recreational
         ? ["jump_rope", "shadow_boxing", "cooldown"]
-        : ["mitts", "technical_sparring", "cooldown"],
+        : ["mitts", "defense_drills", "cooldown"],
       {
         id: `coach-${status}-balanced`,
         source: "coach",
@@ -340,7 +348,7 @@
         label: recreational ? "Circuit des fondamentaux" : "Séance complète du coach",
         rationale: recreational
           ? "Le coach privilégie les bases et une charge facile à assimiler."
-          : "Le coach relie technique, défense et opposition contrôlée.",
+          : "Le coach relie technique et défense sans transformer la séance en sparring.",
         benefit: "Répartit le stimulus sur plusieurs qualités.",
         tradeoff: recreational
           ? "Très sécuritaire, mais la puissance reste peu travaillée."
@@ -435,6 +443,21 @@
     };
   }
 
+  function applySessionAdjustment(baseTotals, input) {
+    const totals = clone(baseTotals);
+    const adjustment = input && typeof input === "object" ? input : {};
+    const read = (key, fallback) => Number.isFinite(Number(adjustment[key])) ? Number(adjustment[key]) : fallback;
+    totals.energyCost = roundTo(clamp(read("energyCost", totals.energyCost), 0, 100));
+    totals.energyDelta = -totals.energyCost;
+    totals.fatigueGain = roundTo(clamp(read("fatigueGain", totals.fatigueGain), 0, 100));
+    totals.fatigueRelief = roundTo(clamp(read("fatigueRelief", totals.fatigueRelief), 0, 100));
+    totals.fatigueDelta = roundTo(totals.fatigueGain - totals.fatigueRelief);
+    return {
+      totals,
+      recoveryQuality: roundTo(clamp(read("recoveryQuality", 1), .75, 1.25), 4),
+    };
+  }
+
   function failedPreview(code, reason, aggregate) {
     return {
       ok: false,
@@ -460,7 +483,34 @@
         return failedPreview("MEDICAL_REST_REQUIRED", recoveryReason, aggregate);
       }
 
-      const { session, totals } = aggregate;
+      const { session, totals: baseTotals } = aggregate;
+      const basePendingStimulus = {};
+      STAT_KEYS.forEach(key => {
+        basePendingStimulus[key] = roundTo(clamp(timeState.stimulus[key] + baseTotals.stimulus[key]));
+      });
+      const baseAveragePendingStimulus = roundTo(
+        STAT_KEYS.reduce((sum, key) => sum + basePendingStimulus[key], 0) / STAT_KEYS.length,
+        1,
+      );
+      const baseProjectedFatigue = roundTo(clamp(
+        timeState.condition.fatigue + baseTotals.fatigueGain - baseTotals.fatigueRelief,
+      ));
+      if (baseProjectedFatigue > MAX_PROJECTED_FATIGUE
+        || Math.max(...Object.values(basePendingStimulus)) > MAX_PENDING_STIMULUS
+        || baseAveragePendingStimulus > MAX_AVERAGE_PENDING_STIMULUS) {
+        return failedPreview(
+          "OVERLOAD_RISK",
+          "La charge est trop élevée pour être assimilée correctement. Récupère ou allège la séance.",
+          aggregate,
+        );
+      }
+      const baseTimeCheck = BoxeurTime.canPerformActivity(timeState, activityFrom(session, baseTotals), {
+        appointmentId: context.appointmentId,
+      });
+      if (!baseTimeCheck.ok) return failedPreview(baseTimeCheck.code, baseTimeCheck.reason, aggregate);
+
+      const adjusted = applySessionAdjustment(baseTotals, context.sessionAdjustment);
+      const totals = adjusted.totals;
       const projectedFatigue = roundTo(clamp(
         timeState.condition.fatigue + totals.fatigueGain - totals.fatigueRelief,
       ));
@@ -506,6 +556,8 @@
           end: clone(timeCheck.end),
         },
         warnings,
+        baseTotals,
+        recoveryQuality: adjusted.recoveryQuality,
       };
     } catch (error) {
       return failedPreview(error.code || "INVALID_SESSION", error.message, aggregate);
@@ -574,7 +626,7 @@
     const nextTimeState = BoxeurTime.performActivity(
       timeState,
       check.activity,
-      { appointmentId: context.appointmentId },
+      { appointmentId: context.appointmentId, recoveryQuality: check.recoveryQuality },
       rng,
     );
     return {
@@ -605,6 +657,7 @@
     buildCoachChoices,
     buildCoachSession,
     aggregateSession,
+    applySessionAdjustment,
     mandatoryRecoveryReason,
     previewSession,
     canExecuteSession: previewSession,

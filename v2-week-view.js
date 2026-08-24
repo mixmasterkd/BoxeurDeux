@@ -6,6 +6,9 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function createBoxeurWeekViewApi() {
   "use strict";
 
+  const ZONES = Object.freeze(["comfortable", "low", "critical", "blocked"]);
+  const TONES = Object.freeze(["positive", "neutral", "warning", "critical"]);
+
   function escapeHTML(value) {
     return String(value == null ? "" : value)
       .replaceAll("&", "&amp;")
@@ -21,106 +24,150 @@
     return Math.min(max, Math.max(min, numeric));
   }
 
-  function normalizeItem(rawItem) {
+  function wholeNumber(value, fallback, min, max) {
+    return Math.round(boundedNumber(value, fallback, min, max));
+  }
+
+  function normalizeItem(rawItem, index = 0) {
     const item = rawItem && typeof rawItem === "object" ? rawItem : {};
     return {
-      label: item.label || "Routine",
+      id: String(item.id || `week-item-${index + 1}`),
+      label: item.label || "Activité planifiée",
       detail: item.detail || "Incluse dans la semaine.",
-      tone: ["positive", "neutral", "warning", "critical"].includes(item.tone) ? item.tone : "neutral",
+      dayLabel: item.dayLabel || item.day || "Placement automatique",
+      cost: wholeNumber(item.cost, 0, -100, 200),
+      tone: TONES.includes(item.tone) ? item.tone : "neutral",
+      removable: item.removable !== false,
+      kindLabel: item.kindLabel || "Activité",
     };
   }
 
   function normalizeContext(rawContext) {
     const raw = rawContext && typeof rawContext === "object" ? rawContext : {};
-    const quick = raw.quick && typeof raw.quick === "object" ? raw.quick : {};
-    const detailed = raw.detailed && typeof raw.detailed === "object" ? raw.detailed : {};
+    const rawCapacity = raw.capacity && typeof raw.capacity === "object" ? raw.capacity : {};
+    const rawPlan = raw.plan && typeof raw.plan === "object" ? raw.plan : {};
+    const rawQuick = raw.quick && typeof raw.quick === "object" ? raw.quick : {};
+    const total = wholeNumber(rawCapacity.total, 100, 1, 200);
+    const remaining = wholeNumber(rawCapacity.remaining, total, 0, total);
+    const spent = wholeNumber(rawCapacity.spent, total - remaining, 0, total);
+    const zone = ZONES.includes(rawCapacity.zone) ? rawCapacity.zone : remaining <= 0 ? "blocked" : remaining <= 12 ? "critical" : remaining <= 28 ? "low" : "comfortable";
+    const items = Array.isArray(rawPlan.items) ? rawPlan.items.slice(0, 20).map(normalizeItem) : [];
+    const available = raw.confirm?.available !== false && raw.confirmAvailable !== false;
     return {
-      week: Math.round(boundedNumber(raw.week, 1, 1, 99999)),
-      mode: raw.mode === "detailed" ? "detailed" : "quick",
-      coachName: raw.coachName || "l’entraîneur du GYM",
-      quick: {
-        available: quick.available !== false,
-        reason: quick.reason || "",
-        label: quick.label || "Suivre le plan rapide",
-        detail: quick.detail || "Travail, entraînement et récupération sont regroupés dans un seul bilan.",
+      week: wholeNumber(raw.week, 1, 1, 99999),
+      capacity: {
+        total,
+        remaining,
+        spent,
+        zone,
+        zoneLabel: rawCapacity.zoneLabel || ({ comfortable: "Réserve confortable", low: "Réserve faible", critical: "Surcharge probable", blocked: "Capacité épuisée" })[zone],
+        detail: rawCapacity.detail || "La réserve inutilisée aide la récupération de la prochaine semaine.",
       },
-      detailed: {
-        label: detailed.label || "Jouer la semaine en détail",
-        detail: detailed.detail || "Visite les lieux et choisis toi-même tes séances et tes moments de récupération.",
-        activitiesCompleted: Math.round(boundedNumber(detailed.activitiesCompleted, 0, 0, 99)),
-        periodsRemaining: Math.round(boundedNumber(detailed.periodsRemaining, 21, 0, 21)),
-        canHandOff: detailed.canHandOff === true,
+      quick: {
+        available: rawQuick.available !== false,
+        label: rawQuick.label || "Suivre le plan rapide",
+        detail: rawQuick.detail || "Crée une semaine équilibrée que tu peux encore modifier avant de la confirmer.",
+        reason: rawQuick.reason || "",
       },
       plan: {
-        title: raw.plan?.title || "Semaine équilibrée",
-        summary: raw.plan?.summary || "Le plan protège la récupération tout en maintenant le rythme de boxe.",
-        tradeoff: raw.plan?.tradeoff || "Tu laisses l’entraîneur répartir la charge au lieu de cibler toi-même une statistique.",
-        items: Array.isArray(raw.plan?.items) ? raw.plan.items.slice(0, 8).map(normalizeItem) : [],
+        title: rawPlan.title || "Plan de la semaine",
+        summary: rawPlan.summary || "Visite les lieux pour ajouter des activités, puis confirme lorsque le programme te convient.",
+        items,
+        editable: rawPlan.editable !== false,
+      },
+      confirm: {
+        available,
+        label: raw.confirm?.label || "Confirmer la semaine",
+        reason: raw.confirm?.reason || raw.confirmReason || "",
       },
     };
+  }
+
+  function capacityMarkup(context, compact = false) {
+    const capacity = context.capacity;
+    return `<section class="v2-week-capacity ${capacity.zone}" aria-labelledby="v2-week-capacity-title">
+      <div class="v2-week-capacity-heading"><span id="v2-week-capacity-title">Énergie restante de la semaine</span><strong>${capacity.remaining}/${capacity.total}</strong></div>
+      <progress max="${capacity.total}" value="${capacity.remaining}" aria-label="Énergie restante de la semaine : ${capacity.remaining} sur ${capacity.total}">${capacity.remaining}/${capacity.total}</progress>
+      <div class="v2-week-capacity-meta"><b>${escapeHTML(capacity.zoneLabel)}</b><span>${capacity.spent} énergie réservée</span></div>
+      ${compact ? "" : `<p>${escapeHTML(capacity.detail)}</p>`}
+    </section>`;
+  }
+
+  function compactPlanMarkup(context) {
+    if (!context.plan.items.length) return `<p class="v2-week-empty">Aucune activité facultative n’est encore planifiée.</p>`;
+    const visible = context.plan.items.slice(0, 4);
+    const extra = context.plan.items.length - visible.length;
+    return `<ul class="v2-week-compact-items" aria-label="Activités déjà planifiées">${visible.map(item => `<li class="${item.tone}"><span>${escapeHTML(item.label)}</span><b>${item.cost > 0 ? `−${item.cost}` : item.cost < 0 ? `+${Math.abs(item.cost)}` : "Prévu"}</b></li>`).join("")}</ul>${extra > 0 ? `<p class="v2-week-more">+${extra} autre${extra > 1 ? "s" : ""} activité${extra > 1 ? "s" : ""}</p>` : ""}`;
   }
 
   function renderLauncher(rawContext) {
     const context = normalizeContext(rawContext);
     const quickDisabled = context.quick.available ? "" : ' disabled aria-disabled="true"';
-    const reason = context.quick.reason
-      ? `<p class="v2-week-blocker" role="status">${escapeHTML(context.quick.reason)}</p>`
-      : "";
-    const handOff = context.detailed.canHandOff
-      ? `<button type="button" class="primary-button" data-v2-week-handoff>Confier le reste au coach</button>`
-      : "";
-    const status = context.mode === "detailed"
-      ? `<p class="v2-week-mode-status"><strong>Mode détaillé</strong> · ${context.detailed.activitiesCompleted} activité${context.detailed.activitiesCompleted > 1 ? "s" : ""} terminée${context.detailed.activitiesCompleted > 1 ? "s" : ""} · ${context.detailed.periodsRemaining} périodes restantes</p>`
-      : `<p class="v2-week-mode-status"><strong>Mode rapide recommandé</strong> · environ 20 à 45 secondes</p>`;
-
-    return `<section class="v2-week-launcher" aria-labelledby="v2-week-launcher-title">
-      <p class="eyebrow">Semaine ${context.week} · à ton rythme</p>
-      <h3 id="v2-week-launcher-title">Une décision importante, pas vingt-et-un clics</h3>
-      ${status}
+    const confirmDisabled = context.confirm.available ? "" : ' disabled aria-disabled="true"';
+    const reason = context.confirm.reason || context.quick.reason;
+    return `<section class="v2-week-launcher" data-v2-week-zone="${context.capacity.zone}" aria-labelledby="v2-week-launcher-title">
+      <div class="v2-week-launcher-heading"><div><p class="eyebrow">Semaine ${context.week} · plan modifiable</p><h3 id="v2-week-launcher-title">Bâtis ta semaine</h3></div><span>${context.plan.items.length} choix</span></div>
+      ${capacityMarkup(context, true)}
+      ${compactPlanMarkup(context)}
       <div class="v2-week-launcher-actions">
-        <button type="button" class="primary-button" data-v2-week-quick${quickDisabled}>${escapeHTML(context.quick.label)}</button>
-        <button type="button" class="secondary-button" data-v2-week-detailed>${escapeHTML(context.detailed.label)}</button>
-        ${handOff}
+        <button type="button" class="secondary-button" data-v2-week-quick${quickDisabled}>${escapeHTML(context.quick.label)}</button>
+        <button type="button" class="secondary-button" data-v2-week-detailed>Voir ou modifier</button>
+        <button type="button" class="primary-button" data-v2-week-confirm${confirmDisabled}>${escapeHTML(context.confirm.label)}</button>
       </div>
-      ${reason}
+      ${reason ? `<p class="v2-week-blocker" role="status">${escapeHTML(reason)}</p>` : ""}
     </section>`;
+  }
+
+  function planItemMarkup(item) {
+    const cost = item.cost > 0 ? `−${item.cost} énergie` : item.cost < 0 ? `+${Math.abs(item.cost)} énergie` : "Aucun coût";
+    const action = item.removable
+      ? `<button type="button" data-v2-week-remove="${escapeHTML(item.id)}" aria-label="Retirer ${escapeHTML(item.label)} du plan">Retirer</button>`
+      : `<span class="v2-week-item-fixed">Prévu par défaut</span>`;
+    return `<li class="${item.tone}"><div><span>${escapeHTML(item.kindLabel)} · ${escapeHTML(item.dayLabel)}</span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(item.detail)}</small></div><div><b>${cost}</b>${action}</div></li>`;
   }
 
   function renderPlan(rawContext) {
     const context = normalizeContext(rawContext);
     const items = context.plan.items.length
-      ? context.plan.items.map(item => `<li class="${item.tone}"><strong>${escapeHTML(item.label)}</strong><span>${escapeHTML(item.detail)}</span></li>`).join("")
-      : `<li class="neutral"><strong>Routine équilibrée</strong><span>Le détail sera calculé au moment de confirmer.</span></li>`;
+      ? context.plan.items.map(planItemMarkup).join("")
+      : `<li class="neutral v2-week-plan-empty"><div><strong>Ton plan est vide</strong><small>Retourne à la carte et visite un lieu pour ajouter une activité.</small></div></li>`;
+    const confirmDisabled = context.confirm.available ? "" : ' disabled aria-disabled="true"';
     return `<section class="v2-week-plan" aria-labelledby="v2-week-plan-title">
-      <header><div><p class="eyebrow">Programme de ${escapeHTML(context.coachName)}</p><h2 id="v2-week-plan-title">${escapeHTML(context.plan.title)}</h2></div><button type="button" data-v2-week-plan-close aria-label="Fermer le programme rapide">Fermer</button></header>
+      <header><div><p class="eyebrow">Semaine ${context.week} · tout reste modifiable</p><h2 id="v2-week-plan-title">${escapeHTML(context.plan.title)}</h2></div><button type="button" data-v2-week-plan-close aria-label="Fermer le plan de la semaine">Fermer</button></header>
       <p>${escapeHTML(context.plan.summary)}</p>
+      ${capacityMarkup(context)}
       <ul class="v2-week-plan-items" aria-label="Contenu du programme">${items}</ul>
-      <p class="v2-week-tradeoff"><strong>Compromis :</strong> ${escapeHTML(context.plan.tradeoff)}</p>
-      <p class="v2-week-engine-note">Le mode rapide utilise les mêmes activités, coûts et règles de récupération que le mode détaillé.</p>
-      <footer><button type="button" class="secondary-button" data-v2-week-plan-close>Retour</button><button type="button" class="primary-button" data-v2-week-confirm${context.quick.available ? "" : ' disabled aria-disabled="true"'}>Lancer la semaine rapide</button></footer>
+      <p class="v2-week-engine-note">Les activités ne sont pas encore accomplies. Elles seront résolues seulement lorsque tu confirmeras la semaine.</p>
+      ${context.confirm.reason ? `<p class="v2-week-blocker" role="status">${escapeHTML(context.confirm.reason)}</p>` : ""}
+      <footer><button type="button" class="secondary-button" data-v2-week-plan-close>Continuer à planifier</button><button type="button" class="primary-button" data-v2-week-confirm${confirmDisabled}>${escapeHTML(context.confirm.label)}</button></footer>
     </section>`;
+  }
+
+  function normalizeSummaryItem(rawItem) {
+    const item = rawItem && typeof rawItem === "object" ? rawItem : {};
+    return { label: item.label || "Bilan", detail: item.detail || "À jour", tone: TONES.includes(item.tone) ? item.tone : "neutral" };
   }
 
   function renderSummary(rawSummary) {
     const raw = rawSummary && typeof rawSummary === "object" ? rawSummary : {};
-    const changes = Array.isArray(raw.changes) ? raw.changes.slice(0, 10).map(normalizeItem) : [];
-    const events = Array.isArray(raw.events) ? raw.events.slice(0, 8).map(normalizeItem) : [];
+    const changes = Array.isArray(raw.changes) ? raw.changes.slice(0, 12).map(normalizeSummaryItem) : [];
+    const events = Array.isArray(raw.events) ? raw.events.slice(0, 10).map(normalizeSummaryItem) : [];
     const changesMarkup = changes.length
       ? changes.map(item => `<li class="${item.tone}"><span>${escapeHTML(item.label)}</span><strong>${escapeHTML(item.detail)}</strong></li>`).join("")
       : `<li class="neutral"><span>Bilan</span><strong>Semaine terminée</strong></li>`;
     const eventsMarkup = events.length
       ? `<section class="v2-week-summary-events" aria-labelledby="v2-week-alerts-title"><h3 id="v2-week-alerts-title">À retenir</h3><ul>${events.map(item => `<li class="${item.tone}"><strong>${escapeHTML(item.label)}</strong><span>${escapeHTML(item.detail)}</span></li>`).join("")}</ul></section>`
       : "";
-    const weekFrom = Math.round(boundedNumber(raw.weekFrom, 1, 1, 99999));
-    const weekTo = Math.round(boundedNumber(raw.weekTo, weekFrom + 1, weekFrom, 99999));
+    const weekFrom = wholeNumber(raw.weekFrom, 1, 1, 99999);
+    const weekTo = wholeNumber(raw.weekTo, weekFrom + 1, weekFrom, 99999);
     return `<section class="v2-week-summary" aria-labelledby="v2-week-summary-title" aria-live="polite">
       <p class="eyebrow">Semaine ${weekFrom} terminée</p><h2 id="v2-week-summary-title">${escapeHTML(raw.title || `Bienvenue à la semaine ${weekTo}`)}</h2>
-      <p>${escapeHTML(raw.summary || "Ton programme, ton emploi et ta récupération ont été résolus.")}</p>
+      <p>${escapeHTML(raw.summary || "Ton plan, ton emploi et ta récupération ont été résolus.")}</p>
       <ul class="v2-week-summary-changes" aria-label="Changements de la semaine">${changesMarkup}</ul>
       ${eventsMarkup}
       <div class="v2-week-summary-actions"><button type="button" class="primary-button" data-v2-week-summary-close>Retour à la carte</button></div>
     </section>`;
   }
 
-  return Object.freeze({ normalizeContext, renderLauncher, renderPlan, renderSummary });
+  return Object.freeze({ ZONES, normalizeContext, renderLauncher, renderPlan, renderSummary });
 });

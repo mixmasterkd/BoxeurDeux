@@ -193,6 +193,60 @@
     });
   }
 
+  function isPhysicalPrimitive(primitive) {
+    return Boolean(primitive && (
+      primitive.kind === "training"
+      || (primitive.kind === "activity" && (
+        primitive.physical === true
+        || primitive.budgetKind === "trainingSessions"
+      ))
+    ));
+  }
+
+  function budgetKindForPrimitive(primitive) {
+    if (isPhysicalPrimitive(primitive)) return "trainingSessions";
+    if (primitive && primitive.kind === "recovery") return "shortRecoveries";
+    if (primitive && primitive.kind === "work") return "workShifts";
+    return null;
+  }
+
+  function normalizeActivityDetail(detailInput, activity) {
+    const detail = detailInput && typeof detailInput === "object" ? detailInput : {};
+    return {
+      label: String(detail.label == null ? activity.label : detail.label),
+      category: String(detail.category == null ? activity.category : detail.category),
+      xpAward: roundTo(finiteNumber(detail.xpAward, 0, 0, Number.MAX_SAFE_INTEGER)),
+      wear: roundTo(finiteNumber(detail.wear, 0, 0, Number.MAX_SAFE_INTEGER)),
+      injuryRiskPercent: roundTo(finiteNumber(
+        detail.injuryRiskPercent == null ? detail.injuryRisk : detail.injuryRiskPercent,
+        0,
+        0,
+        100,
+      ), 1),
+    };
+  }
+
+  function normalizeGenericActivityPrimitive(primitiveInput) {
+    const primitive = primitiveInput && typeof primitiveInput === "object" ? primitiveInput : {};
+    const activity = BoxeurTime.normalizeActivity(primitive.activity);
+    const physical = primitive.physical === true || primitive.budgetKind === "trainingSessions";
+    return {
+      ...clone(primitive),
+      kind: "activity",
+      activity,
+      duration: activity.duration,
+      moneyDelta: roundTo(finiteNumber(
+        primitive.moneyDelta,
+        0,
+        -Number.MAX_SAFE_INTEGER,
+        Number.MAX_SAFE_INTEGER,
+      )),
+      detail: normalizeActivityDetail(primitive.detail, activity),
+      physical,
+      budgetKind: physical ? "trainingSessions" : null,
+    };
+  }
+
   function assertNoPlanOverlap(entries) {
     const sorted = [...entries].sort((left, right) => left.startSlot - right.startSlot || left.id.localeCompare(right.id));
     for (let index = 1; index < sorted.length; index += 1) {
@@ -268,10 +322,23 @@
       throw weekError("STALE_WEEK_PLAN", "Le plan ne correspond pas à la semaine courante.");
     }
     const entries = planInput.entries.map((entry, index) => {
-      if (!entry || typeof entry !== "object" || !["training", "work", "recovery"].includes(entry.kind)) {
+      if (!entry || typeof entry !== "object" || !["training", "work", "recovery", "activity"].includes(entry.kind)) {
         throw weekError("INVALID_WEEK_PLAN", `Entrée de plan invalide à la position ${index + 1}.`);
       }
-      const duration = boundedInteger(entry.duration, 1, 1, BoxeurTime.MAX_ACTIVITY_DURATION);
+      const normalizedEntry = entry.kind === "activity"
+        ? normalizeGenericActivityPrimitive(entry)
+        : clone(entry);
+      const duration = entry.kind === "activity"
+        ? normalizedEntry.activity.duration
+        : boundedInteger(entry.duration, 1, 1, BoxeurTime.MAX_ACTIVITY_DURATION);
+      if (entry.kind === "activity"
+        && entry.duration != null
+        && Number(entry.duration) !== normalizedEntry.activity.duration) {
+        throw weekError(
+          "WEEK_PLAN_ACTIVITY_DURATION_MISMATCH",
+          `${entry.id || `entrée-${index + 1}`} ne correspond pas à la durée de son activité.`,
+        );
+      }
       const startSlot = Number(entry.startSlot);
       if (!Number.isInteger(startSlot)
         || startSlot < bounds.weekStartSlot
@@ -279,7 +346,7 @@
         throw weekError("WEEK_PLAN_OUT_OF_BOUNDS", `${entry.id || `entrée-${index + 1}`} dépasse la semaine courante.`);
       }
       return {
-        ...clone(entry),
+        ...normalizedEntry,
         id: String(entry.id || `plan-${bounds.week}-${index + 1}`),
         startSlot,
         duration,
@@ -287,7 +354,7 @@
     });
     const sorted = assertNoPlanOverlap(entries);
     const budgetInput = planInput.budget && typeof planInput.budget === "object" ? planInput.budget : {};
-    const plannedTrainingCount = sorted.filter(entry => entry.kind === "training").length;
+    const plannedTrainingCount = sorted.filter(isPhysicalPrimitive).length;
     return {
       schemaVersion: SCHEMA_VERSION,
       week: bounds.week,
@@ -401,6 +468,36 @@
       weekState.finances.money = roundTo(beforeMoney + finiteNumber(primitive.pay, 0, 0, Number.MAX_SAFE_INTEGER));
       detail.label = activity.label;
       primitive.activity = activity;
+    } else if (primitive.kind === "activity") {
+      const normalized = normalizeGenericActivityPrimitive(primitive);
+      const moneyAfter = beforeMoney + normalized.moneyDelta;
+      if (moneyAfter < 0) {
+        throw weekError(
+          "INSUFFICIENT_FUNDS",
+          `Fonds insuffisants pour ${normalized.activity.label}.`,
+          { required: Math.abs(normalized.moneyDelta), available: beforeMoney },
+        );
+      }
+      after = BoxeurTime.performActivity(before, normalized.activity, {}, rng);
+      weekState.finances.money = roundTo(finiteNumber(
+        moneyAfter,
+        beforeMoney,
+        0,
+        Number.MAX_SAFE_INTEGER,
+      ));
+      detail = normalized.detail;
+      Object.assign(primitive, normalized);
+      if (normalized.physical) {
+        const event = [...(after.history || [])].reverse().find(candidate => (
+          candidate.type === "activity-completed"
+          && Number(candidate.fromSlot) === Number(before.clock.absoluteSlot)
+          && candidate.activityId === normalized.activity.id
+        ));
+        if (event) {
+          event.weekPhysical = true;
+          event.weekBudgetKind = "trainingSessions";
+        }
+      }
     } else if (primitive.kind === "recovery") {
       const outcome = BoxeurRecovery.performAction(before, primitive.actionId || "active_recovery", rng);
       after = outcome.state;
@@ -473,6 +570,39 @@
     return true;
   }
 
+  function isPhysicalTrainingEvent(event, plan) {
+    if (event?.type !== "activity-completed") return false;
+    const category = String(event.activityCategory || "");
+    const id = String(event.activityId || "");
+    const suppliedPhysicalIds = new Set((plan && plan.entries || [])
+      .filter(isPhysicalPrimitive)
+      .map(entry => String(entry.activity && entry.activity.id || ""))
+      .filter(Boolean));
+    return event.weekPhysical === true
+      || event.weekBudgetKind === "trainingSessions"
+      || suppliedPhysicalIds.has(id)
+      || [
+        "training", "boxing", "boxing-gym-training", "strength", "strength-gym-training",
+        "home-training", "private-training", "group-class", "sparring", "fight",
+      ].includes(category)
+      || id.startsWith("boxing-gym-session:")
+      || id.startsWith("strength-gym-session:")
+      || id.startsWith("home-session:")
+      || id.startsWith("private-trainer:");
+  }
+
+  function physicalDayIndex(absoluteSlot, plan) {
+    return Math.floor((Number(absoluteSlot) - plan.weekStartSlot) / BoxeurTime.PERIODS_PER_DAY);
+  }
+
+  function physicalDaysFromHistory(timeState, plan) {
+    return new Set((timeState.history || []).filter(event => (
+      isPhysicalTrainingEvent(event, plan)
+        && Number(event.fromSlot) >= plan.weekStartSlot
+        && Number(event.fromSlot) < timeState.clock.absoluteSlot
+    )).map(event => physicalDayIndex(event.fromSlot, plan)));
+  }
+
   function weekHistoryCounts(timeState, plan) {
     const workIds = new Set(plan.entries
       .filter(entry => entry.kind === "work")
@@ -484,7 +614,7 @@
         || event.fromSlot < plan.weekStartSlot
         || event.fromSlot >= timeState.clock.absoluteSlot) return;
       const id = String(event.activityId || "");
-      if (id.startsWith("boxing-gym-session:")) counts.trainingSessions += 1;
+      if (isPhysicalTrainingEvent(event, plan)) counts.trainingSessions += 1;
       else if (["home_active_recovery", "home_nap"].includes(id)) counts.shortRecoveries += 1;
       else if (id === "work_shift" || id.startsWith("v2-work:") || workIds.has(id)) counts.workShifts += 1;
     });
@@ -493,7 +623,7 @@
 
   function aggregateSummary(initial, current, mode, plan, records, usedBefore, status, stop, warnings) {
     const executed = {
-      trainingSessions: records.filter(record => record.kind === "training").length,
+      trainingSessions: records.filter(record => budgetKindForPrimitive(record.primitive) === "trainingSessions").length,
       shortRecoveries: records.filter(record => record.kind === "recovery").length,
       workShifts: records.filter(record => record.kind === "work" || (
         record.kind === "appointment" && record.category === "work"
@@ -545,9 +675,7 @@
   }
 
   function actionWouldExceedBudget(primitive, usedBefore, executed, budget) {
-    const key = primitive.kind === "training"
-      ? "trainingSessions"
-      : primitive.kind === "recovery" ? "shortRecoveries" : primitive.kind === "work" ? "workShifts" : null;
+    const key = budgetKindForPrimitive(primitive);
     return key && (usedBefore[key] || 0) + (executed[key] || 0) >= (budget[key] || 0);
   }
 
@@ -563,7 +691,7 @@
   function finalize(initial, current, mode, plan, records, usedBefore, status, stop, warnings) {
     const summary = aggregateSummary(initial, current, mode, plan, records, usedBefore, status, stop, warnings);
     return {
-      ok: !["blocked", "invalid-plan"].includes(status),
+      ok: !["blocked", "invalid-plan", "daily-training-limit"].includes(status),
       mode,
       status,
       weekState: current,
@@ -584,6 +712,7 @@
     const warnings = [];
     const processed = new Set();
     const executed = { trainingSessions: 0, shortRecoveries: 0, workShifts: 0 };
+    const physicalDays = physicalDaysFromHistory(initial.timeState, plan);
     const recoveryConfig = config.recovery && typeof config.recovery === "object" ? config.recovery : {};
     const recoveryEnergy = finiteNumber(recoveryConfig.energyThreshold, 45, 0, 100);
     const recoveryFatigue = finiteNumber(recoveryConfig.fatigueThreshold, 58, 0, 100);
@@ -621,14 +750,17 @@
           warnings.push(`${entry.id} ignoré : budget détaillé déjà utilisé.`);
           continue;
         }
+        if (isPhysicalPrimitive(entry) && physicalDays.has(physicalDayIndex(now, plan))) {
+          warnings.push(`${entry.id} ignoré : une activité physique principale a déjà été faite cette journée.`);
+          continue;
+        }
         try {
           const outcome = executePrimitive(current, entry, config, rng);
           current = outcome.weekState;
           records.push(outcome.record);
-          const budgetKey = entry.kind === "training"
-            ? "trainingSessions"
-            : entry.kind === "recovery" ? "shortRecoveries" : entry.kind === "work" ? "workShifts" : null;
+          const budgetKey = budgetKindForPrimitive(entry);
           if (budgetKey) executed[budgetKey] += 1;
+          if (isPhysicalPrimitive(entry)) physicalDays.add(physicalDayIndex(now, plan));
           continue;
         } catch (error) {
           const blocked = String(error.code || "").startsWith("APPOINTMENT_")
@@ -636,7 +768,7 @@
             : null;
           if (blocked) return finalize(initial, current, mode, plan, records, usedBefore, "appointment", blocked, warnings);
           warnings.push(`${entry.id} non exécuté : ${error.message}`);
-          if (entry.kind === "work") {
+          if (entry.kind === "work" || error.code === "INSUFFICIENT_FUNDS") {
             return finalize(initial, current, mode, plan, records, usedBefore, "blocked", null, warnings);
           }
         }
@@ -691,6 +823,7 @@
     const records = [];
     const warnings = [];
     const actions = Array.isArray(config.actions) ? config.actions : [];
+    const physicalDays = physicalDaysFromHistory(initial.timeState, plan);
 
     for (const action of actions) {
       const due = dueAppointment(current.timeState);
@@ -701,14 +834,18 @@
         warnings.push(`${action.id || action.kind} refusé : budget détaillé épuisé.`);
         return finalize(initial, current, "detailed", plan, records, usedBefore, "budget-exhausted", null, warnings);
       }
+      const actionDay = physicalDayIndex(current.timeState.clock.absoluteSlot, plan);
+      if (isPhysicalPrimitive(action) && physicalDays.has(actionDay)) {
+        warnings.push(`${action.id || action.kind} refusé : une activité physique principale a déjà été faite cette journée.`);
+        return finalize(initial, current, "detailed", plan, records, usedBefore, "daily-training-limit", null, warnings);
+      }
       try {
         const outcome = executePrimitive(current, action, config, rng);
         current = outcome.weekState;
         records.push(outcome.record);
-        const key = action.kind === "training"
-          ? "trainingSessions"
-          : action.kind === "recovery" ? "shortRecoveries" : action.kind === "work" ? "workShifts" : null;
+        const key = budgetKindForPrimitive(action);
         if (key) executed[key] += 1;
+        if (isPhysicalPrimitive(action)) physicalDays.add(actionDay);
       } catch (error) {
         const blocked = String(error.code || "").startsWith("APPOINTMENT_")
           ? blockingAppointment(current.timeState, error.details && error.details.appointmentId)

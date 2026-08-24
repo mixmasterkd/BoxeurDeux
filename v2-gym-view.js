@@ -7,12 +7,11 @@
   "use strict";
 
   const EXERCISES = Object.freeze([
-    Object.freeze({ id: "jump-rope", label: "Corde à danser", short: "Corde", detail: "Rythme, appuis et cardio." }),
-    Object.freeze({ id: "shadow-boxing", label: "Shadow-boxing", short: "Shadow", detail: "Technique, fluidité et déplacements." }),
-    Object.freeze({ id: "heavy-bag", label: "Sac lourd", short: "Sac", detail: "Enchaînements, puissance et gestion de l’effort." }),
-    Object.freeze({ id: "mitt-work", label: "Travail aux mitaines", short: "Mitaines", detail: "Précision, réactions et consignes de l’entraîneur." }),
-    Object.freeze({ id: "defense", label: "Défense et esquives", short: "Défense", detail: "Blocages, retraits, pivots et sorties des câbles." }),
-    Object.freeze({ id: "sparring", label: "Ring et sparring", short: "Ring", detail: "Mise en situation contrôlée avec un partenaire." }),
+    Object.freeze({ id: "jump-rope", label: "Corde à danser", short: "Corde", detail: "Rythme, appuis et cardio.", energyCost: 5, durationMinutes: 15, fatigueGain: 3 }),
+    Object.freeze({ id: "shadow-boxing", label: "Shadow-boxing", short: "Shadow", detail: "Technique, fluidité et déplacements.", energyCost: 4, durationMinutes: 20, fatigueGain: 2 }),
+    Object.freeze({ id: "heavy-bag", label: "Sac lourd", short: "Sac", detail: "Enchaînements, puissance et gestion de l’effort.", energyCost: 7, durationMinutes: 25, fatigueGain: 5 }),
+    Object.freeze({ id: "mitt-work", label: "Travail aux mitaines", short: "Mitaines", detail: "Précision, réactions et consignes de l’entraîneur.", energyCost: 6, durationMinutes: 25, fatigueGain: 4 }),
+    Object.freeze({ id: "defense", label: "Défense et esquives", short: "Défense", detail: "Blocages, retraits, pivots et sorties des câbles.", energyCost: 5, durationMinutes: 20, fatigueGain: 3 }),
   ]);
 
   const ZONES = Object.freeze([
@@ -50,8 +49,12 @@
     const profile = raw.profile && typeof raw.profile === "object" ? raw.profile : {};
     const condition = raw.condition && typeof raw.condition === "object" ? raw.condition : {};
     const coach = raw.coach && typeof raw.coach === "object" ? raw.coach : {};
+    const privateTrainer = raw.privateTrainer && typeof raw.privateTrainer === "object" ? raw.privateTrainer : {};
     const membership = raw.membership && typeof raw.membership === "object" ? raw.membership : {};
     const recreational = raw.recreational && typeof raw.recreational === "object" ? raw.recreational : {};
+    const weekCapacity = raw.weekCapacity && typeof raw.weekCapacity === "object" ? raw.weekCapacity : {};
+    const weekPlan = raw.weekPlan && typeof raw.weekPlan === "object" ? raw.weekPlan : {};
+    const sparring = raw.sparring && typeof raw.sparring === "object" ? raw.sparring : {};
     const careerStatus = raw.careerStatus === "recreational" ? "recreational" : raw.careerStatus === "professional" ? "professional" : "amateur";
     const preparationTone = ["positive", "steady", "warning", "critical"].includes(condition.preparationTone)
       ? condition.preparationTone
@@ -78,7 +81,15 @@
         sessionSummary: coach.sessionSummary || "Échauffement, technique et travail contrôlé au sac.",
         durationMinutes: wholeNumber(coach.durationMinutes, 60, 0, 240),
         available: coach.available !== false,
+        planned: coach.planned === true,
         notice: coach.notice || "",
+      },
+      privateTrainer: {
+        available: privateTrainer.available === true,
+        active: privateTrainer.active === true,
+        name: privateTrainer.name || "Entraîneur privé",
+        detail: privateTrainer.detail || "Programme ciblé en technique ou en défense.",
+        actionLabel: privateTrainer.actionLabel || "Choisir un entraîneur privé",
       },
       membership: {
         active: membership.active === true,
@@ -96,8 +107,26 @@
           : "locked",
         remyDetail: recreational.remyDetail || "",
       },
+      weekCapacity: {
+        total: wholeNumber(weekCapacity.total, 50, 1, 200),
+        used: wholeNumber(weekCapacity.used, 0, 0, 200),
+        remaining: wholeNumber(weekCapacity.remaining, 50, 0, 200),
+      },
+      weekPlan: {
+        entries: Array.isArray(weekPlan.entries) ? weekPlan.entries.slice(0, 12).map((entry, index) => ({
+          id: String(entry?.id || `gym-entry-${index + 1}`),
+          label: String(entry?.label || "Activité du GYM"),
+          cost: wholeNumber(entry?.cost, 0, 0, 100),
+          removable: entry?.removable !== false,
+        })) : [],
+      },
+      sparring: {
+        available: sparring.available !== false,
+        reason: sparring.reason || "",
+        planned: sparring.planned === true,
+      },
       selectedExercises: Array.isArray(raw.selectedExercises)
-        ? raw.selectedExercises.filter((id, index, list) => EXERCISES.some(exercise => exercise.id === id) && list.indexOf(id) === index).slice(0, 3)
+        ? raw.selectedExercises.filter((id, index, list) => EXERCISES.some(exercise => exercise.id === id) && list.indexOf(id) === index).slice(0, EXERCISES.length)
         : [],
       draftDurationMinutes: wholeNumber(raw.draftDurationMinutes, 0, 0, 240),
     };
@@ -136,22 +165,108 @@
     </section>`;
   }
 
+  function sparringState(context) {
+    if (context.careerStatus === "recreational") {
+      const remyCompleted = context.recreational.remyStatus === "completed";
+      return {
+        available: false,
+        status: remyCompleted ? "transition" : "locked",
+        label: remyCompleted ? "Passage amateur requis" : "Verrouillé pendant le parcours récréatif",
+        detail: remyCompleted
+          ? "Rémy a donné son feu vert. Confirme maintenant ton passage amateur auprès de l’entraîneur."
+          : "Complète d’abord le sparring pédagogique avec Rémy « Le Tank », puis confirme ton passage amateur.",
+      };
+    }
+    if (!context.membership.active) {
+      return {
+        available: false,
+        status: "membership",
+        label: "Abonnement requis",
+        detail: "Réactive ton abonnement au GYM avant de réserver un partenaire de sparring.",
+      };
+    }
+    if (context.condition.trainingBlocked) {
+      return {
+        available: false,
+        status: "unavailable",
+        label: "Indisponible aujourd’hui",
+        detail: context.condition.trainingBlockedReason,
+      };
+    }
+    if (!context.sparring.available) {
+      return {
+        available: false,
+        status: "capacity",
+        label: "Programme hebdomadaire complet",
+        detail: context.sparring.reason || "Libère de l’énergie dans ton programme avant d’ajouter un sparring.",
+      };
+    }
+    return {
+      available: true,
+      status: context.sparring.planned ? "planned" : "available",
+      label: context.sparring.planned ? "Déjà planifié" : "Disponible",
+      detail: context.sparring.planned
+        ? "Le sparring sera joué interactivement lorsque tu confirmeras la semaine."
+        : "Ajoute cette activité distincte : elle occupe une journée physique complète.",
+    };
+  }
+
+  function renderSparringCard(context) {
+    const sparring = sparringState(context);
+    const disabled = sparring.available ? "" : " disabled aria-disabled=\"true\" aria-describedby=\"v2-gym-sparring-reason\"";
+    const buttonLabel = sparring.available
+      ? context.sparring.planned ? "Retirer de ma semaine" : "Ajouter à ma semaine"
+      : "Sparring verrouillé";
+    return `<section class="v2-gym-sparring-card ${sparring.available ? "available" : "locked"}" id="v2-gym-sparring-card" data-v2-sparring-state="${sparring.status}" aria-labelledby="v2-gym-sparring-title">
+      <p class="eyebrow">Activité distincte</p>
+      <h3 id="v2-gym-sparring-title">Sparring</h3>
+      <p>Une opposition interactive avec un partenaire. Le sparring ne fait jamais partie d’une séance personnalisée.</p>
+      <div class="v2-gym-sparring-state" id="v2-gym-sparring-reason" role="note"><span aria-hidden="true">${sparring.available ? "✓" : "🔒"}</span><div><strong>${escapeHTML(sparring.label)}</strong><p>${escapeHTML(sparring.detail)}</p></div></div>
+      <button type="button" class="${sparring.available ? "primary-button" : "secondary-button"}" data-v2-sparring-activity="cta"${disabled}>${buttonLabel}</button>
+    </section>`;
+  }
+
+  function renderWeekPlan(context) {
+    if (!context.weekPlan.entries.length) return "";
+    return `<section class="v2-gym-week-plan" aria-labelledby="v2-gym-week-plan-title"><div><p class="eyebrow">Déjà dans la semaine</p><h3 id="v2-gym-week-plan-title">Activités du GYM planifiées</h3></div><ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>−${entry.cost} énergie</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul></section>`;
+  }
+
   function render(rawContext) {
     const context = normalizeContext(rawContext);
+    const sparring = sparringState(context);
     const zones = ZONES.map(zone => {
+      const isSparring = zone.id === "sparring";
+      const recreationalBlocked = context.careerStatus === "recreational" && !["coach", "reception"].includes(zone.id);
       const medicallyBlocked = context.membership.active && context.condition.trainingBlocked && !["coach", "reception"].includes(zone.id);
       const membershipBlocked = !context.membership.active && zone.id !== "reception";
-      const disabled = medicallyBlocked
+      const sparringBlocked = isSparring && !sparring.available;
+      const disabled = sparringBlocked
+        ? " disabled aria-disabled=\"true\" aria-describedby=\"v2-gym-sparring-reason\""
+        : membershipBlocked
+        ? " aria-disabled=\"true\" aria-describedby=\"v2-gym-membership-lock-reason\""
+        : recreationalBlocked
         ? " disabled aria-disabled=\"true\""
-        : membershipBlocked ? " aria-disabled=\"true\" aria-describedby=\"v2-gym-membership-lock-reason\"" : "";
-      const reason = medicallyBlocked
+        : medicallyBlocked
+        ? " disabled aria-disabled=\"true\""
+        : "";
+      const reason = sparringBlocked
+        ? ` Indisponible : ${sparring.label}. ${sparring.detail}`
+        : membershipBlocked
+        ? " Verrouillé : inscription au GYM requise."
+        : recreationalBlocked
+        ? " Indisponible pendant l’initiation : commence par les cours de groupe."
+        : medicallyBlocked
         ? ` Indisponible : ${context.condition.trainingBlockedReason}`
-        : membershipBlocked ? " Verrouillé : inscription au GYM requise." : "";
-      const lock = membershipBlocked ? `<span class="v2-gym-hotspot-lock" aria-hidden="true">🔒</span>` : "";
-      return `<button type="button" class="v2-gym-hotspot v2-gym-hotspot-${zone.id}" data-v2-gym-zone="${zone.id}" aria-label="${escapeHTML(zone.label)}. ${escapeHTML(zone.detail)}${escapeHTML(reason)}"${disabled}><strong>${escapeHTML(zone.label)}</strong><small>${escapeHTML(zone.detail)}</small>${lock}</button>`;
+        : "";
+      const lock = membershipBlocked || sparringBlocked || recreationalBlocked ? `<span class="v2-gym-hotspot-lock" aria-hidden="true">🔒</span>` : "";
+      const actionAttribute = isSparring ? `data-v2-sparring-activity="hotspot" aria-controls="v2-gym-sparring-card"` : `data-v2-gym-zone="${zone.id}"`;
+      return `<button type="button" class="v2-gym-hotspot v2-gym-hotspot-${zone.id}" ${actionAttribute} aria-label="${escapeHTML(zone.label)}. ${escapeHTML(zone.detail)}${escapeHTML(reason)}"${disabled}><strong>${escapeHTML(zone.label)}</strong><small>${escapeHTML(zone.detail)}</small>${lock}</button>`;
     }).join("");
     const coachDisabled = context.coach.available && context.membership.active ? "" : " disabled aria-disabled=\"true\"";
-    const composerDisabled = context.condition.trainingBlocked || !context.membership.active ? " disabled aria-disabled=\"true\"" : "";
+    const coachButtonLabel = context.coach.planned ? "Retirer de ma semaine" : "Ajouter à ma semaine";
+    const coachButtonClass = context.coach.planned ? "secondary-button" : "primary-button";
+    const privateTrainerDisabled = context.privateTrainer.available ? "" : " disabled aria-disabled=\"true\" aria-describedby=\"v2-gym-private-trainer-reason\"";
+    const composerDisabled = context.careerStatus === "recreational" || context.condition.trainingBlocked || !context.membership.active ? " disabled aria-disabled=\"true\"" : "";
     const coachNotice = context.coach.notice ? `<p class="v2-gym-coach-notice">${escapeHTML(context.coach.notice)}</p>` : "";
     const balanceLabel = context.membership.balance == null ? "Solde affiché à l’accueil" : `Solde : ${context.membership.balance} $`;
     const shortfall = context.membership.balance == null ? 0 : Math.max(0, context.membership.monthlyPrice - context.membership.balance);
@@ -163,7 +278,7 @@
     const accessItems = [
       "Travail aux mitaines",
       "Sac lourd et défense",
-      "Ring et sparring",
+      context.careerStatus === "recreational" ? "Sparring après Rémy et le passage amateur" : "Sparring comme activité distincte",
       ...(context.careerStatus === "recreational" ? ["Cours de groupe récréatif"] : []),
     ];
 
@@ -183,6 +298,12 @@
           ${membershipLock}
         </section>
         <aside class="v2-gym-dashboard" aria-label="Séance et état actuel">
+          <section class="v2-gym-readiness weekly">
+            <span>Énergie restante de la semaine</span><strong>${context.weekCapacity.remaining}/${context.weekCapacity.total}</strong>
+            <progress max="${context.weekCapacity.total}" value="${context.weekCapacity.remaining}" aria-label="Énergie hebdomadaire restante : ${context.weekCapacity.remaining} sur ${context.weekCapacity.total}">${context.weekCapacity.remaining}/${context.weekCapacity.total}</progress>
+            <p>${context.weekCapacity.used} déjà réservée. Les choix restent modifiables avant la confirmation.</p>
+          </section>
+          ${renderWeekPlan(context)}
           <section class="v2-gym-readiness ${context.condition.preparationTone}">
             <span>Préparation</span><strong>${escapeHTML(context.condition.preparationLabel)}</strong>
             <p>${escapeHTML(context.condition.preparationDetail)}</p>
@@ -198,9 +319,11 @@
             <p>${escapeHTML(context.coach.sessionSummary)}</p>
             <p class="v2-gym-session-duration"><strong>${context.coach.durationMinutes} minutes</strong> · adaptée à ton état actuel</p>
             ${coachNotice}
-            <button type="button" class="primary-button" data-v2-coach-session${coachDisabled}>Faire la séance de l’entraîneur</button>
-            <button type="button" class="secondary-button" data-v2-compose-session${composerDisabled}>Composer ma séance</button>
+            <button type="button" class="${coachButtonClass}" data-v2-coach-session aria-pressed="${context.coach.planned}"${coachDisabled}>${coachButtonLabel}</button>
+            <button type="button" class="secondary-button" data-v2-compose-session${composerDisabled}>Composer puis ajouter</button>
+            <div class="v2-gym-private-trainer"><strong>${escapeHTML(context.privateTrainer.name)}</strong><small id="v2-gym-private-trainer-reason">${escapeHTML(context.privateTrainer.available ? context.privateTrainer.detail : context.careerStatus === "recreational" ? "Les programmes privés se débloquent après le passage amateur." : "Un abonnement actif est requis.")}</small><button type="button" class="secondary-button" data-v2-boxing-trainer${privateTrainerDisabled}>${escapeHTML(context.privateTrainer.actionLabel)}</button></div>
           </section>
+          ${renderSparringCard(context)}
           <section class="v2-gym-membership ${context.membership.active ? "active" : "inactive"}">
             <span>Réception du GYM</span><strong>${escapeHTML(context.membership.active ? context.membership.label : "Inscription requise")}</strong><p>${escapeHTML(context.membership.detail)}</p>
             <ul class="v2-gym-access-preview" aria-label="${context.membership.active ? "Activités comprises" : "Activités déverrouillées après l’inscription"}">${accessItems.map(item => `<li><span aria-hidden="true">${context.membership.active ? "✓" : "🔒"}</span>${escapeHTML(item)}</li>`).join("")}</ul>
@@ -216,28 +339,35 @@
   function renderComposer(rawContext) {
     const context = normalizeContext(rawContext);
     const selected = context.selectedExercises;
-    const maximumReached = selected.length >= 3;
     const membershipLocked = !context.membership.active;
+    const selectedActivities = selected.map(id => EXERCISES.find(exercise => exercise.id === id)).filter(Boolean);
+    const energyCost = selectedActivities.reduce((sum, exercise) => sum + exercise.energyCost, 0);
+    const fatigueGain = selectedActivities.reduce((sum, exercise) => sum + exercise.fatigueGain, 0);
+    const projectedEnergy = Math.max(0, context.condition.energy - energyCost);
+    const projectedFatigue = Math.min(100, context.condition.fatigue + fatigueGain);
     const exerciseButtons = EXERCISES.map(exercise => {
       const isSelected = selected.includes(exercise.id);
-      const disabled = membershipLocked || context.condition.trainingBlocked || (maximumReached && !isSelected) ? " disabled aria-disabled=\"true\"" : "";
-      return `<button type="button" class="v2-exercise-choice${isSelected ? " selected" : ""}" data-v2-exercise="${exercise.id}" aria-pressed="${isSelected}"${disabled}><strong>${escapeHTML(exercise.label)}</strong><small>${escapeHTML(exercise.detail)}</small></button>`;
+      const lacksEnergy = !isSelected && exercise.energyCost > projectedEnergy;
+      const disabled = membershipLocked || context.condition.trainingBlocked || lacksEnergy ? " disabled aria-disabled=\"true\"" : "";
+      const stateLabel = isSelected ? "Sélectionnée · toucher pour retirer" : lacksEnergy ? "Énergie insuffisante" : `Ajouter · −${exercise.energyCost} énergie`;
+      return `<button type="button" class="v2-exercise-choice${isSelected ? " selected" : ""}" data-v2-exercise="${exercise.id}" aria-pressed="${isSelected}" aria-label="${escapeHTML(`${exercise.label}. ${stateLabel}`)}"${disabled}><span class="v2-exercise-heading-row"><strong>${escapeHTML(exercise.label)}</strong><b>−${exercise.energyCost} E</b></span><small>${escapeHTML(exercise.detail)}</small><em>${exercise.durationMinutes} min · ${escapeHTML(stateLabel)}</em></button>`;
     }).join("");
     const blocks = selected.length
       ? selected.map((id, index) => {
           const exercise = EXERCISES.find(item => item.id === id);
-          return `<li><span>Bloc ${index + 1}</span><strong>${escapeHTML(exercise.label)}</strong><button type="button" data-v2-exercise="${exercise.id}" aria-label="Retirer ${escapeHTML(exercise.label)}">Retirer</button></li>`;
+          return `<li><span>Activité ${index + 1}</span><strong>${escapeHTML(exercise.label)}</strong><small>−${exercise.energyCost} E · ${exercise.durationMinutes} min</small><button type="button" data-v2-exercise="${exercise.id}" aria-label="Retirer ${escapeHTML(exercise.label)}">Retirer</button></li>`;
         }).join("")
-      : `<li class="empty">Choisis ton premier bloc ci-dessous.</li>`;
+      : `<li class="empty">Choisis ta première activité ci-dessous. Tu peux commencer petit ou bâtir une séance plus complète.</li>`;
 
     return `<section class="v2-session-composer" aria-labelledby="v2-composer-title">
-      <header><div><p class="eyebrow">Séance personnalisée</p><h2 id="v2-composer-title">Compose jusqu’à trois blocs</h2></div><button type="button" data-v2-close-composer aria-label="Fermer le compositeur">Fermer</button></header>
-      <p>Une séance courte et cohérente vaut mieux qu’une accumulation de clics. Tu peux modifier un bloc avant de confirmer.</p>
+      <header><div><p class="eyebrow">Séance personnalisée</p><h2 id="v2-composer-title">Bâtis ta séance avec ton énergie</h2></div><button type="button" data-v2-close-composer aria-label="Fermer le compositeur">Fermer</button></header>
+      <p>Ajoute librement les activités qui t’intéressent. Chaque choix réduit immédiatement l’énergie projetée; retirer une activité la remet dans la réserve.</p>
       ${membershipLocked ? `<p class="v2-composer-membership-note" role="status"><strong>Inscription requise.</strong> Retourne à la réception pour débloquer les activités du GYM.</p>` : ""}
-      <div class="v2-composer-state" aria-live="polite"><strong>${selected.length}/3 blocs</strong><span>Durée prévue : ${context.draftDurationMinutes} min</span><span>Énergie : ${context.condition.energy} %</span><span>Fatigue : ${context.condition.fatigue} %</span></div>
-      <ol class="v2-session-blocks" aria-label="Blocs choisis">${blocks}</ol>
+      <section class="v2-composer-energy" aria-label="Énergie disponible pendant la composition" aria-live="polite"><div><span>Énergie pour cette séance</span><strong>${projectedEnergy} %</strong></div><progress max="100" value="${projectedEnergy}">${projectedEnergy} %</progress><p>${context.condition.energy} % au départ · ${energyCost ? `−${energyCost} points dépensés` : "aucune dépense choisie"}</p></section>
+      <div class="v2-composer-state" aria-live="polite"><strong>${selected.length} activité${selected.length > 1 ? "s" : ""}</strong><span>Durée prévue : ${context.draftDurationMinutes} min</span><span>Énergie après : ${projectedEnergy} %</span><span>Fatigue après : ${projectedFatigue} %</span></div>
+      <ol class="v2-session-blocks" aria-label="Activités choisies">${blocks}</ol>
       <div class="v2-exercise-grid" aria-label="Exercices disponibles">${exerciseButtons}</div>
-      <footer><button type="button" class="secondary-button" data-v2-close-composer>Annuler</button><button type="button" class="primary-button" data-v2-confirm-session${selected.length >= 2 && !context.condition.trainingBlocked && !membershipLocked ? "" : " disabled aria-disabled=\"true\""}>Commencer ma séance</button></footer>
+      <footer><button type="button" class="secondary-button" data-v2-close-composer>Annuler</button><button type="button" class="primary-button" data-v2-confirm-session${selected.length >= 1 && !context.condition.trainingBlocked && !membershipLocked ? "" : " disabled aria-disabled=\"true\""}>Ajouter à ma semaine</button></footer>
     </section>`;
   }
 

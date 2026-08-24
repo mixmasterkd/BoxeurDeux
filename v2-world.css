@@ -8,6 +8,13 @@ body.v2-preview {
     linear-gradient(145deg, #0d1010, #080a09 68%);
 }
 
+.v2-work-attendance-warning {
+  padding: 10px 12px;
+  border-left: 4px solid #ffb44d;
+  background: rgba(255, 180, 77, .11);
+  color: #ffe2b8;
+}
+
 body.v2-preview #game.game-shell {
   width: 100%;
   max-width: none;
@@ -371,11 +378,29 @@ body.v2-preview #v2-world[hidden] {
 
 .v2-now-time > small {
   grid-area: moment;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
   padding-top: 7px;
   border-top: 1px solid rgba(255, 255, 255, .1);
   color: #e2e0da;
   font-size: .69rem;
   letter-spacing: .04em;
+}
+
+.v2-now-time > small > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.v2-now-money {
+  flex: 0 0 auto;
+  color: var(--green, #6cb789);
+  font: 800 1rem/1 "Barlow Condensed", sans-serif;
+  letter-spacing: .02em;
+  white-space: nowrap;
 }
 
 .v2-objective-card,
@@ -386,6 +411,120 @@ body.v2-preview #v2-world[hidden] {
 
 .v2-objective-card {
   border-top: 3px solid var(--gold);
+}
+
+.v2-onboarding-card {
+  border-top-color: var(--blue);
+  background:
+    linear-gradient(145deg, rgba(71, 126, 181, .1), transparent 55%),
+    rgba(27, 30, 29, .96);
+}
+
+.v2-onboarding-card.required {
+  border-top-color: var(--gold);
+  background:
+    linear-gradient(145deg, rgba(221, 182, 94, .12), transparent 55%),
+    rgba(27, 30, 29, .96);
+}
+
+.v2-objective-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  min-width: 0;
+}
+
+.v2-objective-heading .eyebrow {
+  min-width: 0;
+  margin: 0;
+}
+
+.v2-objective-requirement {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid rgba(132, 186, 236, .52);
+  border-radius: 999px;
+  color: #bfddf8;
+  background: rgba(37, 81, 121, .28);
+  font-size: .55rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.v2-objective-requirement.required {
+  border-color: rgba(255, 224, 151, .58);
+  color: #ffe7a9;
+  background: rgba(125, 85, 19, .25);
+}
+
+.v2-onboarding-track {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0 12px;
+}
+
+.v2-onboarding-track > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: #9faaa7;
+  font-size: .54rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.v2-onboarding-track strong {
+  min-width: 0;
+  color: #f1eee5;
+  font-size: .61rem;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-onboarding-track progress {
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  color: var(--blue);
+  background: #101311;
+  accent-color: var(--blue);
+}
+
+.v2-onboarding-card.required .v2-onboarding-track progress {
+  color: var(--gold);
+  accent-color: var(--gold);
+}
+
+.v2-onboarding-track progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: #101311;
+}
+
+.v2-onboarding-track progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--blue);
+}
+
+.v2-onboarding-card.required .v2-onboarding-track progress::-webkit-progress-value {
+  background: var(--gold);
+}
+
+.v2-onboarding-track progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--blue);
+}
+
+.v2-onboarding-card.required .v2-onboarding-track progress::-moz-progress-bar {
+  background: var(--gold);
 }
 
 .v2-objective-card h3 {
@@ -1006,6 +1145,19 @@ body.v2-preview #v2-world[hidden] {
     font-size: 1.42rem;
   }
 
+  .v2-onboarding-track {
+    margin-block: 8px 10px;
+  }
+
+  .v2-onboarding-track > div {
+    gap: 5px;
+    font-size: .5rem;
+  }
+
+  .v2-onboarding-track strong {
+    font-size: .56rem;
+  }
+
   .v2-objective-card > p:not(.eyebrow),
   .v2-readiness-card > p {
     font-size: .69rem;
@@ -1112,5 +1264,183 @@ body.v2-preview #v2-world[hidden] {
     animation: none;
     scroll-behavior: auto;
     transition: none;
+  }
+}
+
+/* Panneaux de services autonomes : entraîneurs privés et suppléments. */
+.v2-service-panel {
+  box-sizing: border-box;
+  width: min(1120px, 100%);
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: clamp(18px, 3vw, 34px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 18px;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(221, 182, 94, .1), transparent 26rem),
+    #111512;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .56);
+  overscroll-behavior: contain;
+}
+
+.v2-service-panel > header {
+  position: sticky;
+  top: calc(0px - clamp(18px, 3vw, 34px));
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: calc(0px - clamp(18px, 3vw, 34px)) calc(0px - clamp(18px, 3vw, 34px)) 20px;
+  padding: clamp(18px, 3vw, 34px) clamp(18px, 3vw, 34px) 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(15, 19, 16, .95);
+  backdrop-filter: blur(12px);
+}
+
+.v2-service-panel h2,
+.v2-service-panel h3,
+.v2-service-panel p {
+  margin-top: 0;
+}
+
+.v2-service-panel button {
+  min-height: 44px;
+}
+
+.v2-service-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 12px 15px;
+  border: 1px solid rgba(102, 223, 134, .32);
+  background: rgba(102, 223, 134, .06);
+}
+
+.v2-service-balance strong {
+  color: #66df86;
+  font-size: 1.25rem;
+}
+
+.v2-trainer-targets {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 18px;
+}
+
+.v2-trainer-targets button[aria-pressed="true"] {
+  border-color: var(--gold);
+  color: #111;
+  background: var(--gold);
+}
+
+.v2-trainer-offers,
+.v2-supplement-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.v2-trainer-offer,
+.v2-supplement-card,
+.v2-trainer-active {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .028);
+}
+
+.v2-trainer-offer > *,
+.v2-supplement-card > *,
+.v2-trainer-active > * {
+  margin: 0;
+}
+
+.v2-trainer-offer > button,
+.v2-supplement-card > button {
+  align-self: end;
+  margin-top: auto;
+}
+
+.v2-trainer-active {
+  max-width: 620px;
+  margin-inline: auto;
+  border-color: rgba(221, 182, 94, .38);
+}
+
+.v2-trainer-active progress {
+  width: 100%;
+  height: 13px;
+  accent-color: var(--gold);
+}
+
+.v2-trainer-reason,
+.v2-service-reason,
+.v2-service-empty {
+  color: #e9b36d;
+}
+
+.v2-service-actions,
+.v2-trainer-result > div:last-child {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.v2-service-result-list {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v2-service-result-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .1);
+}
+
+@media (max-width: 760px) {
+  .v2-service-panel {
+    width: 100%;
+    max-height: 100dvh;
+    min-height: 100dvh;
+    padding: 16px 12px max(18px, env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 0;
+  }
+
+  .v2-service-panel > header {
+    top: -16px;
+    margin: -16px -12px 16px;
+    padding: max(14px, env(safe-area-inset-top)) 12px 12px;
+  }
+
+  .v2-service-panel > header h2 {
+    font-size: clamp(1.55rem, 8vw, 2.1rem);
+  }
+
+  .v2-trainer-offers,
+  .v2-supplement-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .v2-trainer-targets,
+  .v2-service-actions,
+  .v2-trainer-result > div:last-child {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

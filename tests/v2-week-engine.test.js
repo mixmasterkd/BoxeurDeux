@@ -35,6 +35,22 @@ function twoTrainingWeek(extra = {}) {
   };
 }
 
+function suppliedPlan(entries, budget = {}) {
+  return {
+    schemaVersion: 1,
+    week: 1,
+    weekStartSlot: 0,
+    weekEndSlot: time.PERIODS_PER_WEEK,
+    budget: {
+      trainingSessions: 0,
+      shortRecoveries: 0,
+      workShifts: 0,
+      ...budget,
+    },
+    entries,
+  };
+}
+
 test("expose le même noyau pur en CommonJS et sur globalThis", () => {
   assert.equal(globalThis.BoxeurWeek, week);
   assert.equal(week.SCHEMA_VERSION, 1);
@@ -185,6 +201,44 @@ test("l'hybride complète la semaine après une séance manuelle sans dépasser 
   assert.equal(result.summary.budget.remaining.trainingSessions, 0);
 });
 
+test("l'hybride compte une activité physique faite à la maison et ne réentraîne pas le même jour", () => {
+  const initial = freshState();
+  const afterHome = time.performActivity(initial, {
+    id: "home-session:shadow-boxing",
+    label: "Shadow-boxing à la maison",
+    category: "home-training",
+    duration: 1,
+    energyCost: 6,
+    fatigueGain: 3,
+    stimulus: { technique: 2, defense: 1 },
+  }, {}, fixedRng());
+  const session = training.createCustomSession(["jump_rope", "cooldown"]);
+  const result = week.runHybridWeek(afterHome, {
+    budget: { trainingSessions: 2, shortRecoveries: 0 },
+    training: { slots: [2, 8], sessions: [session, session], context: GYM },
+  }, fixedRng());
+
+  assert.equal(result.status, "week-complete");
+  assert.equal(result.summary.budget.usedBefore.trainingSessions, 1);
+  assert.equal(result.summary.counts.training, 1);
+  assert.equal(result.timeState.history.filter(event => event.activityCategory === "home-training").length, 1);
+  assert.equal(result.timeState.history.filter(event => event.activityCategory === "boxing-gym-training").length, 1);
+  assert.match(result.summary.warnings.join(" "), /activité physique principale a déjà été faite/i);
+});
+
+test("le moteur rapide refuse de compresser plusieurs séances dans une même journée", () => {
+  const session = training.createCustomSession(["shadow_boxing", "cooldown"]);
+  const result = week.runQuickWeek(freshState(), {
+    budget: { trainingSessions: 3, shortRecoveries: 0 },
+    training: { slots: [0, 1, 2], sessions: [session, session, session], context: GYM },
+  }, fixedRng());
+
+  assert.equal(result.status, "week-complete");
+  assert.equal(result.summary.counts.training, 1);
+  assert.equal(result.timeState.history.filter(event => event.activityCategory === "boxing-gym-training").length, 1);
+  assert.equal(result.summary.warnings.filter(message => /activité physique principale/.test(message)).length, 2);
+});
+
 test("le mode détaillé refuse une séance de plus que son budget", () => {
   const initial = freshState();
   const session = training.createCustomSession(["shadow_boxing", "cooldown"]);
@@ -310,4 +364,131 @@ test("la source aléatoire injectable rend toute la semaine reproductible", () =
   assert.deepEqual(first, second);
   assert.equal(first.summary.actions.length > 0, true);
   assert.ok(first.summary.actions.every(action => Number.isInteger(action.elapsedPeriods) && action.elapsedPeriods >= 1));
+});
+
+test("un plan fourni exécute une activité générique physique avec ses finances et ses détails", () => {
+  const initial = week.createWeekState(freshState(), { money: 200 });
+  const plan = suppliedPlan([{
+    id: "home-conditioning",
+    kind: "activity",
+    startSlot: 0,
+    physical: true,
+    moneyDelta: -25,
+    activity: {
+      id: "home-session:conditioning",
+      label: "Conditionnement à la maison",
+      category: "home-training",
+      duration: 2,
+      energyCost: 12,
+      fatigueGain: 8,
+      stimulus: { cardio: 3, defense: 1 },
+    },
+    detail: {
+      xpAward: 7.5,
+      wear: 3,
+      injuryRisk: 12.4,
+    },
+  }], { trainingSessions: 1 });
+  const result = week.runQuickWeek(initial, { plan }, fixedRng());
+
+  assert.equal(result.status, "week-complete");
+  assert.equal(result.plan.entries[0].duration, 2, "la durée canonique vient de BoxeurTime");
+  assert.equal(result.plan.entries[0].activity.energyCost, 12);
+  assert.equal(result.plan.entries[0].budgetKind, "trainingSessions");
+  assert.equal(result.summary.counts.training, 1);
+  assert.equal(result.summary.budget.executed.trainingSessions, 1);
+  assert.equal(result.summary.money.earned, -25);
+  assert.equal(result.finances.money, 175);
+  assert.equal(result.summary.xpAward, 7.5);
+  assert.equal(result.summary.wear, 3);
+  assert.equal(result.summary.maximumSingleActionInjuryRiskPercent, 12.4);
+  assert.equal(result.summary.actions[0].category, "home-training");
+  assert.equal(result.summary.actions[0].primitive.detail.injuryRiskPercent, 12.4);
+  assert.equal(result.timeState.history.some(event => event.weekPhysical === true), true);
+});
+
+test("budgetKind rend une activité générique physique et impose une seule activité principale par jour", () => {
+  const activity = id => ({
+    id,
+    label: id,
+    category: "other",
+    duration: 1,
+    energyCost: 3,
+    fatigueGain: 1,
+  });
+  const plan = suppliedPlan([
+    {
+      id: "first-physical",
+      kind: "activity",
+      startSlot: 0,
+      budgetKind: "trainingSessions",
+      activity: activity("first-physical"),
+    },
+    {
+      id: "second-physical",
+      kind: "activity",
+      startSlot: 1,
+      budgetKind: "trainingSessions",
+      activity: activity("second-physical"),
+    },
+  ], { trainingSessions: 2 });
+  const result = week.runQuickWeek(freshState(), { plan }, fixedRng());
+
+  assert.equal(result.status, "week-complete");
+  assert.equal(result.summary.counts.training, 1);
+  assert.equal(result.summary.budget.executed.trainingSessions, 1);
+  assert.match(result.summary.warnings.join(" "), /activité physique principale/i);
+  assert.equal(result.timeState.history.some(event => event.activityId === "second-physical"), false);
+});
+
+test("une activité payante est refusée atomiquement lorsque les fonds sont insuffisants", () => {
+  const initial = week.createWeekState(freshState(), { money: 40 });
+  const before = structuredClone(initial);
+  const primitive = {
+    kind: "activity",
+    moneyDelta: -45,
+    activity: {
+      id: "private-session",
+      label: "Séance privée",
+      category: "private-training",
+      duration: 1,
+      energyCost: 5,
+    },
+  };
+
+  assert.throws(
+    () => week.executePrimitive(initial, primitive, {}, fixedRng()),
+    error => error.code === "INSUFFICIENT_FUNDS"
+      && error.details.required === 45
+      && error.details.available === 40,
+  );
+  assert.deepEqual(initial, before);
+
+  const result = week.runQuickWeek(initial, {
+    plan: suppliedPlan([{ id: "private-session", startSlot: 0, ...primitive }]),
+  }, fixedRng());
+  assert.equal(result.status, "blocked");
+  assert.equal(result.timeState.clock.absoluteSlot, 0);
+  assert.equal(result.finances.money, 40);
+  assert.equal(result.summary.actions.length, 0);
+  assert.match(result.summary.warnings[0], /fonds insuffisants/i);
+});
+
+test("un plan fourni refuse une durée qui contredit l'activité normalisée", () => {
+  const plan = suppliedPlan([{
+    id: "bad-duration",
+    kind: "activity",
+    startSlot: 0,
+    duration: 1,
+    activity: {
+      id: "two-periods",
+      label: "Deux périodes",
+      duration: 2,
+    },
+  }]);
+
+  assert.throws(
+    () => week.runQuickWeek(freshState(), { plan }, fixedRng()),
+    error => error.code === "WEEK_PLAN_ACTIVITY_DURATION_MISMATCH",
+  );
 });

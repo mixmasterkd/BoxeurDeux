@@ -23,8 +23,8 @@ function fixedRng(value = 0.5) {
 test("expose le catalogue en CommonJS et sur globalThis avec le terme québécois mitaines", () => {
   assert.equal(globalThis.BoxeurTraining, training);
   assert.equal(training.SCHEMA_VERSION, 1);
-  assert.equal(training.MIN_BLOCKS, 2);
-  assert.equal(training.MAX_BLOCKS, 3);
+  assert.equal(training.MIN_BLOCKS, 1);
+  assert.equal(training.MAX_BLOCKS, 5);
   assert.equal(training.EXERCISES.mitts.label, "Travail aux mitaines");
   assert.deepEqual(
     Object.keys(training.EXERCISES),
@@ -87,6 +87,43 @@ test("l'aperçu agrège durée, énergie, fatigue et stimulus sans rien modifier
   assert.equal(preview.projected.fatigue, 14);
 });
 
+test("un ajustement de supplément reste limité aux coûts de séance", () => {
+  const initial = freshState({ condition: { energy: 90, fatigue: 10 } });
+  const session = training.createCustomSession(["jump_rope", "heavy_bag", "cooldown"]);
+  const base = training.previewSession(initial, session, GYM);
+  const adjusted = training.previewSession(initial, session, {
+    ...GYM,
+    sessionAdjustment: {
+      energyCost: 10.4,
+      fatigueGain: 6,
+      fatigueRelief: 3,
+      recoveryQuality: 1.03,
+      stimulus: { technique: 99, power: 99, cardio: 99, defense: 99 },
+      xp: 999,
+    },
+  });
+
+  assert.equal(base.ok, true);
+  assert.equal(adjusted.ok, true);
+  assert.equal(adjusted.totals.energyCost, 10.4);
+  assert.equal(adjusted.totals.fatigueDelta, 3);
+  assert.equal(adjusted.recoveryQuality, 1.03);
+  assert.deepEqual(adjusted.totals.stimulus, base.totals.stimulus);
+  assert.equal(adjusted.totals.xp, base.totals.xp);
+  assert.equal(adjusted.totals.wear, base.totals.wear);
+  assert.equal(adjusted.totals.injuryRisk, base.totals.injuryRisk);
+});
+
+test("un supplément ne rend pas autorisée une séance de base impossible", () => {
+  const exhausted = freshState({ condition: { energy: 5, fatigue: 10 } });
+  const session = training.createCustomSession(["heavy_bag"]);
+  const preview = training.previewSession(exhausted, session, {
+    ...GYM,
+    sessionAdjustment: { energyCost: 1 },
+  });
+  assert.equal(preview.code, "INSUFFICIENT_ENERGY");
+});
+
 test("refuse l'absence d'abonnement, le manque d'énergie, la surcharge et les séances mal formées", () => {
   const initial = freshState();
   const normal = training.createCustomSession(["shadow_boxing", "mitts"]);
@@ -110,14 +147,35 @@ test("refuse l'absence d'abonnement, le manque d'énergie, la surcharge et les s
     error => error.code === "MEDICAL_REST_REQUIRED",
   );
 
+  assert.equal(training.createCustomSession(["mitts"]).blocks.length, 1);
   assert.throws(
-    () => training.createCustomSession(["mitts"]),
-    error => error.code === "INVALID_BLOCK_COUNT",
+    () => training.createCustomSession(["mitts", "mitts"]),
+    error => error.code === "DUPLICATE_EXERCISE",
   );
   assert.throws(
     () => training.createCustomSession(["mitts", "cooldown", "cooldown"]),
     error => error.code === "DUPLICATE_COOLDOWN",
   );
+});
+
+test("la séance libre accepte les cinq activités et laisse l'énergie imposer la limite", () => {
+  const initial = freshState({ condition: { energy: 100, fatigue: 5 } });
+  const allActivities = training.createCustomSession([
+    "jump_rope",
+    "shadow_boxing",
+    "heavy_bag",
+    "mitts",
+    "defense_drills",
+  ]);
+  const preview = training.previewSession(initial, allActivities, GYM);
+
+  assert.equal(allActivities.blocks.length, 5);
+  assert.equal(preview.ok, true);
+  assert.equal(preview.totals.energyCost, 27);
+  assert.equal(preview.projected.energy, 73);
+
+  const lowEnergy = freshState({ condition: { energy: 20, fatigue: 5 } });
+  assert.equal(training.previewSession(lowEnergy, allActivities, GYM).code, "INSUFFICIENT_ENERGY");
 });
 
 test("sépare le coût de la séance du rétablissement nocturne", () => {

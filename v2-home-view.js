@@ -7,48 +7,80 @@
   "use strict";
 
   const ZONES = Object.freeze([
-    Object.freeze({
-      id: "bed",
-      label: "Lit",
-      detail: "Dormir jusqu’à demain matin",
-      action: "sleep",
-    }),
-    Object.freeze({
-      id: "lounge",
-      label: "Salon",
-      detail: "Récupération active",
-      action: "recover",
-    }),
-    Object.freeze({
-      id: "kitchen",
-      label: "Cuisine",
-      detail: "Repas et poids · bientôt branché",
-      disabled: true,
-    }),
-    Object.freeze({
-      id: "basement",
-      label: "Sous-sol",
-      detail: "Entraînement de dépannage",
-    }),
+    Object.freeze({ id: "bed", label: "Journée de repos", detail: "Ajouter une journée libre à la semaine", action: "rest" }),
+    Object.freeze({ id: "lounge", label: "Jeu d'ordinateur", detail: "Jouer à BoxeurDeux classique", action: "play-v1" }),
+    Object.freeze({ id: "kitchen", label: "Cuisine", detail: "Préparer un repas de récupération", action: "meal" }),
+    Object.freeze({ id: "basement", label: "Sous-sol", detail: "Ajouter un entraînement maison rapide", action: "home-quick" }),
   ]);
 
   const ACTIONS = Object.freeze([
     Object.freeze({
-      id: "sleep",
-      label: "Dormir jusqu’à demain matin",
-      help: "Passe à demain matin pour laisser le corps récupérer et assimiler la charge.",
+      id: "rest",
+      label: "Journée de repos rapide",
+      category: "recovery",
+      kindLabel: "Récupération",
+      impact: "Une journée sans entraînement",
+      command: "Ajouter à la semaine",
+      help: "Réserve une journée plus calme. Les nuits restent automatiques : dormir n’est jamais une action à planifier.",
+      plannable: true,
     }),
     Object.freeze({
-      id: "recover",
-      label: "Récupération active",
-      help: "Utilise une période pour bouger doucement et réduire la fatigue.",
+      id: "home-quick",
+      label: "Entraînement maison rapide",
+      category: "physical",
+      kindLabel: "Entraînement maison",
+      impact: "Charge légère et équilibrée",
+      command: "Ajouter à la semaine",
+      help: "Planifie une petite séance au sous-sol. Elle est moins complète qu’une séance spécialisée au GYM.",
+      plannable: true,
     }),
     Object.freeze({
-      id: "advance",
-      label: "Avancer une période",
-      help: "Laisse passer le prochain moment de la journée sans ajouter d’entraînement.",
+      id: "home-custom",
+      label: "Bâtir mon entraînement maison",
+      category: "physical",
+      kindLabel: "Séance personnalisée",
+      impact: "Choix des exercices",
+      command: "Préparer pour la semaine",
+      help: "Compose une courte séance avec le shadow-boxing, le jogging ou le sac au sous-sol.",
+      plannable: true,
+      amateurOnly: true,
+    }),
+    Object.freeze({
+      id: "meal",
+      label: "Repas maison de récupération",
+      category: "recovery",
+      kindLabel: "Cuisine et récupération",
+      impact: "15 $ · soutien modeste",
+      command: "Préparer pour la semaine",
+      help: "Prépare un repas pour soutenir modestement la récupération. Il coûte de l’argent et occupe un choix du programme.",
+      defaultMoneyCost: 15,
+      plannable: true,
+    }),
+    Object.freeze({
+      id: "play-v1",
+      label: "Jouer à BoxeurDeux classique",
+      category: "leisure",
+      kindLabel: "Loisir hors carrière",
+      impact: "Aucun temps de carrière",
+      command: "Jouer maintenant",
+      help: "Ouvre la V1 dans l’ordinateur. Ce loisir ne planifie rien, ne prend aucune place et ne fait pas avancer la semaine.",
+      plannable: false,
     }),
   ]);
+
+  const ACTION_GROUPS = Object.freeze([
+    Object.freeze({ id: "physical", label: "S'entraîner à la maison", detail: "Une option rapide pour avancer sans microgestion; la séance personnalisée se débloque après le statut récréatif." }),
+    Object.freeze({ id: "recovery", label: "Récupération et cuisine", detail: "Le repos échange une occasion de s’entraîner contre de la récupération; le repas ajoute aussi un coût en argent." }),
+    Object.freeze({ id: "leisure", label: "Ordinateur", detail: "La V1 est un loisir séparé : elle ne modifie jamais le programme ni le calendrier V2." }),
+  ]);
+
+  const ACTION_ALIASES = Object.freeze({
+    sleep: "rest",
+    jogging: "home-quick",
+    "shadow-boxing": "home-quick",
+    "basement-bag": "home-quick",
+  });
+  const ACTION_BY_ID = Object.freeze(Object.fromEntries(ACTIONS.map(action => [action.id, action])));
 
   function escapeHTML(value) {
     return String(value == null ? "" : value)
@@ -57,6 +89,11 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function safeText(value, fallback = "", maxLength = 360) {
+    const text = String(value == null ? "" : value).trim();
+    return (text || fallback).slice(0, maxLength);
   }
 
   function numberInRange(value, fallback, min, max) {
@@ -69,14 +106,131 @@
     return Math.round(numberInRange(value, fallback, min, max));
   }
 
-  function normalizeAction(rawAction) {
-    if (rawAction === false) {
-      return { available: false, reason: "Cette action est indisponible pour le moment." };
+  function firstFinite(values) {
+    const found = values.find(value => value != null && Number.isFinite(Number(value)));
+    return found == null ? null : Number(found);
+  }
+
+  function normalizeCareerStatus(value) {
+    const status = safeText(value, "recreational", 40).toLocaleLowerCase("fr-CA");
+    if (status === "amateur") return "amateur";
+    if (["professional", "professionnel", "pro"].includes(status)) return "professional";
+    return "recreational";
+  }
+
+  function canonicalActionId(value) {
+    const id = safeText(value, "", 80);
+    return ACTION_ALIASES[id] || id;
+  }
+
+  function planEntries(rawPlan) {
+    if (Array.isArray(rawPlan)) return rawPlan.slice(0, 80);
+    if (!rawPlan || typeof rawPlan !== "object") return [];
+    const supplied = [rawPlan.entries, rawPlan.items, rawPlan.actions, rawPlan.selections, rawPlan.plannedActions, rawPlan.homeActionIds].find(Array.isArray);
+    if (supplied) return supplied.slice(0, 80);
+    if (rawPlan.home && typeof rawPlan.home === "object") {
+      if (Array.isArray(rawPlan.home)) return rawPlan.home.slice(0, 80);
+      return Object.entries(rawPlan.home)
+        .filter(([, planned]) => Boolean(planned))
+        .map(([actionId]) => ({ actionId }));
     }
-    const source = rawAction && typeof rawAction === "object" ? rawAction : {};
+    return [];
+  }
+
+  function entryActionId(entry) {
+    if (typeof entry === "string") return canonicalActionId(entry);
+    if (!entry || typeof entry !== "object") return "";
+    return canonicalActionId(entry.homeActionId || entry.actionId || entry.action || entry.id);
+  }
+
+  function normalizePlan(rawPlan) {
+    const source = rawPlan && typeof rawPlan === "object" && !Array.isArray(rawPlan) ? rawPlan : {};
+    const entries = planEntries(rawPlan);
+    const homeActionIds = [];
+    const homeEntries = [];
+    const seen = new Set();
+    entries.forEach((entry, index) => {
+      const id = entryActionId(entry);
+      if (!ACTION_BY_ID[id]?.plannable || seen.has(id)) return;
+      seen.add(id);
+      homeActionIds.push(id);
+      const supplied = entry && typeof entry === "object" ? entry : {};
+      homeEntries.push({
+        id: safeText(supplied.id, `home-${id}-${index + 1}`, 120),
+        actionId: id,
+        label: safeText(supplied.label, ACTION_BY_ID[id].label, 120),
+        cost: wholeNumber(supplied.cost, 0, 0, 100),
+        removable: supplied.removable !== false,
+      });
+    });
+    const countedEntries = entries.filter(entry => {
+      if (entry && typeof entry === "object" && entry.countsTowardCapacity === false) return false;
+      return entryActionId(entry) !== "play-v1";
+    });
     return {
-      available: source.available !== false,
-      reason: source.reason || "Cette action est indisponible pour le moment.",
+      title: safeText(source.title, "Programme de la semaine", 100),
+      note: safeText(source.note || source.detail, "Les choix faits ici s’ajoutent au même programme que le travail et les deux gyms.", 300),
+      homeActionIds,
+      entries: homeEntries,
+      entryCount: wholeNumber(source.entryCount, countedEntries.length, 0, 99),
+    };
+  }
+
+  function normalizeWeekCapacity(rawCapacity, plan) {
+    const source = typeof rawCapacity === "number" && Number.isFinite(rawCapacity)
+      ? { allowed: Number(rawCapacity) }
+      : rawCapacity && typeof rawCapacity === "object" ? rawCapacity : {};
+    const suppliedAllowed = firstFinite([source.allowed, source.limit, source.max, source.capacity, source.total]);
+    const suppliedUsed = firstFinite([source.used, source.planned, source.count]);
+    const suppliedRemaining = firstFinite([source.remaining, source.open]);
+    let used = wholeNumber(suppliedUsed == null ? plan.entryCount : suppliedUsed, plan.entryCount, 0, 99);
+    const allowed = wholeNumber(
+      suppliedAllowed == null ? Math.max(3, used + Math.max(0, suppliedRemaining || 0)) : suppliedAllowed,
+      3,
+      0,
+      99,
+    );
+    if (suppliedUsed == null && suppliedRemaining != null) used = Math.max(0, allowed - wholeNumber(suppliedRemaining, 0, 0, 99));
+    const remaining = suppliedRemaining == null
+      ? Math.max(0, allowed - used)
+      : Math.min(Math.max(0, allowed - used), wholeNumber(suppliedRemaining, 0, 0, 99));
+    return {
+      allowed,
+      used,
+      remaining,
+      full: remaining <= 0,
+      label: safeText(source.label, "Choix hebdomadaires", 80),
+    };
+  }
+
+  function normalizeAction(rawAction, definition, context) {
+    const source = rawAction && typeof rawAction === "object" ? rawAction : {};
+    const planned = definition.plannable && (source.planned === true || context.plan.homeActionIds.includes(definition.id));
+    let available = rawAction !== false && source.available !== false;
+    let reason = safeText(source.reason || source.disabledReason, "Cette option est indisponible pour le moment.", 260);
+    if (definition.amateurOnly && context.careerStatus === "recreational") {
+      available = false;
+      reason = "La séance personnalisée se débloque lorsque tu passes amateur. Utilise l’entraînement maison rapide pour apprendre le rythme du jeu.";
+    } else if (definition.plannable && context.weekCapacity.full && !planned) {
+      available = false;
+      reason = "Le programme de la semaine est complet. Retire d’abord un choix planifié.";
+    }
+    const moneyCost = wholeNumber(
+      source.moneyCost == null ? source.cost == null ? definition.defaultMoneyCost || 0 : source.cost : source.moneyCost,
+      definition.defaultMoneyCost || 0,
+      0,
+      999999,
+    );
+    return {
+      available,
+      reason,
+      planned: Boolean(planned),
+      plannable: definition.plannable,
+      help: safeText(source.help, definition.help, 360),
+      kindLabel: safeText(source.kindLabel, definition.kindLabel, 80),
+      impact: safeText(source.impact, definition.id === "meal" ? `${moneyCost} $ · soutien modeste` : definition.impact, 100),
+      command: safeText(source.command, definition.command, 100),
+      moneyCost,
     };
   }
 
@@ -86,83 +240,108 @@
     const clock = raw.clock && typeof raw.clock === "object" ? raw.clock : {};
     const condition = raw.condition && typeof raw.condition === "object" ? raw.condition : {};
     const rawActions = raw.actions && typeof raw.actions === "object" ? raw.actions : {};
+    const careerStatus = normalizeCareerStatus(raw.careerStatus);
+    const plan = normalizePlan(raw.plan);
+    const weekCapacity = normalizeWeekCapacity(raw.weekCapacity, plan);
     const recommendationTone = ["positive", "steady", "warning", "critical"].includes(condition.recommendationTone)
       ? condition.recommendationTone
       : "steady";
     const pendingLoad = condition.pendingLoad == null
-      ? condition.stimulusLoad == null
-        ? condition.loadToAssimilate
-        : condition.stimulusLoad
+      ? condition.stimulusLoad == null ? condition.loadToAssimilate : condition.stimulusLoad
       : condition.pendingLoad;
+    const actionContext = { careerStatus, plan, weekCapacity };
 
     return {
-      profile: {
-        firstName: profile.firstName || "Boxeur",
-      },
+      profile: { firstName: safeText(profile.firstName, "Boxeur", 50) },
+      careerStatus,
+      careerStatusLabel: careerStatus === "professional" ? "Professionnel" : careerStatus === "amateur" ? "Amateur" : "Récréatif",
       clock: {
-        dayLabel: clock.dayLabel || raw.dayLabel || "Lundi",
-        periodLabel: clock.periodLabel || raw.periodLabel || "Matin",
-        dateLabel: clock.dateLabel || raw.dateLabel || "Date à confirmer",
+        week: wholeNumber(clock.week == null ? raw.week : clock.week, 1, 1, 99999),
+        dayLabel: safeText(clock.dayLabel || raw.dayLabel, "Lundi", 40),
+        dateLabel: safeText(clock.dateLabel || raw.dateLabel, "Date à confirmer", 100),
       },
       condition: {
         energy: wholeNumber(condition.energy, 80, 0, 100),
         fatigue: wholeNumber(condition.fatigue, 10, 0, 100),
         pendingLoad: wholeNumber(pendingLoad, 0, 0, 100),
-        recommendation: condition.recommendation || raw.nextRecommendation || "Garde un rythme équilibré et récupère avant d’ajouter une grosse charge.",
-        recommendationDetail: condition.recommendationDetail || "Ton prochain choix devrait tenir compte de l’énergie, de la fatigue et du travail qu’il reste à assimiler.",
+        recommendation: safeText(condition.recommendation || raw.nextRecommendation, "Garde une semaine équilibrée.", 180),
+        recommendationDetail: safeText(condition.recommendationDetail, "Compare ta récupération aux choix déjà prévus avant d’ajouter une autre charge.", 320),
         recommendationTone,
       },
-      actions: {
-        sleep: normalizeAction(rawActions.sleep),
-        recover: normalizeAction(rawActions.recover),
-        advance: normalizeAction(rawActions.advance),
-      },
+      plan,
+      weekCapacity,
+      actions: Object.fromEntries(ACTIONS.map(action => [action.id, normalizeAction(rawActions[action.id], action, actionContext)])),
     };
   }
 
   function renderHotspot(zone, context) {
-    const action = zone.action ? context.actions[zone.action] : null;
-    const unavailable = zone.disabled === true || (action && !action.available);
+    const state = context.actions[zone.action];
     const reasonId = `v2-home-zone-${zone.id}-reason`;
-    const reason = zone.disabled
-      ? "Cette fonction sera branchée avec le système de repas et de poids."
-      : action && !action.available
-        ? action.reason
-        : "";
-    const actionAttribute = zone.action ? ` data-v2-home-action="${zone.action}"` : "";
-    const disabledAttributes = zone.disabled
-      ? ` aria-disabled="true" aria-describedby="${reasonId}"`
-      : unavailable ? ` disabled aria-disabled="true" aria-describedby="${reasonId}"` : "";
-    const reasonMarkup = reason
-      ? `<span class="v2-home-hotspot-reason" id="${reasonId}">${escapeHTML(reason)}</span>`
-      : "";
+    const disabledAttributes = state.available ? "" : ` aria-disabled="true" aria-describedby="${reasonId}"`;
+    const pressed = state.plannable ? ` aria-pressed="${state.planned ? "true" : "false"}"` : "";
+    const planned = state.planned ? ' data-v2-home-planned="true"' : "";
+    const reason = state.available ? "" : `<span class="v2-home-hotspot-reason" id="${reasonId}">${escapeHTML(state.reason)}</span>`;
+    const detail = state.planned ? "Planifié pour cette semaine" : zone.detail;
 
-    return `<div class="v2-home-hotspot-wrap v2-home-hotspot-${zone.id}">
-      <button type="button" class="v2-home-hotspot" data-v2-home-zone="${zone.id}"${actionAttribute}${disabledAttributes} aria-label="${escapeHTML(zone.label)}. ${escapeHTML(zone.detail)}">
-        <strong>${escapeHTML(zone.label)}</strong><small>${escapeHTML(zone.detail)}</small>
-      </button>${reasonMarkup}
+    return `<div class="v2-home-hotspot-wrap v2-home-hotspot-${zone.id}${state.planned ? " planned" : ""}">
+      <button type="button" class="v2-home-hotspot" data-v2-home-zone="${zone.id}" data-v2-home-action="${zone.action}"${planned}${pressed}${disabledAttributes} aria-label="${escapeHTML(zone.label)}. ${escapeHTML(detail)}.">
+        <strong>${escapeHTML(zone.label)}</strong><small>${escapeHTML(detail)}</small>
+      </button>${reason}
     </div>`;
   }
 
   function renderAction(action, context) {
     const state = context.actions[action.id];
     const helpId = `v2-home-action-${action.id}-help`;
-    const detail = state.available ? action.help : state.reason;
-    const disabledAttributes = state.available ? "" : " disabled aria-disabled=\"true\"";
-    return `<div class="v2-home-action${state.available ? "" : " unavailable"}">
-      <button type="button" data-v2-home-action="${action.id}" aria-describedby="${helpId}"${disabledAttributes}>${escapeHTML(action.label)}</button>
-      <small id="${helpId}">${escapeHTML(detail)}</small>
+    const disabledAttributes = state.available ? "" : ' disabled aria-disabled="true"';
+    const pressed = state.plannable ? ` aria-pressed="${state.planned ? "true" : "false"}"` : "";
+    const planned = state.planned ? ' data-v2-home-planned="true"' : "";
+    const command = state.planned ? "Planifié pour la semaine" : state.command;
+    const help = state.available ? state.help : state.reason;
+    const accessibleLabel = state.planned ? `Retirer de la semaine : ${action.label}` : `${state.command} : ${action.label}`;
+
+    return `<div class="v2-home-action${state.available ? "" : " unavailable"}${state.planned ? " planned" : ""}">
+      <button type="button" data-v2-home-action="${action.id}" aria-label="${escapeHTML(accessibleLabel)}" aria-describedby="${helpId}"${planned}${pressed}${disabledAttributes}>
+        <span class="v2-home-action-title">${escapeHTML(action.label)}</span>
+        <span class="v2-home-action-meta"><b>${escapeHTML(state.kindLabel)}</b><em>${escapeHTML(state.impact)}</em></span>
+        <span class="v2-home-action-command">${escapeHTML(command)}</span>
+      </button>
+      <small id="${helpId}">${escapeHTML(help)}</small>
     </div>`;
+  }
+
+  function renderActionGroup(group, context) {
+    const matching = ACTIONS.filter(action => action.category === group.id);
+    return `<section class="v2-home-action-group v2-home-action-group-${group.id}" aria-labelledby="v2-home-action-group-${group.id}">
+      <div class="v2-home-action-group-heading"><h4 id="v2-home-action-group-${group.id}">${escapeHTML(group.label)}</h4><p>${escapeHTML(group.detail)}</p></div>
+      <div class="v2-home-action-grid">${matching.map(action => renderAction(action, context)).join("")}</div>
+    </section>`;
+  }
+
+  function renderWeekPlan(context) {
+    const capacity = context.weekCapacity;
+    const planned = context.plan.entries.length
+      ? `<ul class="v2-home-planned-list" aria-label="Choix de la maison déjà planifiés">${context.plan.entries.map(entry => `<li><span>${escapeHTML(entry.label)}<small>−${entry.cost} énergie</small></span>${entry.removable ? `<button type="button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
+      : `<p class="v2-home-plan-empty">Aucun choix de la maison n’est encore planifié.</p>`;
+    const status = capacity.full ? "Énergie hebdomadaire épuisée" : `${capacity.remaining} énergie hebdomadaire encore disponible`;
+    const meterMax = Math.max(1, capacity.allowed);
+    const meterValue = Math.min(meterMax, capacity.remaining);
+
+    return `<section class="v2-home-week-plan${capacity.full ? " full" : ""}" aria-labelledby="v2-home-week-plan-title" aria-live="polite">
+      <div class="v2-home-week-plan-heading"><div><p class="eyebrow">Planification</p><h3 id="v2-home-week-plan-title">${capacity.full ? "Programme complet" : escapeHTML(context.plan.title)}</h3></div><strong>${capacity.remaining} / ${capacity.allowed}</strong></div>
+      <meter min="0" max="${meterMax}" value="${meterValue}" aria-label="Énergie hebdomadaire restante : ${capacity.remaining} sur ${capacity.allowed}">${capacity.remaining} sur ${capacity.allowed}</meter>
+      <p><strong>${escapeHTML(status)}</strong> · ${capacity.used} déjà réservée · ${escapeHTML(context.plan.note)}</p>${planned}
+    </section>`;
   }
 
   function render(rawContext) {
     const context = normalizeContext(rawContext);
     const hotspots = ZONES.map(zone => renderHotspot(zone, context)).join("");
-    const actions = ACTIONS.map(action => renderAction(action, context)).join("");
+    const actions = ACTION_GROUPS.map(group => renderActionGroup(group, context)).join("");
 
     return `<div class="v2-home-view">
       <header class="v2-home-header">
-        <div><p class="eyebrow">Maison</p><h2>Chez toi, ${escapeHTML(context.profile.firstName)}</h2></div>
+        <div><p class="eyebrow">Maison · ${escapeHTML(context.careerStatusLabel)}</p><h2>Chez toi, ${escapeHTML(context.profile.firstName)}</h2></div>
         <button type="button" class="secondary-button" data-v2-leave-home>Retour à la carte</button>
       </header>
       <div class="v2-home-layout">
@@ -174,22 +353,23 @@
           </picture>
           <div class="v2-home-hotspots">${hotspots}</div>
         </section>
-        <aside class="v2-home-dashboard" aria-label="Maintenant et récupération">
+        <aside class="v2-home-dashboard" aria-label="Programme et récupération">
           <section class="v2-home-now" aria-labelledby="v2-home-now-title">
-            <p class="eyebrow">Maintenant</p><h3 id="v2-home-now-title">${escapeHTML(context.clock.dayLabel)} · ${escapeHTML(context.clock.periodLabel)}</h3>
-            <p>${escapeHTML(context.clock.dateLabel)}</p>
+            <p class="eyebrow">Repère calendrier</p><h3 id="v2-home-now-title">Semaine ${context.clock.week}</h3>
+            <p>${escapeHTML(context.clock.dayLabel)} · ${escapeHTML(context.clock.dateLabel)}</p>
           </section>
-          <section class="v2-home-condition" aria-label="État de récupération">
+          <section class="v2-home-condition" aria-label="État de récupération actuel">
             <div><span>Énergie</span><strong>${context.condition.energy} %</strong><meter min="0" max="100" value="${context.condition.energy}">${context.condition.energy} %</meter></div>
             <div><span>Fatigue</span><strong>${context.condition.fatigue} %</strong><meter min="0" max="100" value="${context.condition.fatigue}">${context.condition.fatigue} %</meter></div>
             <div><span>Charge à assimiler</span><strong>${context.condition.pendingLoad} %</strong><meter min="0" max="100" value="${context.condition.pendingLoad}">${context.condition.pendingLoad} %</meter></div>
           </section>
+          ${renderWeekPlan(context)}
           <section class="v2-home-recommendation ${context.condition.recommendationTone}" aria-labelledby="v2-home-recommendation-title">
-            <p class="eyebrow">Prochaine recommandation</p><h3 id="v2-home-recommendation-title">${escapeHTML(context.condition.recommendation)}</h3>
+            <p class="eyebrow">Conseil avant de planifier</p><h3 id="v2-home-recommendation-title">${escapeHTML(context.condition.recommendation)}</h3>
             <p>${escapeHTML(context.condition.recommendationDetail)}</p>
           </section>
           <section class="v2-home-actions" aria-labelledby="v2-home-actions-title">
-            <h3 id="v2-home-actions-title">Gérer le temps et la récupération</h3>${actions}
+            <h3 id="v2-home-actions-title">Préparer ta semaine à la maison</h3>${actions}
           </section>
         </aside>
       </div>
@@ -198,29 +378,39 @@
 
   function renderResult(rawResult) {
     const result = rawResult && typeof rawResult === "object" ? rawResult : {};
-    const title = result.title || "Récupération terminée";
-    const summary = result.summary || "Le temps a avancé et ton état de récupération a été mis à jour.";
-    const timeLabel = result.timeLabel || "Nouvel état disponible";
+    const title = safeText(result.title, "Programme mis à jour", 120);
+    const summary = safeText(result.summary, "Le choix de la maison a été ajouté à ton programme.", 360);
+    const timeLabel = safeText(result.timeLabel, "Semaine mise à jour", 120);
     const changes = Array.isArray(result.changes) ? result.changes.slice(0, 8) : [];
     const changeMarkup = changes.length
       ? changes.map(change => {
           const safeChange = change && typeof change === "object" ? change : {};
           const tone = ["positive", "neutral", "warning", "critical"].includes(safeChange.tone) ? safeChange.tone : "neutral";
-          return `<li class="${tone}"><span>${escapeHTML(safeChange.label || "État")}</span><strong>${escapeHTML(safeChange.value || "—")}</strong></li>`;
+          return `<li class="${tone}"><span>${escapeHTML(safeText(safeChange.label, "Programme", 100))}</span><strong>${escapeHTML(safeText(safeChange.value, "—", 120))}</strong></li>`;
         }).join("")
-      : `<li class="neutral"><span>Bilan</span><strong>À jour</strong></li>`;
+      : `<li class="neutral"><span>Programme</span><strong>À jour</strong></li>`;
     const recommendation = result.recommendation
-      ? `<p class="v2-home-result-recommendation"><strong>Prochaine recommandation :</strong> ${escapeHTML(result.recommendation)}</p>`
+      ? `<p class="v2-home-result-recommendation"><strong>À retenir :</strong> ${escapeHTML(safeText(result.recommendation, "", 300))}</p>`
       : "";
 
     return `<section class="v2-home-result" aria-labelledby="v2-home-result-title" aria-live="polite">
-      <p class="eyebrow">Bilan à la maison</p><h2 id="v2-home-result-title">${escapeHTML(title)}</h2>
+      <p class="eyebrow">Programme de la maison</p><h2 id="v2-home-result-title">${escapeHTML(title)}</h2>
       <p>${escapeHTML(summary)}</p><p class="v2-home-result-time">${escapeHTML(timeLabel)}</p>
-      <ul class="v2-home-result-changes" aria-label="Effets de la récupération">${changeMarkup}</ul>
+      <ul class="v2-home-result-changes" aria-label="Changements au programme">${changeMarkup}</ul>
       ${recommendation}
       <div class="v2-home-result-actions"><button type="button" class="secondary-button" data-v2-home-result-close>Continuer à la maison</button><button type="button" class="primary-button" data-v2-leave-home>Retour à la carte</button></div>
     </section>`;
   }
 
-  return Object.freeze({ ZONES, ACTIONS, normalizeContext, render, renderResult });
+  return Object.freeze({
+    ZONES,
+    ACTIONS,
+    ACTION_GROUPS,
+    normalizeCareerStatus,
+    normalizePlan,
+    normalizeWeekCapacity,
+    normalizeContext,
+    render,
+    renderResult,
+  });
 });

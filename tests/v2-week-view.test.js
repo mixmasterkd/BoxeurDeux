@@ -4,52 +4,157 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const view = require("../v2-week-view.js");
 
-test("présente clairement les deux rythmes sans imposer le mode détaillé", () => {
-  const html = view.renderLauncher({
+test("normalise la capacité hebdomadaire et déduit une zone lisible", () => {
+  const context = view.normalizeContext({
     week: 3,
-    coachName: "Coach Tremblay",
-    quick: { available: true },
-    detailed: { activitiesCompleted: 0, periodsRemaining: 21 },
+    capacity: { total: 100, remaining: 24, spent: 76 },
   });
 
-  assert.match(html, /Semaine 3/);
-  assert.match(html, /Suivre le plan rapide/);
-  assert.match(html, /Jouer la semaine en détail/);
+  assert.equal(context.week, 3);
+  assert.deepEqual(context.capacity, {
+    total: 100,
+    remaining: 24,
+    spent: 76,
+    zone: "low",
+    zoneLabel: "Réserve faible",
+    detail: "La réserve inutilisée aide la récupération de la prochaine semaine.",
+  });
+});
+
+test("le lanceur montre l'énergie restante et les trois décisions de planification", () => {
+  const html = view.renderLauncher({
+    week: 4,
+    capacity: {
+      total: 120,
+      remaining: 73,
+      spent: 47,
+      zone: "comfortable",
+      zoneLabel: "Bonne réserve",
+    },
+    plan: {
+      items: [
+        { id: "work", label: "Emploi", cost: 28, removable: false },
+        { id: "gym", label: "Séance du coach", cost: 19, tone: "positive" },
+      ],
+    },
+  });
+
+  assert.match(html, /Semaine 4 · plan modifiable/);
+  assert.match(html, /Énergie restante de la semaine/);
+  assert.match(html, /<progress max="120" value="73" aria-label="Énergie restante de la semaine : 73 sur 120">/);
+  assert.match(html, /47 énergie réservée/);
+  assert.match(html, /2 choix/);
+  assert.match(html, /data-v2-week-quick/);
+  assert.match(html, /data-v2-week-detailed/);
+  assert.match(html, /data-v2-week-confirm/);
   assert.doesNotMatch(html, /data-v2-week-handoff/);
 });
 
-test("explique un blocage rapide et permet de confier une semaine commencée au coach", () => {
-  const blocked = view.renderLauncher({
-    mode: "detailed",
-    quick: { available: false, reason: "Inscris-toi d’abord au GYM de boxe." },
-    detailed: { activitiesCompleted: 2, periodsRemaining: 15, canHandOff: true },
-  });
-
-  assert.match(blocked, /Inscris-toi d’abord/);
-  assert.match(blocked, /data-v2-week-quick disabled/);
-  assert.match(blocked, /Confier le reste au coach/);
-});
-
-test("le plan et le bilan échappent les données et exposent des actions accessibles", () => {
-  const plan = view.renderPlan({
-    coachName: "<Coach>",
+test("le plan rapide reste modifiable et résume les activités déjà choisies", () => {
+  const html = view.renderLauncher({
+    quick: {
+      label: "Appliquer mon plan rapide",
+      detail: "Un programme équilibré qui reste modifiable.",
+    },
     plan: {
-      title: "Technique & récupération",
-      items: [{ label: "GYM", detail: "Mitaines", tone: "positive" }],
-      tradeoff: "Moins de contrôle.",
+      items: [
+        { label: "Travail", cost: 28 },
+        { label: "Cours de groupe", cost: 20 },
+        { label: "Repos à la maison", cost: -8 },
+        { label: "Cuisine", cost: 0 },
+        { label: "Corde à danser", cost: 9 },
+      ],
     },
   });
-  const summary = view.renderSummary({
+
+  assert.match(html, /Appliquer mon plan rapide/);
+  assert.match(html, /Travail/);
+  assert.match(html, /−28/);
+  assert.match(html, /\+8/);
+  assert.match(html, /Cuisine[\s\S]*Prévu/);
+  assert.match(html, /\+1 autre activité/);
+  assert.match(html, /Voir ou modifier/);
+});
+
+test("désactive séparément le plan rapide et la confirmation avec une explication accessible", () => {
+  const quickBlocked = view.renderLauncher({
+    quick: { available: false, reason: "Choisis d’abord ton emploi." },
+    confirm: { available: true },
+  });
+  const confirmBlocked = view.renderPlan({
+    confirm: { available: false, reason: "Le plan dépasse ton énergie disponible." },
+  });
+
+  assert.match(quickBlocked, /data-v2-week-quick disabled aria-disabled="true"/);
+  assert.doesNotMatch(quickBlocked, /data-v2-week-confirm disabled/);
+  assert.match(quickBlocked, /role="status">Choisis d’abord ton emploi\./);
+
+  assert.match(confirmBlocked, /data-v2-week-confirm disabled aria-disabled="true"/);
+  assert.match(confirmBlocked, /role="status">Le plan dépasse ton énergie disponible\./);
+});
+
+test("le plan détaillé permet de retirer les choix facultatifs mais protège les engagements fixes", () => {
+  const html = view.renderPlan({
+    week: 2,
+    capacity: { total: 100, remaining: 53, spent: 47 },
+    plan: {
+      title: "Technique & récupération",
+      summary: "Tout peut encore changer avant la confirmation.",
+      items: [
+        {
+          id: "work-default",
+          kindLabel: "Emploi",
+          dayLabel: "Lundi au vendredi",
+          label: "Entrepôt",
+          detail: "Salaire prévu cette semaine.",
+          cost: 28,
+          removable: false,
+        },
+        {
+          id: "gym-<jab>",
+          kindLabel: "GYM de boxe",
+          dayLabel: "Mercredi soir",
+          label: "Mitaines <techniques>",
+          detail: "Travail de précision.",
+          cost: 19,
+          removable: true,
+        },
+      ],
+    },
+  });
+
+  assert.match(html, /id="v2-week-plan-title">Technique &amp; récupération/);
+  assert.match(html, /Emploi · Lundi au vendredi/);
+  assert.match(html, /Prévu par défaut/);
+  assert.match(html, /Mitaines &lt;techniques&gt;/);
+  assert.match(html, /data-v2-week-remove="gym-&lt;jab&gt;"/);
+  assert.match(html, /aria-label="Retirer Mitaines &lt;techniques&gt; du plan"/);
+  assert.doesNotMatch(html, /data-v2-week-remove="work-default"/);
+  assert.match(html, /data-v2-week-plan-close aria-label="Fermer le plan de la semaine"/);
+  assert.match(html, /résolues seulement lorsque tu confirmeras la semaine/);
+});
+
+test("un plan vide explique comment ajouter une activité", () => {
+  const html = view.renderPlan({ plan: { items: [] } });
+
+  assert.match(html, /Ton plan est vide/);
+  assert.match(html, /Retourne à la carte et visite un lieu/);
+  assert.match(html, /aria-label="Contenu du programme"/);
+});
+
+test("le bilan échappe les données et annonce les résultats importants", () => {
+  const html = view.renderSummary({
     weekFrom: 2,
     weekTo: 3,
+    title: "Bienvenue <champion>",
     changes: [{ label: "Argent", detail: "+100 $", tone: "positive" }],
     events: [{ label: "Attention", detail: "Abonnement bientôt expiré", tone: "warning" }],
   });
 
-  assert.match(plan, /&lt;Coach&gt;/);
-  assert.match(plan, /data-v2-week-confirm/);
-  assert.match(summary, /Semaine 2 terminée/);
-  assert.match(summary, /\+100 \$/);
-  assert.match(summary, /Abonnement bientôt expiré/);
-  assert.match(summary, /aria-live="polite"/);
+  assert.match(html, /Semaine 2 terminée/);
+  assert.match(html, /Bienvenue &lt;champion&gt;/);
+  assert.match(html, /\+100 \$/);
+  assert.match(html, /Abonnement bientôt expiré/);
+  assert.match(html, /aria-live="polite"/);
+  assert.match(html, /data-v2-week-summary-close/);
 });

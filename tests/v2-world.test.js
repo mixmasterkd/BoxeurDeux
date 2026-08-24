@@ -56,6 +56,105 @@ test("guide le parcours récréatif sans masquer les étapes obligatoires", () =
   assert.equal(world.objective(baseCareer({ recreationalSparringStatus: "completed" })).title, "Passer amateur");
 });
 
+test("donne priorité à l'étape déterministe du nouveau tutoriel", () => {
+  const career = baseCareer({
+    jobId: null,
+    v2Job: null,
+    jobsHeldCount: 0,
+    gymWeeks: 0,
+    v2Onboarding: { mode: "guided", week: 3, remyWeek: 6 },
+    v2OnboardingStep: {
+      id: "week-3-mitts",
+      type: "objective",
+      title: "Travailler aux mitaines",
+      detail: "Applique une combinaison simple.",
+      locationId: "boxing-gym",
+      required: false,
+    },
+  });
+  const current = world.objective(career);
+
+  assert.equal(current.id, "week-3-mitts");
+  assert.equal(current.title, "Travailler aux mitaines");
+  assert.equal(current.locationId, "boxing-gym");
+  assert.equal(current.required, false);
+  assert.equal(current.onboarding, true);
+  assert.equal(current.week, 3);
+  assert.equal(current.remyWeek, 6);
+});
+
+test("affiche textuellement le caractère obligatoire ou facultatif et la progression vers Rémy", () => {
+  const common = {
+    v2Onboarding: { mode: "guided", week: 1, remyWeek: 6 },
+    v2OnboardingStep: {
+      id: "choose-initial-job",
+      type: "job",
+      title: "Choisir ton emploi de départ",
+      detail: "La fenêtre reste ouverte jusqu’au choix.",
+      locationId: "work",
+      required: true,
+    },
+  };
+  const required = world.render(baseCareer(common));
+
+  assert.match(required, /data-v2-onboarding-step="choose-initial-job"/);
+  assert.match(required, /Guide récréatif/);
+  assert.match(required, /v2-objective-requirement required">Obligatoire/);
+  assert.match(required, /Semaine 1/);
+  assert.match(required, /Rémy · semaine 6/);
+  assert.match(required, /<progress max="6" value="1">1\/6<\/progress>/);
+  assert.match(required, /aria-label="Parcours guidé : semaine 1 sur 6 avant le sparring de Rémy"/);
+  assert.match(required, /data-v2-location="work">M’y rendre/);
+
+  const optional = world.render(baseCareer({
+    ...common,
+    v2Onboarding: { mode: "guided", week: 4, remyWeek: 6 },
+    v2OnboardingStep: { ...common.v2OnboardingStep, id: "week-4-defense", required: false },
+  }));
+  assert.match(optional, /v2-objective-requirement optional">Facultatif/);
+  assert.match(optional, /<progress max="6" value="4">4\/6<\/progress>/);
+});
+
+test("ignore une étape terminée ou exemptée et conserve les anciens contextes", () => {
+  const oldContext = baseCareer({ recreationalTrainingWeeks: 4 });
+  assert.equal(world.onboardingObjective(oldContext), null);
+  assert.equal(world.objective(oldContext).title, "Bâtir tes bases");
+  assert.doesNotMatch(world.render(oldContext), /v2-onboarding-card/);
+
+  const completed = baseCareer({
+    careerStatus: "amateur",
+    v2Onboarding: { mode: "complete", week: 6, remyWeek: 6 },
+    v2OnboardingStep: {
+      id: "onboarding-complete",
+      type: "complete",
+      title: "Parcours terminé",
+      locationId: "map",
+    },
+  });
+  assert.equal(world.objective(completed).title, "Choisir la prochaine occasion");
+});
+
+test("échappe les données du tutoriel et corrige une destination inconnue", () => {
+  const career = baseCareer({
+    v2Onboarding: { mode: "guided", week: 2, remyWeek: 6 },
+    v2OnboardingStep: {
+      id: 'guide"><script>boom()</script>',
+      type: "objective",
+      title: '<img src=x onerror="boom()">',
+      detail: "<b>danger</b>",
+      locationId: 'work" onclick="boom()',
+      required: false,
+    },
+  });
+  const current = world.objective(career);
+  const html = world.render(career);
+
+  assert.equal(current.locationId, "boxing-gym");
+  assert.doesNotMatch(html, /<script>|<img src=x|onclick=/);
+  assert.match(html, /&lt;img src=x onerror=&quot;boom\(\)&quot;&gt;/);
+  assert.match(html, /&lt;b&gt;danger&lt;\/b&gt;/);
+});
+
 test("rend l’emploi facultatif après un premier poste et n’invente aucun quart", () => {
   const firstJob = baseCareer({ jobId: null, jobsHeldCount: 0 });
   assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "work"), firstJob), "Premier emploi requis");
@@ -73,6 +172,8 @@ test("rend l’emploi facultatif après un premier poste et n’invente aucun qu
     ],
   })), "Quart du dépanneur");
   assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "boxing-gym"), baseCareer({ gymWeeks: 0 })), "Inscription requise");
+  assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "strength-gym"), baseCareer()), "Verrouillé · amateur requis");
+  assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "strength-gym"), baseCareer({ careerStatus: "amateur" })), "Abonnement facultatif");
 });
 
 test("oriente le boxeur amateur vers le gala ou le tournoi pertinent", () => {
@@ -149,21 +250,30 @@ test("place la tuile développeur uniquement dans le lieu Travail", () => {
   assert.match(work, /aria-label="Vente de stupéfiants — À venir"/);
   assert.match(work, /Emploi actuel/);
   assert.match(work, /data-v2-open-job-menu/);
-  assert.match(work, /data-v2-work-shift/);
-  assert.match(work, /Faire mon quart · \+100 \$/);
+  assert.match(work, /data-v2-toggle-work/);
+  assert.match(work, /Retirer le travail de ma semaine/);
+  assert.match(work, /travail est prévu cette semaine/);
+  assert.match(work, /Le salaire affiché est hebdomadaire/);
   assert.doesNotMatch(gym, /data-v2-developer-secret/);
 });
 
-test("confirme visuellement un quart déjà payé sans offrir un deuxième salaire", () => {
+test("garde le travail proposé par défaut tout en permettant de le retirer", () => {
   const work = world.renderLocation("work", baseCareer({
     v2WorkCompleted: true,
     v2WorkAvailable: false,
-    v2WorkBlockReason: "Quart terminé cette semaine · paie versée.",
+    v2WorkBlockReason: "Travail fait cette semaine · paie hebdomadaire versée.",
   }));
 
-  assert.match(work, /Quart terminé cette semaine · paie versée/);
-  assert.match(work, /disabled aria-disabled="true">Quart terminé · paie versée/);
-  assert.doesNotMatch(work, /data-v2-work-shift/);
+  assert.match(work, /Le travail est prévu cette semaine/);
+  assert.match(work, /Retirer le travail de ma semaine/);
+  assert.match(work, /data-v2-toggle-work[^>]+aria-pressed="true">Retirer le travail de ma semaine/);
+  assert.doesNotMatch(work, /Travail fait · paie versée/);
+});
+
+test("met l'argent en évidence dans la barre de semaine", () => {
+  const html = world.render(baseCareer({ money: 432 }));
+  assert.match(html, /class="v2-now-money"[^>]*>432 \$<\/b>/);
+  assert.match(html, /aria-label="Argent disponible 432 \$"/);
 });
 
 test("rend l’emploi de départ comme une étape explicite et immédiate", () => {
@@ -176,7 +286,22 @@ test("rend l’emploi de départ comme une étape explicite et immédiate", () =
   assert.match(work, /Étape obligatoire/);
   assert.match(work, /Choisis ton premier emploi/);
   assert.match(work, />Choisir mon emploi<\/button>/);
-  assert.match(work, /inclus dans chaque semaine rapide/);
+  assert.match(work, /inclus par défaut dans chaque semaine/);
+});
+
+test("montre une candidature automatique et le nombre de semaines restantes", () => {
+  const work = world.renderLocation("work", baseCareer({
+    jobId: null,
+    v2Job: null,
+    jobsHeldCount: 1,
+    jobApplication: { jobId: "warehouse", progress: 1, requiredWeeks: 3 },
+    v2JobApplicationLabel: "Manutention de nuit",
+  }));
+
+  assert.match(work, /Candidature en cours/);
+  assert.match(work, /Manutention de nuit/);
+  assert.match(work, /2 semaines/);
+  assert.match(work, /progress max="3" value="1"/);
 });
 
 test("signale clairement un profil de test et offre le retour à la carrière", () => {

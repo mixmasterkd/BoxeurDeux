@@ -511,13 +511,14 @@
     return preparationFrom(state);
   }
 
-  function applyNightRecoveryMutable(state, rng, nightSlot) {
+  function applyNightRecoveryMutable(state, rng, nightSlot, recoveryQuality = 1) {
     const before = {
       condition: clone(state.condition),
       stats: clone(state.stats),
       stimulus: clone(state.stimulus),
     };
-    const quality = 0.92 + nextRandom(state, rng) * 0.16;
+    const qualityModifier = clamp(recoveryQuality == null ? 1 : recoveryQuality, 0.75, 1.25);
+    const quality = (0.92 + nextRandom(state, rng) * 0.16) * qualityModifier;
     const energyGain = (24 - state.condition.fatigue * 0.05) * quality;
     const fatigueRelief = (9 + state.condition.energy * 0.015) * quality;
     state.condition.energy = roundTo(clamp(state.condition.energy + energyGain));
@@ -544,6 +545,7 @@
       type: "night-recovery",
       at: nightSlot,
       quality: roundTo(quality, 3),
+      qualityModifier: roundTo(qualityModifier, 3),
       before,
       after: {
         condition: clone(state.condition),
@@ -555,12 +557,12 @@
     });
   }
 
-  function advanceClockMutable(state, periods, rng) {
+  function advanceClockMutable(state, periods, rng, recoveryQuality = 1) {
     for (let index = 0; index < periods; index += 1) {
       const leavingPeriod = state.clock.periodIndex;
       state.clock = fromAbsoluteSlot(state.clock.absoluteSlot + 1);
       if (leavingPeriod === PERIODS.length - 1) {
-        applyNightRecoveryMutable(state, rng, state.clock.absoluteSlot);
+        applyNightRecoveryMutable(state, rng, state.clock.absoluteSlot, recoveryQuality);
       }
     }
   }
@@ -686,7 +688,7 @@
       stimulus: clone(next.stimulus),
     };
     const startSlot = next.clock.absoluteSlot;
-    advanceClockMutable(next, check.activity.duration, rng);
+    advanceClockMutable(next, check.activity.duration, rng, options && options.recoveryQuality);
 
     if (options && options.appointmentId) {
       const index = next.appointments.findIndex(appointment => appointment.id === options.appointmentId);
@@ -700,6 +702,7 @@
     appendHistory(next, {
       type: "activity-completed",
       activityId: check.activity.id,
+      activityCategory: check.activity.category,
       appointmentId: options && options.appointmentId ? options.appointmentId : null,
       fromSlot: startSlot,
       toSlot: next.clock.absoluteSlot,

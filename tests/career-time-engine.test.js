@@ -98,6 +98,7 @@ test("les activités dépensent immédiatement de l'énergie, ajoutent de la fat
   assert.deepEqual(next.condition, { energy: 50, fatigue: 16 });
   assert.equal(next.stimulus.cardio, 5);
   assert.equal(next.history.at(-1).type, "activity-completed");
+  assert.equal(next.history.at(-1).activityCategory, "training");
   assert.deepEqual(next.history.at(-1).afterImmediate.condition, { energy: 50, fatigue: 16 });
 });
 
@@ -218,6 +219,31 @@ test("la récupération nocturne restaure l'énergie, réduit la fatigue et assi
   assert.ok(state.stats.technique > before.stats.technique);
   assert.equal(state.history[0].type, "night-recovery");
   assertAllPhysicalValuesAreBounded(state);
+});
+
+test("un modificateur de récupération ne touche que la nuit traversée par l'activité", () => {
+  const evening = time.createState({
+    time: { week: 1, day: "monday", period: "evening" },
+    condition: { energy: 30, fatigue: 55 },
+    stimulus: { technique: 12, power: 6, cardio: 4, defense: 8 },
+  });
+  const activity = {
+    id: "supplement-test",
+    duration: 1,
+    energyCost: 5,
+    fatigueGain: 4,
+    stimulus: { technique: 1 },
+  };
+  const normal = time.performActivity(evening, activity, {}, fixedRng(.5));
+  const supported = time.performActivity(evening, activity, { recoveryQuality: 1.03 }, fixedRng(.5));
+
+  assert.ok(supported.condition.energy > normal.condition.energy);
+  assert.ok(supported.condition.fatigue < normal.condition.fatigue);
+  assert.equal(supported.history.find(event => event.type === "night-recovery").qualityModifier, 1.03);
+  const nextNormalNight = time.advanceTime(normal, 3, fixedRng(.5));
+  const nextSupportedNight = time.advanceTime(supported, 3, fixedRng(.5));
+  assert.equal(nextNormalNight.history.filter(event => event.type === "night-recovery").at(-1).qualityModifier, 1);
+  assert.equal(nextSupportedNight.history.filter(event => event.type === "night-recovery").at(-1).qualityModifier, 1);
 });
 
 test("dix séances ciblées gardent une progression proche du système historique", () => {

@@ -10,7 +10,7 @@
     Object.freeze({ id: "home", label: "Maison", icon: "⌂", detail: "Repos, repas, messages et sac au sous-sol." }),
     Object.freeze({ id: "boxing-gym", label: "GYM de boxe", icon: "B", detail: "Séance du coach, travail aux mitaines, entraînement personnalisé, sparring et entraîneurs privés." }),
     Object.freeze({ id: "strength-gym", label: "Gym de musculation", icon: "M", detail: "Puissance, cardio, récupération et préparateurs physiques." }),
-    Object.freeze({ id: "work", label: "Emploi", icon: "$", detail: "Quarts de travail, entrevues, vacances et finances." }),
+    Object.freeze({ id: "work", label: "Emploi", icon: "$", detail: "Semaine de travail, entrevues, vacances et finances." }),
     Object.freeze({ id: "arena", label: "Aréna", icon: "★", detail: "Galas, tournois, pesées et combats programmés." }),
   ]);
 
@@ -42,7 +42,32 @@
     return { label: "Fragile", tone: "warning", detail: "La récupération devrait passer avant une autre grosse charge." };
   }
 
+  function onboardingObjective(career) {
+    const step = career.v2OnboardingStep;
+    const onboarding = career.v2Onboarding;
+    if (!step || typeof step !== "object") return null;
+    if (onboarding && typeof onboarding === "object" && ["complete", "exempt"].includes(onboarding.mode)) return null;
+    if (["complete", "exempt"].includes(step.type) || ["onboarding-complete", "onboarding-exempt"].includes(step.id)) return null;
+    const locationId = String(step.locationId || "");
+    const validLocation = locationId === "map" || LOCATIONS.some(location => location.id === locationId);
+    const week = Math.max(1, Math.min(999, Number(onboarding?.week ?? career.week) || 1));
+    const remyWeek = Math.max(2, Math.min(52, Number(onboarding?.remyWeek) || 6));
+    return {
+      id: String(step.id || "guided-step"),
+      type: String(step.type || "objective"),
+      title: step.title || "Prochaine étape du parcours",
+      detail: step.detail || "Suis le repère proposé pour avancer sans devoir tout planifier.",
+      locationId: validLocation ? locationId : "boxing-gym",
+      required: step.required === true,
+      onboarding: true,
+      week,
+      remyWeek,
+    };
+  }
+
   function objective(career) {
+    const guided = onboardingObjective(career);
+    if (guided) return guided;
     if (career.careerStatus === "recreational") {
       if (!career.jobId && isFirstJobRequired(career)) return { title: "Choisir un emploi", detail: "Ton premier revenu finance le GYM et le début du parcours.", locationId: "work" };
       if (!career.gymWeeks) return { title: "Entrer au GYM de boxe", detail: "Active ton premier abonnement et rencontre le coach.", locationId: "boxing-gym" };
@@ -54,6 +79,31 @@
     if (career.activeTournament) return { title: "Tournoi en cours", detail: "La pesée, le prochain combat et la récupération se gèrent à l’aréna.", locationId: "arena" };
     if (career.scheduledFight) return { title: "Préparer le prochain combat", detail: `Combat prévu à la semaine ${career.scheduledFight.week}.`, locationId: "arena" };
     return { title: "Choisir la prochaine occasion", detail: "Consulte les galas et tournois annoncés sans remplir ton horaire trop loin d’avance.", locationId: "arena" };
+  }
+
+  function renderObjectiveCard(currentObjective) {
+    const hasDestination = LOCATIONS.some(location => location.id === currentObjective.locationId);
+    const destination = hasDestination
+      ? `<button class="primary-button" type="button" data-v2-location="${escapeHTML(currentObjective.locationId)}">M’y rendre</button>`
+      : "";
+    if (!currentObjective.onboarding) {
+      return `<section class="v2-objective-card"><p class="eyebrow">Prochaine étape</p><h3>${escapeHTML(currentObjective.title)}</h3><p>${escapeHTML(currentObjective.detail)}</p>${destination}</section>`;
+    }
+
+    const currentWeek = Math.max(1, Math.min(currentObjective.remyWeek, currentObjective.week));
+    const requirement = currentObjective.required ? "Obligatoire" : "Facultatif";
+    const requirementClass = currentObjective.required ? "required" : "optional";
+    const progressLabel = currentObjective.week >= currentObjective.remyWeek
+      ? `Rémy · semaine ${currentObjective.remyWeek}`
+      : `Semaine ${currentObjective.week} sur ${currentObjective.remyWeek}`;
+    return `<section class="v2-objective-card v2-onboarding-card ${requirementClass}" data-v2-onboarding-step="${escapeHTML(currentObjective.id)}">
+      <div class="v2-objective-heading"><p class="eyebrow">Guide récréatif</p><span class="v2-objective-requirement ${requirementClass}">${requirement}</span></div>
+      <div class="v2-onboarding-track" aria-label="Parcours guidé : semaine ${currentWeek} sur ${currentObjective.remyWeek} avant le sparring de Rémy">
+        <div><span>Semaine 1</span><strong>${escapeHTML(progressLabel)}</strong><span>Rémy · semaine ${currentObjective.remyWeek}</span></div>
+        <progress max="${currentObjective.remyWeek}" value="${currentWeek}">${currentWeek}/${currentObjective.remyWeek}</progress>
+      </div>
+      <h3>${escapeHTML(currentObjective.title)}</h3><p>${escapeHTML(currentObjective.detail)}</p>${destination}
+    </section>`;
   }
 
   function isFirstJobRequired(career) {
@@ -83,7 +133,10 @@
 
   function locationStatus(location, career) {
     if (location.id === "boxing-gym") return career.gymWeeks > 0 ? `Abonnement · ${career.gymWeeks} sem.` : "Inscription requise";
-    if (location.id === "strength-gym") return career.strengthGymWeeks > 0 ? `Abonnement · ${career.strengthGymWeeks} sem.` : "Facultatif";
+    if (location.id === "strength-gym") {
+      if (career.careerStatus === "recreational") return "Verrouillé · amateur requis";
+      return career.strengthGymWeeks > 0 ? `Abonnement · ${career.strengthGymWeeks} sem.` : "Abonnement facultatif";
+    }
     if (location.id === "work") {
       if (career.jobId) return "Emploi actif";
       if (isFirstJobRequired(career)) return "Premier emploi requis";
@@ -121,23 +174,44 @@
   function workManagement(career) {
     const job = career.v2Job && typeof career.v2Job === "object" ? career.v2Job : null;
     const firstJobRequired = isFirstJobRequired(career) && !job;
+    const application = career.jobApplication && typeof career.jobApplication === "object" ? career.jobApplication : null;
+    const applicationJob = application ? career.v2JobApplicationLabel || "Emploi visé" : "";
     if (job) {
-      const workCompleted = career.v2WorkCompleted === true;
-      const workAvailable = !workCompleted && career.v2WorkAvailable !== false;
-      const workStatus = career.v2WorkBlockReason || (workCompleted ? "Quart terminé cette semaine · paie versée." : "Le mode rapide peut aussi simuler ce quart automatiquement.");
-      const shiftButton = workCompleted
-        ? `<button class="primary-button" type="button" disabled aria-disabled="true">Quart terminé · paie versée</button>`
-        : `<button class="primary-button" type="button" data-v2-work-shift${workAvailable ? "" : ' disabled aria-disabled="true"'}>Faire mon quart · +${Math.round(Number(job.wage) || 0)} $</button>`;
+      const planned = career.v2WorkPlan?.planned !== false;
+      const missed = Math.max(0, Math.min(2, Math.round(Number(career.missedWorkWeeks) || 0)));
+      const workStatus = planned
+        ? `Le travail est prévu cette semaine et réserve ${Math.max(0, Math.round(Number(career.v2WorkPlan?.cost) || 0))} énergie. Tu peux le retirer avant la confirmation.`
+        : "Tu as retiré le travail de cette semaine : l’énergie est libérée, mais tu ne recevras aucune paie et cette semaine comptera comme une absence.";
+      const attendance = missed > 0
+        ? `<p class="v2-work-attendance-warning"><strong>${missed}/3 absence${missed > 1 ? "s" : ""} consécutive${missed > 1 ? "s" : ""}.</strong> La troisième entraîne le congédiement.</p>`
+        : "";
+      const applicationCopy = application
+        ? `<p><strong>Candidature en cours :</strong> ${escapeHTML(applicationJob)} · ${Math.max(0, Math.round(Number(application.progress) || 0))}/${Math.max(1, Math.round(Number(application.requiredWeeks) || 1))} semaine${Number(application.requiredWeeks) > 1 ? "s" : ""} écoulée${Number(application.progress) > 1 ? "s" : ""}.</p>`
+        : "";
+      const shiftButton = `<button class="${planned ? "secondary-button" : "primary-button"}" type="button" data-v2-toggle-work aria-pressed="${planned}">${planned ? "Retirer le travail de ma semaine" : "Ajouter le travail à ma semaine"}</button>`;
       return `<section class="v2-work-management" aria-labelledby="v2-work-management-title">
         <div><p class="eyebrow">Emploi actuel</p><h3 id="v2-work-management-title">${escapeHTML(job.title || "Emploi actif")}</h3></div>
-        <dl><div><dt>Paie hebdomadaire</dt><dd>${Math.round(Number(job.wage) || 0)} $</dd></div><div><dt>Horaire</dt><dd>${escapeHTML(job.schedule || "Quart régulier")}</dd></div></dl>
-        <p>${escapeHTML(workStatus)}</p>
+        <dl><div><dt>Paie de la semaine</dt><dd>${Math.round(Number(job.wage) || 0)} $</dd></div><div><dt>Horaire</dt><dd>${escapeHTML(job.schedule || "Horaire régulier")}</dd></div></dl>
+        <p><strong>Le salaire affiché est hebdomadaire.</strong> Un emploi plus payant réserve davantage d’énergie et laisse moins de place au camp.</p>
+        <p>${escapeHTML(workStatus)}</p>${attendance}${applicationCopy}
+        <p><small>Plus tard, un mini-jeu de travail facultatif pourra donner un petit bonus d’argent sans remplacer cette règle hebdomadaire.</small></p>
         <div class="v2-work-management-actions">${shiftButton}<button class="secondary-button" type="button" data-v2-open-job-menu>Voir mon emploi</button></div>
+      </section>`;
+    }
+    if (application) {
+      const progress = Math.max(0, Math.round(Number(application.progress) || 0));
+      const required = Math.max(1, Math.round(Number(application.requiredWeeks) || 1));
+      const remaining = Math.max(0, required - progress);
+      return `<section class="v2-work-management" aria-labelledby="v2-work-management-title">
+        <div><p class="eyebrow">Candidature en cours</p><h3 id="v2-work-management-title">${escapeHTML(applicationJob)}</h3></div>
+        <p>Réponse garantie dans <strong>${remaining} semaine${remaining > 1 ? "s" : ""}</strong>. Chaque semaine confirmée fait avancer automatiquement l’attente.</p>
+        <progress max="${required}" value="${progress}" aria-label="Progression de la candidature : ${progress} sur ${required}">${progress}/${required}</progress>
+        <div class="v2-work-management-actions"><button class="secondary-button" type="button" data-v2-open-job-menu>Voir ou changer la candidature</button></div>
       </section>`;
     }
     return `<section class="v2-work-management ${firstJobRequired ? "required" : ""}" aria-labelledby="v2-work-management-title">
       <div><p class="eyebrow">${firstJobRequired ? "Étape obligatoire" : "Revenu facultatif"}</p><h3 id="v2-work-management-title">${firstJobRequired ? "Choisis ton premier emploi" : "Chercher un emploi"}</h3></div>
-      <p>${firstJobRequired ? "Ton premier emploi est obtenu immédiatement. Il finance le début du parcours et sera inclus dans chaque semaine rapide." : "Tu peux poursuivre sans emploi ou consulter les possibilités disponibles."}</p>
+      <p>${firstJobRequired ? "Ton premier emploi est obtenu immédiatement. Il finance le début du parcours et sera inclus par défaut dans chaque semaine." : "Tu peux poursuivre sans emploi ou postuler. L’attente dure de une à trois semaines selon le poste."}</p>
       <button class="primary-button" type="button" data-v2-open-job-menu>${firstJobRequired ? "Choisir mon emploi" : "Voir les emplois"}</button>
     </section>`;
   }
@@ -149,11 +223,12 @@
     const clockLabel = career.v2Clock?.dayLabel && career.v2Clock?.periodLabel
       ? `${career.v2Clock.dayLabel} · ${String(career.v2Clock.periodLabel).toLocaleLowerCase("fr-CA")}`
       : "Lundi · matin";
-    const dateAndMoney = `${clockLabel} · ${career.v2DateLabel || "date à confirmer"} · ${Math.round(Number(career.money) || 0)} $`;
+    const dateLabel = `${clockLabel} · ${career.v2DateLabel || "date à confirmer"}`;
+    const moneyLabel = `${Math.round(Number(career.money) || 0)} $`;
     const hotspots = LOCATIONS.map(location => `<button class="v2-map-hotspot" type="button" data-v2-location="${location.id}" aria-label="Entrer : ${escapeHTML(location.label)}. ${escapeHTML(locationStatus(location, career))}"><span aria-hidden="true">${location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${escapeHTML(locationStatus(location, career))}</small></button>`).join("");
     return `<div class="v2-world-layout">
       <section class="v2-map-panel" aria-labelledby="v2-map-title">
-        <div class="v2-map-heading"><div><p class="eyebrow">Quartier de carrière</p><h2 id="v2-map-title">Où vas-tu aujourd’hui, ${escapeHTML(firstName)}?</h2></div><a class="v2-preview-exit" href="./">Retour à l’interface actuelle</a></div>
+        <div class="v2-map-heading"><div><p class="eyebrow">Quartier de carrière</p><h2 id="v2-map-title">Que veux-tu planifier cette semaine, ${escapeHTML(firstName)}?</h2></div><a class="v2-preview-exit" href="./">Retour à l’interface actuelle</a></div>
         ${developerTestBanner(career)}
         <div class="v2-map-canvas">
           <picture><source media="(max-width: 640px)" srcset="assets/carte-quartier-v2-mobile.jpg"><img src="assets/carte-quartier-v2-desktop.jpg" width="1440" height="810" alt="Carte illustrée du quartier avec la maison, les deux gyms, le lieu de travail et l’aréna" /></picture>
@@ -161,13 +236,13 @@
         </div>
       </section>
       <aside class="v2-now-panel" aria-label="Situation actuelle">
-        <div class="v2-now-time"><span>Semaine</span><strong>${String(career.week || 1).padStart(2, "0")}</strong><small>${escapeHTML(dateAndMoney)}</small></div>
-        <section class="v2-objective-card"><p class="eyebrow">Prochaine étape</p><h3>${escapeHTML(currentObjective.title)}</h3><p>${escapeHTML(currentObjective.detail)}</p><button class="primary-button" type="button" data-v2-location="${currentObjective.locationId}">M’y rendre</button></section>
+        <div class="v2-now-time"><span>Semaine</span><strong>${String(career.week || 1).padStart(2, "0")}</strong><small><span>${escapeHTML(dateLabel)}</span><b class="v2-now-money" aria-label="Argent disponible ${escapeHTML(moneyLabel)}">${escapeHTML(moneyLabel)}</b></small></div>
+        ${renderObjectiveCard(currentObjective)}
         <section class="v2-readiness-card ${prep.tone}"><span>État de préparation</span><strong>${escapeHTML(prep.label)}</strong><p>${escapeHTML(prep.detail)}</p><div class="v2-vitals"><span>Énergie <b>${Math.round(career.energy || 0)} %</b></span><span>Fatigue <b>${Math.round(career.fatigue || 0)} %</b></span></div></section>
         <section class="v2-appointment-card"><span>Prochain rendez-vous</span><strong>${escapeHTML(nextAppointment(career))}</strong><button type="button" data-v2-open-calendar>Voir les sept prochains jours</button></section>
       </aside>
     </div>
-    <nav class="v2-world-nav" aria-label="Navigation principale V2"><button class="active" type="button" data-v2-nav="map">Carte</button><button type="button" data-v2-open-calendar>Calendrier</button><button type="button" data-v2-nav="fighter">Boxeur</button><button type="button" data-v2-nav="messages">Messages</button></nav>
+    <nav class="v2-world-nav" aria-label="Navigation principale V2"><button class="active" type="button" data-v2-nav="map">Carte</button><button type="button" data-v2-open-calendar>Calendrier</button><button type="button" data-v2-nav="fighter">Boxeur</button><button type="button" data-v2-nav="inventory">Inventaire</button></nav>
     <section class="v2-location-sheet" role="dialog" aria-modal="true" aria-label="Lieu du quartier" tabindex="-1" hidden></section>`;
   }
 
@@ -177,10 +252,10 @@
     const objectiveHere = objective(career).locationId === location.id;
     const workContent = location.id === "work" ? `${workManagement(career)}${workDeveloperTile()}` : "";
     const previewNote = location.id === "work"
-      ? "Les changements d’emploi par entrevues, les vacances et les mini-jeux seront branchés progressivement à ce lieu."
+      ? "Les candidatures avancent automatiquement chaque semaine. Les vacances et les mini-jeux facultatifs seront enrichis progressivement."
       : "L’intérieur interactif de ce lieu sera branché à la prochaine étape de la V2.";
     return `<div class="v2-location-card" data-location="${location.id}"><div><p class="eyebrow">${objectiveHere ? "Destination recommandée" : "Lieu du quartier"}</p><h2>${escapeHTML(location.label)}</h2><p>${escapeHTML(location.detail)}</p></div><div class="v2-location-status"><span>État du lieu</span><strong>${escapeHTML(locationStatus(location, career))}</strong></div>${workContent}<p class="v2-location-preview-note">${previewNote}</p><button class="secondary-button" type="button" data-v2-close-location>Retour à la carte</button></div>`;
   }
 
-  return Object.freeze({ LOCATIONS, preparation, objective, isFirstJobRequired, nextAppointment, locationStatus, render, renderLocation });
+  return Object.freeze({ LOCATIONS, preparation, onboardingObjective, objective, isFirstJobRequired, nextAppointment, locationStatus, render, renderLocation });
 });

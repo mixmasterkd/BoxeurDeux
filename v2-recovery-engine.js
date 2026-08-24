@@ -78,8 +78,8 @@
     },
     sleep_until_morning: {
       id: "sleep_until_morning",
-      label: "Dormir jusqu'au matin",
-      description: "Avancer jusqu'au prochain matin et assimiler l'entraînement pendant la nuit.",
+      label: "Journée de repos",
+      description: "Libérer le reste de la journée; la récupération de nuit est appliquée automatiquement.",
       kind: "sleep",
     },
     advance_free_period: {
