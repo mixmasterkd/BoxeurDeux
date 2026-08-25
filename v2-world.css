@@ -237,10 +237,10 @@ body.v2-preview #v2-world[hidden] {
   width: clamp(124px, 15vw, 176px);
   min-height: 52px;
   padding: 7px 10px 7px 8px;
-  border: 1px solid rgba(255, 255, 255, .62);
+  border: 1px dashed rgba(255, 255, 255, .62);
   border-radius: 12px;
   color: #fff;
-  background: rgba(13, 16, 15, .9);
+  background: rgba(12, 15, 13, .56);
   box-shadow: 0 7px 22px rgba(0, 0, 0, .38);
   transform: translate(-50%, -50%);
   cursor: pointer;

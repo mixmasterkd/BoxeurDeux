@@ -180,6 +180,7 @@ const privateCoaches = [
 const jobs = Object.freeze([
   { id: "convenience", title: "Commis de dépanneur", schedule: "Horaire souple", wage: 75, interviewWeeks: 1, energy: -14, fatigue: 10, morale: -1, injury: 0, detail: "La solution la moins payante, mais la plus facile à concilier avec le camp." },
   { id: "courier", title: "Coursier local", schedule: "Horaire variable", wage: 100, interviewWeeks: 2, energy: -20, fatigue: 16, morale: -3, injury: 1, detail: "Une meilleure paie hebdomadaire avec plus de kilomètres et de fatigue dans les jambes." },
+  { id: "office", title: "Employé de bureau", schedule: "Bureau · longues heures", wage: 120, interviewWeeks: 2, energy: -14, fatigue: 7, morale: -2, injury: 0, weekCapacityCost: 30, detail: "Une paie solide et peu de fatigue physique, mais de longues journées de bureau qui occupent une grande partie de la semaine." },
   { id: "warehouse", title: "Manutention de nuit", schedule: "Horaire exigeant", wage: 130, interviewWeeks: 3, energy: -27, fatigue: 23, morale: -5, injury: 3, detail: "La paie hebdomadaire la plus élevée, au prix d’une lourde dépense physique." },
 ]);
 
@@ -2339,9 +2340,23 @@ function openJobMenu() {
     const referenceEligible = state.jobReferenceBonus || Boolean(activeJob && state.jobTenureWeeks >= 12 && state.missedWorkWeeks === 0);
     const requiredWeeks = Math.max(1, job.interviewWeeks - (referenceEligible ? 1 : 0));
     const hiring = immediate ? "Embauche immédiate" : `${requiredWeeks} semaine${requiredWeeks > 1 ? "s" : ""} d’entrevues${referenceEligible && job.interviewWeeks > 1 ? " · bon dossier inclus" : ""}`;
-    return `<button class="coach-card${isTarget ? " selected" : ""}" type="button" data-select-job="${job.id}" aria-pressed="${isTarget}" ${isActive ? "disabled" : ""}><strong>${escapeHTML(job.title)}</strong><span>${job.wage} $ · ${escapeHTML(job.schedule)}</span><small>${hiring}<br>${job.energy} énergie · +${job.fatigue} fatigue · ${job.morale} moral${job.injury ? ` · +${job.injury} risque` : ""}<br>${escapeHTML(job.detail)}</small></button>`;
+    return renderJobBoardSheet(job, {
+      active: isActive,
+      selected: isTarget,
+      disabled: isActive,
+      status: hiring,
+      effects: `${job.energy} énergie · +${job.fatigue} fatigue · ${job.morale} moral${job.injury ? ` · +${job.injury} risque` : ""}`,
+    });
   }).join("");
   document.querySelector("#job-dialog").showModal();
+}
+
+function renderJobBoardSheet(job, { active = false, selected = false, disabled = false, status = "", effects = "" } = {}) {
+  const capacityCost = Number(job.weekCapacityCost);
+  const availability = Number.isFinite(capacityCost)
+    ? `<small class="job-board-availability">Longues heures · ${Math.round(capacityCost)} capacité de semaine réservée</small>`
+    : "";
+  return `<button class="job-board-sheet${selected ? " selected" : ""}${active ? " active" : ""}" type="button" data-select-job="${escapeHTML(job.id)}" aria-pressed="${selected}" ${disabled ? "disabled" : ""}><span class="job-board-pin" aria-hidden="true"></span><span class="job-board-sheet-type">Offre d’emploi</span><strong>${escapeHTML(job.title)}</strong><span class="job-board-pay">${job.wage} $ / semaine · ${escapeHTML(job.schedule)}</span><small class="job-board-status">${escapeHTML(status)}</small><small class="job-board-effects">${escapeHTML(effects)}</small>${availability}<small class="job-board-detail">${escapeHTML(job.detail)}</small></button>`;
 }
 
 function hireJob(job, initial = false) {
@@ -3427,6 +3442,7 @@ function v2WorkLocationContext() {
   const workEntry = plannerState?.entries?.find(entry => entry.source === "work") || null;
   return {
     ...career,
+    v2JobOffers: jobs.map(job => ({ id: job.id, title: job.title, wage: job.wage, schedule: job.schedule })),
     v2JobApplicationLabel: jobs.find(job => job.id === career.jobApplication?.jobId)?.title || "",
     v2WorkPlan: {
       planned: Boolean(workEntry),
@@ -3878,8 +3894,9 @@ function openV2Location(locationId) {
   const isBoxingGym = locationId === "boxing-gym" && window.BoxeurGymView;
   const isStrengthGym = locationId === "strength-gym" && window.BoxeurStrengthView;
   const isHome = locationId === "home" && window.BoxeurHomeView;
+  const isWork = locationId === "work" && window.BoxeurWorkView;
   const career = v2CareerView();
-  sheet.classList.toggle("v2-location-sheet-full", Boolean(isBoxingGym || isStrengthGym || isHome));
+  sheet.classList.toggle("v2-location-sheet-full", Boolean(isBoxingGym || isStrengthGym || isHome || isWork));
   sheet.classList.toggle("v2-location-sheet-strength", Boolean(isStrengthGym));
   sheet.innerHTML = isBoxingGym
     ? window.BoxeurGymView.render(v2GymContext())
@@ -3887,6 +3904,8 @@ function openV2Location(locationId) {
       ? window.BoxeurStrengthView.render(v2StrengthContext())
       : isHome
         ? window.BoxeurHomeView.render(v2HomeContext())
+        : isWork
+          ? window.BoxeurWorkView.render(v2WorkLocationContext())
         : window.BoxeurWorld.renderLocation(locationId, locationId === "work" ? v2WorkLocationContext() : career);
   if (["boxing-gym", "home", "work"].includes(locationId) && window.BoxeurWorld?.renderLocationGuide) {
     const guide = window.BoxeurWorld.renderLocationGuide(career, locationId);
@@ -3894,10 +3913,15 @@ function openV2Location(locationId) {
       ? sheet.querySelector(".v2-gym-dashboard")
       : isHome
         ? sheet.querySelector(".v2-home-dashboard")
-        : sheet.querySelector(".v2-location-card");
+        : isWork
+          ? sheet.querySelector(".v2-work-dashboard")
+          : sheet.querySelector(".v2-location-card");
     if (guide && guideTarget) guideTarget.insertAdjacentHTML("afterbegin", guide);
   }
-  activateV2LocationSheet(sheet, "[data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-close-location], button");
+  if (isWork && window.BoxeurWorld?.renderWorkDeveloperTile) {
+    sheet.querySelector(".v2-work-dashboard")?.insertAdjacentHTML("beforeend", window.BoxeurWorld.renderWorkDeveloperTile());
+  }
+  activateV2LocationSheet(sheet, "[data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-leave-work], [data-v2-close-location], button");
 }
 
 function openV2Fighter() {
@@ -4262,6 +4286,8 @@ function v2PlannerLoadCost(energyCost, fatigueDelta, minimum = 4, extraBaseCost 
 
 function v2PlannerWorkCost(job) {
   if (!job) return 0;
+  const explicitCapacityCost = Number(job.weekCapacityCost);
+  if (Number.isFinite(explicitCapacityCost)) return Math.max(8, Math.round(explicitCapacityCost));
   return Math.max(8, Math.round(Math.max(0, -Number(job.energy || 0)) * .7 + Math.max(0, Number(job.fatigue || 0)) * .5));
 }
 
@@ -5851,7 +5877,13 @@ function openV2JobMenu() {
         : targeted
           ? `Candidature en cours · ${application.progress}/${application.requiredWeeks}`
           : `${job.interviewWeeks} semaine${job.interviewWeeks > 1 ? "s" : ""} d’attente`;
-    return `<button class="coach-card${targeted ? " selected" : ""}" type="button" data-select-job="${job.id}" aria-pressed="${targeted}" ${active || targeted ? "disabled" : ""}><strong>${escapeHTML(job.title)}</strong><span>${job.wage} $ · ${escapeHTML(job.schedule)}</span><small>${status}<br>${job.energy} énergie · +${job.fatigue} fatigue<br>${escapeHTML(job.detail)}</small></button>`;
+    return renderJobBoardSheet(job, {
+      active,
+      selected: targeted,
+      disabled: active || targeted,
+      status,
+      effects: `${job.energy} énergie · +${job.fatigue} fatigue`,
+    });
   }).join("");
   const cancel = application && !immediate
     ? `<button class="text-button" type="button" data-v2-cancel-job-application>Annuler la candidature en cours</button>`
@@ -6206,7 +6238,24 @@ function renderV2GymMenu(menuId) {
   sheet.dataset.originLocation = "boxing-gym";
   sheet.classList.add("v2-location-sheet-full");
   sheet.innerHTML = markup;
-  activateV2LocationSheet(sheet, "[data-v2-coach-session], [data-v2-boxing-trainer], [data-v2-sparring-activity], [data-v2-amateur-transition], [data-v2-gym-menu-close]");
+  const preferredFocus = menuId === "coach"
+    ? "[data-v2-amateur-transition]:not([disabled]), [data-v2-coach-session]:not([disabled]), [data-v2-boxing-trainer]:not([disabled])"
+    : "[data-v2-sparring-activity]:not([disabled])";
+  activateV2LocationSheet(sheet, preferredFocus);
+}
+
+function renderV2WorkMenu(menuId) {
+  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+  if (!sheet || !window.BoxeurWorkView?.renderMenu) return;
+  const markup = window.BoxeurWorkView.renderMenu(menuId, v2WorkLocationContext());
+  if (!markup) return;
+  sheet.dataset.originLocation = "work";
+  sheet.classList.add("v2-location-sheet-full");
+  sheet.innerHTML = markup;
+  const preferredFocus = menuId === "schedule"
+    ? "[data-v2-toggle-work]:not([disabled])"
+    : "[data-v2-open-job-menu]:not([disabled])";
+  activateV2LocationSheet(sheet, preferredFocus);
 }
 
 const V2_HOME_ACTION_TO_ENGINE = Object.freeze({
@@ -8270,7 +8319,7 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     closeV2Location();
     return;
   }
-  if (event.target.closest("[data-v2-close-location], [data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-close-fighter], [data-v2-close-inventory]")) {
+  if (event.target.closest("[data-v2-close-location], [data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-leave-work], [data-v2-close-fighter], [data-v2-close-inventory]")) {
     closeV2Location();
     revealPendingV2LevelAlert();
     return;
@@ -8325,6 +8374,16 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
   }
   if (event.target.closest("[data-v2-work-shift]")) {
     runV2WorkShift();
+    return;
+  }
+  const workZone = event.target.closest("[data-v2-work-zone]");
+  if (workZone) {
+    if (workZone.dataset.v2WorkZone === "schedule") renderV2WorkMenu("schedule");
+    else if (["job", "employment"].includes(workZone.dataset.v2WorkZone)) openV2JobMenu();
+    return;
+  }
+  if (event.target.closest("[data-v2-work-menu-close]")) {
+    openV2Location("work");
     return;
   }
   const homeMenu = event.target.closest("[data-v2-home-menu]");

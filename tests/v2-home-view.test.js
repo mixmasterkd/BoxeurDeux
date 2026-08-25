@@ -65,6 +65,17 @@ test("conserve les deux illustrations et les cinq hotspots interactifs", () => {
   assert.match(html, /Appartement illustré avec cuisine, salon, chambre et espace d’entraînement au sous-sol/);
 });
 
+test("propose seulement le frigo comme prototype visuel pour ouvrir la cuisine", () => {
+  const html = homeView.render(baseContext());
+
+  assert.match(html, /v2-home-fridge-prototype/);
+  assert.match(html, /v2-home-fridge-button[^>]+data-v2-home-zone="kitchen"[^>]+data-v2-home-menu="kitchen"/);
+  assert.match(html, /v2-home-fridge-image-desktop[^>]+assets\/maison-v2-desktop\.jpg/);
+  assert.match(html, /v2-home-fridge-image-mobile[^>]+assets\/maison-v2-mobile\.jpg/);
+  assert.match(html, /v2-home-fridge-title[^>]*>Cuisine<\/span>/);
+  assert.doesNotMatch(html, /v2-home-hotspot-kitchen/);
+});
+
 test("affiche le repère de semaine, les jauges et le conseil avant de planifier", () => {
   const html = homeView.render(baseContext());
 

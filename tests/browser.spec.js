@@ -515,6 +515,66 @@ test("explique et verrouille le GYM V2 avant l’inscription", async ({ page }) 
   await expect(page.locator("#membership-dialog")).toBeVisible();
 });
 
+test("affiche le lieu Emploi V2 selon le poste sans modifier sa mécanique", async ({ page }) => {
+  const officeSnapshot = amateurSnapshot({
+    jobId: "office",
+    jobsHeldCount: 1,
+    introJobRequired: false,
+    initialGymRequired: false,
+  });
+  await page.route("https://fonts.googleapis.com/**", route => route.abort());
+  await page.route("https://fonts.gstatic.com/**", route => route.abort());
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  await page.evaluate(value => {
+    localStorage.clear();
+    localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
+  }, officeSnapshot);
+  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  const workView = page.locator(".v2-work-view-office");
+  await expect(workView).toBeVisible();
+  await expect(workView.locator('.v2-work-scene img')).toHaveAttribute("src", /emploi-bureau-v2-desktop\.png$/);
+  await expect(workView.locator("[data-v2-work-zone]")).toHaveCount(3);
+  await expect(workView.locator("[data-v2-leave-work]")).toBeVisible();
+  await expect(workView.locator('[data-v2-work-zone="mini-game"]')).toHaveAttribute("aria-disabled", "true");
+
+  const hotspotStyle = await workView.locator('[data-v2-work-zone="schedule"]').evaluate(element => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, border: style.borderTopStyle };
+  });
+  expect(hotspotStyle).toEqual({ background: "rgba(12, 15, 13, 0.56)", border: "dashed" });
+
+  await page.locator('[data-v2-work-zone="schedule"]').click();
+  await expect(page.locator(".v2-work-menu")).toContainText("Horaire de la semaine");
+  await expect(page.locator("[data-v2-toggle-work]")).toContainText("Retirer le travail de ma semaine");
+  await page.locator("[data-v2-work-menu-close]").click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => workView.locator('.v2-work-scene img').evaluate(image => image.currentSrc)).toContain("emploi-bureau-v2-mobile.png");
+  expect((await workView.locator('[data-v2-work-zone="schedule"]').boundingBox()).height).toBeGreaterThanOrEqual(44);
+  await page.locator("[data-v2-leave-work]").click();
+
+  const noJobSnapshot = amateurSnapshot({
+    jobId: null,
+    jobsHeldCount: 1,
+    introJobRequired: false,
+    initialGymRequired: false,
+  });
+  await page.evaluate(value => {
+    localStorage.clear();
+    localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
+  }, noJobSnapshot);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await expect(page.locator(".v2-work-board-scene")).toBeVisible();
+  await expect(page.locator('[data-v2-work-zone="employment"]')).toHaveCount(4);
+  await page.locator('[data-v2-work-zone="employment"]').first().click();
+  await expect(page.locator("#job-dialog")).toBeVisible();
+});
+
 test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmation", async ({ page }) => {
   test.setTimeout(60_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
@@ -550,26 +610,31 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   await expect(page.locator(".v2-week-blocker")).toContainText("emploi de départ");
 
   await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
-  await expect(page.locator(".v2-work-management.required")).toContainText("Choisis ton premier emploi");
-  await page.locator("[data-v2-open-job-menu]").first().click();
+  await expect(page.locator(".v2-work-board-scene")).toContainText("Ton premier emploi est requis");
+  await page.locator('[data-v2-work-zone="employment"]').first().click();
   await expect(page.locator("#job-dialog")).toBeVisible();
   await page.locator('#job-options [data-select-job="courier"]').click();
   await expect(page.locator("#job-dialog")).not.toBeVisible();
   await expect(page.getByRole("button", { name: /Entrer : Emploi/ })).toHaveAccessibleName(/Emploi actif/);
 
   await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await expect(page.locator(".v2-work-view")).toContainText("Coursier local");
+  await page.locator('[data-v2-work-zone="schedule"]').click();
   const workToggle = page.locator("[data-v2-toggle-work]");
-  await expect(page.locator(".v2-work-management")).toContainText("prévu cette semaine");
+  await expect(page.locator(".v2-work-menu")).toContainText("prévu cette semaine");
   await expect(workToggle).toContainText("Retirer le travail de ma semaine");
   const capacityWithWork = Number(await launcher.locator("progress").getAttribute("value"));
   await workToggle.click();
-  await expect(page.locator(".v2-work-management")).toContainText("aucune paie");
+  await page.locator('[data-v2-work-zone="schedule"]').click();
+  await expect(page.locator(".v2-work-menu")).toContainText("aucune paie");
   await expect(page.locator("[data-v2-toggle-work]")).toContainText("Ajouter le travail à ma semaine");
   const capacityWithoutWork = Number(await launcher.locator("progress").getAttribute("value"));
   expect(capacityWithoutWork).toBeGreaterThan(capacityWithWork);
   await page.locator("[data-v2-toggle-work]").click();
+  await page.locator('[data-v2-work-zone="schedule"]').click();
   await expect(page.locator("[data-v2-toggle-work]")).toContainText("Retirer le travail de ma semaine");
-  await page.locator("[data-v2-close-location]").click();
+  await page.locator("[data-v2-work-menu-close]").click();
+  await page.locator("[data-v2-leave-work]").click();
 
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   await expect(page.locator(".v2-gym-membership.inactive")).toContainText("Inscription requise");
@@ -631,11 +696,14 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
 
   const beforeManualDraft = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")).timeState);
   await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await page.locator('[data-v2-work-zone="schedule"]').click();
   await page.locator("[data-v2-toggle-work]").click();
+  await page.locator('[data-v2-work-zone="schedule"]').click();
   await expect(page.locator("[data-v2-toggle-work]")).toContainText("Ajouter le travail à ma semaine");
-  await page.locator("[data-v2-close-location]").click();
+  await page.locator("[data-v2-work-menu-close]").click();
+  await page.locator("[data-v2-leave-work]").click();
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
-  await page.locator('[data-v2-gym-zone="coach"]').click();
+  await page.locator('.v2-gym-hotspot[data-v2-gym-zone="coach"]').click();
   await page.locator("[data-v2-coach-session]").click();
   await expect(page.locator(".v2-gym-view")).toContainText("Cours de groupe");
   await expect(page.locator(".v2-gym-week-plan")).toContainText("Cours de groupe");
@@ -819,9 +887,12 @@ test("retire le travail, congédie après trois absences puis attend 1 à 3 sema
 
   const missWorkWeek = async expectedAbsences => {
     await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+    await page.locator('[data-v2-work-zone="schedule"]').click();
     await page.locator("[data-v2-toggle-work]").click();
-    await expect(page.locator(".v2-work-management")).toContainText("aucune paie");
-    await page.locator("[data-v2-close-location]").click();
+    await page.locator('[data-v2-work-zone="schedule"]').click();
+    await expect(page.locator(".v2-work-menu")).toContainText("aucune paie");
+    await page.locator("[data-v2-work-menu-close]").click();
+    await page.locator("[data-v2-leave-work]").click();
     await confirmWeekFromLauncher(page);
     await expect(page.locator(".v2-week-summary")).toBeVisible();
     await expect(page.locator(".v2-week-summary")).toContainText(expectedAbsences < 2 ? "Première absence" : expectedAbsences === 2 ? "Dernier avertissement" : "Emploi perdu");
@@ -1324,7 +1395,7 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
   await expect(page.locator("#job-dialog-cancel")).toBeHidden();
   await page.keyboard.press("Escape");
   await expect(jobDialog).toBeVisible();
-  await expect(page.locator("#job-options [data-select-job]:not([disabled])")).toHaveCount(3);
+  await expect(page.locator("#job-options [data-select-job]:not([disabled])")).toHaveCount(4);
   await page.locator("#job-options [data-select-job]").first().click();
   await expect(jobDialog).toBeHidden();
 
@@ -1371,11 +1442,11 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
 
   await page.locator("[data-v2-leave-gym]").click();
   await page.locator('[data-v2-location="work"]').first().click();
-  const workTutorial = page.locator(".v2-location-card > .v2-onboarding-card");
+  const workTutorial = page.locator(".v2-work-dashboard > .v2-onboarding-card");
   await expect(workTutorial).toHaveAttribute("data-v2-onboarding-step", "purchase-initial-membership");
   await expect(workTutorial).toContainText("Retourne à la carte, puis appuie sur « GYM de boxe »");
   const workGuideTop = await workTutorial.evaluate(element => element.getBoundingClientRect().top);
-  const workHeadingTop = await page.locator(".v2-location-card > div").first().evaluate(element => element.getBoundingClientRect().top);
+  const workHeadingTop = await page.locator(".v2-work-dashboard > .v2-work-status-card").evaluate(element => element.getBoundingClientRect().top);
   expect(workGuideTop).toBeLessThan(workHeadingTop);
   await workTutorial.locator('[data-v2-location="boxing-gym"]').click();
   await expect(gymTutorial).toContainText("Dans le GYM, appuie sur « Accueil »");
@@ -1402,7 +1473,7 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
   await expect(guideCard).toContainText("Facultatif");
 
   await guideCard.locator('[data-v2-location="boxing-gym"]').click();
-  await page.locator('[data-v2-gym-zone="coach"]').click();
+  await page.locator('.v2-gym-hotspot[data-v2-gym-zone="coach"]').click();
   await page.locator("[data-v2-coach-session]").click();
   await expect(gymTutorial).toContainText("Prévoir une journée de repos");
   await expect(gymTutorial).toContainText("Va à la maison");
@@ -1620,6 +1691,12 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   await expect(page.locator("#game > .topbar")).toBeHidden();
   const desktopMap = await page.locator(".v2-map-canvas").boundingBox();
   expect(desktopMap.width / desktopMap.height).toBeGreaterThan(1.6);
+  const desktopMapHotspotAppearance = await page.locator(".v2-map-hotspot").first().evaluate(element => ({
+    background: getComputedStyle(element).backgroundColor,
+    borderStyle: getComputedStyle(element).borderStyle,
+  }));
+  expect(desktopMapHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.56)");
+  expect(desktopMapHotspotAppearance.borderStyle).toBe("dashed");
   const gymOpener = page.getByRole("button", { name: /Entrer : GYM de boxe/ }).first();
   await gymOpener.click();
   const locationSheet = page.locator(".v2-location-sheet");
@@ -1643,6 +1720,12 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   await expect(page.locator(".v2-gym-view")).toBeVisible();
   await expect(page.locator(".v2-gym-view")).toContainText("Coach et entraîneur privé");
   await expect(page.locator(".v2-gym-floor img")).toHaveJSProperty("complete", true);
+  const desktopGymHotspotAppearance = await page.locator(".v2-gym-hotspot").first().evaluate(element => ({
+    background: getComputedStyle(element).backgroundColor,
+    borderStyle: getComputedStyle(element).borderStyle,
+  }));
+  expect(desktopGymHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.56)");
+  expect(desktopGymHotspotAppearance.borderStyle).toBe("dashed");
   await page.locator('[data-v2-gym-zone="ring"]').click();
   await expect(page.locator('[data-v2-sparring-state="available"]')).toContainText("Activité distincte");
   await expect(page.locator('[data-v2-sparring-activity="cta"]')).toBeEnabled();
@@ -1668,6 +1751,15 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   expect(v2Capsule.timeState).toEqual(timeBeforeGymDraft);
   expect(v2Capsule.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "boxing-custom")).toBe(true);
   await page.locator("[data-v2-leave-gym]").click();
+
+  await page.getByRole("button", { name: /Entrer : Maison/ }).click();
+  const desktopHomeHotspotAppearance = await page.locator(".v2-home-hotspot").first().evaluate(element => ({
+    background: getComputedStyle(element).backgroundColor,
+    borderStyle: getComputedStyle(element).borderStyle,
+  }));
+  expect(desktopHomeHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.56)");
+  expect(desktopHomeHotspotAppearance.borderStyle).toBe("dashed");
+  await page.keyboard.press("Escape");
 
   await page.locator('[data-v2-nav="inventory"]').click();
   await expect(page.locator(".v2-inventory-view")).toBeVisible();
@@ -1718,11 +1810,10 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   const mobileCoachButton = await page.locator("[data-v2-coach-session]").boundingBox();
   expect(mobileCoachButton && mobileCoachButton.height).toBeGreaterThanOrEqual(44);
   await page.locator("[data-v2-gym-menu-close]").click();
-  await page.locator('[data-v2-gym-zone="ring"]').click();
-  await page.locator('[data-v2-sparring-activity="cta"]').scrollIntoViewIfNeeded();
-  const mobileSparringButton = await page.locator('[data-v2-sparring-activity="cta"]').boundingBox();
-  expect(mobileSparringButton && mobileSparringButton.height).toBeGreaterThanOrEqual(44);
-  await page.locator("[data-v2-gym-menu-close]").click();
+  const mobileRingHotspot = page.locator('[data-v2-gym-zone="ring"]');
+  const mobileRingButton = await mobileRingHotspot.boundingBox();
+  expect(mobileRingButton && mobileRingButton.height).toBeGreaterThanOrEqual(44);
+  await expect(mobileRingHotspot).toBeDisabled();
   await page.locator("[data-v2-leave-gym]").click();
 
   await page.getByRole("button", { name: /Entrer : Maison/ }).click();
@@ -1921,7 +2012,7 @@ test("ouvre le menu développeur depuis Travail en V2 et restaure la vraie carri
   await expect(secretTile).toContainText("Vente de stupéfiants");
   await expect(secretTile).toContainText("À venir");
   expect((await secretTile.boundingBox()).height).toBeGreaterThanOrEqual(44);
-  const workFit = await page.locator('.v2-location-card[data-location="work"]').evaluate(element => ({
+  const workFit = await page.locator(".v2-work-view").evaluate(element => ({
     scrollWidth: element.scrollWidth,
     clientWidth: element.clientWidth,
     documentWidth: document.documentElement.scrollWidth,
@@ -2013,7 +2104,10 @@ test("choisit un emploi, reçoit sa paie et perd le poste après trois absences"
   await expect(workAction).toBeDisabled();
   await expect(workAction).toContainText("Choisis d’abord un emploi");
   await expect(page.locator("#job-dialog")).toBeVisible();
-  await expect(page.locator("#job-options [data-select-job]")).toHaveCount(3);
+  await expect(page.locator("#job-options")).toHaveClass(/job-board/);
+  await expect(page.locator("#job-options [data-select-job]")).toHaveCount(4);
+  await expect(page.locator('[data-select-job="office"]')).toContainText("Employé de bureau");
+  await expect(page.locator('[data-select-job="office"]')).toContainText("Longues heures · 30 capacité de semaine réservée");
   await page.locator('[data-select-job="courier"]').click();
   await expect(page.locator("#job-dialog")).not.toBeVisible();
   await expect(workAction).toBeEnabled();

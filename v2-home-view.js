@@ -327,6 +327,15 @@
       ? `data-v2-home-menu="${escapeHTML(zone.menu)}"`
       : `data-v2-home-action="${escapeHTML(zone.action)}"`;
 
+    if (zone.id === "kitchen") {
+      return `<div class="v2-home-fridge-prototype">
+        <button type="button" class="v2-home-fridge-button" data-v2-home-zone="${zone.id}" ${target}${planned}${pressed}${disabledAttributes} aria-label="${escapeHTML(zone.label)}. ${escapeHTML(detail)}.">
+          <span class="v2-home-fridge-frame" aria-hidden="true"><img class="v2-home-fridge-image v2-home-fridge-image-desktop" src="assets/maison-v2-desktop.jpg" alt=""><img class="v2-home-fridge-image v2-home-fridge-image-mobile" src="assets/maison-v2-mobile.jpg" alt=""></span>
+          <span class="v2-home-fridge-title" aria-hidden="true">Cuisine</span>
+        </button>${reason}
+      </div>`;
+    }
+
     return `<div class="v2-home-hotspot-wrap v2-home-hotspot-${zone.id}${state.planned ? " planned" : ""}">
       <button type="button" class="v2-home-hotspot" data-v2-home-zone="${zone.id}" ${target}${planned}${pressed}${disabledAttributes} aria-label="${escapeHTML(zone.label)}. ${escapeHTML(detail)}.">
         <strong>${escapeHTML(zone.label)}</strong><small>${escapeHTML(detail)}</small>

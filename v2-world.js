@@ -369,5 +369,5 @@
     return `<div class="v2-location-card" data-location="${location.id}"><div><p class="eyebrow">${objectiveHere ? "Destination recommandée" : "Lieu du quartier"}</p><h2>${escapeHTML(location.label)}</h2><p>${escapeHTML(location.detail)}</p></div><div class="v2-location-status"><span>État du lieu</span><strong>${escapeHTML(locationStatus(location, career))}</strong></div>${workContent}<p class="v2-location-preview-note">${previewNote}</p><button class="secondary-button" type="button" data-v2-close-location>Retour à la carte</button></div>`;
   }
 
-  return Object.freeze({ LOCATIONS, preparation, onboardingObjective, objective, renderObjectiveCard, renderLocationGuide, isFirstJobRequired, nextAppointment, locationStatus, render, renderLocation });
+  return Object.freeze({ LOCATIONS, preparation, onboardingObjective, objective, renderObjectiveCard, renderLocationGuide, renderWorkDeveloperTile: workDeveloperTile, isFirstJobRequired, nextAppointment, locationStatus, render, renderLocation });
 });
