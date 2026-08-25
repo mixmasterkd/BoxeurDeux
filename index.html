@@ -95,168 +95,8 @@
     </dialog>
 
     <main id="game" class="game-shell hidden">
-      <section id="v2-world" class="v2-world" hidden aria-label="Carte de carrière V2"></section>
-
-      <header class="topbar">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">B2</span>
-          <div>
-            <p class="eyebrow">Gestion de carrière</p>
-            <h1>Boxeur Deux</h1>
-          </div>
-        </div>
-        <div class="week-block" aria-label="État de la semaine">
-          <span class="week-label">Semaine</span>
-          <strong id="week">01</strong>
-          <span id="top-date" class="top-date">5 janv. 2026</span>
-        </div>
-        <div class="top-vitals" aria-label="Jauges rapides">
-          <span id="top-energy" class="top-energy" aria-label="Énergie 72 %">E:72%</span>
-          <span id="top-fitness" class="top-fitness" aria-label="Forme physique 68 %">Fo:68%</span>
-          <span id="top-fatigue" class="top-fatigue" aria-label="Fatigue 0 %">Fa:0%</span>
-          <span id="top-morale" class="top-morale" aria-label="Moral 68 %">M:68%</span>
-          <span id="top-money" class="top-money" aria-label="Argent disponible">0$</span>
-        </div>
-      </header>
-
-      <section class="fighter-card" aria-labelledby="fighter-name">
-        <div id="fighter-portrait" class="portrait portrait-crop" role="img" aria-label="Portrait du boxeur"><img id="fighter-portrait-image" src="assets/portraits-hommes.webp" width="1152" height="768" alt="" /></div>
-        <div class="fighter-copy">
-          <p id="fighter-meta" class="eyebrow">Amateur · En développement</p>
-          <h2 id="fighter-name">Ton boxeur</h2>
-          <p id="career-records">Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">0 V · 0 D · 0 N</span></p>
-          <button id="edit-profile" class="fighter-edit-button" type="button">Modifier le profil</button>
-        </div>
-        <div class="money-spotlight">
-          <span>Disponible</span>
-          <strong id="money-spotlight">0 $</strong>
-        </div>
-        <div class="actions-counter">
-          <span>Plan de la semaine</span>
-          <div id="action-pips" class="pips" aria-label="3 actions restantes"></div>
-        </div>
-        <div id="fighter-next-fight" class="fighter-next-fight"></div>
-        <div id="career-medals" class="career-medals"></div>
-      </section>
-
-      <div class="dashboard-grid">
-        <section class="panel stats-panel" aria-labelledby="stats-title">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">État actuel</p>
-              <h2 id="stats-title">Le tableau de bord</h2>
-            </div>
-            <div class="panel-heading-actions">
-              <button id="export-career" class="text-button" type="button">Exporter</button>
-              <button id="restart" class="text-button" type="button">Recommencer</button>
-            </div>
-          </div>
-          <div class="level-strip" aria-live="polite">
-            <div><span>Niveau</span><strong id="level">1</strong></div>
-            <div class="level-xp"><span id="xp-progress">XP 0 / 100</span><div class="meter"><div id="xp-meter-fill" class="meter-fill"></div></div></div>
-            <span id="level-notice" class="level-notice" hidden></span>
-            <button id="open-level-dialog" class="secondary-button" type="button" disabled><span id="level-button-label">Points :</span> <span id="level-points">0</span></button>
-          </div>
-          <div id="stats" class="stats-grid"></div>
-          <div class="combat-heading">
-            <p class="eyebrow">Profil de combat</p>
-            <span id="fighter-style-label"></span>
-          </div>
-          <div id="combat-stats" class="combat-stats"></div>
-        </section>
-
-      </div>
-
-      <div class="management-grid">
-        <div class="management-column career-column">
-          <section class="membership-panel calendar-launch-panel" aria-labelledby="calendar-launch-title">
-            <div class="membership-copy">
-              <p class="eyebrow">Progression compétitive</p>
-              <h2 id="calendar-launch-title">Calendrier des combats</h2>
-              <p id="calendar-launch-copy">Le parcours compétitif apparaîtra après le sparring d’évaluation.</p>
-            </div>
-            <div id="calendar-summary" class="membership-status"></div>
-            <button id="open-calendar" class="membership-button" type="button">Choisir un combat</button>
-          </section>
-
-          <section class="coaching-panel employment-panel" aria-labelledby="employment-title">
-            <div class="section-heading"><div><p class="eyebrow">Carrière et finances</p><h2 id="employment-title">Emploi</h2></div><p>Une action Travail représente la semaine de travail et verse la paie hebdomadaire. Les emplois plus payants demandent davantage d’énergie.</p></div>
-            <div id="employment" class="private-coaching"></div>
-          </section>
-
-      <section class="membership-panel" aria-labelledby="membership-title">
-        <div class="membership-copy">
-          <p class="eyebrow">Accès au camp</p>
-          <h2 id="membership-title">GYM de boxe</h2>
-          <p>Mitaines, défense et sparring.</p>
-        </div>
-        <div id="membership-status" class="membership-status"></div>
-        <button id="membership-button" class="membership-button" type="button"></button>
-        <div id="boxing-gym-services" class="gym-services"></div>
-      </section>
-
-      <section class="membership-panel strength-membership-panel" aria-labelledby="strength-membership-title">
-        <div class="membership-copy"><p class="eyebrow">Préparation physique</p><h2 id="strength-membership-title">Gym de musculation</h2><p>Exercices, préparateurs et boutique.</p></div>
-        <div id="strength-membership-status" class="membership-status"></div>
-        <button id="strength-membership-button" class="membership-button" type="button"></button>
-        <div id="strength-gym-services" class="gym-services"></div>
-      </section>
-
-      <section class="coaching-panel" aria-labelledby="coaching-title">
-        <div class="section-heading"><div><p class="eyebrow">Progression ciblée</p><h2 id="coaching-title">Coachs privés</h2></div><p>GYM de boxe : rabais de 10 $ sur les coachs de boxe. Gym de musculation : accès obligatoire aux préparateurs physiques.</p></div>
-        <div id="private-coaching" class="private-coaching"></div>
-      </section>
-        </div>
-      </div>
-
-      <div class="weekly-layout">
-      <section class="actions-section" aria-labelledby="actions-title">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Planifier la semaine</p>
-            <h2 id="actions-title">Compose ton programme</h2>
-          </div>
-          <p id="action-limit-help">Chaque choix compte. La semaine se termine après trois actions.</p>
-        </div>
-        <div id="action-grid" class="action-groups"></div>
-      </section>
-
-      <section class="plan-panel" aria-labelledby="plan-title">
-        <div class="plan-heading">
-          <div><p class="eyebrow">Aperçu avant confirmation</p><h2 id="plan-title">Plan hebdomadaire</h2></div>
-          <span id="plan-count" class="plan-count">0 / 3 actions</span>
-        </div>
-        <div id="plan-content"></div>
-        <div class="plan-footer">
-          <p id="plan-help">Sélectionne au moins une action pour continuer.</p>
-          <div class="plan-footer-actions">
-            <button id="advance-week" class="primary-button advance-button" type="button" disabled>Passer à la semaine suivante</button>
-            <div id="plan-fight-actions" class="plan-fight-actions" hidden>
-              <button id="plan-withdraw-fight" class="secondary-button withdraw-button" type="button">Se désister</button>
-              <button id="plan-start-fight" class="primary-button" type="button">Entrer dans le ring</button>
-            </div>
-          </div>
-        </div>
-      </section>
-      </div>
+      <section id="v2-world" class="v2-world" hidden aria-label="Carte de carrière"></section>
     </main>
-
-    <dialog id="profile-dialog" class="service-dialog profile-dialog" aria-labelledby="profile-dialog-title">
-      <form id="profile-form" class="service-card">
-        <div class="service-heading"><div><p class="eyebrow">Fiche du boxeur</p><h2 id="profile-dialog-title">Modifier le profil</h2></div><button id="profile-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
-        <div class="profile-form-grid">
-          <label>Prénom<input id="edit-first-name" autocomplete="given-name" required maxlength="30" /></label>
-          <label>Nom<input id="edit-last-name" autocomplete="family-name" required maxlength="30" /></label>
-          <label>Surnom<input id="edit-nickname" required maxlength="30" /></label>
-          <label>Division<input id="edit-sex-label" readonly /></label>
-          <label>Catégorie de poids<select id="edit-weight-class" required></select></label>
-          <label>Portrait<select id="edit-portrait"><option value="0">Portrait 1</option><option value="1">Portrait 2</option><option value="2">Portrait 3</option></select></label>
-          <label>Coin de combat<select id="edit-corner"><option value="red">Coin rouge</option><option value="blue">Coin bleu</option></select></label>
-        </div>
-        <p id="profile-edit-note" class="service-lead">Le style de base et ses points restent inchangés.</p>
-        <div class="service-actions"><button id="profile-cancel" class="secondary-button" type="button">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div>
-      </form>
-    </dialog>
 
     <dialog id="division-migration-dialog" class="service-dialog migration-dialog" aria-labelledby="division-migration-title">
       <form id="division-migration-form" class="service-card">
@@ -323,17 +163,6 @@
       </div>
     </dialog>
 
-    <dialog id="private-dialog" class="service-dialog" aria-labelledby="private-dialog-title">
-      <form id="private-form" method="dialog" class="service-card">
-        <div class="service-heading"><div><p class="eyebrow">Coaching privé</p><h2 id="private-dialog-title">Choisir un spécialiste</h2></div><button class="dialog-close" value="cancel" aria-label="Fermer" formnovalidate>×</button></div>
-        <p id="private-dialog-copy" class="service-lead">Les coachs de boxe travaillent technique et défense. Les préparateurs physiques travaillent puissance et cardio.</p>
-        <div id="private-coach-options" class="coach-menu-grid"></div>
-        <label id="private-stat-field" hidden>Qualité travaillée<select id="private-stat"></select></label>
-        <div id="private-dialog-effect" class="service-effect"></div>
-        <div class="service-actions"><button class="secondary-button" value="cancel" formnovalidate>Annuler</button><button id="private-confirm" class="primary-button" value="default" disabled>Payer le premier cours</button></div>
-      </form>
-    </dialog>
-
     <dialog id="job-dialog" class="service-dialog" aria-labelledby="job-dialog-title">
       <div class="service-card">
         <div class="service-heading"><div><p class="eyebrow">Carrière et finances</p><h2 id="job-dialog-title">Choisir un emploi</h2></div><button id="job-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
@@ -349,15 +178,6 @@
         <p id="membership-dialog-copy" class="service-lead">Le GYM est le centre de l’entraînement de boxe : mitaines, défense, cours de groupe et sparring.</p>
         <div id="membership-options" class="coach-menu-grid"></div>
         <div class="service-actions"><button id="membership-dialog-cancel" class="secondary-button" type="button">Fermer</button></div>
-      </div>
-    </dialog>
-
-    <dialog id="strength-membership-dialog" class="service-dialog" aria-labelledby="strength-membership-dialog-title">
-      <div class="service-card">
-        <div class="service-heading"><div><p class="eyebrow">Préparation physique</p><h2 id="strength-membership-dialog-title">Choisir un forfait</h2></div><button id="strength-membership-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
-        <p id="strength-membership-dialog-copy" class="service-lead">Le gym de musculation débloque les exercices, la boutique et les préparateurs physiques. Pour le calendrier du jeu, un mois représente quatre semaines.</p>
-        <div id="strength-membership-options" class="coach-menu-grid"></div>
-        <div class="service-actions"><button id="strength-membership-dialog-cancel" class="secondary-button" type="button">Fermer</button></div>
       </div>
     </dialog>
 
@@ -381,16 +201,6 @@
         <div id="amateur-transition" class="pro-transition" hidden></div>
         <div id="pro-transition" class="pro-transition"></div>
         <div class="service-actions calendar-dialog-actions"><button id="calendar-dialog-done" class="primary-button" type="button">Fermer le calendrier</button></div>
-      </div>
-    </dialog>
-
-    <dialog id="summary-dialog" class="service-dialog summary-dialog" aria-labelledby="summary-title">
-      <div class="service-card">
-        <div class="service-heading">
-          <div><p class="eyebrow">Semaine terminée</p><h2 id="summary-title">Bilan</h2></div>
-        </div>
-        <div id="summary-content" class="summary-content"></div>
-        <div class="service-actions"><button id="summary-close" class="primary-button" type="button">Continuer</button></div>
       </div>
     </dialog>
 

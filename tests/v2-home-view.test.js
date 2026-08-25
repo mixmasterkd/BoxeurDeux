@@ -26,7 +26,6 @@ function baseContext(overrides = {}) {
       "home-quick": { available: true },
       "home-custom": { available: true },
       meal: { available: true },
-      "play-v1": { available: true },
     },
     ...overrides,
   };
@@ -34,8 +33,8 @@ function baseContext(overrides = {}) {
 
 test("expose la même API pure en CommonJS et dans le navigateur", () => {
   assert.equal(globalThis.BoxeurHomeView, homeView);
-  assert.equal(homeView.ZONES.length, 5);
-  assert.deepEqual(homeView.ACTIONS.map(action => action.id), ["rest", "home-quick", "home-custom", "roadwork-short", "roadwork-long", "roadwork-intervals", "meal", "play-v1"]);
+  assert.equal(homeView.ZONES.length, 4);
+  assert.deepEqual(homeView.ACTIONS.map(action => action.id), ["rest", "home-quick", "home-custom", "roadwork-short", "roadwork-long", "roadwork-intervals", "meal"]);
   assert.deepEqual(homeView.ACTION_GROUPS.map(group => group.id), ["training", "running", "kitchen"]);
   assert.equal(typeof homeView.normalizePlan, "function");
   assert.equal(typeof homeView.normalizeWeekCapacity, "function");
@@ -51,12 +50,12 @@ test("emploie le gabarit partagé des lieux V2", () => {
   assert.match(html, /v2-home-week-plan v2-place-week-plan/);
 });
 
-test("conserve les deux illustrations et les cinq hotspots interactifs", () => {
+test("conserve les deux illustrations et les quatre hotspots interactifs", () => {
   const html = homeView.render(baseContext());
 
   assert.match(html, /assets\/maison-v2-desktop\.jpg/);
   assert.match(html, /assets\/maison-v2-mobile\.jpg/);
-  assert.equal((html.match(/data-v2-home-zone=/g) || []).length, 5);
+  assert.equal((html.match(/data-v2-home-zone=/g) || []).length, 4);
   for (const zone of homeView.ZONES) {
     const target = zone.menu ? `data-v2-home-menu="${zone.menu}"` : `data-v2-home-action="${zone.action}"`;
     assert.match(html, new RegExp(`<button[^>]+type="button"[^>]+data-v2-home-zone="${zone.id}"[^>]+${target}`));
@@ -136,7 +135,7 @@ test("reconnaît les activityId produits par le planificateur hebdomadaire", () 
   }]);
 });
 
-test("un programme complet bloque les nouveaux choix, mais pas le loisir ni un choix à retirer", () => {
+test("un programme complet bloque les nouveaux choix, mais pas un choix à retirer", () => {
   const context = homeView.normalizeContext(baseContext({
     careerStatus: "amateur",
     plan: { entries: [{ actionId: "rest" }, { actionId: "work" }, { actionId: "boxing-quick" }] },
@@ -150,12 +149,8 @@ test("un programme complet bloque les nouveaux choix, mais pas le loisir ni un c
     assert.equal(context.actions[actionId].available, false);
     assert.match(context.actions[actionId].reason, /programme de la semaine est complet/i);
   }
-  assert.equal(context.actions["play-v1"].available, true);
-  assert.equal(context.actions["play-v1"].planned, false);
-
   const html = homeView.render(context);
   assert.match(html, /Programme complet/);
-  assert.match(html, /data-v2-home-action="play-v1"[^>]*(?!disabled)/);
 });
 
 test("la séance maison personnalisée reste visible et verrouillée seulement au statut récréatif", () => {
@@ -200,33 +195,14 @@ test("les menus gardent les commandes de planification et séparent les activit�
     homeView.renderMenu("kitchen", context),
   ].join("\n");
 
-  for (const actionId of ["rest", "home-quick", "home-custom", "roadwork-short", "roadwork-long", "roadwork-intervals", "meal", "play-v1"]) {
+  for (const actionId of ["rest", "home-quick", "home-custom", "roadwork-short", "roadwork-long", "roadwork-intervals", "meal"]) {
     assert.match(html, new RegExp(`data-v2-home-action="${actionId}"`));
   }
   assert.match(html, /Ajouter à la semaine/);
   assert.match(html, /Préparer pour la semaine/);
   assert.match(html, /18 \$ · soutien modeste/);
-  assert.match(html, /Jouer à BoxeurDeux classique/);
+  assert.doesNotMatch(html, /BoxeurDeux classique|play-v1/);
   assert.doesNotMatch(html, /data-v2-home-action="(?:sleep|recover|jogging|shadow-boxing|basement-bag|advance)"/);
-});
-
-test("jouer à la V1 est systématiquement exclu du plan et de sa capacité", () => {
-  const plan = homeView.normalizePlan({
-    entries: [
-      { actionId: "play-v1" },
-      { actionId: "rest" },
-      { actionId: "souvenir", countsTowardCapacity: false },
-    ],
-  });
-  const capacity = homeView.normalizeWeekCapacity({}, plan);
-
-  assert.deepEqual(plan.homeActionIds, ["rest"]);
-  assert.equal(plan.entryCount, 1);
-  assert.equal(capacity.used, 1);
-
-  const html = homeView.render(baseContext({ plan: { entries: [{ actionId: "play-v1" }] } }));
-  const playButton = html.match(/<button[^>]+data-v2-home-action="play-v1"[^>]*>/)?.[0] || "";
-  assert.doesNotMatch(playButton, /aria-pressed|data-v2-home-planned/);
 });
 
 test("accepte les formes compactes de capacité et les alias d’anciens plans", () => {

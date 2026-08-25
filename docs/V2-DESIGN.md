@@ -323,7 +323,7 @@ En amateur, il n'y a aucun match nul. Les combats locaux utilisent trois juges e
 
 Le premier emploi demeure obligatoire au début de la carrière. Sa fenêtre initiale n'offre ni fermeture ni annulation, ne se ferme pas par clic à l'extérieur ou avec la touche Échap et bloque l'avancement tant qu'un emploi n'a pas été choisi. L'emploi est ensuite proposé par défaut dans chaque semaine, mais le joueur peut le retirer avant de confirmer son programme. Retrouver un emploi après une perte demeure facultatif.
 
-La semaine de travail réserve automatiquement une partie de l'énergie hebdomadaire. La paie et la fatigue normale sont simulées sans exiger un clic répétitif. Retirer le travail rembourse cette énergie, supprime la paie et compte comme une absence. Une présence remet le dossier d'assiduité en règle; trois semaines consécutives sans travailler entraînent le congédiement et l'indemnité de vacances V1 applicable.
+La semaine de travail réserve automatiquement une partie de l'énergie hebdomadaire. La paie et la fatigue normale sont simulées sans exiger un clic répétitif. Retirer le travail rembourse cette énergie, supprime la paie et compte comme une absence. Une présence remet le dossier d'assiduité en règle; trois semaines consécutives sans travailler entraînent le congédiement et l'indemnité de vacances historique applicable.
 
 En cas de conflit avec un combat, un déplacement ou une séance réservée, le jeu pourra proposer :
 
@@ -606,7 +606,7 @@ Les scènes sont validées au minimum en 1440 × 900, 1280 × 720, 390 × 844, 3
 
 La V2 doit ouvrir les sauvegardes actuelles sans supprimer de progression. La migration est versionnée, idempotente et testée sur plusieurs profils : récréatif, amateur débutant, tournoi actif, carrière avancée, sans emploi et profil professionnel de test.
 
-La V2 est ouverte directement, sans paramètre d'URL. Sa capsule écrit uniquement les champs durables prévus dans la sauvegarde principale et conserve séparément son historique détaillé. L'ordinateur de la maison permet d'ouvrir la V1 comme jeu classique, sans faire avancer l'horloge V2. Une carrière déjà avancée ne repasse pas par l'abonnement et l'emploi bloquants destinés uniquement à une nouvelle carrière.
+Le jeu actuel est ouvert directement, sans paramètre d'URL ni ancienne interface parallèle. Sa capsule écrit uniquement les champs durables prévus dans la sauvegarde principale et conserve séparément son historique détaillé. Une carrière déjà avancée ne repasse pas par l'abonnement et l'emploi bloquants destinés uniquement à une nouvelle carrière.
 
 Principes de conversion :
 
@@ -619,7 +619,7 @@ Principes de conversion :
 - conserver les champs historiques nécessaires à l'importation, mais ne plus les utiliser comme source active après migration;
 - exporter directement au nouveau format tout en important les anciennes versions.
 
-La capsule additive et la sauvegarde principale servent de mécanisme de retour contrôlé pendant la transition. Le moteur de combat reste lançable directement par le menu développeur jusqu'à ce que son raccord complet au calendrier et la comparaison d'équilibre soient acceptés. La V1 ne sera retirée qu'après validation de la migration, des importations et exportations et de l'absence de progression doublée.
+La capsule additive et la sauvegarde principale assurent la compatibilité des carrières pendant la transition. Le moteur de combat reste lançable directement par le menu développeur jusqu'à ce que son raccord complet au calendrier et la comparaison d'équilibre soient acceptés. Les anciens formats restent importables, mais l'ancien jeu n'est plus exécutable.
 
 ## 12. Suppression des systèmes inutiles ou obsolètes
 
@@ -759,7 +759,7 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 ### Compatibilité
 
 - Toutes les sauvegardes de test migrent et peuvent être exportées puis réimportées.
-- La V1 demeure utilisable et son instantané de retour n'est jamais modifié par la capsule V2.
+- Les anciennes sauvegardes restent importables sans réactiver l'ancienne interface.
 - Les carrières récréatives, amateurs, en tournoi et avancées reprennent à un état cohérent.
 - Emplois, vacances, abonnements, blessures, argent, réputation, statistiques et bilans sont préservés.
 - Le reste du jeu ne dépend plus d'un champ ou d'un écran déclaré obsolète.

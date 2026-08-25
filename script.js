@@ -12,21 +12,18 @@ const STRENGTH_GYM_MONTH_WEEKS = 4;
 const STRENGTH_GYM_THREE_MONTH_WEEKS = 12;
 const STRENGTH_GYM_SIX_MONTH_WEEKS = 24;
 const STRENGTH_GYM_YEAR_WEEKS = 48;
-const PRIVATE_PRICE = 90;
 const TOURNAMENT_PREP_WEEKS = 4;
 const RECREATIONAL_START_DATE = "2026-09-07";
 const RECREATIONAL_SPARRING_WEEK = 6;
 const RECREATIONAL_MAX_WEEK = 10;
 const SAVE_KEY = "boxeur-deux-career-v2";
-const CLASSIC_GAME_ACTIVE = new URLSearchParams(window.location.search).get("classic") === "1";
 const DEV_RETURN_SAVE_KEY = `${SAVE_KEY}-dev-return`;
 const DEV_TEST_ACTIVE_KEY = `${SAVE_KEY}-dev-active`;
 const DEV_UNLOCK_CODE = "128";
 const SAVE_VERSION = 5;
-const V2_ACTIVE = !CLASSIC_GAME_ACTIVE;
 const V2_PREVIEW_SAVE_KEY = `${SAVE_KEY}-v2-preview`;
 const MAX_SUPPLEMENTS_PER_WEEK = 2;
-const SPONSOR_COOLDOWN_WEEKS = 4;
+const MAX_LEGACY_PLAN_ITEMS = 32;
 const FIRST_PAID_VACATION_WEEKS = 8;
 const PAID_VACATION_INTERVAL_WEEKS = 12;
 const MAX_PAID_VACATION_WEEKS = 3;
@@ -165,18 +162,20 @@ const tournamentNamesFemale = [
 ];
 const tournamentStyles = ["Pression", "Boxeur mobile", "Contre-attaquant", "Puncheur", "Défensif", "Complet"];
 
-const privateCoaches = [
-  { id: "renard", type: "boxing", name: "Luc Renard", nickname: "Le Méthodique", targets: ["technique", "defense"], price: 100, sessions: 4, reward: 1, fatigue: 10, fitness: 3, morale: 1 },
-  { id: "morin", type: "boxing", name: "Étienne Morin", nickname: "Le Professeur", targets: ["technique"], price: 125, sessions: 4, reward: 1, fatigue: 9, fitness: 3, morale: 2 },
-  { id: "clarke", type: "boxing", name: "Malik Clarke", nickname: "Le Rempart", targets: ["defense"], price: 130, sessions: 4, reward: 1, fatigue: 8, fitness: 3, morale: 2 },
-  { id: "diaz", type: "boxing", name: "Sofia Diaz", nickname: "La Pédagogue", targets: ["technique", "defense"], price: 175, sessions: 5, reward: 2, fatigue: 7, fitness: 4, morale: 3 },
-  { id: "petrov", type: "boxing", name: "Aleksandar Petrov", nickname: "Le Maître", targets: ["technique", "defense"], price: 310, sessions: 6, reward: 3, fatigue: 6, fitness: 4, morale: 3 },
-  { id: "okoro", type: "physical", name: "Emmanuel Okoro", nickname: "Le Préparateur", targets: ["power", "cardio"], price: 110, sessions: 4, reward: 1, fatigue: 7, fitness: 6, morale: 1 },
-  { id: "silva", type: "physical", name: "Mateo Silva", nickname: "Explosif", targets: ["power"], price: 135, sessions: 4, reward: 1, fatigue: 9, fitness: 6, morale: 1 },
-  { id: "kim", type: "physical", name: "Noah Kim", nickname: "Le Moteur", targets: ["cardio"], price: 135, sessions: 4, reward: 1, fatigue: 7, fitness: 7, morale: 1 },
-  { id: "tremblay", type: "physical", name: "Mélanie Tremblay", nickname: "La Science", targets: ["power", "cardio"], price: 185, sessions: 5, reward: 2, fatigue: 6, fitness: 7, morale: 2 },
-  { id: "dubois", type: "physical", name: "Victor Dubois", nickname: "Haute Performance", targets: ["power", "cardio"], price: 325, sessions: 6, reward: 3, fatigue: 5, fitness: 8, morale: 2 },
-];
+// Catalogue minimal utilisé uniquement pour convertir les anciens programmes
+// privés vers le système d'entraîneur actuel.
+const LEGACY_PRIVATE_COACHES = Object.freeze([
+  { id: "renard", name: "Luc Renard", targets: ["technique", "defense"], price: 100, sessions: 4, reward: 1 },
+  { id: "morin", name: "Étienne Morin", targets: ["technique"], price: 125, sessions: 4, reward: 1 },
+  { id: "clarke", name: "Malik Clarke", targets: ["defense"], price: 130, sessions: 4, reward: 1 },
+  { id: "diaz", name: "Sofia Diaz", targets: ["technique", "defense"], price: 175, sessions: 5, reward: 2 },
+  { id: "petrov", name: "Aleksandar Petrov", targets: ["technique", "defense"], price: 310, sessions: 6, reward: 3 },
+  { id: "okoro", name: "Emmanuel Okoro", targets: ["power", "cardio"], price: 110, sessions: 4, reward: 1 },
+  { id: "silva", name: "Mateo Silva", targets: ["power"], price: 135, sessions: 4, reward: 1 },
+  { id: "kim", name: "Noah Kim", targets: ["cardio"], price: 135, sessions: 4, reward: 1 },
+  { id: "tremblay", name: "Mélanie Tremblay", targets: ["power", "cardio"], price: 185, sessions: 5, reward: 2 },
+  { id: "dubois", name: "Victor Dubois", targets: ["power", "cardio"], price: 325, sessions: 6, reward: 3 },
+]);
 
 const jobs = Object.freeze([
   { id: "convenience", title: "Commis de dépanneur", schedule: "Horaire souple", wage: 75, interviewWeeks: 1, energy: -14, fatigue: 10, morale: -1, injury: 0, detail: "La solution la moins payante, mais la plus facile à concilier avec le camp." },
@@ -270,22 +269,6 @@ const INITIAL_STATE = {
   lastFightWeek: 0,
   journal: [],
 };
-
-const generalStats = [
-  { key: "money", label: "Argent", suffix: " $", max: 500, className: "money" },
-  { key: "energy", label: "Énergie", suffix: "%" },
-  { key: "fatigue", label: "Fatigue", suffix: "%", className: "fatigue" },
-  { key: "fitness", label: "Forme physique", suffix: "%" },
-  { key: "morale", label: "Moral", suffix: "%" },
-  { key: "reputation", label: "Réputation", suffix: "%", className: "reputation" },
-  { key: "injury", label: "Risque de blessure", suffix: "%", className: "injury" },
-];
-
-const actionCategories = [
-  { id: "training", label: "Préparation et technique", hint: "Développe les qualités qui feront la différence dans le ring." },
-  { id: "recovery", label: "Récupération", hint: "Protège ton énergie, ta forme et ton corps." },
-  { id: "career", label: "Carrière et finances", hint: "Finance le camp, développe ta réputation et garde le moral." },
-];
 
 const betweenWeekEvents = [
   {
@@ -393,32 +376,6 @@ function betweenWeekEventById(eventId) {
   return allBetweenWeekEvents.find(event => event.id === eventId);
 }
 
-const actions = [
-  { id: "gym", category: "training", icon: "T", title: "Travail aux mitaines", detail: "+12 XP · +5 forme · −18 énergie · +12 fatigue", progressStat: "technique", requiresGym: true, changes: { fitness: 5, energy: -18, injury: 3, experience: 12 }, message: "Le travail aux mitaines affine les gestes et les enchaînements." },
-  { id: "group-class", category: "training", icon: "G", title: "Cours de groupe", detail: "+10 XP · +4 forme · −15 énergie · +11 fatigue", requiresGym: true, changes: { fitness: 4, energy: -15, injury: 2, experience: 10, morale: 2 }, message: "Le cours de groupe donne des repères simples, du rythme et l’habitude du gym." },
-  { id: "home-bag", category: "training", icon: "D", title: "Sac au sous-sol", detail: "+6 XP · +2 forme · −12 énergie · +9 fatigue", changes: { fitness: 2, energy: -12, injury: 1, experience: 6 }, message: "Au sous-sol, le sac permet de garder les gestes de base quand le GYM n’est pas accessible." },
-  { id: "private", category: "training", icon: "P", title: "Séance privée", detail: "Programme privé requis", requiresPrivateProgram: true, message: "Un cours privé fait avancer ton programme individuel." },
-  { id: "sparring", category: "training", icon: "S", title: "Sparring", detail: "+18 XP · +4 forme · −24 énergie · +22 fatigue · +12 risque", requiresGym: true, changes: { experience: 18, fitness: 4, energy: -24, injury: 12, reputation: 2 }, message: "Les rounds de sparring donnent de l’expérience réelle, mais le corps encaisse." },
-  { id: "roadwork", category: "training", icon: "C", title: "Course matinale", detail: "+9 XP · +5 forme · −16 énergie · +14 fatigue", changes: { fitness: 5, energy: -16, injury: 2, experience: 9 }, message: "La course construit la base physique nécessaire aux longs combats." },
-  { id: "heavybag", category: "training", icon: "D", title: "Défense et esquives", detail: "+11 XP · +4 forme · −17 énergie · +15 fatigue", progressStat: "defense", requiresGym: true, changes: { fitness: 4, energy: -17, injury: 3, experience: 11 }, message: "Les répétitions défensives améliorent les esquives et les blocages." },
-  { id: "video", category: "training", icon: "V", title: "Étude vidéo", detail: "+8 XP · −7 énergie · +1 moral · +4 fatigue", changes: { experience: 8, energy: -7, morale: 1 }, message: "L’étude vidéo affine ta compréhension du ring." },
-  { id: "strength-power", category: "training", icon: "M", title: "Musculation", detail: "+10 XP · +5 forme · −18 énergie · +18 fatigue · +5 risque", progressStat: "power", requiresStrengthGym: true, changes: { experience: 10, fitness: 5, energy: -18, injury: 5 }, message: "La musculation construit progressivement une puissance plus utile dans le ring." },
-  { id: "strength-circuit", category: "training", icon: "C", title: "Cardio sur appareils", detail: "Rameur, vélo et tapis · +10 XP · +5 forme · −20 énergie · +16 fatigue", progressStat: "cardio", requiresStrengthGym: true, changes: { experience: 10, fitness: 5, energy: -20, injury: 3 }, message: "Le travail sur rameur, vélo et tapis développe l’endurance du boxeur." },
-  { id: "rest", category: "recovery", icon: "Z", title: "Repos", detail: "+24 énergie · −20 fatigue · −7 risque · +4 moral", changes: { energy: 24, injury: -7, morale: 4 }, message: "Une vraie journée de repos remet le corps d'aplomb." },
-  { id: "eat", category: "recovery", icon: "+", title: "Bien manger", detail: "35 $ · +12 énergie · +4 forme · +2 moral", cost: 35, changes: { money: -35, energy: 12, fitness: 4, morale: 2 }, message: "Un bon repas nourrit la récupération autant que le moral." },
-  { id: "physio", category: "recovery", icon: "T", title: "Physiothérapie", detail: "55 $ · −16 risque · +8 énergie · +2 forme · accélère la guérison", cost: 55, changes: { money: -55, injury: -16, injuryWeeks: -1, energy: 8, fitness: 2 }, message: "Le traitement du physiothérapeute calme les douleurs avant qu'elles ne s'installent." },
-  { id: "spa", category: "recovery", icon: "R", title: "Spa et récupération", detail: "65 $ · +38 énergie · −20 risque · +6 moral", cost: 65, changes: { money: -65, energy: 38, injury: -20, morale: 6 }, message: "Le protocole de récupération remet le corps et la tête en état." },
-  { id: "work", category: "career", icon: "$", title: "Travailler", detail: "Emploi requis · paie hebdomadaire et fatigue selon le poste", requiresJob: true, message: "La semaine de travail paie les factures, mais peut laisser les jambes lourdes." },
-  { id: "interview", category: "career", icon: "E", title: "Passer des entrevues", detail: "Candidature requise · −3 énergie · +1 moral", changes: { energy: -3, morale: 1 }, message: "Une entrevue fait avancer la candidature vers un nouvel emploi." },
-  { id: "vacation", category: "career", icon: "☼", title: "Vacances payées", detail: "Congé payé · récupération sans perdre ton emploi · hors limite d’actions", requiresJob: true, message: "Une semaine de congé payé protège le corps sans couper le revenu." },
-  { id: "promotion", category: "career", icon: "M", title: "Promotion locale", detail: "20 $ · +8 réputation · +3 moral · −10 énergie", cost: 20, changes: { money: -20, reputation: 8, morale: 3, energy: -10 }, message: "Quelques apparitions locales font circuler ton nom dans le quartier." },
-  { id: "family", category: "career", icon: "F", title: "Temps avec les proches", detail: "+9 moral · +6 énergie", changes: { morale: 9, energy: 6 }, message: "Une soirée avec les proches remet la carrière en perspective." },
-  { id: "sponsor", category: "career", icon: "$+", title: "Petite commandite", detail: "+85 $ · +2 réputation · −12 énergie · −2 moral · délai de 4 semaines", requiresReputation: 30, changes: { money: 85, reputation: 2, morale: -2, energy: -12 }, message: "Une entreprise locale finance une partie du camp en échange d'une apparition promotionnelle." },
-  { id: "drug-sales", category: "career", icon: "!", title: "Vente de stupéfiants", detail: "À venir · risques judiciaires et semaines de détention dans une future version", future: true, message: "Cette activité n’est pas encore disponible." },
-];
-
-const actionFatigue = { gym: 12, "group-class": 11, "home-bag": 9, private: 10, sparring: 22, roadwork: 14, heavybag: 15, video: 4, "strength-power": 18, "strength-circuit": 16, rest: -20, eat: 2, physio: -10, spa: -25, work: 18, interview: 1, promotion: 6, family: -4, sponsor: 8 };
-
 const strengthGymProducts = [
   { id: "protein-bar", label: "Barre protéinée", price: 10, effect: "+3 E · −1 Fa · +1 M", changes: { energy: 3, fatigue: -1, morale: 1 } },
   { id: "sports-drink", label: "Boisson sportive", price: 14, effect: "+6 E · −2 Fa", changes: { energy: 6, fatigue: -2 } },
@@ -442,11 +399,10 @@ window.addEventListener("unhandledrejection", event => {
 
 let state = cloneData(INITIAL_STATE);
 let draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
-let weeklyPlan = [];
+let legacyPendingPlanForMigration = [];
 let toastTimer;
 let fightState = null;
 let sparringRingState = null;
-let selectedPrivateCoachId = null;
 let draftPortraitId = 0;
 let drugSalesTapCount = 0;
 let resumeCareerAlertsAfterLevelDialog = false;
@@ -455,7 +411,6 @@ let v2ComposerSelection = [];
 let v2StrengthSelection = [];
 let v2HomeSelection = [];
 let v2TrainerTarget = "technique";
-let v2PendingTraining = null;
 let developerBoutScheduledBackup = null;
 
 const clamp = (value, min = 0, max = 100) => Math.min(max, Math.max(min, value));
@@ -638,20 +593,40 @@ function normalizeCareerState(source) {
     normalized.supplementWeek = normalized.week;
     normalized.supplementsUsed = [];
   }
-  const coach = privateCoaches.find(item => item.id === source.privateProgram?.coachId);
+  const coach = LEGACY_PRIVATE_COACHES.find(item => item.id === source.privateProgram?.coachId);
   const target = source.privateProgram?.target;
-  normalized.privateProgram = coach && coach.targets.includes(target) ? {
+  const legacyPrivateProgram = coach && coach.targets.includes(target) ? {
     coachId: coach.id,
     target,
     sessionsCompleted: safeNumber(source.privateProgram.sessionsCompleted, 0, 0, Math.max(0, coach.sessions - 1)),
     firstSessionPaid: Boolean(source.privateProgram.firstSessionPaid),
   } : null;
+  normalized.privateProgram = null;
   normalized.v2SupplementState = window.BoxeurSupplements
     ? window.BoxeurSupplements.createState(source.v2SupplementState || source, { weekKey: normalized.week })
     : source.v2SupplementState && typeof source.v2SupplementState === "object" ? cloneData(source.v2SupplementState) : null;
   normalized.v2TrainerState = window.BoxeurTrainer
     ? window.BoxeurTrainer.createState(source.v2TrainerState || {})
     : source.v2TrainerState && typeof source.v2TrainerState === "object" ? cloneData(source.v2TrainerState) : null;
+  if (window.BoxeurTrainer && legacyPrivateProgram && !normalized.v2TrainerState.activeProgram) {
+    const trainerId = coach.reward >= 3 ? "elite" : coach.reward >= 2 ? "specialist" : "club";
+    normalized.v2TrainerState = window.BoxeurTrainer.createState({
+      ...normalized.v2TrainerState,
+      activeProgram: {
+        id: `legacy:${coach.id}:${target}`,
+        trainerId,
+        target,
+        sessionsTotal: coach.sessions,
+        sessionsCompleted: legacyPrivateProgram.sessionsCompleted,
+        startedWeek: normalized.week,
+        costPaid: legacyPrivateProgram.firstSessionPaid ? coach.price : 0,
+      },
+    });
+    normalized.journal.unshift({
+      week: normalized.week,
+      text: `Programme privé de ${coach.name} transféré vers le système d’entraîneur actuel sans frais supplémentaires.`,
+    });
+  }
   try {
     normalized.v2WeekPlannerState = window.BoxeurWeekPlanner && source.v2WeekPlannerState?.kind === window.BoxeurWeekPlanner.STATE_KIND
       ? window.BoxeurWeekPlanner.restorePlanner(source.v2WeekPlannerState)
@@ -697,7 +672,7 @@ function applyCareerTheme() {
 }
 
 function careerSnapshot() {
-  return { version: SAVE_VERSION, savedAt: new Date().toISOString(), state: cloneData(state), weeklyPlan: cloneData(weeklyPlan) };
+  return { version: SAVE_VERSION, savedAt: new Date().toISOString(), state: cloneData(state), weeklyPlan: [] };
 }
 
 function persistCareer() {
@@ -810,10 +785,6 @@ function dueTournamentBooking() {
   const weekStart = careerWeekDate(0);
   const weekEnd = careerWeekDate(6);
   return activeBookings().find(booking => booking.event?.kind === "tournament" && booking.event.startDate <= weekEnd && booking.event.endDate >= weekStart) || null;
-}
-
-function dueGalaBooking() {
-  return activeBookings().find(booking => booking.event?.kind === "gala" && booking.event.careerWeek === state.week) || null;
 }
 
 function normalizeCompetitionState() {
@@ -934,39 +905,24 @@ function normalizeCompetitionState() {
 function hydrateCareer(snapshot) {
   const source = snapshot?.state || snapshot;
   const previousState = state;
-  const previousPlan = weeklyPlan;
+  const previousLegacyPlan = legacyPendingPlanForMigration;
   try {
     state = normalizeCareerState(source);
     normalizeCompetitionState();
     ensureCareerCalendar();
     syncLevelProgress();
-    const seenActions = new Set();
-    let restoredCoreActions = 0;
-    let restoredVacation = false;
-    weeklyPlan = (Array.isArray(snapshot?.weeklyPlan) ? snapshot.weeklyPlan : []).filter(item => {
-      const action = actions.find(candidate => candidate.id === item?.actionId);
-      if (!action || seenActions.has(action.id)) return false;
-      if (action.id === "private" && !state.privateProgram) return false;
-      if (action.id === "interview" && !state.jobApplication) return false;
-      if (action.id === "work" && seenActions.has("vacation")) return false;
-      if (action.id === "vacation" && seenActions.has("work")) return false;
-      if (isBonusAction(action)) {
-        if (restoredVacation || !vacationStatus().available) return false;
-        restoredVacation = true;
-      } else {
-        if (restoredCoreActions >= weeklyActionLimit()) return false;
-        restoredCoreActions += 1;
-      }
-      seenActions.add(action.id);
-      return true;
-    });
+    legacyPendingPlanForMigration = (Array.isArray(snapshot?.weeklyPlan) ? snapshot.weeklyPlan : [])
+      .filter(item => typeof item?.actionId === "string")
+      .slice(0, MAX_LEGACY_PLAN_ITEMS)
+      .map(item => ({ actionId: item.actionId }));
+    // Le planificateur actuel est l'unique source d'exécution. L'ancien
+    // brouillon est archivé dans la capsule, jamais réactivé.
     fightState = null;
     sparringRingState = null;
-    selectedPrivateCoachId = null;
     applyCareerTheme();
   } catch (error) {
     state = previousState;
-    weeklyPlan = previousPlan;
+    legacyPendingPlanForMigration = previousLegacyPlan;
     throw error;
   }
 }
@@ -994,22 +950,6 @@ function loadSavedSnapshot() {
     console.warn("[Boxeur Deux] Sauvegarde locale illisible :", error);
     return null;
   }
-}
-
-function exportCareer() {
-  if (!state.profile) return showToast("Aucune carrière à exporter.");
-  persistCareer();
-  const blob = new Blob([JSON.stringify(careerSnapshot(), null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `boxeur-deux-${state.profile.lastName || "carriere"}.json`;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  showToast("Carrière exportée");
 }
 
 function restoreCareer(snapshot, options = {}) {
@@ -1201,7 +1141,6 @@ function runDeveloperTool(id) {
   }
   const skippedWeek = state.week;
   const events = [];
-  weeklyPlan = [];
   endWeek(events);
   state.pendingWeekEvent = null;
   scheduleRecreationalSparring(events);
@@ -1228,7 +1167,6 @@ function loadDeveloperPreset(id) {
     if (!localStorage.getItem(DEV_TEST_ACTIVE_KEY)) localStorage.setItem(DEV_RETURN_SAVE_KEY, JSON.stringify(careerSnapshot()));
     localStorage.setItem(DEV_TEST_ACTIVE_KEY, "1");
     hydrateCareer(developerPresetSnapshot(id));
-    weeklyPlan = [];
     invalidateV2PreviewCapsule();
     render();
     document.querySelector("#developer-test-dialog")?.close();
@@ -1246,7 +1184,6 @@ function restoreDeveloperReturnCareer() {
     hydrateCareer(JSON.parse(raw));
     localStorage.removeItem(DEV_RETURN_SAVE_KEY);
     localStorage.removeItem(DEV_TEST_ACTIVE_KEY);
-    weeklyPlan = [];
     invalidateV2PreviewCapsule();
     render();
     document.querySelector("#developer-test-dialog")?.close();
@@ -1307,17 +1244,18 @@ function renderLevel() {
   const dialogCopy = document.querySelector("#level-dialog-copy");
   const choices = document.querySelector("#level-choices");
   const notice = document.querySelector("#level-notice");
-  if (!levelNode || !xpProgress || !xpMeter || !points || !buttonLabel || !openButton || !dialogCopy || !choices || !notice) return;
-  levelNode.textContent = level;
-  xpProgress.textContent = `XP ${currentXp} / ${needed}`;
-  xpMeter.style.width = `${clamp((currentXp / needed) * 100)}%`;
-  points.textContent = state.levelPoints;
-  openButton.disabled = state.levelPoints < 1;
-  buttonLabel.textContent = state.levelPoints ? "Répartir ·" : "Points :";
-  notice.hidden = !state.levelNotice;
-  notice.textContent = state.levelNotice || "";
-  dialogCopy.textContent = state.levelPoints ? `${state.levelPoints} point${state.levelPoints > 1 ? "s" : ""} disponible${state.levelPoints > 1 ? "s" : ""}. Chaque point ajoute +1 à une statistique.` : "Les entraînements restent ton moyen principal de progresser. Les points de niveau offrent un petit bonus de spécialisation.";
-  choices.innerHTML = Object.entries(combatLabels).map(([key, label]) => `<button class="level-choice" type="button" data-level-stat="${key}" ${state.levelPoints < 1 || state.combatStats[key] >= 99 ? "disabled" : ""}><span>${label}</span><strong>${Math.floor(state.combatStats[key])}</strong><em>+1</em></button>`).join("");
+  if (levelNode) levelNode.textContent = level;
+  if (xpProgress) xpProgress.textContent = `XP ${currentXp} / ${needed}`;
+  if (xpMeter) xpMeter.style.width = `${clamp((currentXp / needed) * 100)}%`;
+  if (points) points.textContent = state.levelPoints;
+  if (openButton) openButton.disabled = state.levelPoints < 1;
+  if (buttonLabel) buttonLabel.textContent = state.levelPoints ? "Répartir ·" : "Points :";
+  if (notice) {
+    notice.hidden = !state.levelNotice;
+    notice.textContent = state.levelNotice || "";
+  }
+  if (dialogCopy) dialogCopy.textContent = state.levelPoints ? `${state.levelPoints} point${state.levelPoints > 1 ? "s" : ""} disponible${state.levelPoints > 1 ? "s" : ""}. Chaque point ajoute +1 à une statistique.` : "Les entraînements restent ton moyen principal de progresser. Les points de niveau offrent un petit bonus de spécialisation.";
+  if (choices) choices.innerHTML = Object.entries(combatLabels).map(([key, label]) => `<button class="level-choice" type="button" data-level-stat="${key}" ${state.levelPoints < 1 || state.combatStats[key] >= 99 ? "disabled" : ""}><span>${label}</span><strong>${Math.floor(state.combatStats[key])}</strong><em>+1</em></button>`).join("");
 }
 
 function openLevelDialog(resumeCareerAlerts = false) {
@@ -1362,94 +1300,6 @@ function renderCreation() {
     const styleBonus = styleBonuses[key] || 0;
     return `<div class="creation-stat"><div class="creation-stat-name"><strong>${label}</strong><small>Base ${BASE_COMBAT_STAT}${styleBonus ? ` · style +${styleBonus}` : ""}</small></div><div class="stat-stepper"><button type="button" data-stat="${key}" data-change="-1" ${draftStats[key] === 0 ? "disabled" : ""}>−</button><output>${BASE_COMBAT_STAT + styleBonus + draftStats[key]}</output><button type="button" data-stat="${key}" data-change="1" ${remaining === 0 ? "disabled" : ""}>+</button></div></div>`;
   }).join("");
-}
-
-function renderFighter() {
-  const profile = state.profile;
-  renderLevel();
-  const nickname = profile.nickname ? ` « ${profile.nickname} »` : "";
-  document.querySelector("#fighter-name").textContent = `${profile.firstName}${nickname} ${profile.lastName}`;
-  const isProfessional = state.careerStatus === "professional";
-  const statusLabel = isProfessional ? "Professionnel" : isAwaitingAmateurTransition() ? "Prêt à passer amateur" : isRecreationalCareer() ? "Récréatif" : "Amateur";
-  const campStatus = state.injuryWeeks > 0 ? ` · Blessé (${state.injuryWeeks} sem.)` : state.fatigue >= 75 ? " · Camp épuisé" : state.morale < 25 ? " · Moral fragile" : "";
-  const divisionLabel = profile.sex === "female" ? "Division féminine" : "Division masculine";
-  document.querySelector("#fighter-meta").textContent = `${weightClassLabel(profile.weightClass, profile.sex)} · ${divisionLabel} · ${styles[profile.style].label} · ${statusLabel}${campStatus}`;
-  const portrait = document.querySelector("#fighter-portrait");
-  const portraitImage = document.querySelector("#fighter-portrait-image");
-  portrait?.style.setProperty("--portrait-index", String(profile.portraitId || 0));
-  if (portraitImage) portraitImage.src = portraitAsset(profile.sex);
-  portrait?.setAttribute("aria-label", `Portrait de ${profile.firstName}`);
-  document.querySelector("#fighter-style-label").textContent = styles[profile.style].label;
-  const record = state.amateurRecord;
-  const amateurText = `${record.wins} V · ${record.losses} D${record.draws ? ` · ${record.draws} N historique${record.draws > 1 ? "s" : ""}` : ""}`;
-  const pro = state.professionalRecord;
-  document.querySelector("#career-records").innerHTML = isProfessional ? `Montréal, QC <span class="dot">•</span> Bilan pro : ${pro.wins} V · ${pro.losses} D · ${pro.draws} N <span class="dot">•</span> Bilan amateur final : ${amateurText}` : isRecreationalCareer() || isAwaitingAmateurTransition() ? `Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">À venir</span>` : `Montréal, QC <span class="dot">•</span> Bilan amateur : <span id="amateur-record">${amateurText}</span>`;
-  const medalTotals = Object.values(state.medals).reduce((totals, medals) => ({ bronze: totals.bronze + medals.bronze, silver: totals.silver + medals.silver, gold: totals.gold + medals.gold }), { bronze: 0, silver: 0, gold: 0 });
-  const medalCount = medalTotals.bronze + medalTotals.silver + medalTotals.gold;
-  document.querySelector("#career-medals").innerHTML = `<span>Médailles</span>${medalCount ? `<strong><i class="medal-dot bronze"></i>${medalTotals.bronze}<i class="medal-dot silver"></i>${medalTotals.silver}<i class="medal-dot gold"></i>${medalTotals.gold}</strong>` : "<em>Aucune pour l’instant</em>"}`;
-  document.querySelector("#combat-stats").innerHTML = Object.entries(combatLabels).map(([key, label]) => `<div class="combat-stat"><span>${label}</span><strong>${Math.floor(state.combatStats[key])}</strong></div>`).join("");
-  const nextFight = document.querySelector("#fighter-next-fight");
-  const opponent = scheduledOpponent();
-  if (opponent && state.scheduledFight) {
-    const timing = state.week >= state.scheduledFight.week ? "Maintenant" : `Semaine ${state.scheduledFight.week}`;
-    nextFight.className = `fighter-next-fight${state.week >= state.scheduledFight.week ? " due" : ""}`;
-    nextFight.textContent = `Prochain combat · ${timing} · ${opponent.name}`;
-  } else if (state.activeTournament && state.activeTournament.status !== "completed") {
-    const tournament = tournamentDefs.find(item => item.id === state.activeTournament.id);
-    nextFight.className = "fighter-next-fight";
-    nextFight.textContent = `Prochaine compétition · ${state.activeTournament.name || tournament?.name || "Tournoi"} · semaine ${state.activeTournament.startWeek}`;
-  } else if (isAwaitingAmateurTransition()) {
-    nextFight.className = "fighter-next-fight due";
-    nextFight.textContent = "Étape suivante · passer amateur";
-  } else {
-    nextFight.className = "fighter-next-fight empty";
-    nextFight.textContent = "Aucun combat programmé";
-  }
-}
-
-function openProfileEditor() {
-  if (!state.profile) return;
-  document.querySelector("#edit-first-name").value = state.profile.firstName;
-  document.querySelector("#edit-last-name").value = state.profile.lastName;
-  document.querySelector("#edit-nickname").value = state.profile.nickname;
-  const weightSelect = document.querySelector("#edit-weight-class");
-  document.querySelector("#edit-sex-label").value = state.profile.sex === "female" ? "Féminine" : "Masculine";
-  renderWeightOptions(weightSelect, state.profile.sex, state.profile.weightClass);
-  weightSelect.disabled = Boolean(state.scheduledFight || state.activeTournament);
-  document.querySelector("#edit-portrait").value = String(state.profile.portraitId || 0);
-  const cornerSelect = document.querySelector("#edit-corner");
-  cornerSelect.querySelector("option[data-test-corner]")?.remove();
-  if (!cornerSelect.querySelector(`option[value="${state.profile.corner}"]`)) {
-    const option = new Option(`Coin ${cornerLabel(state.profile.corner)} · test`, state.profile.corner);
-    option.dataset.testCorner = "true";
-    cornerSelect.add(option);
-  }
-  cornerSelect.value = state.profile.corner;
-  document.querySelector("#profile-edit-note").textContent = weightSelect.disabled ? "La catégorie est verrouillée pendant un combat ou un tournoi programmé. Le style de base reste inchangé." : "Le style de base et ses points restent inchangés.";
-  document.querySelector("#profile-dialog").showModal();
-}
-
-function saveProfileEdits(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  if (!form.reportValidity() || !state.profile) return;
-  state.profile.firstName = document.querySelector("#edit-first-name").value.trim();
-  state.profile.lastName = document.querySelector("#edit-last-name").value.trim();
-  state.profile.nickname = document.querySelector("#edit-nickname").value.trim();
-  if (!document.querySelector("#edit-weight-class").disabled) {
-    const nextWeightClass = document.querySelector("#edit-weight-class").value;
-    if (nextWeightClass !== state.profile.weightClass) {
-      state.profile.weightClass = nextWeightClass;
-      const category = weightClassDefinition(nextWeightClass, state.profile.sex);
-      state.currentWeightKg = defaultCompetitionWeight(category);
-    }
-  }
-  state.profile.portraitId = safeNumber(document.querySelector("#edit-portrait").value, 0, 0, 2);
-  state.profile.corner = isCornerTheme(document.querySelector("#edit-corner").value) ? document.querySelector("#edit-corner").value : "red";
-  applyCareerTheme();
-  document.querySelector("#profile-dialog").close();
-  render();
-  showToast("Profil mis à jour");
 }
 
 function amateurFightCount() {
@@ -1511,46 +1361,8 @@ function opponentExperienceReward(difficulty) {
   return clamp(Math.round(18 + (difficulty - playerCombatStrength()) * .9), 14, 26);
 }
 
-function weeklyActionLimit() {
-  const base = amateurFightCount() >= 10 ? 4 : 3;
-  if (state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek) return 0;
-  const galaDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
-  const available = Math.max(0, base - (galaDue ? 1 : 0));
-  return hasWeakBoxingRhythm() ? Math.min(1, available) : available;
-}
-
 function isCompetitiveCareer() {
   return state.careerStatus === "amateur" || state.careerStatus === "professional";
-}
-
-function hasWeakBoxingRhythm() {
-  return isCompetitiveCareer() && state.boxingInactivityWeeks >= 3;
-}
-
-const boxingTrainingActionIds = new Set(["gym", "group-class", "home-bag", "sparring", "heavybag"]);
-const lowFitnessAllowedActionIds = new Set(["gym", "group-class", "home-bag", "roadwork", "video"]);
-const progressiveReturnActionIds = new Set(["gym", "group-class", "home-bag", "roadwork"]);
-
-function isProgressiveReturn(action) {
-  return Boolean(action && state.fitness < 18 && progressiveReturnActionIds.has(action.id));
-}
-
-function actionDisplayDetail(action) {
-  if (action?.id === "interview" && state.jobApplication) {
-    const job = jobs.find(item => item.id === state.jobApplication.jobId);
-    return `${job?.title || "Candidature"} · ${state.jobApplication.progress}/${state.jobApplication.requiredWeeks} entrevue${state.jobApplication.requiredWeeks > 1 ? "s" : ""} · −3 énergie · +1 moral`;
-  }
-  if (!isProgressiveReturn(action)) return action.detail;
-  const label = action.id === "roadwork" ? "Footing léger" : "Reprise progressive";
-  return `${label} · intensité réduite · +${Math.max(4, action.changes?.fitness || 0)} forme · peu de risque · progression de statistique suspendue`;
-}
-
-function planHasBoxingTraining(privateCoach = null) {
-  return weeklyPlan.some(item => boxingTrainingActionIds.has(item.actionId)) || privateCoach?.type === "boxing";
-}
-
-function recordBoxingTrainingForWeek(week, privateCoach = null) {
-  if (isCompetitiveCareer() && planHasBoxingTraining(privateCoach)) state.boxingTrainingWeek = week;
 }
 
 function updateBoxingRhythm(events, endingWeek) {
@@ -1590,21 +1402,6 @@ function buildLocalOpponent(template, offset, slot) {
   };
   prepared.stats = opponentStatsForRating(rating, prepared.style, `${prepared.id}-${state.week}-${slot}`);
   return prepared;
-}
-
-function weeklyOpponentOffers() {
-  const pool = opponentPool();
-  const count = amateurFightCount();
-  if (count === 0 && state.week === 1) {
-    return [buildLocalOpponent(pool[1], -1, 0), buildLocalOpponent(pool[0], -4, 1), buildLocalOpponent(pool[2], 2, 2)];
-  }
-  const start = ((state.week - 1) * 2 + count) % pool.length;
-  const templates = [start, (start + 3) % pool.length, (start + 7) % pool.length].map(index => pool[index]);
-  return templates.map((template, index) => buildLocalOpponent(template, [-4, -1, 2][index], index));
-}
-
-function offeredFightWeek(opponent) {
-  return Math.max(4, state.week + opponent.dateLead);
 }
 
 function scheduledOpponent() {
@@ -1761,53 +1558,6 @@ function professionalEligibility() {
   return { eligible: false, reason: `Termine un parcours majeur ou dispute encore ${20 - count} combat${20 - count > 1 ? "s" : ""}` };
 }
 
-function nextTournamentEvent() {
-  const currentDate = careerWeekDate(0);
-  return state.calendar?.events?.find(event => event.kind === "tournament" && event.endDate >= currentDate) || null;
-}
-
-function renderCalendarLaunch() {
-  const copy = document.querySelector("#calendar-launch-copy");
-  const summary = document.querySelector("#calendar-summary");
-  const button = document.querySelector("#open-calendar");
-  if (!copy || !summary || !button) return;
-  if (isAwaitingAmateurTransition()) {
-    copy.textContent = "Le sparring d’évaluation est terminé. Confirme le passage au circuit amateur pour continuer.";
-    summary.className = "membership-status active";
-    summary.innerHTML = "<strong>Prêt à passer amateur</strong>Le calendrier s’ouvrira dès ta confirmation";
-    button.textContent = "Passer amateur";
-    return;
-  }
-  if (isRecreationalCareer()) {
-    const sparringCompleted = state.recreationalSparringStatus === "completed";
-    const sparringDue = Boolean(state.scheduledFight?.isRecreationalSparring && state.week >= state.scheduledFight.week);
-    const remainingWeeks = Math.max(0, RECREATIONAL_SPARRING_WEEK - state.week);
-    if (sparringCompleted) {
-      copy.textContent = state.week >= RECREATIONAL_MAX_WEEK
-        ? "Le parcours récréatif se termine ici. Confirme le passage amateur pour poursuivre la carrière."
-        : "Rémy a terminé son évaluation. Tu peux passer amateur maintenant ou continuer à apprendre jusqu’à la semaine 10.";
-      summary.className = "membership-status active";
-      summary.innerHTML = `<strong>Passage amateur disponible</strong>${state.week >= RECREATIONAL_MAX_WEEK ? "Semaine 10 atteinte" : `Encore ${RECREATIONAL_MAX_WEEK - state.week} semaine${RECREATIONAL_MAX_WEEK - state.week > 1 ? "s" : ""} récréative${RECREATIONAL_MAX_WEEK - state.week > 1 ? "s" : ""} possibles`}`;
-      button.textContent = "Passer amateur";
-    } else {
-      copy.textContent = `Rémy « Le Tank » t’attend pour un sparring d’évaluation en semaine ${RECREATIONAL_SPARRING_WEEK}. Les cours de groupe et le GYM te préparent sans obligation de remplir dix semaines.`;
-      summary.className = `membership-status${sparringDue ? " active" : ""}`;
-      summary.innerHTML = sparringDue
-        ? `<strong>Sparring disponible</strong>Rémy « Le Tank » est prêt au GYM`
-        : `<strong>${state.recreationalTrainingWeeks} / 10 entraînements au GYM</strong>Rémy arrive dans ${remainingWeeks || 1} semaine${remainingWeeks === 1 ? "" : "s"}`;
-      button.textContent = sparringDue ? "Voir le sparring" : "Voir le parcours";
-    }
-    return;
-  }
-  const tournament = nextTournamentEvent();
-  copy.textContent = "Galas et tournois annoncés à l’avance. Choisis une seule date lorsqu’ils se chevauchent.";
-  summary.className = "membership-status active";
-  summary.innerHTML = tournament
-    ? `<strong>Prochain tournoi</strong>${escapeHTML(tournament.name)} · ${formatCareerDate(tournament.startDate)}`
-    : "<strong>Calendrier actif</strong>Les prochains galas arrivent bientôt";
-  button.textContent = "Choisir un combat";
-}
-
 function renderRecreationalCalendar(path, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition) {
   const sparringCompleted = state.recreationalSparringStatus === "completed";
   const isSparringDue = Boolean(state.scheduledFight?.isRecreationalSparring && state.week >= state.scheduledFight.week);
@@ -1855,7 +1605,6 @@ function renderFights() {
   ensureCareerCalendar();
   ensureDueTournamentActive();
   scheduleRecreationalSparring();
-  renderCalendarLaunch();
   const scheduled = document.querySelector("#scheduled-fight");
   const calendarContainer = document.querySelector("#calendar-events");
   const tournamentsContainer = document.querySelector("#tournaments");
@@ -1903,7 +1652,7 @@ function renderFights() {
     const isFightWeek = state.week >= state.scheduledFight.week;
     const eventName = state.scheduledFight.tournamentId ? state.scheduledFight.event?.name || tournamentDefs.find(item => item.id === state.scheduledFight.tournamentId)?.name || "Tournoi amateur" : "Combat local";
     const withdrawLabel = state.scheduledFight.tournamentId ? "Abandonner le tournoi" : "Se désister";
-    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé · ${eventName}</p><strong>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</strong><p>${isFightWeek ? `Le combat occupe une action : prépare d’abord jusqu’à ${weeklyActionLimit()} action${weeklyActionLimit() > 1 ? "s" : ""}, puis entre dans le ring.` : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? `<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">${withdrawLabel}</button><button id="start-fight" class="primary-button" type="button">Préparation terminée · combattre</button></div>` : ""}</div>`;
+    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé · ${eventName}</p><strong>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</strong><p>${isFightWeek ? "Le combat est arrivé. Vérifie ton énergie et ta préparation avant d’entrer dans le ring." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? `<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">${withdrawLabel}</button><button id="start-fight" class="primary-button" type="button">Préparation terminée · combattre</button></div>` : ""}</div>`;
   } else {
     scheduled.innerHTML = "";
   }
@@ -1983,54 +1732,8 @@ function renderFights() {
   proTransition.innerHTML = `<div><strong>Passer professionnel</strong><p>${pro.reason}${blocked && pro.eligible ? " · Termine ou annule d’abord le combat programmé." : ""}</p></div><button id="turn-pro" class="primary-button" type="button" ${!pro.eligible || blocked ? "disabled" : ""}>Passer professionnel</button>`;
 }
 
-function projectedMoney() {
-  return state.money + weeklyPlan.reduce((total, item) => {
-    return total + (actionChangesFor(item).money || 0);
-  }, 0);
-}
-
 function currentJob() {
   return jobs.find(job => job.id === state.jobId) || null;
-}
-
-function initialGymReserve() {
-  return state.initialGymRequired && state.gymWeeks === 0 ? GYM_PRICE : 0;
-}
-
-function spendableMoney() {
-  return Math.max(0, state.money - initialGymReserve());
-}
-
-function protectedBudgetLock(cost) {
-  const reserve = initialGymReserve();
-  if (!reserve || spendableMoney() >= cost) return "";
-  return `${reserve} $ restent réservés pour le premier mois du GYM de boxe`;
-}
-
-function vacationStatus() {
-  const job = currentJob();
-  if (!job) return { available: false, reason: "Un emploi est requis pour obtenir des vacances payées" };
-  if (state.vacationBankWeeks > 0) {
-    return { available: true, reason: `${state.vacationBankWeeks}/${MAX_PAID_VACATION_WEEKS} semaine${state.vacationBankWeeks > 1 ? "s" : ""} en banque · ne compte pas comme action` };
-  }
-  const requiredTenure = state.jobVacationEarnedAtTenure
-    ? state.jobVacationEarnedAtTenure + PAID_VACATION_INTERVAL_WEEKS
-    : FIRST_PAID_VACATION_WEEKS;
-  const remaining = Math.max(0, requiredTenure - state.jobTenureWeeks);
-  return {
-    available: false,
-    requiredTenure,
-    remaining,
-    reason: remaining ? `Prochaine semaine de vacances dans ${remaining} semaine${remaining > 1 ? "s" : ""}` : "La prochaine semaine de vacances sera créditée à la fin de la semaine",
-  };
-}
-
-function isBonusAction(action) {
-  return action?.id === "vacation";
-}
-
-function plannedCoreActionCount() {
-  return weeklyPlan.filter(item => !isBonusAction(actions.find(action => action.id === item.actionId))).length;
 }
 
 function isRecreationalCareer() {
@@ -2043,308 +1746,6 @@ function isAwaitingAmateurTransition() {
 
 function canPassAmateurCareer() {
   return isAwaitingAmateurTransition() || (isRecreationalCareer() && state.recreationalSparringStatus === "completed");
-}
-
-function isRecreationalLimitReached() {
-  return isRecreationalCareer() && state.recreationalSparringStatus === "completed" && state.week >= RECREATIONAL_MAX_WEEK;
-}
-
-function actionIsVisibleForCareer(action) {
-  if (!action) return false;
-  if (action.id === "interview" && !state.jobApplication) return false;
-  if (isAwaitingAmateurTransition()) return false;
-  if (isRecreationalLimitReached()) return false;
-  if (!isRecreationalCareer()) return action.id !== "group-class";
-  const recreationalActions = ["gym", "group-class", "home-bag", "rest", "work", "vacation", "interview", "drug-sales"];
-  if (state.strengthGymWeeks > 0) recreationalActions.push("strength-power", "strength-circuit");
-  return recreationalActions.includes(action.id);
-}
-
-function actionRequirementLock(action) {
-  if (!action) return "Action inconnue";
-  if (!actionIsVisibleForCareer(action)) return isAwaitingAmateurTransition() ? "Passe amateur pour reprendre la carrière" : "Cette action n’est pas disponible à ce statut";
-  if (action.future && action.id !== "drug-sales") return "Bientôt disponible";
-  if (action.id === "drug-sales") return "";
-  if (action.id === "work" && !currentJob()) return "Choisis d’abord un emploi dans le panneau Emploi";
-  if (action.id === "interview") {
-    if (!state.jobApplication) return "Choisis d’abord un emploi visé dans le panneau Emploi";
-    if (state.jobApplication.offerReady) return "Offre confirmée : le poste commencera la semaine prochaine";
-  }
-  if (action.id === "vacation") {
-    if (state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek) return "Indisponible pendant un tournoi";
-    const vacation = vacationStatus();
-    if (!vacation.available) return vacation.reason;
-  }
-  if (action.requiresPrivateProgram && !state.privateProgram) return "Commence un programme avec un coach";
-  if (action.id === "private") {
-    const coach = privateCoaches.find(item => item.id === state.privateProgram?.coachId);
-    if (coach?.type === "physical" && state.strengthGymWeeks === 0) return "Abonnement au gym de musculation requis";
-  }
-  if (state.injuryWeeks > 0 && action.category === "training") return `Blessé · récupération obligatoire (${state.injuryWeeks} sem.)`;
-  if (state.injuryWeeks > 0 && action.id === "work") return `Blessé · impossible de travailler (${state.injuryWeeks} sem.)`;
-  if (action.requiresGym && state.gymWeeks === 0) return "Abonnement au GYM de boxe requis";
-  if (action.requiresStrengthGym && state.strengthGymWeeks === 0) return "Abonnement au gym de musculation requis";
-  if (action.requiresReputation && state.reputation < action.requiresReputation) return `Réputation ${action.requiresReputation} requise`;
-  if (action.id === "sponsor" && state.week < state.sponsorAvailableWeek) {
-    const remaining = state.sponsorAvailableWeek - state.week;
-    return `Nouvelle commandite dans ${remaining} semaine${remaining > 1 ? "s" : ""}`;
-  }
-  return "";
-}
-
-function actionConditionLock(action) {
-  const job = action.id === "work" ? currentJob() : null;
-  if (action.id === "work" && state.energy < Math.max(30, Math.abs(job?.energy || 0) + 8)) return "Énergie insuffisante pour assurer cette semaine de travail";
-  if (action.id === "work" && state.fatigue >= 75) return "Fatigue trop élevée : repose-toi avant de retravailler";
-  if (action.id === "rest" && !restRecoveryIsNeeded()) return "Repos inutile : ton boxeur est déjà frais et intact";
-  if (action.category === "training" && state.energy < 28) return "Énergie trop basse pour bien t’entraîner";
-  if (action.category === "training" && state.fitness < 18 && !lowFitnessAllowedActionIds.has(action.id)) return "Forme trop basse : choisis une reprise progressive avant cette séance intensive";
-  if (action.category === "training" && state.morale < 25) return "Moral trop bas : le camp ne peut pas être productif";
-  if (action.category === "training" && state.fatigue >= 75) return "Fatigue trop élevée : récupère avant l’entraînement";
-  if (actionFatigue[action.id] >= 17 && state.fatigue >= 88) return "Fatigue trop élevée pour une séance intensive";
-  return "";
-}
-
-function restRecoveryIsNeeded() {
-  if (state.energy < 92 || state.fatigue > 10 || state.injury > 0 || state.injuryWeeks > 0) return true;
-  const plannedStrain = weeklyPlan.filter(item => item.actionId !== "rest").reduce((total, item) => {
-    const changes = actionChangesFor(item);
-    return {
-      energy: total.energy + (changes.energy || 0),
-      fatigue: total.fatigue + (changes.fatigue || 0),
-      injury: total.injury + (changes.injury || 0),
-    };
-  }, { energy: state.energy, fatigue: state.fatigue, injury: state.injury });
-  return plannedStrain.energy < 92 || plannedStrain.fatigue > 10 || plannedStrain.injury > 0;
-}
-
-function actionLock(action) {
-  const requirement = actionRequirementLock(action);
-  if (requirement) return requirement;
-  const condition = actionConditionLock(action);
-  if (condition) return condition;
-  const workAndVacationPlanned = weeklyPlan.some(item => item.actionId === "work") && weeklyPlan.some(item => item.actionId === "vacation");
-  if (workAndVacationPlanned || (action.id === "work" && weeklyPlan.some(item => item.actionId === "vacation")) || (action.id === "vacation" && weeklyPlan.some(item => item.actionId === "work"))) {
-    return "Les vacances payées remplacent le travail cette semaine";
-  }
-  if (!isBonusAction(action) && plannedCoreActionCount() >= weeklyActionLimit()) return "Plan complet — retire une action";
-  if (action.id === "private") {
-    const coach = privateCoaches.find(item => item.id === state.privateProgram?.coachId);
-    const price = coach ? privateCourseDuePrice(coach) : 0;
-    if (!coach || projectedMoney() < price) return `Il manque ${price - projectedMoney()} $ pour ce cours`;
-  }
-  if (action.cost && projectedMoney() < action.cost) return `Il manque ${action.cost - projectedMoney()} $ au budget prévu`;
-  return "";
-}
-
-function recommendedActionIds() {
-  const recommendations = [];
-  const add = id => {
-    if (!recommendations.includes(id)) recommendations.push(id);
-  };
-  const fightDistance = state.scheduledFight ? state.scheduledFight.week - state.week : Infinity;
-
-  if (state.energy <= 45) add("rest");
-  if (state.fatigue >= 55) add("rest");
-  if (state.morale <= 35) add("family");
-  if (state.injuryWeeks > 0) add(state.money >= 55 ? "physio" : "rest");
-  if (state.injury >= 30) add(state.money >= 55 ? "physio" : "rest");
-  if (state.money < GYM_PRICE && currentJob()) add("work");
-  if (fightDistance <= 2) add("video");
-  if (recommendations.length < 2 && state.energy > 35 && state.fatigue < 55 && !state.injuryWeeks) {
-    add(state.gymWeeks > 0 ? "gym" : "roadwork");
-  }
-  [state.gymWeeks > 0 ? "gym" : "roadwork", "video", "family"].forEach(id => {
-    if (recommendations.length < 2) add(id);
-  });
-  return new Set(recommendations.slice(0, 2));
-}
-
-function renderActions() {
-  const recommended = recommendedActionIds();
-  const visibleCategories = actionCategories.map(category => ({
-    ...category,
-    actions: actions.filter(action => action.category === category.id && (!action.requiresPrivateProgram || state.privateProgram) && actionIsVisibleForCareer(action)),
-  })).filter(category => category.actions.length);
-  if (!visibleCategories.length) {
-    const recreationalLimit = isRecreationalLimitReached();
-    document.querySelector("#action-grid").innerHTML = `<div class="career-transition-lock"><strong>${recreationalLimit ? "La période récréative est terminée." : "Le gym attend ta décision."}</strong><p>${recreationalLimit ? "Tu as atteint la semaine 10 après le sparring avec Rémy « Le Tank ». Ouvre le calendrier et appuie sur « Passer amateur » pour continuer." : "Le sparring avec Rémy « Le Tank » est terminé. Ouvre le calendrier et appuie sur « Passer amateur » pour continuer."}</p></div>`;
-    return;
-  }
-  document.querySelector("#action-grid").innerHTML = visibleCategories.map((category, index) => {
-    const categoryActions = category.actions.map((action, originalIndex) => ({
-      action,
-      originalIndex,
-      priority: recommended.has(action.id) ? 0 : actionRequirementLock(action) ? 2 : 1,
-    })).sort((first, second) => first.priority - second.priority || first.originalIndex - second.originalIndex);
-    const cards = categoryActions.map(({ action }) => {
-      const selected = weeklyPlan.some(item => item.actionId === action.id);
-      const lock = selected ? "" : actionLock(action);
-      const isRecommended = recommended.has(action.id) && !action.future && !lock;
-      const privateCoach = action.id === "private" ? privateCoaches.find(coach => coach.id === state.privateProgram?.coachId) : null;
-      const duePrice = privateCoach ? privateCourseDuePrice(privateCoach) : 0;
-      const progressDetail = action.progressStat && !isProgressiveReturn(action) ? ` · ${state.trainingProgress[action.progressStat]}/10 vers +1 ${combatLabels[action.progressStat].toLowerCase()}` : "";
-      const work = action.id === "work" ? workOutcome() : action.id === "vacation" ? vacationOutcome() : null;
-      const job = ["work", "vacation"].includes(action.id) ? currentJob() : null;
-      const actionDetail = work && job ? action.id === "vacation"
-        ? `${job.title} · +${work.money} $ · +${work.energy} énergie · ${work.fatigue} fatigue · +${work.morale} moral`
-        : `${job.title} · +${work.money} $ · ${work.energy} énergie · +${work.fatigue} fatigue · ${work.morale} moral${work.injury ? ` · +${work.injury} risque` : ""}`
-        : actionDisplayDetail(action);
-      const detail = privateCoach ? `${combatLabels[state.privateProgram.target]} · séance ${state.privateProgram.sessionsCompleted + 1} / ${privateCoach.sessions} · ${duePrice ? `${duePrice} $` : "déjà payée"} · +10 XP` : `${actionDetail}${progressDetail}`;
-      return `<button class="action-card${action.future ? " future" : ""}${selected ? " selected" : ""}${isRecommended ? " recommended" : ""}" type="button" data-action="${action.id}" ${lock ? "disabled" : ""} aria-pressed="${selected}">
-        <span class="action-icon" aria-hidden="true">${action.icon}</span><h3>${action.title}</h3><p>${detail}</p>
-        ${isRecommended ? `<span class="action-recommendation">Conseillé cette semaine</span>` : ""}
-        ${lock ? `<span class="action-lock">${lock}</span>` : ""}
-      </button>`;
-    }).join("");
-    return `<section class="action-group" aria-labelledby="action-group-${category.id}"><div class="action-group-heading"><span>0${index + 1}</span><div><h3 id="action-group-${category.id}">${category.label}</h3><p>${category.hint}</p></div></div><div class="action-grid">${cards}</div></section>`;
-  }).join("");
-}
-
-function renderMembership() {
-  const status = document.querySelector("#membership-status");
-  const button = document.querySelector("#membership-button");
-  const services = document.querySelector("#boxing-gym-services");
-  if (state.gymWeeks > 0) {
-    const expiring = state.gymWeeks === 1;
-    status.className = `membership-status active${expiring ? " warning" : ""}`;
-    status.innerHTML = `<strong>${expiring ? "Renouvellement bientôt nécessaire" : "GYM de boxe actif"}</strong>${state.gymWeeks} semaine${state.gymWeeks > 1 ? "s" : ""} restante${state.gymWeeks > 1 ? "s" : ""}`;
-    button.textContent = expiring ? "Dernière semaine d’accès" : "Accès inclus";
-    button.disabled = true;
-  } else {
-    status.className = "membership-status";
-    const required = state.initialGymRequired;
-    status.innerHTML = required
-      ? `<strong>Premier abonnement réservé</strong>${GYM_PRICE} $ sont protégés pour le GYM de boxe avant le début du parcours récréatif`
-      : "<strong>GYM de boxe expiré</strong>Le sac au sous-sol reste disponible; les mitaines, cours et sparring attendent un renouvellement";
-    button.disabled = false;
-    button.textContent = required ? `Activer le premier mois · ${GYM_PRICE} $` : "Choisir un forfait";
-    button.title = "";
-  }
-  services.innerHTML = state.gymWeeks > 0 ? `<div class="gym-exercise-heading"><strong>Exercices du GYM de boxe</strong><small>${isRecreationalCareer() ? "Mitaines et cours de groupe pour bâtir les bases" : "Disponibles dans Préparation et technique"}</small></div><div class="gym-exercise-grid">${gymExerciseCard("technique", "Travail aux mitaines")}${!isRecreationalCareer() ? gymExerciseCard("defense", "Défense et esquives") : ""}</div>` : `<div class="gym-locked-note">Sans abonnement, le sac au sous-sol reste dans les tuiles de préparation.</div>`;
-}
-
-function gymExerciseCard(stat, label) {
-  const progress = state.trainingProgress[stat] || 0;
-  return `<div class="gym-exercise-card"><div><strong>${label}</strong><small>+1 ${combatLabels[stat].toLowerCase()} toutes les 10 séances</small></div><span>${progress}/10</span><div class="gym-progress"><i style="width:${progress * 10}%"></i></div></div>`;
-}
-
-function productLock(product) {
-  if (state.supplementWeek !== state.week) {
-    state.supplementWeek = state.week;
-    state.supplementsUsed = [];
-  }
-  if (state.supplementsUsed.includes(product.id)) return "Déjà consommé cette semaine";
-  if (state.supplementsUsed.length >= MAX_SUPPLEMENTS_PER_WEEK) return `Limite de ${MAX_SUPPLEMENTS_PER_WEEK} produits par semaine`;
-  if (state.money < product.price) return `Il manque ${product.price - state.money} $`;
-  const budgetLock = protectedBudgetLock(product.price);
-  if (budgetLock) return budgetLock;
-  if (product.id === "preworkout" && state.fatigue >= 85) return "Fatigue trop élevée";
-  if ((product.id === "preworkout" || product.id === "energy-drink") && state.energy >= 95) return "Énergie déjà presque pleine";
-  const useful = Object.entries(product.changes).some(([key, value]) => {
-    if (["energy", "fitness", "morale"].includes(key) && value > 0) return state[key] < 100;
-    if (["fatigue", "injury"].includes(key) && value < 0) return state[key] > 0;
-    return false;
-  });
-  return useful ? "" : "Aucun bénéfice actuellement";
-}
-
-function renderStrengthMembership() {
-  const status = document.querySelector("#strength-membership-status");
-  const button = document.querySelector("#strength-membership-button");
-  const services = document.querySelector("#strength-gym-services");
-  if (state.strengthGymWeeks > 0) {
-    const expiring = state.strengthGymWeeks === 1;
-    status.className = `membership-status active${expiring ? " warning" : ""}`;
-    status.innerHTML = `<strong>${expiring ? "Renouvellement bientôt nécessaire" : "Abonnement actif"}</strong>${state.strengthGymWeeks} semaine${state.strengthGymWeeks > 1 ? "s" : ""} restante${state.strengthGymWeeks > 1 ? "s" : ""}`;
-    button.textContent = expiring ? "Dernière semaine d’accès" : "Accès musculation actif";
-    button.disabled = true;
-  } else {
-    status.className = "membership-status";
-    status.innerHTML = "<strong>Non abonné</strong>Exercices, boutique et préparateurs verrouillés";
-    button.disabled = false;
-    button.textContent = "Choisir un forfait";
-  }
-  if (!services) return;
-  const shop = strengthGymProducts.map(product => {
-    const lock = productLock(product);
-    return `<button type="button" class="gym-product" data-buy-supplement="${product.id}" ${lock ? `disabled title="${lock}"` : ""}><strong>${product.label}</strong><span>${product.price} $</span><small>${product.effect}</small>${lock ? `<em>${lock}</em>` : ""}</button>`;
-  }).join("");
-  services.innerHTML = state.strengthGymWeeks > 0 ? `<div class="gym-exercise-heading"><strong>Exercices</strong><small>Dans Préparation et technique</small></div><div class="gym-exercise-grid">${gymExerciseCard("power", "Musculation")}${gymExerciseCard("cardio", "Cardio sur appareils")}</div><div class="gym-shop"><div class="gym-shop-heading"><span>Boutique</span><small>Effet immédiat · ${state.supplementsUsed.length}/${MAX_SUPPLEMENTS_PER_WEEK} cette semaine</small></div><div class="gym-shop-actions">${shop}</div></div>` : `<div class="gym-locked-note">Abonne-toi pour débloquer les exercices, les préparateurs et la boutique.</div>`;
-}
-
-function privateCoursePrice(coach) {
-  return Math.max(0, coach.price - (coach.type === "boxing" && state.gymWeeks > 0 ? 10 : 0));
-}
-
-function privateCourseDuePrice(coach) {
-  return state.privateProgram?.firstSessionPaid && state.privateProgram.sessionsCompleted === 0 ? 0 : privateCoursePrice(coach);
-}
-
-function renderPrivateCoaching() {
-  const coaching = document.querySelector("#private-coaching");
-  if (!coaching) return;
-  const program = state.privateProgram;
-  if (program) {
-    const coach = privateCoaches.find(item => item.id === program.coachId);
-    const remaining = Math.max(0, coach.sessions - program.sessionsCompleted);
-    const price = privateCourseDuePrice(coach);
-    const discountActive = coach.type === "boxing" && state.gymWeeks > 0;
-    const accessNote = coach.type === "physical" && state.strengthGymWeeks === 0 ? " · abonnement musculation requis pour continuer" : "";
-    coaching.innerHTML = `<div class="private-program"><span>${coach.type === "boxing" ? "Coach de boxe" : "Préparateur physique"} · programme en cours</span><strong>${coach.name} · ${combatLabels[program.target]}</strong><small>${remaining} cours restant${remaining > 1 ? "s" : ""} avant +${coach.reward} ${combatLabels[program.target].toLowerCase()} · prochain cours : ${price ? `${price} $${discountActive ? " (rabais inclus)" : ""}` : "déjà payé"}${accessNote}.</small></div>`;
-  } else {
-    coaching.innerHTML = `<div class="coaching-heading"><span>Aucun programme actif</span><small>Compare dix spécialistes, leur prix et les qualités accessibles.</small></div><button id="open-coach-menu" class="primary-button" type="button">Choisir un coach ou un préparateur</button>`;
-  }
-}
-
-function renderEmployment() {
-  const employment = document.querySelector("#employment");
-  if (!employment) return;
-  const job = currentJob();
-  const application = state.jobApplication;
-  const targetJob = jobs.find(item => item.id === application?.jobId);
-  if (!job) {
-    const required = state.introJobRequired;
-    if (application && targetJob) {
-      const ready = application.offerReady;
-      employment.innerHTML = `<div class="private-program employment-program application${ready ? " ready" : ""}"><span>${ready ? "Offre confirmée" : "Recherche d’emploi"}</span><strong>${escapeHTML(targetJob.title)} · ${application.progress}/${application.requiredWeeks} entrevue${application.requiredWeeks > 1 ? "s" : ""}</strong><small>${ready ? "Le poste commencera à la prochaine semaine." : "Planifie « Passer des entrevues » pour faire avancer la candidature. Sans cette action, le compteur reste en pause."}</small><div class="employment-actions"><button id="open-job-menu" class="secondary-button" type="button">Changer de candidature</button><button id="cancel-job-application" class="text-button" type="button">Annuler la candidature</button></div></div>`;
-      return;
-    }
-    employment.innerHTML = `<div class="coaching-heading"><span>${required ? "Premier emploi requis" : "Sans emploi"}</span><small>${required ? "Choisis ton emploi de départ avant de passer ta première semaine." : "Choisis un poste, puis fais progresser les entrevues dans tes actions hebdomadaires."}</small></div><button id="open-job-menu" class="primary-button" type="button">${required ? "Choisir mon emploi de départ" : "Chercher un emploi"}</button>`;
-    return;
-  }
-  const absenceNote = state.missedWorkWeeks === 0
-    ? "Présence en règle"
-    : state.missedWorkWeeks === 1
-      ? "1 absence · deux chances restantes"
-      : "2/3 absences · prochain quart manqué : congédiement";
-  const vacation = vacationStatus();
-  const warningClass = state.missedWorkWeeks >= 2 ? " danger" : state.missedWorkWeeks === 1 ? " warning" : "";
-  const applicationCopy = application && targetJob ? `<div class="employment-application"><span>Candidature en cours</span><strong>${escapeHTML(targetJob.title)} · ${application.progress}/${application.requiredWeeks}</strong><small>${application.offerReady ? "Offre confirmée pour la semaine prochaine." : "Chaque action « Passer des entrevues » ajoute une étape."}</small></div>` : "";
-  employment.innerHTML = `<div class="private-program employment-program${warningClass}"><span>Emploi actif · ${escapeHTML(job.schedule)}</span><strong>${escapeHTML(job.title)} · ${job.wage} $ par semaine travaillée</strong><small>${escapeHTML(job.detail)} <b>${absenceNote}</b>. Vacances : ${escapeHTML(vacation.reason)}.</small>${applicationCopy}<div class="employment-actions"><button id="open-job-menu" class="secondary-button" type="button">${application ? "Changer de candidature" : "Postuler ailleurs"}</button>${application ? '<button id="cancel-job-application" class="text-button" type="button">Annuler la candidature</button>' : ""}<button id="quit-job" class="text-button" type="button">Quitter l’emploi</button></div></div>`;
-}
-
-function openJobMenu() {
-  const activeJob = currentJob();
-  const immediate = state.introJobRequired && state.jobsHeldCount === 0 && !activeJob;
-  document.querySelector("#job-dialog-title").textContent = immediate ? "Choisir l’emploi de départ" : "Choisir une candidature";
-  const copy = document.querySelector("#job-dialog-copy");
-  if (copy) copy.textContent = immediate ? "Ton premier emploi est obtenu immédiatement. Ensuite, chaque changement demandera des entrevues planifiées dans la semaine." : "Choisis le poste visé. Une nouvelle candidature remet la progression actuelle à zéro; l’embauche est garantie lorsque toutes les entrevues sont terminées.";
-  document.querySelector("#job-options").innerHTML = jobs.map(job => {
-    const isActive = job.id === activeJob?.id;
-    const isTarget = job.id === state.jobApplication?.jobId;
-    const referenceEligible = state.jobReferenceBonus || Boolean(activeJob && state.jobTenureWeeks >= 12 && state.missedWorkWeeks === 0);
-    const requiredWeeks = Math.max(1, job.interviewWeeks - (referenceEligible ? 1 : 0));
-    const hiring = immediate ? "Embauche immédiate" : `${requiredWeeks} semaine${requiredWeeks > 1 ? "s" : ""} d’entrevues${referenceEligible && job.interviewWeeks > 1 ? " · bon dossier inclus" : ""}`;
-    return renderJobBoardSheet(job, {
-      active: isActive,
-      selected: isTarget,
-      disabled: isActive,
-      status: hiring,
-      effects: `${job.energy} énergie · +${job.fatigue} fatigue · ${job.morale} moral${job.injury ? ` · +${job.injury} risque` : ""}`,
-    });
-  }).join("");
-  document.querySelector("#job-dialog").showModal();
 }
 
 function renderJobBoardSheet(job, { active = false, selected = false, disabled = false, status = "", effects = "" } = {}) {
@@ -2372,75 +1773,6 @@ function hireJob(job, initial = false) {
   state.journal.unshift({ week: state.week, text: `${state.profile.firstName} ${verb} un emploi : ${job.title}, paie hebdomadaire de ${job.wage} $.` });
 }
 
-function selectJob(jobId) {
-  const job = jobs.find(item => item.id === jobId);
-  if (!job) return;
-  if (state.introJobRequired && state.jobsHeldCount === 0 && !currentJob()) {
-    hireJob(job, true);
-    document.querySelector("#job-dialog").close();
-    render();
-    showToast(`${job.title} · action Travailler débloquée`);
-    return;
-  }
-  if (job.id === state.jobId) return;
-  const activeJob = currentJob();
-  const referenceEligible = state.jobReferenceBonus || Boolean(activeJob && state.jobTenureWeeks >= 12 && state.missedWorkWeeks === 0);
-  const requiredWeeks = Math.max(1, job.interviewWeeks - (referenceEligible ? 1 : 0));
-  state.jobApplication = { jobId: job.id, progress: 0, requiredWeeks, offerReady: false, referenceBonusApplied: referenceEligible };
-  weeklyPlan = weeklyPlan.filter(item => item.actionId !== "interview");
-  state.journal.unshift({ week: state.week, text: `Candidature envoyée : ${job.title}. ${requiredWeeks} semaine${requiredWeeks > 1 ? "s" : ""} d’entrevues requise${requiredWeeks > 1 ? "s" : ""}.` });
-  document.querySelector("#job-dialog").close();
-  render();
-  showToast(`${job.title} · candidature lancée`);
-}
-
-function cancelJobApplication() {
-  if (!state.jobApplication) return;
-  const job = jobs.find(item => item.id === state.jobApplication.jobId);
-  state.jobApplication = null;
-  weeklyPlan = weeklyPlan.filter(item => item.actionId !== "interview");
-  render();
-  showToast(`Candidature ${job ? `chez ${job.title} ` : ""}annulée`);
-}
-
-function quitJob() {
-  const job = currentJob();
-  if (!job) return;
-  if (!window.confirm(`Quitter ${job.title} ?\n\nTu pourras rester sans emploi ou en choisir un autre plus tard.`)) return;
-  state.jobReferenceBonus = state.jobTenureWeeks >= 12 && state.missedWorkWeeks === 0;
-  state.journal.unshift({ week: state.week, text: `${state.profile.firstName} quitte son emploi : ${job.title}.${state.jobReferenceBonus ? " Son bon dossier réduira la prochaine recherche d’une entrevue." : ""}` });
-  state.jobId = null;
-  state.missedWorkWeeks = 0;
-  state.jobTenureWeeks = 0;
-  state.jobVacationEarnedAtTenure = 0;
-  state.vacationBankWeeks = 0;
-  state.jobWagesEarned = 0;
-  state.workStreak = 0;
-  render();
-  showToast("Emploi quitté");
-}
-
-function advanceJobApplication(events, week) {
-  if (!weeklyPlan.some(item => item.actionId === "interview") || !state.jobApplication || state.jobApplication.offerReady) return;
-  const job = jobs.find(item => item.id === state.jobApplication.jobId);
-  if (!job) {
-    state.jobApplication = null;
-    return;
-  }
-  state.jobApplication.progress = Math.min(state.jobApplication.requiredWeeks, state.jobApplication.progress + 1);
-  if (state.jobApplication.progress >= state.jobApplication.requiredWeeks) {
-    state.jobApplication.offerReady = true;
-    const note = `${job.title} : entrevues terminées, offre confirmée. Le poste commencera la semaine prochaine.`;
-    events.push(note);
-    state.journal.unshift({ week, text: note });
-    return;
-  }
-  const remaining = state.jobApplication.requiredWeeks - state.jobApplication.progress;
-  const note = `${job.title} : entrevue ${state.jobApplication.progress}/${state.jobApplication.requiredWeeks} terminée. Encore ${remaining} semaine${remaining > 1 ? "s" : ""} d’entrevue.`;
-  events.push(note);
-  state.journal.unshift({ week, text: note });
-}
-
 function activateReadyJobOffer(events) {
   if (!state.jobApplication?.offerReady) return;
   const job = jobs.find(item => item.id === state.jobApplication.jobId);
@@ -2464,53 +1796,6 @@ const strengthGymPlans = Object.freeze([
   { id: "six-months", label: "6 mois", weeks: STRENGTH_GYM_SIX_MONTH_WEEKS, price: STRENGTH_GYM_SIX_MONTH_PRICE, detail: "24 semaines d’accès · 60 $ d’économie." },
   { id: "yearly", label: "1 an", weeks: STRENGTH_GYM_YEAR_WEEKS, price: STRENGTH_GYM_YEAR_PRICE, detail: "48 semaines d’accès · 180 $ d’économie." },
 ]);
-
-function openMembershipMenu() {
-  if (state.gymWeeks > 0) return;
-  const initial = state.initialGymRequired;
-  const choices = initial ? gymPlans.filter(plan => plan.id === "monthly") : gymPlans;
-  document.querySelector("#membership-dialog-title").textContent = initial ? "Premier abonnement obligatoire" : "Renouveler le GYM de boxe";
-  document.querySelector("#membership-dialog-copy").textContent = initial
-    ? "Ton budget de départ couvre ce premier mois. Choisis ensuite un emploi pour financer la suite du camp."
-    : "Sans abonnement, le sac au sous-sol reste disponible. Les mitaines, cours et sparring demandent un accès actif au GYM.";
-  document.querySelector("#membership-options").innerHTML = choices.map(plan => `<button class="coach-card" type="button" data-gym-plan="${plan.id}" ${state.money < plan.price ? "disabled" : ""}><strong>${plan.label} · ${plan.price} $</strong><span>${plan.weeks} semaines d’accès</span><small>${plan.detail}${state.money < plan.price ? `<br>Il manque ${plan.price - state.money} $.` : ""}</small></button>`).join("");
-  document.querySelector("#membership-dialog").showModal();
-}
-
-function selectGymPlan(planId) {
-  const plan = gymPlans.find(item => item.id === planId);
-  if (!plan || state.gymWeeks > 0 || state.money < plan.price) return;
-  state.money -= plan.price;
-  state.gymWeeks = plan.weeks;
-  state.initialGymRequired = false;
-  state.journal.unshift({ week: state.week, text: `Abonnement GYM de boxe activé : ${plan.label.toLowerCase()} (${plan.weeks} semaines).` });
-  document.querySelector("#membership-dialog").close();
-  render();
-  showToast(`GYM actif · ${plan.weeks} semaines`);
-}
-
-function openStrengthMembershipMenu() {
-  if (state.strengthGymWeeks > 0) return;
-  document.querySelector("#strength-membership-dialog-copy").textContent = initialGymReserve()
-    ? `${GYM_PRICE} $ restent réservés pour le premier mois obligatoire du GYM de boxe. Le reste du budget peut servir à la musculation.`
-    : "Le gym de musculation débloque les exercices, la boutique et les préparateurs physiques. Pour le calendrier du jeu, un mois représente quatre semaines.";
-  document.querySelector("#strength-membership-options").innerHTML = strengthGymPlans.map(plan => {
-    const budgetLock = state.money < plan.price ? `Il manque ${plan.price - state.money} $.` : protectedBudgetLock(plan.price);
-    return `<button class="coach-card" type="button" data-strength-gym-plan="${plan.id}" ${budgetLock ? "disabled" : ""}><strong>${plan.label} · ${plan.price} $</strong><span>${plan.weeks} semaines d’accès</span><small>${plan.detail}${budgetLock ? `<br>${budgetLock}` : ""}</small></button>`;
-  }).join("");
-  document.querySelector("#strength-membership-dialog").showModal();
-}
-
-function selectStrengthGymPlan(planId) {
-  const plan = strengthGymPlans.find(item => item.id === planId);
-  if (!plan || state.strengthGymWeeks > 0 || state.money < plan.price || protectedBudgetLock(plan.price)) return;
-  state.money -= plan.price;
-  state.strengthGymWeeks = plan.weeks;
-  state.journal.unshift({ week: state.week, text: `Abonnement gym de musculation activé : ${plan.label.toLowerCase()} (${plan.weeks} semaines).` });
-  document.querySelector("#strength-membership-dialog").close();
-  render();
-  showToast(`Musculation active · ${plan.weeks} semaines`);
-}
 
 function accruePaidVacation(job, events, week) {
   const requiredTenure = state.jobVacationEarnedAtTenure
@@ -2582,85 +1867,6 @@ function settleJobAttendance(worked, events, week, excused = false, paidWork = f
   state.journal.unshift({ week, text: note });
 }
 
-function workOutcome() {
-  const job = currentJob();
-  if (!job) return null;
-  return {
-    money: job.wage,
-    energy: job.energy,
-    fatigue: job.fatigue,
-    morale: job.morale,
-    injury: job.injury + (state.fatigue >= 70 ? 2 : 0),
-  };
-}
-
-function vacationOutcome() {
-  const job = currentJob();
-  if (!job) return null;
-  return { money: job.wage, energy: 14, fatigue: -18, morale: 8, injury: -4 };
-}
-
-function actionChangesFor(item) {
-  const action = actions.find(candidate => candidate.id === item.actionId);
-  if (!action) return {};
-  if (action.id === "work") return workOutcome() || {};
-  if (action.id === "vacation") return vacationOutcome() || {};
-  if (action.id === "private") {
-    const coach = privateCoaches.find(item => item.id === state.privateProgram?.coachId);
-    if (!coach) return {};
-    return { money: -privateCourseDuePrice(coach), energy: -14, fatigue: coach.fatigue, fitness: coach.fitness, morale: coach.morale, experience: 10 };
-  }
-  const changes = { ...(action.changes || {}) };
-  const progressiveReturn = isProgressiveReturn(action);
-  if (progressiveReturn) {
-    if (changes.energy < 0) changes.energy = Math.round(changes.energy * .58);
-    changes.fitness = Math.max(4, changes.fitness || 0);
-    if (changes.injury > 0) changes.injury = Math.min(1, changes.injury);
-    if (changes.experience > 0) changes.experience = Math.max(3, Math.round(changes.experience * .5));
-  }
-  if (actionFatigue[action.id]) changes.fatigue = (changes.fatigue || 0) + (progressiveReturn ? Math.max(3, Math.round(actionFatigue[action.id] * .5)) : actionFatigue[action.id]);
-  if (action.category === "training" && changes.experience) {
-    const readiness = clamp(.45 + state.energy / 220 + state.fitness / 260 + state.morale / 600 - state.fatigue / 260, .45, 1.15);
-    changes.experience = Math.max(1, Math.round(changes.experience * readiness));
-  }
-  return changes;
-}
-
-function planItemEffects(item) {
-  const action = actions.find(candidate => candidate.id === item.actionId);
-  const reachesMilestone = action?.progressStat && (state.trainingProgress[action.progressStat] || 0) >= 9;
-  return {
-    action,
-    general: actionChangesFor(item),
-    combat: reachesMilestone && !isProgressiveReturn(action) ? { [action.progressStat]: 1 } : {},
-  };
-}
-
-function planEffects() {
-  const rawGeneral = {};
-  const rawCombat = {};
-  let earned = 0;
-  let spent = 0;
-  weeklyPlan.forEach(item => {
-    const effects = planItemEffects(item);
-    Object.entries(effects.general).forEach(([key, value]) => {
-      rawGeneral[key] = (rawGeneral[key] || 0) + value;
-      if (key === "money") value >= 0 ? earned += value : spent += Math.abs(value);
-    });
-    Object.entries(effects.combat).forEach(([key, value]) => rawCombat[key] = (rawCombat[key] || 0) + value);
-  });
-  const general = Object.fromEntries(Object.entries(rawGeneral).map(([key, value]) => {
-    const finalValue = key === "money" || key === "experience" ? Math.max(0, state[key] + value) : clamp(state[key] + value);
-    return [key, finalValue - state[key]];
-  }));
-  const combat = Object.fromEntries(Object.entries(rawCombat).map(([key, value]) => [key, clamp(state.combatStats[key] + value, 0, 99) - state.combatStats[key]]));
-  return { general, combat, rawGeneral, rawCombat, earned, spent };
-}
-
-function signed(value, suffix = "") {
-  return `${value > 0 ? "+" : ""}${value}${suffix}`;
-}
-
 function scheduleRecreationalSparring(events = []) {
   if (!isRecreationalCareer() || state.week < RECREATIONAL_SPARRING_WEEK || state.recreationalSparringStatus === "completed" || state.scheduledFight) return;
   const scheduledWeek = Math.max(RECREATIONAL_SPARRING_WEEK, state.week + (state.injuryWeeks > 0 ? state.injuryWeeks : 0));
@@ -2684,153 +1890,23 @@ function scheduleRecreationalSparring(events = []) {
   state.journal.unshift({ week: state.week, text: note });
 }
 
-function advanceRecreationalTraining(events, week) {
-  if (!isRecreationalCareer()) return;
-  const trainedAtGym = weeklyPlan.some(item => ["gym", "group-class"].includes(item.actionId));
-  if (trainedAtGym && state.recreationalTrainingWeeks < RECREATIONAL_MAX_WEEK) {
-    state.recreationalTrainingWeeks += 1;
-    const note = `Parcours récréatif : ${state.recreationalTrainingWeeks}/10 entraînements au GYM de boxe.`;
-    events.push(note);
-    state.journal.unshift({ week, text: note });
-  }
-  scheduleRecreationalSparring(events);
-}
-
-function planValidation() {
-  const tournamentDue = Boolean(state.activeTournament && state.activeTournament.status !== "completed" && state.week >= state.activeTournament.startWeek);
-  const scheduledFightDue = Boolean(state.scheduledFight && state.week >= state.scheduledFight.week);
-  if (state.pendingWeekEvent) return { valid: false, reason: "Choisis d’abord l’événement entre les semaines." };
-  if (isAwaitingAmateurTransition()) return { valid: false, reason: "Le sparring est terminé : ouvre le calendrier et appuie sur « Passer amateur »." };
-  if (isRecreationalLimitReached()) return { valid: false, reason: "La semaine 10 clôt le parcours récréatif : ouvre le calendrier et appuie sur « Passer amateur »." };
-  if (isRecreationalCareer() && state.introJobRequired && !currentJob()) return { valid: false, reason: "Choisis d’abord ton emploi de départ dans le panneau Emploi." };
-  if (isRecreationalCareer() && state.initialGymRequired && state.gymWeeks === 0) return { valid: false, reason: "Active d’abord le premier abonnement au GYM de boxe." };
-  if (tournamentDue && state.injuryWeeks === 0) return { valid: false, reason: "Le tournoi a commencé : ouvre le tableau pour disputer le prochain combat." };
-  if (!weeklyPlan.length && !scheduledFightDue) return { valid: false, reason: "Sélectionne au moins une action pour continuer." };
-  if (plannedCoreActionCount() > weeklyActionLimit()) return { valid: false, reason: `Le plan dépasse la limite de ${weeklyActionLimit()} actions.` };
-  const seen = new Set();
-  for (const item of weeklyPlan) {
-    const action = actions.find(candidate => candidate.id === item.actionId);
-    if (!action || seen.has(item.actionId)) return { valid: false, reason: "Le plan contient une action invalide ou en double." };
-    seen.add(item.actionId);
-    const lock = actionRequirementLock(action) || actionConditionLock(action);
-    if (lock) return { valid: false, reason: `${action.title} : ${lock}.` };
-  }
-  if (seen.has("work") && seen.has("vacation")) return { valid: false, reason: "Les vacances payées remplacent le travail cette semaine." };
-  const totals = planEffects();
-  if (state.money + (totals.rawGeneral.money || 0) < 0) return { valid: false, reason: "Le plan dépasse ton budget. Retire une dépense ou ajoute du travail." };
-  const finalEnergy = clamp(state.energy + (totals.rawGeneral.energy || 0));
-  const finalFatigue = clamp(state.fatigue + (totals.rawGeneral.fatigue || 0));
-  if (finalEnergy < 5) return { valid: false, reason: "Ce programme épuiserait complètement ton boxeur. Ajoute de la récupération." };
-  if (finalFatigue >= 96) return { valid: false, reason: "Ce programme pousserait la fatigue à un niveau dangereux. Ajoute du repos." };
-  const coreActions = plannedCoreActionCount();
-  return { valid: true, reason: scheduledFightDue ? `Le combat réserve une action. Tu peux encore préparer ${coreActions}/${weeklyActionLimit()} action${weeklyActionLimit() > 1 ? "s" : ""} avant d’entrer dans le ring.` : tournamentDue ? "Tournoi en pause pendant la blessure : planifie une semaine de récupération." : "Rien ne sera appliqué avant ta confirmation." };
-}
-
-function renderPlan() {
-  const content = document.querySelector("#plan-content");
-  const actionLimit = weeklyActionLimit();
-  const coreActionCount = plannedCoreActionCount();
-  const vacationPlanned = weeklyPlan.some(item => item.actionId === "vacation");
-  document.querySelector("#plan-count").textContent = `${coreActionCount} / ${actionLimit} action${actionLimit > 1 ? "s" : ""}${vacationPlanned ? " · + vacances" : ""}`;
-  if (!weeklyPlan.length) {
-    content.innerHTML = `<div class="plan-list plan-list-empty">${Array.from({ length: actionLimit }, (_, index) => `<div class="plan-slot"><span>${index + 1}</span><em>Libre</em></div>`).join("")}</div><div class="plan-empty">Ton programme est vide. Choisis jusqu’à ${actionLimit} actions ci-dessus.</div>`;
-  } else {
-    const totals = planEffects();
-    const effectParts = Object.entries(totals.general).filter(([key, value]) => key !== "money" && value).map(([key, value]) => `${generalStats.find(stat => stat.key === key)?.label || "Expérience"} ${signed(value, key === "experience" ? "" : "%")}`);
-    effectParts.push(...Object.entries(totals.combat).filter(([, value]) => value).map(([key, value]) => `${combatLabels[key]} ${signed(value)}`));
-    const plannedRows = weeklyPlan.map((item, index) => {
-      const action = actions.find(candidate => candidate.id === item.actionId);
-      const coach = action.id === "private" ? privateCoaches.find(item => item.id === state.privateProgram?.coachId) : null;
-      const duePrice = coach ? privateCourseDuePrice(coach) : 0;
-      const currentProgress = action.progressStat ? state.trainingProgress[action.progressStat] || 0 : 0;
-      const progressDetail = action.progressStat && !isProgressiveReturn(action) ? currentProgress >= 9 ? ` · cette séance donne +1 ${combatLabels[action.progressStat].toLowerCase()}` : ` · progression prévue : ${currentProgress + 1}/10` : "";
-      const work = action.id === "work" ? workOutcome() : action.id === "vacation" ? vacationOutcome() : null;
-      const job = ["work", "vacation"].includes(action.id) ? currentJob() : null;
-      const actionDetail = work && job ? action.id === "vacation"
-        ? `${job.title} · +${work.money} $ · +${work.energy} énergie · ${work.fatigue} fatigue · +${work.morale} moral`
-        : `${job.title} · +${work.money} $ · ${work.energy} énergie · +${work.fatigue} fatigue · ${work.morale} moral${work.injury ? ` · +${work.injury} risque` : ""}`
-        : actionDisplayDetail(action);
-      const detail = coach ? `${combatLabels[state.privateProgram.target]} · ${duePrice ? `${duePrice} $` : "séance déjà payée"} · cours ${state.privateProgram.sessionsCompleted + 1} / ${coach.sessions}` : `${actionDetail}${progressDetail}`;
-      return `<div class="plan-row"><span class="plan-order">${index + 1}</span><div class="plan-row-copy"><strong>${action.title}</strong><small>${detail}</small></div><div class="plan-row-actions"><button class="plan-remove" type="button" data-remove="${action.id}">Retirer</button></div></div>`;
-    }).join("");
-    const emptyRows = Array.from({ length: Math.max(0, actionLimit - coreActionCount) }, (_, index) => `<div class="plan-slot"><span>${coreActionCount + index + 1}</span><em>Libre</em></div>`).join("");
-    content.innerHTML = `<div class="plan-list">${plannedRows}${emptyRows}</div><div class="plan-totals"><div class="plan-total-block"><span>Argent à la fin</span><strong class="${projectedMoney() >= state.money ? "positive" : "negative"}">${projectedMoney()} $</strong></div><div class="plan-total-block"><span>Gains / dépenses</span><strong><span class="positive">+${totals.earned} $</span> · <span class="negative">−${totals.spent} $</span></strong></div><div class="plan-total-block"><span>Effets prévus</span><div class="plan-effects">${effectParts.join(" · ") || "Aucun changement de jauge"}</div></div></div>`;
-  }
-  const localFightDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
-  const validation = planValidation();
-  const advance = document.querySelector("#advance-week");
-  const fightActions = document.querySelector("#plan-fight-actions");
-  advance.disabled = !validation.valid;
-  advance.hidden = localFightDue;
-  advance.title = validation.valid ? "" : validation.reason;
-  fightActions.hidden = !localFightDue;
-  document.querySelector("#plan-help").textContent = localFightDue ? `Le combat occupe une action. Tes ${actionLimit} autres choix seront appliqués avant l’entrée dans le ring.` : validation.reason;
-}
-
 function render() {
   const hasFighter = Boolean(state.profile);
   document.querySelector("#creation-screen").classList.toggle("hidden", hasFighter);
   document.querySelector("#game").classList.toggle("hidden", !hasFighter);
-  if (hasFighter) ensureCareerCalendar();
-  renderV2WorldPreview(hasFighter);
-  if (!hasFighter) return;
-
-  ensureDueTournamentActive();
-  renderFighter();
-  document.querySelector(".strength-membership-panel").hidden = isAwaitingAmateurTransition();
-  document.querySelector("#private-coaching").closest(".coaching-panel").hidden = isRecreationalCareer() || isAwaitingAmateurTransition();
-  document.querySelector("#money-spotlight").textContent = `${state.money} $`;
-  document.querySelector("#week").textContent = String(state.week).padStart(2, "0");
-  const weekStartDate = careerWeekDate(0);
-  const weekEndDate = careerWeekDate(6);
-  const topDate = document.querySelector("#top-date");
-  topDate.textContent = formatCareerDate(weekStartDate);
-  topDate.setAttribute("aria-label", `Semaine du ${formatCareerDate(weekStartDate, { long: true })} au ${formatCareerDate(weekEndDate, { long: true })}`);
-  const topEnergy = document.querySelector("#top-energy");
-  topEnergy.textContent = `E:${state.energy}%`;
-  topEnergy.setAttribute("aria-label", `Énergie ${state.energy} %`);
-  const topFitness = document.querySelector("#top-fitness");
-  topFitness.textContent = `Fo:${state.fitness}%`;
-  topFitness.setAttribute("aria-label", `Forme physique ${state.fitness} %`);
-  const topFatigue = document.querySelector("#top-fatigue");
-  topFatigue.textContent = `Fa:${state.fatigue}%`;
-  topFatigue.setAttribute("aria-label", `Fatigue ${state.fatigue} %`);
-  const topMorale = document.querySelector("#top-morale");
-  topMorale.textContent = `M:${state.morale}%`;
-  topMorale.setAttribute("aria-label", `Moral ${state.morale} %`);
-  const topMoney = document.querySelector("#top-money");
-  topMoney.textContent = `${state.money}$`;
-  topMoney.setAttribute("aria-label", `Argent disponible ${state.money} dollars`);
-  const actionLimit = weeklyActionLimit();
-  const galaDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
-  document.querySelector("#action-limit-help").textContent = isAwaitingAmateurTransition() ? "Le parcours est en pause : confirme le passage amateur dans le calendrier." : isRecreationalLimitReached() ? "La semaine 10 clôt le parcours récréatif : confirme le passage amateur dans le calendrier." : isRecreationalCareer() ? `Parcours récréatif : peu de choix, une base solide. Le sparring avec Rémy arrive en semaine ${RECREATIONAL_SPARRING_WEEK}.` : actionLimit === 0 ? "Le tournoi occupe toute la semaine : les décisions se prennent dans le hub de compétition." : hasWeakBoxingRhythm() ? "Rythme faible : une seule action est disponible jusqu’à un entraînement de boxe." : galaDue ? `Le gala réserve une action : ${actionLimit} choix de camp restent disponibles avant le combat.` : actionLimit === 4 ? "Expérience acquise : compose maintenant un programme de quatre actions." : `Trois actions par semaine · la quatrième se débloque après ${Math.max(0, 10 - amateurFightCount())} combat${10 - amateurFightCount() > 1 ? "s" : ""}.`;
-  const pips = document.querySelector("#action-pips");
-  const plannedCoreActions = plannedCoreActionCount();
-  pips.innerHTML = Array.from({ length: actionLimit }, (_, index) => `<span class="pip ${index < plannedCoreActions ? "active" : ""}"></span>`).join("");
-  pips.setAttribute("aria-label", `${plannedCoreActions} action${plannedCoreActions > 1 ? "s" : ""} planifiée${plannedCoreActions > 1 ? "s" : ""} sur ${actionLimit}${weeklyPlan.some(item => item.actionId === "vacation") ? ", plus une semaine de vacances payées" : ""}`);
-
-  document.querySelector("#stats").innerHTML = generalStats.map(stat => {
-    const display = `${state[stat.key]}${stat.suffix}`;
-    const width = clamp((state[stat.key] / (stat.max || 100)) * 100);
-    return `<div class="stat ${stat.className || ""}">
-      <div class="stat-top"><span>${stat.label}</span><span class="stat-value">${display}</span></div>
-      <div class="meter" role="progressbar" aria-label="${stat.label}" aria-valuemin="0" aria-valuemax="${stat.max || 100}" aria-valuenow="${state[stat.key]}"><div class="meter-fill" style="width:${width}%"></div></div>
-    </div>`;
-  }).join("");
-
-  renderMembership();
-  renderStrengthMembership();
-  renderPrivateCoaching();
-  renderEmployment();
+  if (!hasFighter) {
+    renderV2WorldPreview(false);
+    return;
+  }
+  renderLevel();
   renderFights();
-  renderActions();
-  renderPlan();
+  renderV2WorldPreview(true);
   persistCareer();
 }
 
 function renderV2WorldPreview(hasFighter = Boolean(state.profile)) {
   const root = document.querySelector("#v2-world");
-  const active = Boolean(V2_ACTIVE && hasFighter && window.BoxeurWorld && window.BoxeurCareerV2Migration);
+  const active = Boolean(hasFighter && window.BoxeurWorld && window.BoxeurCareerV2Migration);
   document.body.classList.toggle("v2-preview", active);
   if (!root) return;
   root.hidden = !active;
@@ -2891,9 +1967,11 @@ function v2PreviewFingerprint(career = state) {
 
 function createV2PreviewCapsule() {
   const snapshot = careerSnapshot();
+  if (legacyPendingPlanForMigration.length) snapshot.weeklyPlan = cloneData(legacyPendingPlanForMigration);
   const capsule = window.BoxeurCareerV2Migration.migrateV5ToV2(snapshot, {
     seed: `preview:${v2PreviewFingerprint(state)}`,
   });
+  legacyPendingPlanForMigration = [];
   capsule.previewFingerprint = v2PreviewFingerprint(state);
   capsule.previewRuntime = {
     trainingSessions: safeNumber(state.recreationalTrainingWeeks, 0, 0, 999),
@@ -3031,8 +2109,11 @@ function invalidateV2PreviewCapsule() {
 }
 
 function ensureV2PreviewCapsule() {
-  if (!V2_ACTIVE || !state.profile || !window.BoxeurCareerV2Migration) return null;
-  if (v2PreviewCapsule?.previewFingerprint === v2PreviewFingerprint(state)) return v2PreviewCapsule;
+  if (!state.profile || !window.BoxeurCareerV2Migration) return null;
+  if (v2PreviewCapsule?.previewFingerprint === v2PreviewFingerprint(state)) {
+    legacyPendingPlanForMigration = [];
+    return v2PreviewCapsule;
+  }
   try {
     const stored = JSON.parse(localStorage.getItem(V2_PREVIEW_SAVE_KEY) || "null");
     if (window.BoxeurCareerV2Migration.isV2Capsule(stored) && stored.previewFingerprint === v2PreviewFingerprint(state)) {
@@ -3045,6 +2126,7 @@ function ensureV2PreviewCapsule() {
     v2PreviewCapsule = createV2PreviewCapsule();
   }
   normalizeV2PreviewRuntime(v2PreviewCapsule);
+  legacyPendingPlanForMigration = [];
   persistV2PreviewCapsule();
   return v2PreviewCapsule;
 }
@@ -3456,7 +2538,6 @@ function v2GymContext() {
   const trainingContext = v2TrainingContext();
   const coachSession = window.BoxeurTraining.buildCoachSession(capsule.timeState, trainingContext);
   const coachPreview = window.BoxeurTraining.previewSession(capsule.timeState, coachSession, trainingContext);
-  const boxingCoach = privateCoaches.find(item => item.id === state.privateProgram?.coachId && item.type === "boxing");
   const runtime = normalizeV2PreviewRuntime(capsule);
   const activeTrainerProgram = window.BoxeurTrainer && runtime.career.v2TrainerState
     ? window.BoxeurTrainer.getPublicState(runtime.career.v2TrainerState).activeProgram
@@ -3495,7 +2576,7 @@ function v2GymContext() {
       trainingBlockedReason,
     },
     coach: {
-      name: boxingCoach?.name || "l’entraîneur du GYM",
+      name: "l’entraîneur du GYM",
       sessionTitle: state.careerStatus === "recreational" ? "Cours de groupe · fondamentaux" : coachSession.label,
       sessionSummary: coachSession.blocks.map(block => block.label).join(" · "),
       durationMinutes: coachPreview.totals?.durationMinutes || 0,
@@ -3709,35 +2790,6 @@ const V2_HOME_ACTIVITIES = Object.freeze({
   }),
 });
 
-function v2ActivityOnCurrentDay(timeState, predicate) {
-  if (!Array.isArray(timeState?.history) || !window.BoxeurTime) return null;
-  const dayStart = v2DayStartSlot(timeState);
-  const dayEnd = dayStart + window.BoxeurTime.PERIODS_PER_DAY;
-  return [...timeState.history].reverse().find(event => (
-    event?.type === "activity-completed"
-    && Number(event.fromSlot) >= dayStart
-    && Number(event.fromSlot) < dayEnd
-    && predicate(event)
-  )) || null;
-}
-
-function v2HomeActivityState(timeState, viewId, physicalDone) {
-  const activity = V2_HOME_ACTIVITIES[viewId];
-  if (!activity) return { available: false, reason: "Activité inconnue." };
-  if (activity.category === "home-training") {
-    if (state.injuryWeeks > 0) return { available: false, reason: v2PreparationView(timeState).detail };
-    if (physicalDone) return { available: false, reason: "Une activité physique principale a déjà été faite aujourd’hui." };
-  }
-  if (viewId === "meal" && v2ActivityOnCurrentDay(timeState, event => event.activityId === activity.id)) {
-    return { available: false, reason: "Le repas de récupération de cette journée est déjà préparé." };
-  }
-  if (v2WouldCrossWeek(timeState, activity.duration)) {
-    return { available: false, reason: "Cette activité dépasserait la fin de la semaine actuelle." };
-  }
-  const check = window.BoxeurTime.canPerformActivity(timeState, activity);
-  return { available: check.ok, reason: check.ok ? "" : check.reason };
-}
-
 function v2HomeContext() {
   const capsule = ensureV2PreviewCapsule();
   if (!capsule?.timeState || !window.BoxeurRecovery || !window.BoxeurTime || !window.BoxeurWeekPlanner) return null;
@@ -3780,7 +2832,6 @@ function v2HomeContext() {
       "roadwork-long": actionState("roadwork-long"),
       "roadwork-intervals": actionState("roadwork-intervals"),
       meal: { ...actionState("meal"), moneyCost: 15 },
-      "play-v1": { available: true, reason: "" },
     },
     weekCapacity: {
       allowed: preview.capacity.total,
@@ -4062,7 +3113,6 @@ function unreserveV2PlannerSupplement(entryId) {
 function closeV2Location() {
   const sheet = document.querySelector("#v2-world .v2-location-sheet");
   if (!sheet) return;
-  if (sheet.querySelector(".v2-supplement-picker")) v2PendingTraining = null;
   const origin = sheet.dataset.originLocation;
   const rememberedFocus = v2LocationReturnFocus;
   sheet.hidden = true;
@@ -4947,31 +3997,6 @@ function applyV2QuickWeekPlan() {
   }
 }
 
-function v2WeekActionAllowance(career = v2CareerView()) {
-  const bouts = Number(career.amateurRecord?.wins || 0) + Number(career.amateurRecord?.losses || 0);
-  return bouts >= 10 ? 4 : 3;
-}
-
-function v2WeekTrainingCapacity(timeState, career = v2CareerView()) {
-  const jobConsumesRoutine = Boolean(career.jobId);
-  const allowed = career.gymWeeks > 0
-    ? Math.max(0, Math.min(3, v2WeekActionAllowance(career) - (jobConsumesRoutine ? 1 : 0)))
-    : 0;
-  const used = v2WeekTrainingActivityCount(timeState);
-  return { allowed, used, remaining: Math.max(0, allowed - used) };
-}
-
-function v2WeekCompletedActivityCount(timeState) {
-  if (!timeState?.clock || !Array.isArray(timeState.history) || !window.BoxeurTime) return 0;
-  const start = v2WeekStartSlot(timeState);
-  const end = start + window.BoxeurTime.PERIODS_PER_WEEK;
-  return timeState.history.filter(event => (
-    event.type === "activity-completed"
-    && Number(event.fromSlot) >= start
-    && Number(event.fromSlot) < end
-  )).length;
-}
-
 function v2WeekQuickBlockReason(career = v2CareerView()) {
   const onboarding = v2OnboardingView();
   if (onboarding && !onboarding.gates.closeWeek.allowed) return onboarding.gates.closeWeek.reason;
@@ -4988,114 +4013,6 @@ function v2WeekQuickBlockReason(career = v2CareerView()) {
   ));
   if (importantAppointment) return `${importantAppointment.title || "Un rendez-vous"} doit être réglé avant de confirmer toute la semaine.`;
   return "";
-}
-
-function v2WeekFlexibleSchedule(timeState, career, capacity) {
-  const weekStart = v2WeekStartSlot(timeState);
-  const now = Math.max(0, timeState.clock.absoluteSlot - weekStart);
-  const weekEnd = window.BoxeurTime.PERIODS_PER_WEEK;
-  const occupied = [];
-  const physicalDays = new Set((timeState.history || []).filter(event => (
-    v2IsPrimaryPhysicalEvent(event)
-      && Number(event.fromSlot) >= weekStart
-      && Number(event.fromSlot) < weekStart + weekEnd
-  )).map(event => Math.floor((Number(event.fromSlot) - weekStart) / window.BoxeurTime.PERIODS_PER_DAY)));
-  const reserve = (slot, duration) => occupied.push({ from: slot, to: slot + duration });
-  const findSlot = (preferred, duration) => {
-    for (let slot = Math.max(now, preferred); slot + duration <= weekEnd; slot += 1) {
-      if (occupied.every(range => slot + duration <= range.from || slot >= range.to)) return slot;
-    }
-    return null;
-  };
-  const findTrainingSlot = preferred => {
-    const firstCandidate = Math.max(now, preferred);
-    for (let slot = 2; slot < weekEnd; slot += window.BoxeurTime.PERIODS_PER_DAY) {
-      const dayIndex = Math.floor(slot / window.BoxeurTime.PERIODS_PER_DAY);
-      if (slot < firstCandidate || physicalDays.has(dayIndex)) continue;
-      if (occupied.every(range => slot + 1 <= range.from || slot >= range.to)) return slot;
-    }
-    return null;
-  };
-  const job = jobs.find(item => item.id === career.jobId) || null;
-  const workCompleted = Boolean(job && v2WeekWorkActivityCount(timeState, job.id) > 0);
-  const workSlot = job && !workCompleted ? findSlot(0, 2) : null;
-  if (workSlot != null) reserve(workSlot, 2);
-  const trainingSlots = [];
-  const preferredTrainingSlots = [2, 8, 14];
-  for (let index = 0; index < capacity.remaining; index += 1) {
-    const preferred = preferredTrainingSlots[Math.min(preferredTrainingSlots.length - 1, capacity.used + index)];
-    const slot = findTrainingSlot(preferred);
-    if (slot == null) break;
-    reserve(slot, 1);
-    physicalDays.add(Math.floor(slot / window.BoxeurTime.PERIODS_PER_DAY));
-    trainingSlots.push(slot);
-  }
-  return {
-    job,
-    workCompleted,
-    workSlot,
-    missedWork: Boolean(job && !workCompleted && workSlot == null),
-    trainingSlots,
-    unscheduledTraining: Math.max(0, capacity.remaining - trainingSlots.length),
-  };
-}
-
-function v2WeekEngineConfig() {
-  const capsule = ensureV2PreviewCapsule();
-  const career = v2CareerView();
-  const capacity = v2WeekTrainingCapacity(capsule.timeState, career);
-  const schedule = v2WeekFlexibleSchedule(capsule.timeState, career, capacity);
-  const config = {
-    finances: { money: career.money },
-    budget: { trainingSessions: capacity.allowed, shortRecoveries: 2 },
-    recovery: { energyThreshold: 45, fatigueThreshold: 58 },
-  };
-  if (schedule.trainingSlots.length > 0) {
-    config.trainingContext = v2TrainingContext();
-    config.training = {
-      slots: schedule.trainingSlots,
-      context: v2TrainingContext(),
-    };
-  } else {
-    config.training = false;
-  }
-  if (schedule.job && schedule.workSlot != null) {
-    config.work = {
-      id: schedule.job.id,
-      title: schedule.job.title,
-      weeklyPay: schedule.job.wage,
-      energy: schedule.job.energy,
-      fatigue: schedule.job.fatigue,
-      duration: 2,
-      shifts: [{ relativeSlot: schedule.workSlot }],
-    };
-  }
-  return config;
-}
-
-function v2WeekPlanItems(career, capacity, schedule) {
-  const job = schedule.job;
-  const items = [];
-  if (job && schedule.workCompleted) {
-    items.push({ label: job.title, detail: "Travail déjà fait · la paie hebdomadaire ne sera pas versée une deuxième fois.", tone: "positive" });
-  } else if (job && schedule.workSlot != null) {
-    items.push({ label: job.title, detail: `Semaine de travail simulée · paie ${job.wage} $ · fatigue normale appliquée`, tone: "neutral" });
-  } else if (schedule.missedWork) {
-    items.push({ label: "Travail non effectué", detail: "Il ne reste pas deux périodes avant lundi : aucune paie ne sera inventée.", tone: "warning" });
-  }
-  if (schedule.trainingSlots.length > 0) {
-    items.push({
-      label: `${schedule.trainingSlots.length} séance${schedule.trainingSlots.length > 1 ? "s" : ""} productive${schedule.trainingSlots.length > 1 ? "s" : ""}`,
-      detail: capacity.used > 0 ? `${capacity.used} déjà faite${capacity.used > 1 ? "s" : ""}; le coach complète seulement ce qui tient encore dans la semaine.` : "Réparties dans la semaine selon ton énergie et ta fatigue.",
-      tone: "positive",
-    });
-  } else if (career.gymWeeks <= 0) {
-    items.push({ label: "Maintien sans GYM", detail: "Aucun gain ciblé du coach; le sac au sous-sol demeure accessible en mode détaillé.", tone: "warning" });
-  }
-  if (schedule.unscheduledTraining > 0) items.push({ label: "Temps insuffisant", detail: `${schedule.unscheduledTraining} séance${schedule.unscheduledTraining > 1 ? "s" : ""} restante${schedule.unscheduledTraining > 1 ? "s" : ""} ne sera pas comprimée artificiellement avant lundi.`, tone: "warning" });
-  items.push({ label: "Récupération", detail: "Les nuits et, au besoin, jusqu’à deux récupérations courtes assimilent la charge.", tone: "positive" });
-  items.push({ label: "Arrêt automatique", detail: "La simulation s’arrête avant une pesée, un combat, un tournoi ou une décision importante.", tone: "neutral" });
-  return items;
 }
 
 function v2WeekViewContext() {
@@ -5969,11 +4886,6 @@ function closeOptionalDialog(dialogId) {
   dialog.close();
 }
 
-function v2InitialJobSelectionRequired() {
-  if (!V2_ACTIVE || !state.profile) return false;
-  return v2OnboardingView()?.gates.jobSelection.required === true;
-}
-
 function runV2WorkShift() {
   const capsule = ensureV2PreviewCapsule();
   if (!capsule || !window.BoxeurWeekPlanner) return;
@@ -5983,67 +4895,6 @@ function runV2WorkShift() {
   ensureV2WeekPlanner(capsule);
   openV2WeekPlan();
   showToast(`${job.title} est déjà réservé par défaut · paie de ${job.wage} $ à la confirmation`);
-}
-
-function commitV2SessionResult(outcome) {
-  const capsule = ensureV2PreviewCapsule();
-  if (!capsule) return;
-  const trainedEarlierThisWeek = v2WeekTrainingActivityCount(capsule.timeState) > 0;
-  capsule.timeState = outcome.timeState;
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  runtime.weekMode = "detailed";
-  runtime.career.experience += safeNumber(outcome.result.xpAward, 0, 0, 1000);
-  if (state.careerStatus === "recreational" && !trainedEarlierThisWeek && v2WeekTrainingActivityCount(outcome.timeState) > 0) {
-    runtime.trainingSessions = safeNumber(runtime.trainingSessions + 1, 0, 0, 999);
-  }
-  runtime.sessions.unshift(cloneData(outcome.result));
-  runtime.sessions = runtime.sessions.slice(0, 50);
-  v2ProgressionSnapshot(capsule);
-  persistV2PreviewCapsule();
-}
-
-function renderV2SessionResult(outcome) {
-  renderV2WorldPreview(true);
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  if (!sheet || !window.BoxeurGymView) return;
-  const pendingLoad = Object.values(outcome.result.remainingStimulus || {}).reduce((sum, value) => sum + Number(value || 0), 0);
-  const sessionDelta = outcome.result.sessionConditionDelta || outcome.result.conditionDelta;
-  const nightDelta = outcome.result.nightRecoveryDelta || { energy: 0, fatigue: 0 };
-  const crossedNight = nightDelta.energy !== 0 || nightDelta.fatigue !== 0;
-  const changes = [
-    { label: "Énergie · séance", value: v2Signed(sessionDelta.energy), tone: sessionDelta.energy < 0 ? "warning" : "positive" },
-    { label: "Fatigue · séance", value: v2Signed(sessionDelta.fatigue), tone: sessionDelta.fatigue > 0 ? "warning" : "positive" },
-    { label: "Charge encore à assimiler", value: v2Signed(pendingLoad, " pts"), tone: "neutral" },
-    { label: "Usure de séance", value: v2Signed(outcome.result.wear, ""), tone: outcome.result.wear >= 2 ? "warning" : "neutral" },
-  ];
-  if (outcome.result.supplement) {
-    changes.push({ label: "Produit utilisé", value: outcome.result.supplement.label, tone: "positive" });
-  }
-  if (crossedNight) {
-    changes.splice(2, 0, {
-      label: "Récupération de nuit",
-      value: `${v2Signed(nightDelta.energy, " E")} · ${v2Signed(nightDelta.fatigue, " F")}`,
-      tone: "positive",
-    });
-  }
-  sheet.dataset.originLocation = "boxing-gym";
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.innerHTML = window.BoxeurGymView.renderResult({
-    title: outcome.result.label,
-    summary: "La charge est enregistrée. Les gains permanents seront assimilés pendant la récupération, pas au moment du clic.",
-    durationMinutes: outcome.result.durationMinutes,
-    changes,
-    highlights: [
-      ...outcome.session.blocks.map(block => block.label),
-      ...(outcome.result.supplement ? [`${outcome.result.supplement.label} · ${outcome.result.supplement.benefit}`] : []),
-    ],
-    nextStep: crossedNight
-      ? "La nuit a déjà assimilé une partie du travail; la charge restante demandera encore de la récupération."
-      : outcome.timeState.clock.period === "evening"
-        ? "La soirée arrive : une nuit complète transformera une partie de cette charge en progression."
-        : "Tu peux encore faire une activité légère, mais empiler les grosses séances réduit leur rendement.",
-  });
-  activateV2LocationSheet(sheet, "[data-v2-result-close]");
 }
 
 function v2SupplementState(capsule = ensureV2PreviewCapsule()) {
@@ -6097,130 +4948,6 @@ function purchaseV2Supplement(productId) {
   }
 }
 
-function renderV2SupplementPicker() {
-  const pending = v2PendingTraining;
-  const capsule = ensureV2PreviewCapsule();
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  if (!pending || !capsule || !sheet || !window.BoxeurSupplements) return;
-  const supplementState = v2SupplementState(capsule);
-  const options = window.BoxeurSupplements.getUseOptions(supplementState, {
-    sessionId: pending.sessionId,
-    useId: `use:${pending.sessionId}`,
-    weekKey: pending.weekKey,
-    careerStatus: state.careerStatus,
-  }).filter(option => option.quantity > 0);
-  const cards = options.map(option => `<article class="v2-supplement-card${option.available ? "" : " unavailable"}"><div><p class="eyebrow">Inventaire ×${option.quantity}</p><h3>${escapeHTML(option.label)}</h3></div><p>${escapeHTML(option.benefit)}</p><small>Compromis : ${escapeHTML(option.compromise)}</small><button type="button" data-v2-supplement-prepare="${option.id}"${option.available ? "" : " disabled aria-disabled=\"true\""}>Utiliser pour cette séance</button>${option.available ? "" : `<small class="v2-service-reason">${escapeHTML(option.disabledReason)}</small>`}</article>`).join("");
-  sheet.dataset.originLocation = pending.locationId;
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.classList.toggle("v2-location-sheet-strength", pending.locationId === "strength-gym");
-  sheet.innerHTML = `<section class="v2-service-panel v2-supplement-picker" aria-labelledby="v2-supplement-picker-title"><header><div><p class="eyebrow">Avant la séance</p><h2 id="v2-supplement-picker-title">Préparer un supplément?</h2></div><button type="button" class="secondary-button" data-v2-supplement-picker-close>Retour</button></header><p>Le produit modifie légèrement l’énergie ou la fatigue de cette séance seulement. Le stimulus, l’XP et les statistiques ne changent pas.</p>${cards ? `<div class="v2-supplement-grid">${cards}</div>` : `<p class="v2-service-empty">Ton inventaire est vide. La boutique se trouve au gym de musculation.</p>`}<div class="v2-service-actions"><button type="button" class="primary-button" data-v2-supplement-skip>Commencer sans produit</button></div></section>`;
-  activateV2LocationSheet(sheet, "[data-v2-supplement-skip]");
-}
-
-function queueV2Training(kind, payload, locationId) {
-  const capsule = ensureV2PreviewCapsule();
-  if (!capsule?.timeState) return;
-  const windowState = v2NextTrainingWindow(capsule.timeState);
-  if (!windowState.available) return showToast(windowState.reason);
-  try {
-    const previewTime = windowState.waitPeriods > 0
-      ? window.BoxeurTime.advanceTime(capsule.timeState, windowState.waitPeriods)
-      : capsule.timeState;
-    const preview = kind === "strength"
-      ? window.BoxeurStrength.previewSession(previewTime, payload, { ...v2StrengthContext(), physicalSessionCompletedToday: false })
-      : window.BoxeurTraining.previewSession(previewTime, payload, v2TrainingContext());
-    if (!preview.ok) throw new Error(preview.reason);
-    const payloadId = kind === "strength" ? payload.join("-") : payload.id;
-    v2PendingTraining = {
-      kind,
-      payload: cloneData(payload),
-      locationId,
-      sessionId: `${kind}:${capsule.timeState.clock.week}:${windowState.startSlot}:${safeIdentifier(payloadId, "session")}`,
-      weekKey: `week-${capsule.timeState.clock.week}`,
-    };
-    const inventory = window.BoxeurSupplements && ["amateur", "professional"].includes(state.careerStatus)
-      ? window.BoxeurSupplements.inventoryList(v2SupplementState(capsule))
-      : [];
-    if (!inventory.length) executeV2PendingTraining(null);
-    else renderV2SupplementPicker();
-  } catch (error) {
-    showToast(error.message || "Cette séance n’est pas disponible maintenant.");
-  }
-}
-
-function closeV2SupplementPicker() {
-  const pending = v2PendingTraining;
-  v2PendingTraining = null;
-  if (!pending) return;
-  if (pending.kind === "strength") renderV2StrengthGym();
-  else if (pending.payload?.source === "custom") renderV2Composer();
-  else openV2Location("boxing-gym");
-}
-
-function executeV2PendingTraining(productId = null) {
-  const pending = v2PendingTraining;
-  const capsule = ensureV2PreviewCapsule();
-  if (!pending || !capsule?.timeState) return;
-  const beforeCapsule = cloneData(capsule);
-  const beforeCareerState = cloneData(state);
-  let runtime;
-  let outcome;
-  try {
-    runtime = normalizeV2PreviewRuntime(capsule);
-    prepareV2TrainingWindow(capsule);
-    let sessionAdjustment = null;
-    let supplementOutcome = null;
-    if (productId) {
-      const sourceSupplementState = v2SupplementState(capsule);
-      const prepared = window.BoxeurSupplements.prepareForSession(sourceSupplementState, productId, {
-        sessionId: pending.sessionId,
-        useId: `use:${pending.sessionId}`,
-        weekKey: pending.weekKey,
-        careerStatus: state.careerStatus,
-      });
-      const baseTotals = pending.kind === "strength"
-        ? window.BoxeurStrength.aggregateSelection(pending.payload).totals
-        : window.BoxeurTraining.aggregateSession(pending.payload).totals;
-      supplementOutcome = window.BoxeurSupplements.applyToSession(prepared.state, baseTotals, { sessionId: pending.sessionId });
-      sessionAdjustment = supplementOutcome.session;
-    }
-    outcome = pending.kind === "strength"
-      ? window.BoxeurStrength.executeSession(capsule.timeState, pending.payload, {
-          ...v2StrengthContext(),
-          physicalSessionCompletedToday: false,
-          sessionAdjustment,
-        })
-      : window.BoxeurTraining.executeSession(capsule.timeState, pending.payload, {
-          ...v2TrainingContext(),
-          sessionAdjustment,
-        });
-    if (supplementOutcome) {
-      runtime.career.v2SupplementState = supplementOutcome.state;
-      outcome.result.supplement = supplementOutcome.result;
-    }
-    if (pending.kind === "strength") commitV2StrengthResult(outcome);
-    else commitV2SessionResult(outcome);
-  } catch (error) {
-    v2PreviewCapsule = beforeCapsule;
-    state = beforeCareerState;
-    v2PendingTraining = pending;
-    showToast(error.message || "La séance n’a pas pu commencer; aucun produit n’a été consommé.");
-    renderV2SupplementPicker();
-    return;
-  }
-  v2PendingTraining = null;
-  if (pending.kind === "strength") v2StrengthSelection = [];
-  else if (pending.payload?.source === "custom") v2ComposerSelection = [];
-  try {
-    if (pending.kind === "strength") renderV2StrengthResult(outcome);
-    else renderV2SessionResult(outcome);
-  } catch (error) {
-    console.error("[Boxeur Deux] Résultat de séance impossible à afficher :", error);
-    renderV2WorldPreview(true);
-    showToast("Séance enregistrée. Retourne au gym pour consulter ton nouvel état.");
-  }
-}
-
 function runV2CoachSession() {
   const plannerId = state.careerStatus === "recreational" ? "group-class" : "boxing-coach";
   addV2PlannerActivity(plannerId, {}, { toggle: plannerId === "group-class", reopen: "boxing-gym" });
@@ -6254,25 +4981,6 @@ function renderV2WorkMenu(menuId) {
   activateV2LocationSheet(sheet, preferredFocus);
 }
 
-const V2_HOME_ACTION_TO_ENGINE = Object.freeze({
-  sleep: "sleep_until_morning",
-  recover: "active_recovery",
-  advance: "advance_free_period",
-});
-
-function renderV2ClassicComputer() {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  if (!sheet) return;
-  sheet.dataset.originLocation = "home";
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.innerHTML = `<section class="v2-classic-computer" aria-labelledby="v2-classic-computer-title">
-    <header><div><p class="eyebrow">Ordinateur de la maison</p><h2 id="v2-classic-computer-title">BoxeurDeux classique</h2></div><button type="button" class="secondary-button" data-v2-classic-close>Fermer l’ordinateur</button></header>
-    <p>La V1 reste jouable comme un jeu à part. Cette partie isolée ne remplace pas ta carrière V2 et ne fait pas avancer son temps.</p>
-    <div class="v2-classic-monitor"><iframe src="./?classic=1&amp;arcade=1" title="BoxeurDeux classique dans l’ordinateur de la maison" sandbox="allow-scripts allow-forms allow-modals" loading="eager"></iframe></div>
-  </section>`;
-  activateV2LocationSheet(sheet, "[data-v2-classic-close]");
-}
-
 function renderV2HomeMenu(menuId) {
   const sheet = document.querySelector("#v2-world .v2-location-sheet");
   if (!sheet || !window.BoxeurHomeView?.renderMenu) return;
@@ -6284,32 +4992,7 @@ function renderV2HomeMenu(menuId) {
   activateV2LocationSheet(sheet, "[data-v2-home-action], [data-v2-home-menu-close]");
 }
 
-function showV2HomeActivityResult({ title, summary, before, after, stimulusAdded = 0, xpAward = 0, recommendation = "" }) {
-  renderV2WorldPreview(true);
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  if (!sheet || !window.BoxeurHomeView) return;
-  sheet.dataset.originLocation = "home";
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.innerHTML = window.BoxeurHomeView.renderResult({
-    title,
-    summary,
-    timeLabel: `${after.clock.dayLabel} · ${after.clock.periodLabel} · ${v2CareerView().v2DateLabel}`,
-    changes: [
-      { label: "Énergie", value: v2Signed(after.condition.energy - before.condition.energy, " pts"), tone: after.condition.energy >= before.condition.energy ? "positive" : "warning" },
-      { label: "Fatigue", value: v2Signed(after.condition.fatigue - before.condition.fatigue, " pts"), tone: after.condition.fatigue <= before.condition.fatigue ? "positive" : "warning" },
-      { label: "Charge ajoutée", value: v2Signed(stimulusAdded, " pts"), tone: stimulusAdded > 0 ? "neutral" : "positive" },
-      { label: "Expérience", value: xpAward > 0 ? `+${xpAward} XP` : "Aucune", tone: xpAward > 0 ? "positive" : "neutral" },
-    ],
-    recommendation,
-  });
-  activateV2LocationSheet(sheet, "[data-v2-home-result-close]");
-}
-
 function runV2HomeAction(viewActionId) {
-  if (viewActionId === "play-v1") {
-    renderV2ClassicComputer();
-    return;
-  }
   if (viewActionId === "home-custom") {
     if (state.careerStatus === "recreational") return showToast("La séance maison personnalisée se débloque après le passage amateur.");
     v2HomeSelection = [];
@@ -6453,43 +5136,6 @@ function selectV2StrengthPlan(planId) {
   showToast(`Gym de musculation actif · ${plan.label.toLowerCase()} · ${plan.weeks} semaines`);
 }
 
-function commitV2StrengthResult(outcome) {
-  const capsule = ensureV2PreviewCapsule();
-  if (!capsule || !outcome?.result || !window.BoxeurStrengthView) return;
-  capsule.timeState = outcome.timeState;
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  runtime.weekMode = "detailed";
-  runtime.career.experience += safeNumber(outcome.result.xpAward, 0, 0, 1000);
-  runtime.sessions.unshift(cloneData(outcome.result));
-  runtime.sessions = runtime.sessions.slice(0, 50);
-  v2ProgressionSnapshot(capsule);
-  persistV2PreviewCapsule();
-}
-
-function renderV2StrengthResult(outcome) {
-  renderV2WorldPreview(true);
-
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  if (!sheet) return;
-  const remaining = Object.values(outcome.result.remainingStimulus || {}).reduce((sum, value) => sum + Number(value || 0), 0);
-  sheet.dataset.originLocation = "strength-gym";
-  sheet.classList.add("v2-location-sheet-full", "v2-location-sheet-strength");
-  sheet.innerHTML = window.BoxeurStrengthView.renderResult({
-    title: outcome.result.label,
-    summary: "La séance produit une charge physique à assimiler; elle ne donne aucun point de statistique instantané.",
-    durationMinutes: outcome.result.durationMinutes,
-    activities: outcome.session.activities.map(activity => activity.label),
-    changes: [
-      { label: "Énergie · séance", value: v2Signed(outcome.result.sessionConditionDelta.energy), tone: "warning" },
-      { label: "Fatigue · séance", value: v2Signed(outcome.result.sessionConditionDelta.fatigue), tone: "warning" },
-      { label: "Charge à assimiler", value: v2Signed(remaining, " pts"), tone: "neutral" },
-      { label: "Expérience", value: `+${outcome.result.xpAward} XP`, tone: "positive" },
-      ...(outcome.result.supplement ? [{ label: "Produit utilisé", value: outcome.result.supplement.label, tone: "positive" }] : []),
-    ],
-  });
-  activateV2LocationSheet(sheet, "[data-v2-strength-result-close]");
-}
-
 function runV2StrengthSession() {
   if (!window.BoxeurStrength || !v2StrengthSelection.length) {
     return showToast("Ajoute au moins un exercice de travail physique.");
@@ -6513,12 +5159,6 @@ function v2TrainerAccess(locationId, program = null) {
   if (!capsule?.timeState || !career) return { available: false, reason: "Carrière V2 indisponible." };
   if (!["amateur", "professional"].includes(state.careerStatus)) {
     return { available: false, reason: "Les programmes privés se débloquent après le passage amateur." };
-  }
-  if (state.privateProgram) {
-    return {
-      available: false,
-      reason: "Un programme privé de l’interface classique est encore actif. Termine-le depuis l’ordinateur de la maison avant d’en commencer un nouveau.",
-    };
   }
   const membershipActive = locationId === "strength-gym" ? career.strengthGymWeeks > 0 : career.gymWeeks > 0;
   if (!membershipActive) return { available: false, reason: "Un abonnement actif dans ce gym est requis." };
@@ -6619,24 +5259,6 @@ function startV2TrainerProgram(trainerId) {
   }
 }
 
-function showV2TrainerResult(locationId, outcome) {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  if (!sheet) return;
-  const result = outcome.result;
-  const accepted = Object.values(result.progression?.effectiveAccepted || {}).reduce((sum, value) => sum + Number(value || 0), 0);
-  sheet.dataset.originLocation = locationId;
-  sheet.dataset.trainerLocation = locationId;
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.classList.toggle("v2-location-sheet-strength", locationId === "strength-gym");
-  sheet.innerHTML = `<section class="v2-service-panel v2-trainer-result" aria-labelledby="v2-trainer-result-title" aria-live="polite">
-    <p class="eyebrow">Séance privée terminée</p><h2 id="v2-trainer-result-title">${escapeHTML(result.trainer.label)} · ${escapeHTML(v2TrainerTargetLabel(result.target))}</h2>
-    <p>${result.programCompleted ? "Programme complété. Le travail déjà créé continuera de s’assimiler pendant la récupération." : `${result.program.sessionsCompleted}/${result.program.sessionsTotal} séances complétées dans ce programme.`}</p>
-    <ul class="v2-service-result-list"><li><span>Énergie</span><strong>${v2Signed(result.energyDelta)}</strong></li><li><span>Fatigue</span><strong>${v2Signed(result.fatigueDelta)}</strong></li><li><span>Charge ciblée acceptée</span><strong>${v2Signed(accepted, " pts")}</strong></li></ul>
-    <div><button type="button" class="secondary-button" data-v2-trainer-result-close>Continuer au gym</button><button type="button" class="primary-button" data-v2-leave-${locationId === "strength-gym" ? "strength-gym" : "gym"}>Retour à la carte</button></div>
-  </section>`;
-  activateV2LocationSheet(sheet, "[data-v2-trainer-result-close]");
-}
-
 function runV2TrainerSession() {
   const capsule = ensureV2PreviewCapsule();
   if (!capsule?.timeState || !window.BoxeurTrainer) return;
@@ -6734,119 +5356,6 @@ function applyCombatChanges(changes = {}) {
   });
 }
 
-function toggleAction(action) {
-  if (!action) return showToast("Cette action n’est plus disponible.");
-  if (action.id === "drug-sales") return registerDeveloperSecretTap();
-  const existing = weeklyPlan.findIndex(item => item.actionId === action.id);
-  if (existing >= 0) {
-    weeklyPlan.splice(existing, 1);
-    render();
-    return;
-  }
-  const lock = actionLock(action);
-  if (lock) return showToast(lock);
-  weeklyPlan.push({ actionId: action.id });
-  render();
-}
-
-function openCoachMenu() {
-  if (state.privateProgram) return;
-  const activeV2Program = window.BoxeurTrainer && state.v2TrainerState
-    ? window.BoxeurTrainer.getPublicState(window.BoxeurTrainer.createState(state.v2TrainerState)).activeProgram
-    : null;
-  if (activeV2Program) {
-    showToast("Un programme privé V2 est déjà actif. Termine-le dans le gym correspondant.");
-    return;
-  }
-  selectedPrivateCoachId = null;
-  document.querySelector("#private-dialog-title").textContent = "Choisir un spécialiste";
-  document.querySelector("#private-dialog-copy").textContent = "Les coachs de boxe travaillent la technique et la défense; le GYM de boxe donne 10 $ de rabais par cours. Les préparateurs physiques travaillent la puissance et le cardio et exigent un abonnement actif au gym de musculation.";
-  document.querySelector("#private-stat-field").hidden = true;
-  document.querySelector("#private-confirm").disabled = true;
-  document.querySelector("#private-dialog-effect").innerHTML = "<span>Sélectionne un spécialiste pour voir son programme.</span>";
-  document.querySelector("#private-coach-options").innerHTML = privateCoaches.map(coach => {
-    const price = privateCoursePrice(coach);
-    const type = coach.type === "boxing" ? "Coach de boxe" : "Préparateur physique";
-    const membershipLocked = coach.type === "physical" && state.strengthGymWeeks === 0;
-    const status = membershipLocked ? "Abonnement musculation requis" : state.money < price ? `Il manque ${price - state.money} $` : `${price} $ / cours`;
-    return `<button class="coach-card" type="button" data-select-private-coach="${coach.id}" ${membershipLocked || state.money < price ? "disabled" : ""}><strong>${coach.name} « ${coach.nickname} »</strong><span>${type} · ${status}</span><small>${coach.targets.map(target => combatLabels[target]).join(" + ")} · ${coach.sessions} cours → +${coach.reward}</small></button>`;
-  }).join("");
-  document.querySelector("#private-dialog").showModal();
-}
-
-function openPrivateProgram(coachId) {
-  const coach = privateCoaches.find(item => item.id === coachId);
-  const price = coach ? privateCoursePrice(coach) : 0;
-  if (!coach || state.privateProgram) return;
-  if (coach.type === "physical" && state.strengthGymWeeks === 0) return showToast("Abonnement au gym de musculation requis.");
-  if (state.money < price) return showToast("Pas assez d’argent pour ce premier cours.");
-  selectedPrivateCoachId = coachId;
-  document.querySelectorAll("[data-select-private-coach]").forEach(button => button.classList.toggle("selected", button.dataset.selectPrivateCoach === coachId));
-  const statField = document.querySelector("#private-stat-field");
-  const statSelect = document.querySelector("#private-stat");
-  statField.hidden = false;
-  statSelect.innerHTML = coach.targets.map(target => `<option value="${target}">${combatLabels[target]}</option>`).join("");
-  document.querySelector("#private-confirm").disabled = false;
-  const discountActive = coach.type === "boxing" && state.gymWeeks > 0;
-  const accessCopy = coach.type === "physical"
-    ? " Abonnement au gym de musculation actif."
-    : discountActive
-      ? " Rabais de 10 $ inclus grâce au GYM de boxe."
-      : " Abonne-toi au GYM de boxe pour économiser 10 $ par cours.";
-  document.querySelector("#private-dialog-effect").innerHTML = `<strong>${price} $</strong><span>${coach.sessions} cours pour +${coach.reward}.${accessCopy}<br>Le premier cours sera payé, mais restera à planifier.</span>`;
-}
-
-function startPrivateProgram() {
-  const coach = privateCoaches.find(item => item.id === selectedPrivateCoachId);
-  const target = document.querySelector("#private-stat").value;
-  const price = coach ? privateCoursePrice(coach) : 0;
-  if (!coach || !coach.targets.includes(target) || state.privateProgram) return;
-  const activeV2Program = window.BoxeurTrainer && state.v2TrainerState
-    ? window.BoxeurTrainer.getPublicState(window.BoxeurTrainer.createState(state.v2TrainerState)).activeProgram
-    : null;
-  if (activeV2Program) return showToast("Un programme privé V2 est déjà actif. Termine-le dans le gym correspondant.");
-  if (coach.type === "physical" && state.strengthGymWeeks === 0) return showToast("Abonnement au gym de musculation requis.");
-  if (state.money < price) return showToast("Pas assez d’argent pour ce premier cours.");
-  state.money -= price;
-  state.privateProgram = { coachId: coach.id, target, sessionsCompleted: 0, firstSessionPaid: true };
-  state.journal.unshift({ week: state.week, text: `Premier cours privé avec ${coach.name} : programme ${combatLabels[target].toLowerCase()} lancé.` });
-  document.querySelector("#private-dialog").close();
-  render();
-  showToast(`Séance 1 payée · ${coach.sessions} cours à effectuer`);
-}
-
-function completePrivateCourse(events, week) {
-  const program = state.privateProgram;
-  if (!program) return;
-  const coach = privateCoaches.find(item => item.id === program.coachId);
-  if (!coach) return;
-  program.firstSessionPaid = false;
-  program.sessionsCompleted += 1;
-  if (program.sessionsCompleted < coach.sessions) {
-    const remaining = coach.sessions - program.sessionsCompleted;
-    events.push(`Cours privé terminé : ${remaining} cours restant${remaining > 1 ? "s" : ""} en ${combatLabels[program.target].toLowerCase()}.`);
-    return;
-  }
-  applyCombatChanges({ [program.target]: coach.reward });
-  events.push(`Programme privé terminé : +${coach.reward} ${combatLabels[program.target]}.`);
-  state.journal.unshift({ week, text: `Programme privé terminé avec ${coach.name} : +${coach.reward} ${combatLabels[program.target]}.` });
-  state.privateProgram = null;
-}
-
-function advanceTrainingProgress(events, week) {
-  weeklyPlan.forEach(item => {
-    const action = actions.find(candidate => candidate.id === item.actionId);
-    if (!action?.progressStat || isProgressiveReturn(action)) return;
-    const stat = action.progressStat;
-    state.trainingProgress[stat] = (state.trainingProgress[stat] || 0) + 1;
-    if (state.trainingProgress[stat] < 10) return;
-    state.trainingProgress[stat] = 0;
-    const result = state.combatStats[stat] < 99 ? `10 séances terminées : +1 ${combatLabels[stat]}.` : `${combatLabels[stat]} est déjà au maximum.`;
-    events.push(result);
-    state.journal.unshift({ week, text: result });
-  });
-}
-
 function endWeek(events) {
   const endingWeek = state.week;
   state.week += 1;
@@ -6866,7 +5375,7 @@ function endWeek(events) {
       state.currentWeightKg = Math.round((state.currentWeightKg + weeklyAdjustment) * 10) / 10;
     }
   }
-  if (!weeklyPlan.some(item => actions.find(action => action.id === item.actionId)?.category === "training") && state.preFightTrainingWeek !== endingWeek) state.fitness = clamp(state.fitness - 1);
+  if (state.preFightTrainingWeek !== endingWeek) state.fitness = clamp(state.fitness - 1);
   if (state.preFightTrainingWeek === endingWeek) state.preFightTrainingWeek = 0;
   const membershipWasActive = state.gymWeeks > 0;
   const strengthMembershipWasActive = state.strengthGymWeeks > 0;
@@ -6929,128 +5438,6 @@ function endWeek(events) {
     events.push(expiry);
     state.journal.unshift({ week: endingWeek, text: expiry });
   }
-}
-
-function weeklyAlertTone(event) {
-  const text = String(event || "").toLocaleLowerCase("fr-CA");
-  if (/congédi|blessure|ko\b|tko\b|annul|expir|insuffisant|impossible|suspend|disqualif/.test(text)) return "critical";
-  if (/fatigue|rythme faible|rythme fragile|absence|risque|renouvel|dernière semaine|attention|avertissement/.test(text)) return "warning";
-  if (/niveau|vacances payées|offre confirmée|nouvel emploi|emploi actif|récupér|débloqu|sparring|tournoi/.test(text)) return "positive";
-  return "info";
-}
-
-function renderWeeklyAlerts(events) {
-  const labels = {
-    critical: ["À corriger", "!"],
-    warning: ["À surveiller", "!"],
-    positive: ["Bonne nouvelle", "✓"],
-  };
-  const highlights = events
-    .map(text => ({ text, tone: weeklyAlertTone(text) }))
-    .filter(item => item.tone !== "info")
-    .slice(0, 4);
-  if (!highlights.length) return "";
-  return `<section class="summary-alerts" aria-label="Alertes de la semaine"><h3>À surveiller</h3>${highlights.map(({ text, tone }) => {
-    const [label, icon] = labels[tone];
-    return `<div class="summary-alert ${tone}"><span class="summary-alert-icon" aria-hidden="true">${icon}</span><p><strong>${label}</strong>${escapeHTML(text)}</p></div>`;
-  }).join("")}</section>`;
-}
-
-function executePlan() {
-  const validation = planValidation();
-  if (!validation.valid) return showToast(validation.reason);
-  const endingWeek = state.week;
-  const levelBefore = state.level;
-  const before = { ...Object.fromEntries(generalStats.map(stat => [stat.key, state[stat.key]])), experience: state.experience, combatStats: { ...state.combatStats } };
-  const totals = planEffects();
-  const events = [];
-  const privateCoachThisWeek = weeklyPlan.some(item => item.actionId === "private") ? privateCoaches.find(coach => coach.id === state.privateProgram?.coachId) : null;
-  weeklyPlan.forEach(item => {
-    const { action } = planItemEffects(item);
-    state.journal.unshift({ week: endingWeek, text: action.message });
-  });
-  applyChanges(totals.rawGeneral);
-  advanceTrainingProgress(events, endingWeek);
-  applyCombatChanges(totals.rawCombat);
-  if (weeklyPlan.some(item => item.actionId === "private")) completePrivateCourse(events, endingWeek);
-  const boxingWorkThisWeek = planHasBoxingTraining(privateCoachThisWeek);
-  recordBoxingTrainingForWeek(endingWeek, privateCoachThisWeek);
-  if (privateCoachThisWeek?.type === "physical" && !boxingWorkThisWeek) state.boxingNeglectWeeks += 1;
-  else if (boxingWorkThisWeek) state.boxingNeglectWeeks = 0;
-  if (state.boxingNeglectWeeks >= 3) {
-    applyCombatChanges({ technique: -1, defense: -1 });
-    state.boxingNeglectWeeks = 0;
-    events.push("Trois semaines centrées uniquement sur la préparation physique : −1 technique et −1 défense.");
-  }
-  const workedThisWeek = weeklyPlan.some(item => item.actionId === "work");
-  const vacationThisWeek = weeklyPlan.some(item => item.actionId === "vacation");
-  if (vacationThisWeek) {
-    state.vacationBankWeeks = Math.max(0, state.vacationBankWeeks - 1);
-    events.push("Vacances payées : la paie est maintenue et le corps récupère sans avertissement d’emploi. Cette tuile ne compte pas parmi les actions de la semaine.");
-  }
-  state.workStreak = workedThisWeek ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
-  settleJobAttendance(workedThisWeek || vacationThisWeek, events, endingWeek, false, workedThisWeek);
-  advanceJobApplication(events, endingWeek);
-  advanceRecreationalTraining(events, endingWeek);
-  if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = endingWeek + SPONSOR_COOLDOWN_WEEKS;
-  if (workedThisWeek && state.workStreak >= 3) events.push("Tu enchaînes les semaines de travail : ta fraîcheur au camp commence à souffrir.");
-  endWeek(events);
-  if (state.level > levelBefore && state.levelNotice) events.unshift(state.levelNotice);
-  const changes = [];
-  [...generalStats.map(stat => [stat.key, stat.label, stat.key === "money" ? " $" : "%"]), ["experience", "Expérience", ""]].forEach(([key, label, suffix]) => {
-    const delta = state[key] - before[key];
-    if (delta) changes.push(`${label} : ${signed(delta, suffix)}`);
-  });
-  Object.entries(combatLabels).forEach(([key, label]) => {
-    const delta = state.combatStats[key] - before.combatStats[key];
-    if (delta) changes.push(`${label} : ${signed(delta)}`);
-  });
-  weeklyPlan = [];
-  render();
-  document.querySelector("#summary-title").textContent = `Bilan de la semaine ${endingWeek}`;
-  document.querySelector("#summary-content").innerHTML = `<div class="summary-money"><div><span>Argent gagné</span><strong class="earned">+${totals.earned} $</strong></div><div><span>Argent dépensé</span><strong class="spent">−${totals.spent} $</strong></div></div>${renderWeeklyAlerts(events)}<div class="summary-section"><h3>Changements nets</h3><ul>${changes.map(change => `<li>${change}</li>`).join("") || "<li>Aucun changement</li>"}</ul></div><div class="summary-section"><h3>Événements</h3><ul>${events.map(event => `<li>${escapeHTML(event)}</li>`).join("") || "<li>Aucun imprévu cette semaine.</li>"}</ul></div>`;
-  document.querySelector("#summary-dialog").showModal();
-}
-
-function applyPreFightPlan() {
-  const localFightDue = Boolean(state.scheduledFight && !state.scheduledFight.tournamentId && state.week >= state.scheduledFight.week);
-  if (!localFightDue) return true;
-  const validation = planValidation();
-  if (!validation.valid) {
-    showToast(validation.reason);
-    return false;
-  }
-  const events = [];
-  if (!weeklyPlan.length) {
-    settleJobAttendance(false, events, state.week);
-    return true;
-  }
-  const totals = planEffects();
-  const privateCoachThisWeek = weeklyPlan.some(item => item.actionId === "private") ? privateCoaches.find(coach => coach.id === state.privateProgram?.coachId) : null;
-  weeklyPlan.forEach(item => {
-    const { action } = planItemEffects(item);
-    state.journal.unshift({ week: state.week, text: `Avant le gala : ${action.message}` });
-  });
-  applyChanges(totals.rawGeneral);
-  advanceTrainingProgress(events, state.week);
-  applyCombatChanges(totals.rawCombat);
-  if (weeklyPlan.some(item => item.actionId === "private")) completePrivateCourse(events, state.week);
-  const boxingWork = planHasBoxingTraining(privateCoachThisWeek);
-  recordBoxingTrainingForWeek(state.week, privateCoachThisWeek);
-  state.preFightTrainingWeek = boxingWork || weeklyPlan.some(item => actions.find(action => action.id === item.actionId)?.category === "training") ? state.week : 0;
-  if (privateCoachThisWeek?.type === "physical" && !boxingWork) state.boxingNeglectWeeks += 1;
-  else if (boxingWork) state.boxingNeglectWeeks = 0;
-  const worked = weeklyPlan.some(item => item.actionId === "work");
-  const vacation = weeklyPlan.some(item => item.actionId === "vacation");
-  if (vacation) state.vacationBankWeeks = Math.max(0, state.vacationBankWeeks - 1);
-  if (weeklyPlan.some(item => item.actionId === "video")) state.preFightStudyWeek = state.week;
-  state.workStreak = worked ? state.workStreak + 1 : Math.max(0, state.workStreak - 1);
-  settleJobAttendance(worked || vacation, events, state.week, false, worked);
-  advanceJobApplication(events, state.week);
-  if (weeklyPlan.some(item => item.actionId === "sponsor")) state.sponsorAvailableWeek = state.week + SPONSOR_COOLDOWN_WEEKS;
-  weeklyPlan = [];
-  if (events.length) state.journal.unshift({ week: state.week, text: `Préparation du gala : ${events.join(" ")}` });
-  return true;
 }
 
 function continueAfterWeekTransition() {
@@ -7142,8 +5529,7 @@ async function startFight() {
   if (state.week < state.scheduledFight.week) return showToast(`Combat prévu à la semaine ${state.scheduledFight.week}.`);
   const isDeveloperBout = Boolean(state.scheduledFight.isDeveloperBout);
   if (state.injuryWeeks > 0 && !isDeveloperBout) return showToast("Blessure en cours : ce combat doit être annulé.");
-  const isV2Sparring = Boolean(V2_ACTIVE && state.scheduledFight.isV2Sparring);
-  if (!state.scheduledFight.tournamentId && !isV2Sparring && !isDeveloperBout && !applyPreFightPlan()) return;
+  const isV2Sparring = Boolean(state.scheduledFight.isV2Sparring);
   if (!state.scheduledFight.travelApplied) {
     applyChanges({ energy: state.scheduledFight.travelEffects?.energy || 0, fatigue: state.scheduledFight.travelEffects?.fatigue || 0 });
     state.scheduledFight.travelApplied = true;
@@ -7151,7 +5537,7 @@ async function startFight() {
   const isRecreationalSparring = Boolean(state.scheduledFight.isRecreationalSparring);
   const isPracticeSparring = Boolean(state.scheduledFight.isPracticeSparring);
   const isNonRecordSparring = isRecreationalSparring || isPracticeSparring;
-  const v2FightCareer = V2_ACTIVE && !state.scheduledFight.tournamentId && !isDeveloperBout
+  const v2FightCareer = !state.scheduledFight.tournamentId && !isDeveloperBout
     ? v2CareerView()
     : null;
   const difficulty = opponentDifficulty(opponent);
@@ -7161,7 +5547,6 @@ async function startFight() {
   const activeEffect = state.activeTournament?.competition?.activeEffects?.find(effect => effect.type === "scouting");
   const homeStudy = Number(scheduled.homeAdvantage?.coachReadBonus || 0);
   const campStudy = state.preFightStudyWeek === state.week ? .10 : 0;
-  const coach = privateCoaches.find(item => item.id === state.privateProgram?.coachId && item.type === "boxing");
   fightState = BoxeurCombat.createFight({
     id: `${scheduled.id}-${state.week}-${scheduled.tournamentRound ?? "local"}`,
     seed: scheduled.fightSeed,
@@ -7169,7 +5554,7 @@ async function startFight() {
     tournamentId: scheduled.tournamentId,
     opponentDifficulty: difficulty,
     exchangesPerRound: isNonRecordSparring ? 4 : 5,
-    coachQuality: clamp((isNonRecordSparring ? .58 : .60) + (coach?.reward || 0) * .035 + homeStudy, .55, .78),
+    coachQuality: clamp((isNonRecordSparring ? .58 : .60) + homeStudy, .55, .78),
     studyBonus: Math.max(campStudy, activeEffect?.readAccuracyBonus || 0, homeStudy),
     studyExchangeLimit: activeEffect?.exchangesRemaining,
     playerEffects: state.activeTournament?.competition?.activeEffects || [],
@@ -7275,7 +5660,6 @@ function bookGalaEvent(eventId, slotIndex) {
   const event = state.calendar.events.find(item => item.id === eventId && item.kind === "gala");
   if (!event) return showToast("Ce gala n’est plus disponible.");
   if (state.scheduledFight) return showToast("Un autre combat est déjà programmé.");
-  if (event.careerWeek === state.week && plannedCoreActionCount() >= (amateurFightCount() >= 10 ? 4 : 3)) return showToast("Retire une action : le gala doit réserver une place dans la semaine.");
   const travel = BoxeurCalendar.travelOptionsForEvent(event)[0];
   const result = BoxeurCalendar.createBooking({ event, career: state, existingBookings: activeBookings(), travelOptionId: travel?.id, currentDate: careerWeekDate(0) });
   if (!result.ok) return showToast(result.reason || "Inscription impossible.");
@@ -7422,14 +5806,12 @@ function turnProfessional() {
 
 function beginAmateurCareer() {
   if (!canPassAmateurCareer()) return;
-  if (V2_ACTIVE) {
-    const capsule = ensureV2PreviewCapsule();
-    const onboarding = v2OnboardingView(capsule);
-    if (onboarding && !onboarding.gates.passAmateur.allowed) return showToast(onboarding.gates.passAmateur.reason);
-    if (capsule?.timeState?.stats) state.combatStats = cloneData(capsule.timeState.stats);
-    if (onboarding?.state.mode === "guided") {
-      applyV2OnboardingEvent({ type: window.BoxeurOnboarding.EVENT_TYPES.PASS_AMATEUR });
-    }
+  const capsule = ensureV2PreviewCapsule();
+  const onboarding = v2OnboardingView(capsule);
+  if (onboarding && !onboarding.gates.passAmateur.allowed) return showToast(onboarding.gates.passAmateur.reason);
+  if (capsule?.timeState?.stats) state.combatStats = cloneData(capsule.timeState.stats);
+  if (onboarding?.state.mode === "guided") {
+    applyV2OnboardingEvent({ type: window.BoxeurOnboarding.EVENT_TYPES.PASS_AMATEUR });
   }
   const amateurEpoch = careerWeekDate(0);
   state.careerStatus = "amateur";
@@ -7536,7 +5918,6 @@ function closeTournamentBoard() {
     const events = [state.activeTournament.summary];
     settleJobAttendance(false, events, state.week, true);
     state.activeTournament = null;
-    weeklyPlan = [];
     endWeek(events);
     render();
     showToast("Tournoi terminé · retour au calendrier");
@@ -8073,21 +6454,6 @@ function chooseFightCoachDirective(optionId) {
   renderFight(transition.result.text);
 }
 
-function sparringActionForPurpose(actions, purpose, preferredId) {
-  if (actions.some(action => action.id === preferredId)) return preferredId;
-  const exits = ["pivot_exit", "lateral_evade", "retreat_step", "retake_center", "clinch", "compact_cover"];
-  const fallback = purpose === "coach"
-    ? actions.find(action => action.directiveAligned)
-    : purpose === "attack"
-      ? actions.find(action => action.family === "attack")
-      : purpose === "defense"
-        ? actions.find(action => action.family === "defense")
-        : purpose === "exit"
-          ? actions.find(action => exits.includes(action.id))
-          : null;
-  return (fallback || actions[0])?.id || preferredId;
-}
-
 function applySparringMovement(movementId) {
   if (!isRemyRingPrototype() || fightState.phase !== "exchange") return;
   try {
@@ -8281,7 +6647,6 @@ function finishFight() {
   } else if (!isV2Sparring && !isDeveloperBout) {
     const weekTransitionEvents = [];
     settleJobAttendance(false, weekTransitionEvents, state.week);
-    weeklyPlan = [];
     endWeek(weekTransitionEvents);
   }
   if (!isV2Sparring && !isDeveloperBout) persistCareer();
@@ -8362,10 +6727,8 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   const sex = document.querySelector("#fighter-sex").value === "female" ? "female" : "male";
   invalidateV2PreviewCapsule();
   state = cloneData(INITIAL_STATE);
-  weeklyPlan = [];
   fightState = null;
   sparringRingState = null;
-  selectedPrivateCoachId = null;
   state.profile = {
     firstName: document.querySelector("#first-name").value.trim(),
     lastName: document.querySelector("#last-name").value.trim(),
@@ -8384,8 +6747,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   Object.keys(combatLabels).forEach(key => { state.combatStats[key] = BASE_COMBAT_STAT + styles[style].bonuses[key] + draftStats[key]; });
   state.journal = [{ week: 1, text: `${state.profile.firstName} commence au statut récréatif. Choisis un emploi et active le premier mois de GYM pour lancer le parcours.` }];
   render();
-  if (V2_ACTIVE) openV2JobMenu();
-  else openJobMenu();
+  openV2JobMenu();
   showToast("Nouvelle carrière lancée · statut récréatif");
 });
 
@@ -8411,10 +6773,8 @@ document.querySelector("#resume-new")?.addEventListener("click", () => {
   document.querySelector("#resume-dialog")?.close();
   invalidateV2PreviewCapsule();
   state = cloneData(INITIAL_STATE);
-  weeklyPlan = [];
   fightState = null;
   sparringRingState = null;
-  selectedPrivateCoachId = null;
   draftPortraitId = 0;
   draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
   document.querySelector("#creation-form").reset();
@@ -8646,10 +7006,6 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     revealPendingV2LevelAlert();
     return;
   }
-  if (event.target.closest("[data-v2-classic-close]")) {
-    openV2Location("home");
-    return;
-  }
   if (event.target.closest("[data-v2-gym-menu-close]")) {
     openV2Location("boxing-gym");
     return;
@@ -8684,19 +7040,6 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
   const supplementBuy = event.target.closest("[data-v2-supplement-buy]");
   if (supplementBuy) {
     purchaseV2Supplement(supplementBuy.dataset.v2SupplementBuy);
-    return;
-  }
-  const supplementPrepare = event.target.closest("[data-v2-supplement-prepare]");
-  if (supplementPrepare) {
-    executeV2PendingTraining(supplementPrepare.dataset.v2SupplementPrepare);
-    return;
-  }
-  if (event.target.closest("[data-v2-supplement-skip]")) {
-    executeV2PendingTraining(null);
-    return;
-  }
-  if (event.target.closest("[data-v2-supplement-picker-close]")) {
-    closeV2SupplementPicker();
     return;
   }
   if (event.target.closest("[data-v2-supplement-shop-close]")) {
@@ -8780,7 +7123,7 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     return;
   }
   if (event.target.closest("[data-v2-open-calendar]")) {
-    document.querySelector("#open-calendar")?.click();
+    openCalendarDialog();
     return;
   }
   const gymZone = event.target.closest("[data-v2-gym-zone]");
@@ -8812,33 +7155,13 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
   }
 });
 
-document.querySelector("#action-grid").addEventListener("click", event => {
-  const button = event.target.closest(".action-card");
-  if (!button) return;
-  const action = actions.find(item => item.id === button.dataset.action);
-  toggleAction(action);
-});
-
-document.querySelector("#private-coaching").addEventListener("click", event => {
-  if (event.target.closest("#open-coach-menu")) openCoachMenu();
-});
-
-document.querySelector("#employment").addEventListener("click", event => {
-  if (event.target.closest("#open-job-menu")) openJobMenu();
-  if (event.target.closest("#quit-job")) quitJob();
-  if (event.target.closest("#cancel-job-application")) cancelJobApplication();
-});
-
 document.querySelector("#job-options").addEventListener("click", event => {
-  if (V2_ACTIVE && event.target.closest("[data-v2-cancel-job-application]")) {
+  if (event.target.closest("[data-v2-cancel-job-application]")) {
     cancelV2JobApplication();
     return;
   }
   const job = event.target.closest("[data-select-job]");
-  if (job) {
-    if (V2_ACTIVE) selectV2Job(job.dataset.selectJob);
-    else selectJob(job.dataset.selectJob);
-  }
+  if (job) selectV2Job(job.dataset.selectJob);
 });
 
 document.querySelector("#job-dialog-close").addEventListener("click", () => closeOptionalDialog("job-dialog"));
@@ -8850,33 +7173,6 @@ document.querySelector("#job-dialog")?.addEventListener("cancel", event => {
   }
 });
 
-document.querySelector("#private-coach-options").addEventListener("click", event => {
-  const coach = event.target.closest("[data-select-private-coach]");
-  if (coach) openPrivateProgram(coach.dataset.selectPrivateCoach);
-});
-
-document.querySelector("#private-form").addEventListener("submit", event => {
-  event.preventDefault();
-  if (event.submitter?.id === "private-confirm") startPrivateProgram();
-  else document.querySelector("#private-dialog").close();
-});
-
-document.querySelector("#plan-content").addEventListener("click", event => {
-  const remove = event.target.closest("[data-remove]");
-  if (remove) {
-    weeklyPlan = weeklyPlan.filter(item => item.actionId !== remove.dataset.remove);
-    render();
-    return;
-  }
-});
-
-document.querySelector("#advance-week").addEventListener("click", executePlan);
-document.querySelector("#export-career")?.addEventListener("click", exportCareer);
-document.querySelector("#edit-profile")?.addEventListener("click", openProfileEditor);
-document.querySelector("#profile-form")?.addEventListener("submit", saveProfileEdits);
-document.querySelector("#profile-dialog-close")?.addEventListener("click", () => document.querySelector("#profile-dialog")?.close());
-document.querySelector("#profile-cancel")?.addEventListener("click", () => document.querySelector("#profile-dialog")?.close());
-document.querySelector("#open-level-dialog")?.addEventListener("click", () => openLevelDialog(false));
 document.querySelector("#level-dialog-close")?.addEventListener("click", () => document.querySelector("#level-dialog")?.close());
 document.querySelector("#level-dialog")?.addEventListener("close", () => {
   if (!resumeCareerAlertsAfterLevelDialog) return;
@@ -8906,29 +7202,20 @@ document.querySelector("#level-choices")?.addEventListener("click", event => {
   if (!combatLabels[stat] || state.combatStats[stat] >= 99) return;
   state.levelPoints -= 1;
   applyCombatChanges({ [stat]: 1 });
-  if (V2_ACTIVE) {
-    const capsule = v2PreviewCapsule || ensureV2PreviewCapsule();
-    if (capsule?.timeState?.stats) {
-      capsule.timeState.stats[stat] = state.combatStats[stat];
-      v2ProgressionSnapshot(capsule);
-      persistV2PreviewCapsule();
-    }
+  const capsule = v2PreviewCapsule || ensureV2PreviewCapsule();
+  if (capsule?.timeState?.stats) {
+    capsule.timeState.stats[stat] = state.combatStats[stat];
+    v2ProgressionSnapshot(capsule);
+    persistV2PreviewCapsule();
   }
   render();
   showToast(`+1 ${combatLabels[stat]}`);
   if (state.levelPoints === 0 && resumeCareerAlertsAfterLevelDialog) setTimeout(() => document.querySelector("#level-dialog")?.close(), 0);
 });
-document.querySelector("#plan-start-fight").addEventListener("click", startFight);
-document.querySelector("#plan-withdraw-fight").addEventListener("click", withdrawFight);
-document.querySelector("#summary-close").addEventListener("click", () => {
-  document.querySelector("#summary-dialog").close();
-  showCareerAlertOrContinue();
-});
 document.querySelector("#week-event-choices").addEventListener("click", event => {
   const choice = event.target.closest("[data-week-choice]");
   if (choice) resolveBetweenWeekChoice(choice.dataset.weekChoice);
 });
-document.querySelector("#summary-dialog").addEventListener("cancel", event => event.preventDefault());
 document.querySelector("#week-event-dialog").addEventListener("cancel", event => event.preventDefault());
 
 document.querySelector("#calendar-events").addEventListener("click", event => {
@@ -8965,7 +7252,12 @@ document.querySelector("#amateur-transition").addEventListener("click", event =>
   if (event.target.closest("#turn-amateur")) beginAmateurCareer();
 });
 
-document.querySelector("#open-calendar").addEventListener("click", () => document.querySelector("#calendar-dialog")?.showModal());
+function openCalendarDialog() {
+  if (!state.profile) return;
+  renderFights();
+  document.querySelector("#calendar-dialog")?.showModal();
+}
+
 function closeCalendarDialog() {
   document.querySelector("#calendar-dialog")?.close();
   if (isRecreationalCareer() && state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
@@ -8995,30 +7287,9 @@ document.querySelector("#fight-dialog").addEventListener("cancel", event => {
   if (fightState) event.preventDefault();
 });
 
-function setupMobileCollapsibles() {
-  document.querySelectorAll(".collapsible-section").forEach(section => {
-    const toggle = section.querySelector(".mobile-section-toggle");
-    if (!toggle) return;
-    const startsOpen = section.dataset.mobileOpen === "true";
-    const stateLabel = toggle.querySelector(".toggle-state");
-    section.classList.toggle("mobile-collapsed", !startsOpen);
-    toggle.setAttribute("aria-expanded", String(startsOpen));
-    if (stateLabel) stateLabel.textContent = startsOpen ? "Masquer" : "Afficher";
-    toggle.addEventListener("click", () => {
-      const collapsed = section.classList.toggle("mobile-collapsed");
-      toggle.setAttribute("aria-expanded", String(!collapsed));
-      if (stateLabel) stateLabel.textContent = collapsed ? "Afficher" : "Masquer";
-    });
-  });
-}
-
-document.querySelector("#membership-button").addEventListener("click", openMembershipMenu);
 document.querySelector("#membership-options").addEventListener("click", event => {
   const plan = event.target.closest("[data-gym-plan]");
-  if (plan) {
-    if (V2_ACTIVE) selectV2GymPlan(plan.dataset.gymPlan);
-    else selectGymPlan(plan.dataset.gymPlan);
-  }
+  if (plan) selectV2GymPlan(plan.dataset.gymPlan);
 });
 document.querySelector("#membership-dialog-close").addEventListener("click", () => closeOptionalDialog("membership-dialog"));
 document.querySelector("#membership-dialog-cancel").addEventListener("click", () => closeOptionalDialog("membership-dialog"));
@@ -9029,46 +7300,6 @@ document.querySelector("#membership-dialog")?.addEventListener("cancel", event =
   }
 });
 
-document.querySelector("#strength-membership-button").addEventListener("click", openStrengthMembershipMenu);
-document.querySelector("#strength-membership-options").addEventListener("click", event => {
-  const plan = event.target.closest("[data-strength-gym-plan]");
-  if (plan) selectStrengthGymPlan(plan.dataset.strengthGymPlan);
-});
-document.querySelector("#strength-membership-dialog-close").addEventListener("click", () => document.querySelector("#strength-membership-dialog").close());
-document.querySelector("#strength-membership-dialog-cancel").addEventListener("click", () => document.querySelector("#strength-membership-dialog").close());
-
-document.querySelector("#strength-gym-services").addEventListener("click", event => {
-  const product = event.target.closest("[data-buy-supplement]")?.dataset.buySupplement;
-  if (!product || state.strengthGymWeeks === 0) return;
-  const offer = strengthGymProducts.find(item => item.id === product);
-  if (!offer) return;
-  const lock = productLock(offer);
-  if (lock) return showToast(lock);
-  applyChanges({ money: -offer.price, ...offer.changes });
-  state.supplementWeek = state.week;
-  state.supplementsUsed.push(offer.id);
-  render();
-  showToast(`${offer.label} consommé · ${state.supplementsUsed.length}/${MAX_SUPPLEMENTS_PER_WEEK} cette semaine`);
-});
-
-function resetCareer() {
-  if (window.confirm("Recommencer et retourner à la création du boxeur ?\n\nLa carrière actuelle restera récupérable si tu recharges la page avant de valider le nouveau boxeur.")) {
-    invalidateV2PreviewCapsule();
-    state = cloneData(INITIAL_STATE);
-    weeklyPlan = [];
-    fightState = null;
-    sparringRingState = null;
-    applyCareerTheme();
-    draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
-    document.querySelector("#creation-form").reset();
-    renderCreation();
-    render();
-  }
-}
-
-document.querySelector("#restart").addEventListener("click", resetCareer);
-
-setupMobileCollapsibles();
 renderCreation();
 render();
 showResumePrompt();

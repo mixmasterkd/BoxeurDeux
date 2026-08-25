@@ -8,7 +8,6 @@
 
   const ZONES = Object.freeze([
     Object.freeze({ id: "bed", label: "Journée de repos", detail: "Ajouter une journée libre à la semaine", action: "rest" }),
-    Object.freeze({ id: "lounge", label: "Jeu d'ordinateur", detail: "Jouer à BoxeurDeux classique", action: "play-v1" }),
     Object.freeze({ id: "kitchen", label: "Cuisine", detail: "Voir les repas de récupération", menu: "kitchen" }),
     Object.freeze({ id: "basement", label: "Sous-sol", detail: "Choisir un entraînement maison", menu: "training" }),
     Object.freeze({ id: "running", label: "Course", detail: "Choisir ta sortie", menu: "running" }),
@@ -92,16 +91,6 @@
       plannable: true,
       amateurOnly: true,
       amateurOnlyReason: "Les repas de récupération se débloquent lorsque tu passes amateur.",
-    }),
-    Object.freeze({
-      id: "play-v1",
-      label: "Jouer à BoxeurDeux classique",
-      category: "leisure",
-      kindLabel: "Loisir hors carrière",
-      impact: "Aucun temps de carrière",
-      command: "Jouer maintenant",
-      help: "Ouvre la V1 dans l’ordinateur. Ce loisir ne planifie rien, ne prend aucune place et ne fait pas avancer la semaine.",
-      plannable: false,
     }),
   ]);
 
@@ -201,10 +190,7 @@
         removable: supplied.removable !== false,
       });
     });
-    const countedEntries = entries.filter(entry => {
-      if (entry && typeof entry === "object" && entry.countsTowardCapacity === false) return false;
-      return entryActionId(entry) !== "play-v1";
-    });
+    const countedEntries = entries.filter(entry => !(entry && typeof entry === "object" && entry.countsTowardCapacity === false));
     return {
       title: safeText(source.title, "Programme de la semaine", 100),
       note: safeText(source.note || source.detail, "Les choix faits ici s’ajoutent au même programme que le travail et les deux gyms.", 300),
