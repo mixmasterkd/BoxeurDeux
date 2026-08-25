@@ -89,7 +89,10 @@
 
   function guideInstruction(currentObjective, currentLocationId) {
     if (currentObjective.actionMode === "review-and-confirm") {
-      return "Ton cours est dans ton programme. Tu peux l’ouvrir pour le vérifier ou confirmer la semaine lorsque tu es prêt.";
+      return "Ton programme est prêt, mais rien n’est encore appliqué. Ouvre-le pour le vérifier, puis confirme la semaine dans la fenêtre suivante.";
+    }
+    if (currentObjective.actionMode === "quick-plan") {
+      return "Appuie sur « Suivre le plan rapide ». Le programme restera entièrement modifiable avant sa confirmation.";
     }
     const destination = locationLabel(currentObjective.locationId);
     if (currentLocationId === "map") {
@@ -100,6 +103,21 @@
     }
     if (currentObjective.type === "membership" && currentLocationId === "boxing-gym") {
       return "Dans le GYM, appuie sur « Accueil », puis choisis le premier abonnement.";
+    }
+    if (currentObjective.type === "membership-renewal" && currentLocationId === "boxing-gym") {
+      return "Dans le GYM, appuie sur « Accueil », puis choisis et paie le forfait que tu veux renouveler.";
+    }
+    if (currentObjective.type === "work-priority" && currentLocationId === "work") {
+      return "Dans le panneau de ton emploi, retire le travail de cette semaine. La perte de paie et l’absence seront appliquées normalement.";
+    }
+    if (currentObjective.type === "home-training" && currentLocationId === "home") {
+      return "À la maison, ouvre le sous-sol et ajoute « Entraînement maison rapide ». Cette séance utilise réellement le shadow-boxing et le sac.";
+    }
+    if (currentObjective.type === "roadwork" && currentLocationId === "home") {
+      return "À la maison, ouvre le menu « Course » par la porte, puis ajoute « Court jog » à ta semaine.";
+    }
+    if (currentObjective.type === "recreational-course" && currentLocationId === "boxing-gym") {
+      return "Dans le GYM, va voir l’entraîneur et ajoute le cours récréatif à ta semaine.";
     }
     if (currentObjective.type === "objective" && currentLocationId === "boxing-gym") {
       return "Dans le GYM, va voir l’entraîneur et ajoute le cours récréatif à ta semaine.";
@@ -123,6 +141,9 @@
     if (currentObjective.actionMode === "review-and-confirm") {
       return `<div class="v2-onboarding-actions"><button class="primary-button" type="button" data-v2-week-handoff>Confirmer semaine</button></div>`;
     }
+    if (currentObjective.actionMode === "quick-plan") {
+      return `<button class="primary-button" type="button" data-v2-week-quick>Suivre le plan rapide</button>`;
+    }
     if (currentLocationId !== currentObjective.locationId) {
       return currentObjective.locationId === "map"
         ? ""
@@ -130,6 +151,21 @@
     }
     if (currentObjective.type === "membership" && currentLocationId === "boxing-gym") {
       return `<button class="primary-button" type="button" data-v2-gym-zone="reception">Aller à l’accueil</button>`;
+    }
+    if (currentObjective.type === "membership-renewal" && currentLocationId === "boxing-gym") {
+      return `<button class="primary-button" type="button" data-v2-gym-zone="reception">Renouveler à l’accueil</button>`;
+    }
+    if (currentObjective.type === "work-priority" && currentLocationId === "work") {
+      return `<button class="primary-button" type="button" data-v2-toggle-work aria-pressed="true">Ne pas travailler cette semaine</button>`;
+    }
+    if (currentObjective.type === "home-training" && currentLocationId === "home") {
+      return `<button class="primary-button" type="button" data-v2-home-menu="training">Ouvrir le menu du sous-sol</button>`;
+    }
+    if (currentObjective.type === "roadwork" && currentLocationId === "home") {
+      return `<button class="primary-button" type="button" data-v2-home-menu="running">Ouvrir le menu Course</button>`;
+    }
+    if (currentObjective.type === "recreational-course" && currentLocationId === "boxing-gym") {
+      return `<button class="primary-button" type="button" data-v2-gym-zone="coach">Voir le cours récréatif</button>`;
     }
     if (currentObjective.type === "objective" && currentLocationId === "boxing-gym") {
       return `<button class="primary-button" type="button" data-v2-gym-zone="coach">Voir le cours récréatif</button>`;

@@ -9,8 +9,9 @@
   const ZONES = Object.freeze([
     Object.freeze({ id: "bed", label: "Journée de repos", detail: "Ajouter une journée libre à la semaine", action: "rest" }),
     Object.freeze({ id: "lounge", label: "Jeu d'ordinateur", detail: "Jouer à BoxeurDeux classique", action: "play-v1" }),
-    Object.freeze({ id: "kitchen", label: "Cuisine", detail: "Préparer un repas de récupération", action: "meal" }),
-    Object.freeze({ id: "basement", label: "Sous-sol", detail: "Ajouter un entraînement maison rapide", action: "home-quick" }),
+    Object.freeze({ id: "kitchen", label: "Cuisine", detail: "Voir les repas de récupération", menu: "kitchen" }),
+    Object.freeze({ id: "basement", label: "Sous-sol", detail: "Choisir un entraînement maison", menu: "training" }),
+    Object.freeze({ id: "running", label: "Course", detail: "Choisir ta sortie", menu: "running" }),
   ]);
 
   const ACTIONS = Object.freeze([
@@ -41,9 +42,43 @@
       kindLabel: "Séance personnalisée",
       impact: "Choix des exercices",
       command: "Préparer pour la semaine",
-      help: "Compose une courte séance avec le shadow-boxing, le jogging ou le sac au sous-sol.",
+      help: "Compose une courte séance avec le shadow-boxing et le sac au sous-sol. La course se choisit séparément.",
       plannable: true,
       amateurOnly: true,
+    }),
+    Object.freeze({
+      id: "roadwork-short",
+      label: "Court jog",
+      category: "running",
+      kindLabel: "Course",
+      impact: "Cardio léger · charge modérée",
+      command: "Ajouter à la semaine",
+      help: "Une sortie courte pour bâtir ton cardio sans prendre toute ta semaine.",
+      plannable: true,
+    }),
+    Object.freeze({
+      id: "roadwork-long",
+      label: "Long jog",
+      category: "running",
+      kindLabel: "Course",
+      impact: "Endurance soutenue",
+      command: "Ajouter à la semaine",
+      help: "Une sortie plus longue pour travailler l'endurance. Elle se débloque après le statut récréatif.",
+      plannable: true,
+      amateurOnly: true,
+      amateurOnlyReason: "Le long jog se débloque lorsque tu passes amateur.",
+    }),
+    Object.freeze({
+      id: "roadwork-intervals",
+      label: "Intervalles",
+      category: "running",
+      kindLabel: "Course",
+      impact: "Cardio intense",
+      command: "Ajouter à la semaine",
+      help: "Des efforts rapides et exigeants. Ils se débloquent après le statut récréatif.",
+      plannable: true,
+      amateurOnly: true,
+      amateurOnlyReason: "Les intervalles se débloquent lorsque tu passes amateur.",
     }),
     Object.freeze({
       id: "meal",
@@ -55,6 +90,8 @@
       help: "Prépare un repas pour soutenir modestement la récupération. Il coûte de l’argent et occupe un choix du programme.",
       defaultMoneyCost: 15,
       plannable: true,
+      amateurOnly: true,
+      amateurOnlyReason: "Les repas de récupération se débloquent lorsque tu passes amateur.",
     }),
     Object.freeze({
       id: "play-v1",
@@ -69,14 +106,15 @@
   ]);
 
   const ACTION_GROUPS = Object.freeze([
-    Object.freeze({ id: "physical", label: "S'entraîner à la maison", detail: "Une option rapide pour avancer sans microgestion; la séance personnalisée se débloque après le statut récréatif." }),
-    Object.freeze({ id: "recovery", label: "Récupération et cuisine", detail: "Le repos échange une occasion de s’entraîner contre de la récupération; le repas ajoute aussi un coût en argent." }),
-    Object.freeze({ id: "leisure", label: "Ordinateur", detail: "La V1 est un loisir séparé : elle ne modifie jamais le programme ni le calendrier V2." }),
+    Object.freeze({ id: "training", label: "Entraînement maison", detail: "Choisis une séance rapide ou bâtis une séance personnalisée au sous-sol.", actionIds: ["home-quick", "home-custom"] }),
+    Object.freeze({ id: "running", label: "Course", detail: "Choisis le format de ta sortie. Seul le court jog est disponible en récréatif.", actionIds: ["roadwork-short", "roadwork-long", "roadwork-intervals"] }),
+    Object.freeze({ id: "kitchen", label: "Cuisine et récupération", detail: "Les repas de récupération seront accessibles après le parcours récréatif.", actionIds: ["meal"] }),
   ]);
 
   const ACTION_ALIASES = Object.freeze({
     sleep: "rest",
-    jogging: "home-quick",
+    jogging: "roadwork-short",
+    "short-jog": "roadwork-short",
     "shadow-boxing": "home-quick",
     "basement-bag": "home-quick",
   });
@@ -213,7 +251,7 @@
     let reason = safeText(source.reason || source.disabledReason, "Cette option est indisponible pour le moment.", 260);
     if (definition.amateurOnly && context.careerStatus === "recreational") {
       available = false;
-      reason = "La séance personnalisée se débloque lorsque tu passes amateur. Utilise l’entraînement maison rapide pour apprendre le rythme du jeu.";
+      reason = definition.amateurOnlyReason || "La séance personnalisée se débloque lorsque tu passes amateur. Utilise l’entraînement maison rapide pour apprendre le rythme du jeu.";
     } else if (definition.plannable && context.weekCapacity.full && !planned) {
       available = false;
       reason = "Le programme de la semaine est complet. Retire d’abord un choix planifié.";
@@ -278,16 +316,19 @@
   }
 
   function renderHotspot(zone, context) {
-    const state = context.actions[zone.action];
+    const state = zone.action ? context.actions[zone.action] : { available: true, planned: false };
     const reasonId = `v2-home-zone-${zone.id}-reason`;
     const disabledAttributes = state.available ? "" : ` aria-disabled="true" aria-describedby="${reasonId}"`;
     const pressed = state.plannable ? ` aria-pressed="${state.planned ? "true" : "false"}"` : "";
     const planned = state.planned ? ' data-v2-home-planned="true"' : "";
     const reason = state.available ? "" : `<span class="v2-home-hotspot-reason" id="${reasonId}">${escapeHTML(state.reason)}</span>`;
     const detail = state.planned ? "Planifié pour cette semaine" : zone.detail;
+    const target = zone.menu
+      ? `data-v2-home-menu="${escapeHTML(zone.menu)}"`
+      : `data-v2-home-action="${escapeHTML(zone.action)}"`;
 
     return `<div class="v2-home-hotspot-wrap v2-home-hotspot-${zone.id}${state.planned ? " planned" : ""}">
-      <button type="button" class="v2-home-hotspot" data-v2-home-zone="${zone.id}" data-v2-home-action="${zone.action}"${planned}${pressed}${disabledAttributes} aria-label="${escapeHTML(zone.label)}. ${escapeHTML(detail)}.">
+      <button type="button" class="v2-home-hotspot" data-v2-home-zone="${zone.id}" ${target}${planned}${pressed}${disabledAttributes} aria-label="${escapeHTML(zone.label)}. ${escapeHTML(detail)}.">
         <strong>${escapeHTML(zone.label)}</strong><small>${escapeHTML(detail)}</small>
       </button>${reason}
     </div>`;
@@ -318,10 +359,25 @@
   }
 
   function renderActionGroup(group, context) {
-    const matching = ACTIONS.filter(action => action.category === group.id);
+    const matching = group.actionIds.map(id => ACTION_BY_ID[id]).filter(Boolean);
     return `<section class="v2-home-action-group v2-home-action-group-${group.id}" aria-labelledby="v2-home-action-group-${group.id}">
       <div class="v2-home-action-group-heading"><h4 id="v2-home-action-group-${group.id}">${escapeHTML(group.label)}</h4><p>${escapeHTML(group.detail)}</p></div>
       <div class="v2-home-action-grid">${matching.map(action => renderAction(action, context)).join("")}</div>
+    </section>`;
+  }
+
+  function menuById(menuId) {
+    return ACTION_GROUPS.find(group => group.id === String(menuId || "")) || null;
+  }
+
+  function renderMenu(menuId, rawContext) {
+    const context = normalizeContext(rawContext);
+    const menu = menuById(menuId);
+    if (!menu) return "";
+    return `<section class="v2-home-menu" aria-labelledby="v2-home-menu-title">
+      <header><div><p class="eyebrow">Maison · semaine ${context.clock.week}</p><h2 id="v2-home-menu-title">${escapeHTML(menu.label)}</h2></div><button type="button" class="secondary-button" data-v2-home-menu-close>Retour à la maison</button></header>
+      <p>${escapeHTML(menu.detail)}</p>
+      <div class="v2-home-menu-actions">${renderActionGroup(menu, context)}</div>
     </section>`;
   }
 
@@ -344,7 +400,6 @@
   function render(rawContext) {
     const context = normalizeContext(rawContext);
     const hotspots = ZONES.map(zone => renderHotspot(zone, context)).join("");
-    const actions = ACTION_GROUPS.map(group => renderActionGroup(group, context)).join("");
 
     return `<div class="v2-home-view v2-place-view">
       <header class="v2-home-header v2-place-header">
@@ -370,9 +425,6 @@
           <section class="v2-home-recommendation v2-place-card ${context.condition.recommendationTone}" aria-labelledby="v2-home-recommendation-title">
             <p class="eyebrow">Conseil avant de planifier</p><h3 id="v2-home-recommendation-title">${escapeHTML(context.condition.recommendation)}</h3>
             <p>${escapeHTML(context.condition.recommendationDetail)}</p>
-          </section>
-          <section class="v2-home-actions v2-place-card v2-place-actions" aria-labelledby="v2-home-actions-title">
-            <h3 id="v2-home-actions-title">Préparer ta semaine à la maison</h3>${actions}
           </section>
         </aside>
       </div>
@@ -409,11 +461,13 @@
     ZONES,
     ACTIONS,
     ACTION_GROUPS,
+    menuById,
     normalizeCareerStatus,
     normalizePlan,
     normalizeWeekCapacity,
     normalizeContext,
     render,
+    renderMenu,
     renderResult,
   });
 });

@@ -34,11 +34,12 @@ function baseContext(overrides = {}) {
 
 test("expose la même API pure en CommonJS et dans le navigateur", () => {
   assert.equal(globalThis.BoxeurHomeView, homeView);
-  assert.equal(homeView.ZONES.length, 4);
-  assert.deepEqual(homeView.ACTIONS.map(action => action.id), ["rest", "home-quick", "home-custom", "meal", "play-v1"]);
-  assert.deepEqual(homeView.ACTION_GROUPS.map(group => group.id), ["physical", "recovery", "leisure"]);
+  assert.equal(homeView.ZONES.length, 5);
+  assert.deepEqual(homeView.ACTIONS.map(action => action.id), ["rest", "home-quick", "home-custom", "roadwork-short", "roadwork-long", "roadwork-intervals", "meal", "play-v1"]);
+  assert.deepEqual(homeView.ACTION_GROUPS.map(group => group.id), ["training", "running", "kitchen"]);
   assert.equal(typeof homeView.normalizePlan, "function");
   assert.equal(typeof homeView.normalizeWeekCapacity, "function");
+  assert.equal(typeof homeView.renderMenu, "function");
   assert.equal(Object.isFrozen(homeView.ACTIONS), true);
 });
 
@@ -50,14 +51,15 @@ test("emploie le gabarit partagé des lieux V2", () => {
   assert.match(html, /v2-home-week-plan v2-place-week-plan/);
 });
 
-test("conserve les deux illustrations et les quatre hotspots interactifs", () => {
+test("conserve les deux illustrations et les cinq hotspots interactifs", () => {
   const html = homeView.render(baseContext());
 
   assert.match(html, /assets\/maison-v2-desktop\.jpg/);
   assert.match(html, /assets\/maison-v2-mobile\.jpg/);
-  assert.equal((html.match(/data-v2-home-zone=/g) || []).length, 4);
+  assert.equal((html.match(/data-v2-home-zone=/g) || []).length, 5);
   for (const zone of homeView.ZONES) {
-    assert.match(html, new RegExp(`<button[^>]+type="button"[^>]+data-v2-home-zone="${zone.id}"[^>]+data-v2-home-action="${zone.action}"`));
+    const target = zone.menu ? `data-v2-home-menu="${zone.menu}"` : `data-v2-home-action="${zone.action}"`;
+    assert.match(html, new RegExp(`<button[^>]+type="button"[^>]+data-v2-home-zone="${zone.id}"[^>]+${target}`));
   }
   assert.match(html, /data-v2-leave-home/);
   assert.match(html, /Appartement illustré avec cuisine, salon, chambre et espace d’entraînement au sous-sol/);
@@ -103,7 +105,7 @@ test("normalise le plan sans le modifier et marque clairement les choix déjà p
   assert.match(html, /<strong>1 \/ 3<\/strong>/);
   assert.match(html, /aria-label="Énergie hebdomadaire restante : 1 sur 3"/);
   assert.match(html, /data-v2-home-action="rest"[^>]+data-v2-home-planned="true" aria-pressed="true"/);
-  assert.match(html, /Planifié pour la semaine/);
+  assert.match(html, /Planifié pour cette semaine/);
   assert.match(html, /Journée de repos rapide<small>Aucun coût d’énergie<\/small>/);
   assert.match(html, /data-v2-location-remove="home-rest-1"/);
 });
@@ -133,7 +135,7 @@ test("un programme complet bloque les nouveaux choix, mais pas le loisir ni un c
   assert.equal(context.weekCapacity.full, true);
   assert.equal(context.actions.rest.available, true);
   assert.equal(context.actions.rest.planned, true);
-  for (const actionId of ["home-quick", "home-custom", "meal"]) {
+  for (const actionId of ["home-quick", "home-custom", "roadwork-short", "roadwork-long", "roadwork-intervals", "meal"]) {
     assert.equal(context.actions[actionId].available, false);
     assert.match(context.actions[actionId].reason, /programme de la semaine est complet/i);
   }
@@ -150,7 +152,7 @@ test("la séance maison personnalisée reste visible et verrouillée seulement a
   assert.equal(recreational.actions["home-custom"].available, false);
   assert.match(recreational.actions["home-custom"].reason, /lorsque tu passes amateur/i);
 
-  const lockedHtml = homeView.render(baseContext());
+  const lockedHtml = homeView.renderMenu("training", baseContext());
   assert.match(lockedHtml, /data-v2-home-action="home-custom"[^>]+disabled aria-disabled="true"/);
   assert.match(lockedHtml, /id="v2-home-action-home-custom-help">La séance personnalisée se débloque lorsque tu passes amateur\./);
 
@@ -161,20 +163,39 @@ test("la séance maison personnalisée reste visible et verrouillée seulement a
   assert.equal(professional.careerStatusLabel, "Professionnel");
 });
 
-test("les boutons emploient Ajouter ou Préparer pour la semaine et le repas montre son coût", () => {
-  const html = homeView.render(baseContext({
+test("la course reste un menu indépendant et seul le court jog est accessible en récréatif", () => {
+  const recreational = homeView.normalizeContext(baseContext());
+  assert.equal(recreational.actions["roadwork-short"].available, true);
+  assert.equal(recreational.actions["roadwork-long"].available, false);
+  assert.equal(recreational.actions["roadwork-intervals"].available, false);
+  assert.equal(recreational.actions.meal.available, false);
+
+  const menu = homeView.renderMenu("running", baseContext());
+  assert.match(menu, /<h2 id="v2-home-menu-title">Course<\/h2>/);
+  assert.match(menu, /data-v2-home-action="roadwork-short"/);
+  assert.match(menu, /data-v2-home-action="roadwork-long"[^>]+disabled aria-disabled="true"/);
+  assert.match(menu, /id="v2-home-action-roadwork-long-help">Le long jog se débloque lorsque tu passes amateur\.<\/small>/);
+});
+
+test("les menus gardent les commandes de planification et séparent les activités de la scène", () => {
+  const context = baseContext({
     careerStatus: "amateur",
     actions: { meal: { available: true, moneyCost: 18 } },
-  }));
+  });
+  const html = [
+    homeView.render(context),
+    homeView.renderMenu("training", context),
+    homeView.renderMenu("running", context),
+    homeView.renderMenu("kitchen", context),
+  ].join("\n");
 
-  for (const actionId of ["rest", "home-quick", "home-custom", "meal", "play-v1"]) {
+  for (const actionId of ["rest", "home-quick", "home-custom", "roadwork-short", "roadwork-long", "roadwork-intervals", "meal", "play-v1"]) {
     assert.match(html, new RegExp(`data-v2-home-action="${actionId}"`));
   }
   assert.match(html, /Ajouter à la semaine/);
   assert.match(html, /Préparer pour la semaine/);
   assert.match(html, /18 \$ · soutien modeste/);
-  assert.match(html, /Jouer maintenant/);
-  assert.match(html, /ne planifie rien, ne prend aucune place et ne fait pas avancer la semaine/);
+  assert.match(html, /Jouer à BoxeurDeux classique/);
   assert.doesNotMatch(html, /data-v2-home-action="(?:sleep|recover|jogging|shadow-boxing|basement-bag|advance)"/);
 });
 
@@ -212,16 +233,18 @@ test("accepte les formes compactes de capacité et les alias d’anciens plans",
   assert.equal(homeView.normalizeWeekCapacity(null, homeView.normalizePlan([])).allowed, 3);
 });
 
-test("un hotspot bloqué reste focusable et sa carte explique aussi la raison", () => {
-  const html = homeView.render(baseContext({
+test("un menu verrouillé reste ouvrable et explique l’indisponibilité de son repas", () => {
+  const context = baseContext({
+    careerStatus: "amateur",
     actions: { meal: { available: false, reason: "Il manque 8 $ pour les provisions." } },
-  }));
+  });
+  const home = homeView.render(context);
+  const menu = homeView.renderMenu("kitchen", context);
 
-  assert.match(html, /<button[^>]+data-v2-home-zone="kitchen"[^>]+aria-disabled="true"[^>]+aria-describedby="v2-home-zone-kitchen-reason"/);
-  assert.doesNotMatch(html, /data-v2-home-zone="kitchen"[^>]+ disabled/);
-  assert.match(html, /id="v2-home-zone-kitchen-reason">Il manque 8 \$ pour les provisions\.<\/span>/);
-  assert.match(html, /data-v2-home-action="meal"[^>]+disabled aria-disabled="true"/);
-  assert.match(html, /id="v2-home-action-meal-help">Il manque 8 \$ pour les provisions\.<\/small>/);
+  assert.match(home, /data-v2-home-zone="kitchen"[^>]+data-v2-home-menu="kitchen"/);
+  assert.doesNotMatch(home, /data-v2-home-zone="kitchen"[^>]+disabled/);
+  assert.match(menu, /data-v2-home-action="meal"[^>]+disabled aria-disabled="true"/);
+  assert.match(menu, /id="v2-home-action-meal-help">Il manque 8 \$ pour les provisions\.<\/small>/);
 });
 
 test("échappe les données fournies par la sauvegarde ou le moteur de semaine", () => {
@@ -240,12 +263,11 @@ test("échappe les données fournies par la sauvegarde ou le moteur de semaine",
 });
 
 test("emploie un vocabulaire québécois cohérent et ne transforme pas dormir en action", () => {
-  const html = homeView.render(baseContext({ careerStatus: "amateur" }));
+  const html = `${homeView.render(baseContext({ careerStatus: "amateur" }))}\n${homeView.renderMenu("training", baseContext({ careerStatus: "amateur" }))}`;
 
   assert.match(html, /Sous-sol/);
-  assert.match(html, /GYM/);
-  assert.match(html, /Journée de repos rapide/);
-  assert.match(html, /Les nuits restent automatiques/);
+  assert.match(html, /Course/);
+  assert.match(html, /Journée de repos/);
   assert.match(html, /shadow-boxing/);
   assert.doesNotMatch(html, /Dormir jusqu|petit-déjeuner|cave/i);
 });

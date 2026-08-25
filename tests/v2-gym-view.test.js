@@ -53,9 +53,10 @@ test("rend les deux illustrations et quatre zones principales sous forme de vrai
   for (const zone of gymView.ZONES) {
     assert.match(html, new RegExp(`<button[^>]+data-v2-gym-zone="${zone.id}"`));
   }
-  assert.match(html, /<button[^>]+data-v2-coach-session[^>]*>Ajouter à ma semaine<\/button>/);
-  assert.doesNotMatch(html, /data-v2-compose-session|data-v2-boxing-trainer|data-v2-sparring-activity="cta"/);
-  assert.match(html, /Commence simplement avec le cours de groupe/);
+  assert.doesNotMatch(html, /data-v2-coach-session|data-v2-compose-session|data-v2-boxing-trainer|data-v2-sparring-activity="cta"/);
+  const coachMenu = gymView.renderMenu("coach", baseContext());
+  assert.match(coachMenu, /<button[^>]+data-v2-coach-session[^>]*>Ajouter à ma semaine<\/button>/);
+  assert.match(html, /Cours récréatifs/);
   assert.match(html, /Énergie/);
   assert.match(html, /Fatigue/);
   assert.match(html, /Temps disponible <b>75 min<\/b>/);
@@ -88,20 +89,22 @@ test("échappe les données sérialisables dans la vue principale", () => {
   assert.match(html, /&lt;img src=x onerror=&quot;boom\(\)&quot;&gt;/);
 });
 
-test("montre le chemin pédagogique de Rémy uniquement au statut récréatif", () => {
+test("retire la tuile de parcours récréatif et route Rémy par le ring", () => {
   const recreational = gymView.render(baseContext({
     recreational: { trainingWeeks: 6, targetWeeks: 6, remyStatus: "ready" },
   }));
   const amateur = gymView.render(baseContext({ careerStatus: "amateur" }));
+  const recreationalCoachMenu = gymView.renderMenu("coach", baseContext());
+  const amateurCoachMenu = gymView.renderMenu("coach", baseContext({ careerStatus: "amateur" }));
 
-  assert.match(recreational, /Parcours récréatif/);
-  assert.match(recreational, /Rémy « Le Tank »/);
-  assert.match(recreational, /Cours de groupe/);
-  assert.match(recreational, /data-v2-remy-sparring/);
+  assert.doesNotMatch(recreational, /Parcours récréatif|En route vers Rémy|data-v2-remy-sparring/);
+  assert.match(recreational, /data-v2-gym-zone="ring"(?![^>]+disabled)/);
+  assert.match(recreational, /Sparring pédagogique avec Rémy/);
+  assert.match(recreationalCoachMenu, /cours récréatifs sont préparés/i);
   assert.doesNotMatch(amateur, /Rémy « Le Tank »/);
-  assert.match(amateur, /Parcours amateur/);
-  assert.match(amateur, /sparring pour arriver prêt/);
-  assert.doesNotMatch(amateur, /Cours de groupe/);
+  assert.doesNotMatch(amateur, /data-v2-coach-session|data-v2-boxing-trainer/);
+  assert.match(amateurCoachMenu, /data-v2-coach-session/);
+  assert.match(amateurCoachMenu, /data-v2-boxing-trainer/);
 });
 
 test("sépare le sparring des séances et le verrouille jusqu’après Rémy et le passage amateur", () => {
@@ -111,25 +114,29 @@ test("sépare le sparring des séances et le verrouille jusqu’après Rémy et 
   const afterRemy = gymView.render(baseContext({
     recreational: { trainingWeeks: 6, targetWeeks: 10, remyStatus: "completed" },
   }));
-  const amateur = gymView.render(baseContext({ careerStatus: "amateur" }));
+  const afterRemyCoach = gymView.renderMenu("coach", baseContext({
+    recreational: { trainingWeeks: 6, targetWeeks: 10, remyStatus: "completed" },
+  }));
+  const amateur = gymView.renderMenu("ring", baseContext({ careerStatus: "amateur" }));
 
   assert.match(beforeRemy, /data-v2-gym-zone="ring"[^>]+disabled/);
   assert.match(beforeRemy, /sparring pédagogique avec Rémy/);
   assert.doesNotMatch(beforeRemy, /data-v2-sparring-activity="cta"/);
-  assert.match(afterRemy, /Passage amateur requis/);
+  assert.match(afterRemy, /Passe amateur avec l’entraîneur/);
   assert.doesNotMatch(afterRemy, /data-v2-sparring-activity="cta"/);
+  assert.match(afterRemyCoach, /data-v2-amateur-transition/);
   assert.match(amateur, /data-v2-sparring-state="available"/);
   assert.match(amateur, /activité distincte/);
   assert.match(amateur, /data-v2-sparring-activity="cta"(?![^>]+disabled)/);
   assert.doesNotMatch(amateur, /Cours de groupe/);
 });
 
-test("rend le CTA de sparring accessible et explique chaque blocage", () => {
-  const membershipBlocked = gymView.render(baseContext({
+test("rend le CTA de sparring dans son menu et explique chaque blocage", () => {
+  const membershipBlocked = gymView.renderMenu("ring", baseContext({
     careerStatus: "amateur",
     membership: { active: false, monthlyPrice: 110, balance: 75 },
   }));
-  const medicalBlocked = gymView.render(baseContext({
+  const medicalBlocked = gymView.renderMenu("ring", baseContext({
     careerStatus: "amateur",
     condition: {
       energy: 80,
@@ -141,7 +148,6 @@ test("rend le CTA de sparring accessible et explique chaque blocage", () => {
 
   assert.match(membershipBlocked, /data-v2-sparring-state="membership"/);
   assert.match(membershipBlocked, /Abonnement requis/);
-  assert.match(membershipBlocked, /data-v2-gym-zone="ring"[^>]+aria-controls="v2-gym-sparring-card"[^>]+aria-describedby="v2-gym-sparring-reason"/);
   assert.match(medicalBlocked, /data-v2-sparring-state="unavailable"/);
   assert.match(medicalBlocked, /Repos médical obligatoire/);
   assert.match(medicalBlocked, /data-v2-sparring-activity="cta"[^>]+aria-disabled="true"[^>]+aria-describedby="v2-gym-sparring-reason"/);
@@ -166,22 +172,19 @@ test("rend l’inscription incontournable et explique les activités verrouillé
 
   assert.match(html, /data-membership-active="false"/);
   assert.match(html, /<strong>Inscription requise<\/strong>/);
-  assert.match(html, /1 mois · ou 3 mois à rabais/);
-  assert.match(html, /<strong>110 \$<\/strong>/);
-  assert.match(html, /Solde : 75 \$ · il manque 35 \$/);
-  assert.match(html, /data-v2-gym-zone="reception"[^>]+aria-label="S’inscrire · 110 \$\. Solde : 75 \$ · il manque 35 \$"/);
-  assert.match(html, /Cours de groupe récréatif/);
+  assert.match(html, /Utilise le bouton <strong>Accueil<\/strong> dans le GYM pour t’inscrire/);
+  assert.match(html, /data-v2-gym-zone="reception"/);
   assert.match(html, /sac au sous-sol reste accessible à la maison/);
 
   for (const zone of gymView.ZONES.filter(item => !["reception", "ring"].includes(item.id))) {
-    assert.match(html, new RegExp(`data-v2-gym-zone="${zone.id}"[^>]+aria-disabled="true"[^>]+aria-describedby="v2-gym-membership-lock-reason"`));
+    assert.match(html, new RegExp(`data-v2-gym-zone="${zone.id}"[^>]+aria-disabled="true"`));
     const openingTag = html.match(new RegExp(`<button[^>]+data-v2-gym-zone="${zone.id}"[^>]*>`))[0];
     assert.doesNotMatch(openingTag, /\sdisabled(?:\s|>)/);
   }
-  assert.match(html, /data-v2-gym-zone="ring"[^>]+disabled[^>]+aria-describedby="v2-gym-sparring-reason"/);
+  assert.match(html, /data-v2-gym-zone="ring"[^>]+disabled[^>]+aria-disabled="true"/);
   assert.doesNotMatch(html, /data-v2-gym-zone="reception"[^>]+aria-disabled/);
-  assert.match(html, /data-v2-coach-session[^>]+disabled[^>]+aria-disabled="true"/);
-  assert.doesNotMatch(html, /data-v2-compose-session/);
+  assert.doesNotMatch(html, /data-v2-coach-session|data-v2-compose-session/);
+  assert.match(gymView.renderMenu("coach", baseContext({ membership: { active: false, monthlyPrice: 110, balance: 75 } })), /data-v2-coach-session[^>]+disabled[^>]+aria-disabled="true"/);
 
   const composer = gymView.renderComposer(baseContext({ membership: { active: false, monthlyPrice: 110, balance: 75 } }));
   assert.match(composer, /Inscription requise/);
@@ -248,7 +251,7 @@ test("affiche les activités du GYM planifiées avec un retrait direct", () => {
   assert.match(html, /Programme de la semaine/);
   assert.match(html, /v2-place-week-plan/);
   assert.match(html, /data-v2-location-remove="boxing-1"/);
-  assert.match(html, /data-v2-coach-session aria-pressed="true"[^>]*>Retirer de ma semaine/);
+  assert.match(gymView.renderMenu("coach", baseContext({ coach: { planned: true } })), /data-v2-coach-session aria-pressed="true"[^>]*>Retirer de ma semaine/);
 });
 
 test("rend la restriction médicale visible et bloque les zones d’entraînement", () => {
@@ -270,5 +273,9 @@ test("rend la restriction médicale visible et bloque les zones d’entraînemen
   assert.match(html, /Repos médical obligatoire pendant 2 semaines/);
   assert.match(html, /data-v2-gym-zone="training"[^>]+disabled[^>]+aria-disabled="true"/);
   assert.doesNotMatch(html, /data-v2-gym-zone="reception"[^>]+disabled/);
-  assert.match(html, /data-v2-compose-session[^>]+disabled[^>]+aria-disabled="true"/);
+  assert.match(gymView.renderMenu("coach", baseContext({
+    careerStatus: "amateur",
+    condition: { trainingBlocked: true, trainingBlockedReason: "Repos médical obligatoire pendant 2 semaines." },
+    coach: { available: false },
+  })), /data-v2-coach-session[^>]+disabled[^>]+aria-disabled="true"/);
 });

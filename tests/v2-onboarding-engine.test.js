@@ -104,7 +104,7 @@ test("emploi et abonnement suffisent au verrou de semaine 1; la première séanc
 
   assert.equal(state.week, 2);
   assert.equal(state.firstWeekClosed, true);
-  assert.equal(onboarding.getCurrentStep(state).id, "week-2-group-class");
+  assert.equal(onboarding.getCurrentStep(state).id, "week-2-follow-plan");
   assert.equal(onboarding.getGates(state).leaveJob.allowed, true);
   state = onboarding.applyEvent(state, E.LEAVE_JOB);
   assert.equal(state.initialJob.selected, true, "quitter plus tard ne doit pas réactiver l'obligation initiale");
@@ -115,10 +115,10 @@ test("les objectifs courts des semaines 1 à 5 sont déterministes mais non bloq
   let state = completeInitialChoices();
   const expected = [
     "week-1-first-session",
-    "week-2-group-class",
-    "week-3-mitts",
-    "week-4-defense",
-    "week-5-remy-preparation",
+    "week-2-follow-plan",
+    "week-3-training-priority",
+    "week-4-roadwork",
+    "week-5-renew-and-prepare",
   ];
 
   expected.forEach((objectiveId, index) => {
@@ -129,6 +129,21 @@ test("les objectifs courts des semaines 1 à 5 sont déterministes mais non bloq
     if (index < expected.length - 1) state = onboarding.applyEvent(state, E.CLOSE_WEEK);
   });
   assert.deepEqual(state.completedObjectiveIds, expected);
+});
+
+test("migre les anciens identifiants des semaines 2 à 5 vers les leçons réelles", () => {
+  const state = onboarding.normalizeState({
+    ...completeInitialChoices(),
+    week: 5,
+    completedObjectiveIds: ["week-2-group-class", "week-3-mitts", "week-4-defense"],
+  });
+
+  assert.deepEqual(state.completedObjectiveIds, [
+    "week-2-follow-plan",
+    "week-3-training-priority",
+    "week-4-roadwork",
+  ]);
+  assert.equal(onboarding.getCurrentStep(state).id, "week-5-renew-and-prepare");
 });
 
 test("Rémy devient un rendez-vous obligatoire à la semaine 6 sans quota d'entraînements", () => {
@@ -237,7 +252,7 @@ test("normalise directement une capsule V2 sans perdre sa phase ni sa semaine", 
   assert.equal(state.week, 3);
   assert.equal(state.initialJob.selected, true);
   assert.equal(state.initialGym.purchased, true);
-  assert.equal(onboarding.getCurrentStep(state).id, "week-3-mitts");
+  assert.equal(onboarding.getCurrentStep(state).id, "week-3-training-priority");
 });
 
 test("un état canonique reste sérialisable, normalisable et conserve les choix terminés", () => {

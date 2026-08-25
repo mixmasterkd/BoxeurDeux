@@ -7,7 +7,8 @@
 }
 
 .v2-location-sheet.v2-location-sheet-full > .v2-session-composer,
-.v2-location-sheet.v2-location-sheet-full > .v2-session-result {
+.v2-location-sheet.v2-location-sheet-full > .v2-session-result,
+.v2-location-sheet.v2-location-sheet-full > .v2-gym-menu {
   align-self: center;
   justify-self: center;
 }
@@ -603,6 +604,17 @@
   border-left-color: var(--green, #6cb789);
 }
 
+.v2-gym-membership-hint {
+  margin-top: 10px !important;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, .1);
+  color: var(--v2-gym-muted) !important;
+}
+
+.v2-gym-membership-hint strong {
+  color: var(--ink, #f4f0e7);
+}
+
 .v2-gym-membership > button {
   border: 1px solid var(--v2-gym-border);
   color: var(--ink, #f4f0e7);
@@ -710,6 +722,56 @@
 .v2-gym-path-progress strong {
   color: var(--gold, #ddb65e);
   font: 800 1.05rem/1 "Barlow Condensed", sans-serif;
+}
+
+.v2-gym-menu {
+  width: min(640px, calc(100% - 24px));
+  max-height: min(720px, calc(100dvh - 24px));
+  padding: clamp(18px, 4vw, 30px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-top: 4px solid var(--gold, #ddb65e);
+  border-radius: 18px;
+  color: var(--ink, #f4f0e7);
+  background:
+    linear-gradient(150deg, rgba(221, 182, 94, .08), transparent 35%),
+    #171a18;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, .62);
+}
+
+.v2-gym-menu > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.v2-gym-menu > header > div {
+  min-width: 0;
+}
+
+.v2-gym-menu h2 {
+  overflow-wrap: anywhere;
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
+  line-height: .95;
+}
+
+.v2-gym-menu > header > button {
+  flex: 0 0 auto;
+}
+
+.v2-gym-menu > p {
+  margin-top: 14px;
+  color: #c6c3bc;
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
+.v2-gym-menu-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 /* Compositeur et bilan : panneaux autonomes utilisables dans la feuille de lieu. */
@@ -1272,6 +1334,7 @@
     max-width: 78px;
     min-height: 44px;
     padding: 6px 8px;
+    border-style: dashed;
     border-radius: 999px;
     text-align: center;
     background: rgba(12, 15, 13, .56);

@@ -145,39 +145,6 @@
     };
   }
 
-  function recreationalPath(context) {
-    if (context.careerStatus !== "recreational") {
-      return `<section class="v2-gym-path v2-gym-path-amateur" aria-label="Parcours de boxe">
-        <p class="eyebrow">Parcours ${context.careerStatus === "professional" ? "professionnel" : "amateur"}</p>
-        <h3>Prépare ton prochain objectif</h3>
-        <p>Utilise les séances du GYM et le sparring pour arriver prêt à ton prochain rendez-vous.</p>
-      </section>`;
-    }
-
-    const progress = Math.min(context.recreational.trainingWeeks, context.recreational.targetWeeks);
-    const statuses = {
-      locked: `Complète encore les bases au GYM. Le sparring de Rémy est réservé à la semaine ${context.recreational.sparringWeek}.`,
-      scheduled: "Le sparring pédagogique est inscrit à ton calendrier.",
-      ready: "Tu peux maintenant monter dans le ring pour ton évaluation.",
-      completed: "Évaluation terminée : retourne voir l’entraîneur quand tu voudras passer amateur.",
-    };
-    const detail = context.recreational.remyDetail || statuses[context.recreational.remyStatus];
-    const action = context.recreational.remyStatus === "ready"
-      ? `<button type="button" class="primary-button" data-v2-remy-sparring>Faire le sparring pédagogique</button>`
-      : context.recreational.remyStatus === "completed"
-        ? `<button type="button" class="primary-button" data-v2-amateur-transition>Voir l’entraîneur</button>`
-        : "";
-
-    return `<section class="v2-gym-path v2-gym-path-recreational" aria-labelledby="v2-remy-title">
-      <p class="eyebrow">Parcours récréatif</p>
-      <h3 id="v2-remy-title">En route vers Rémy « Le Tank »</h3>
-      <p class="v2-gym-path-progress"><strong>${progress}/${context.recreational.targetWeeks}</strong> semaines d’initiation avec entraînement</p>
-      <p class="v2-gym-group-class"><strong>Cours de groupe :</strong> inclus au parcours récréatif avec une inscription active au GYM.</p>
-      <p id="v2-gym-sparring-reason">${escapeHTML(detail)}</p>
-      ${action}
-    </section>`;
-  }
-
   function sparringState(context) {
     if (context.careerStatus === "recreational") {
       const remyCompleted = context.recreational.remyStatus === "completed";
@@ -251,19 +218,103 @@
     </section>`;
   }
 
+  function renderCoachCard(context) {
+    const disabled = context.coach.available && context.membership.active ? "" : " disabled aria-disabled=\"true\"";
+    const buttonLabel = context.coach.planned
+      ? "Retirer de ma semaine"
+      : context.coach.plannedCount > 0
+        ? "Ajouter une 2e séance"
+        : "Ajouter à ma semaine";
+    const buttonClass = context.coach.planned ? "secondary-button" : "primary-button";
+    const notice = context.coach.notice ? `<p class="v2-gym-coach-notice">${escapeHTML(context.coach.notice)}</p>` : "";
+    return `<article class="v2-gym-coach-card v2-gym-action-card recommended" aria-labelledby="v2-gym-coach-title">
+      <div class="v2-gym-action-heading"><span>Recommandé</span><small>${context.coach.durationMinutes} min</small></div>
+      <p class="eyebrow">Préparée par ${escapeHTML(context.coach.name)}</p>
+      <h3 id="v2-gym-coach-title">${escapeHTML(context.coach.sessionTitle)}</h3>
+      <p>${escapeHTML(context.coach.sessionSummary)}</p>
+      ${notice}
+      <button type="button" class="${buttonClass}" data-v2-coach-session aria-pressed="${context.coach.planned}"${disabled}>${buttonLabel}</button>
+    </article>`;
+  }
+
+  function renderPrivateTrainerCard(context) {
+    if (context.careerStatus === "recreational") return "";
+    const disabled = context.privateTrainer.available ? "" : " disabled aria-disabled=\"true\" aria-describedby=\"v2-gym-private-trainer-reason\"";
+    const detail = context.privateTrainer.available
+      ? `${context.privateTrainer.detail} Une séance privée remplace une séance de boxe dans ton programme.`
+      : !context.membership.active
+        ? "Un abonnement actif est requis."
+        : "Le service privé est indisponible pour le moment.";
+    return `<article class="v2-gym-action-card${disabled ? " locked" : ""}" aria-labelledby="v2-gym-private-title">
+      <div class="v2-gym-action-heading"><span>Spécialisé</span><small>Service payant</small></div>
+      <h3 id="v2-gym-private-title">${escapeHTML(context.privateTrainer.name)}</h3><p id="v2-gym-private-trainer-reason">${escapeHTML(detail)}</p>
+      <button type="button" class="secondary-button" data-v2-boxing-trainer${disabled}>${escapeHTML(context.privateTrainer.actionLabel)}</button>
+    </article>`;
+  }
+
+  function renderAmateurTransitionCard(context) {
+    if (context.careerStatus !== "recreational" || context.recreational.remyStatus !== "completed") return "";
+    return `<article class="v2-gym-action-card recommended" aria-labelledby="v2-gym-amateur-transition-title">
+      <div class="v2-gym-action-heading"><span>Parcours terminé</span><small>Rémy a donné son feu vert</small></div>
+      <h3 id="v2-gym-amateur-transition-title">Passer amateur</h3>
+      <p>Ton évaluation avec Rémy est terminée. Confirme ton passage amateur avec l’entraîneur.</p>
+      <button type="button" class="primary-button" data-v2-amateur-transition>Confirmer le passage amateur</button>
+    </article>`;
+  }
+
+  function renderMenu(menuId, rawContext) {
+    const context = normalizeContext(rawContext);
+    const id = String(menuId || "");
+    if (id === "coach") {
+      const description = context.careerStatus === "recreational"
+        ? "Les cours récréatifs sont préparés par l’entraîneur."
+        : "Choisis la séance préparée par le coach ou un entraîneur privé ciblé.";
+      return `<section class="v2-gym-menu" aria-labelledby="v2-gym-menu-title">
+        <header><div><p class="eyebrow">GYM de boxe</p><h2 id="v2-gym-menu-title">Voir l’entraîneur</h2></div><button type="button" class="secondary-button" data-v2-gym-menu-close>Retour au GYM</button></header>
+        <p>${escapeHTML(description)}</p>
+        <div class="v2-gym-menu-actions">${renderAmateurTransitionCard(context)}${renderCoachCard(context)}${renderPrivateTrainerCard(context)}</div>
+      </section>`;
+    }
+    if (id === "ring") {
+      return `<section class="v2-gym-menu" aria-labelledby="v2-gym-menu-title">
+        <header><div><p class="eyebrow">GYM de boxe</p><h2 id="v2-gym-menu-title">Ring</h2></div><button type="button" class="secondary-button" data-v2-gym-menu-close>Retour au GYM</button></header>
+        <p>Le sparring est une activité distincte : il ne fait jamais partie d’une séance personnalisée.</p>
+        <div class="v2-gym-menu-actions">${renderSparringCard(context)}</div>
+      </section>`;
+    }
+    return "";
+  }
+
   function render(rawContext) {
     const context = normalizeContext(rawContext);
     const sparring = sparringState(context);
     const zones = ZONES.map(zone => {
       const isRing = zone.id === "ring";
-      const recreationalBlocked = context.careerStatus === "recreational" && !["coach", "reception"].includes(zone.id);
+      const remyReady = isRing && context.careerStatus === "recreational" && context.recreational.remyStatus === "ready";
+      const recreationalBlocked = context.careerStatus === "recreational" && !["coach", "reception"].includes(zone.id) && !remyReady;
       const medicallyBlocked = context.membership.active && context.condition.trainingBlocked && !["coach", "reception"].includes(zone.id);
       const membershipBlocked = !context.membership.active && zone.id !== "reception";
-      const sparringBlocked = isRing && !sparring.available;
+      const sparringBlocked = isRing && !sparring.available && !remyReady;
+      const display = {
+        label: zone.label,
+        detail: zone.detail,
+      };
+      if (zone.id === "coach") display.detail = context.careerStatus === "recreational" ? "Cours récréatifs" : "Coach et entraîneur privé";
+      if (zone.id === "training") {
+        display.label = context.careerStatus === "recreational" ? "Zone d’entraînement · Amateur" : zone.label;
+        display.detail = context.careerStatus === "recreational" ? "Bâtir ma séance après le passage amateur" : "Bâtir ma séance personnalisée";
+      }
+      if (isRing && context.careerStatus === "recreational") {
+        display.detail = remyReady
+          ? "Sparring pédagogique avec Rémy"
+          : context.recreational.remyStatus === "completed"
+            ? "Passe amateur avec l’entraîneur"
+            : "Débloqué avec Rémy";
+      }
       const disabled = sparringBlocked
-        ? " disabled aria-disabled=\"true\" aria-describedby=\"v2-gym-sparring-reason\""
+        ? " disabled aria-disabled=\"true\""
         : membershipBlocked
-        ? " aria-disabled=\"true\" aria-describedby=\"v2-gym-membership-lock-reason\""
+        ? " aria-disabled=\"true\""
         : recreationalBlocked
         ? " disabled aria-disabled=\"true\""
         : medicallyBlocked
@@ -279,54 +330,12 @@
         ? ` Indisponible : ${context.condition.trainingBlockedReason}`
         : "";
       const lock = membershipBlocked || sparringBlocked || recreationalBlocked ? `<span class="v2-gym-hotspot-lock" aria-hidden="true">🔒</span>` : "";
-      const actionAttribute = `data-v2-gym-zone="${zone.id}"${isRing ? ` aria-controls="v2-gym-sparring-card"` : ""}`;
-      return `<button type="button" class="v2-gym-hotspot v2-gym-hotspot-${zone.id}" ${actionAttribute} aria-label="${escapeHTML(zone.label)}. ${escapeHTML(zone.detail)}${escapeHTML(reason)}"${disabled}><strong>${escapeHTML(zone.label)}</strong><small>${escapeHTML(zone.detail)}</small>${lock}</button>`;
+      const reasonMarkup = reason ? `<span class="sr-only">${escapeHTML(reason)}</span>` : "";
+      return `<button type="button" class="v2-gym-hotspot v2-gym-hotspot-${zone.id}" data-v2-gym-zone="${zone.id}" aria-label="${escapeHTML(display.label)}. ${escapeHTML(display.detail)}${escapeHTML(reason)}"${disabled}><strong>${escapeHTML(display.label)}</strong><small>${escapeHTML(display.detail)}</small>${lock}${reasonMarkup}</button>`;
     }).join("");
-    const coachDisabled = context.coach.available && context.membership.active ? "" : " disabled aria-disabled=\"true\"";
-    const coachButtonLabel = context.coach.planned
-      ? "Retirer de ma semaine"
-      : context.coach.plannedCount > 0
-        ? "Ajouter une 2e séance"
-        : "Ajouter à ma semaine";
-    const coachButtonClass = context.coach.planned ? "secondary-button" : "primary-button";
-    const privateTrainerDisabled = context.privateTrainer.available ? "" : " disabled aria-disabled=\"true\" aria-describedby=\"v2-gym-private-trainer-reason\"";
-    const composerDisabled = context.careerStatus === "recreational" || context.condition.trainingBlocked || !context.membership.active ? " disabled aria-disabled=\"true\"" : "";
-    const coachNotice = context.coach.notice ? `<p class="v2-gym-coach-notice">${escapeHTML(context.coach.notice)}</p>` : "";
-    const balanceLabel = context.membership.balance == null ? "Solde affiché à l’accueil" : `Solde : ${context.membership.balance} $`;
-    const shortfall = context.membership.balance == null ? 0 : Math.max(0, context.membership.monthlyPrice - context.membership.balance);
-    const priceDetail = shortfall > 0 ? `${balanceLabel} · il manque ${shortfall} $` : balanceLabel;
-    const membershipButton = context.membership.active ? "Gérer mon abonnement" : `S’inscrire · ${context.membership.monthlyPrice} $`;
     const membershipLock = context.membership.active ? "" : `<div class="v2-gym-access-lock" id="v2-gym-membership-lock-reason" role="note">
       <span aria-hidden="true">🔒</span><div><strong>Inscription requise</strong><p>Les activités restent visibles pour découvrir le GYM, mais elles se débloquent seulement après l’inscription. Le sac au sous-sol reste accessible à la maison.</p></div>
     </div>`;
-    const accessItems = [
-      "Travail aux mitaines",
-      "Sac lourd et défense",
-      context.careerStatus === "recreational" ? "Sparring après Rémy et le passage amateur" : "Sparring comme activité distincte",
-      ...(context.careerStatus === "recreational" ? ["Cours de groupe récréatif"] : []),
-    ];
-    const customReason = context.careerStatus === "recreational"
-      ? "La composition libre se débloque après le passage amateur."
-      : !context.membership.active
-        ? "Un abonnement actif est requis."
-        : context.condition.trainingBlocked ? context.condition.trainingBlockedReason : "Choisis précisément les exercices et la charge de ta séance.";
-    const privateReason = context.privateTrainer.available
-      ? context.privateTrainer.detail
-      : context.careerStatus === "recreational"
-        ? "Les programmes privés se débloquent après le passage amateur."
-        : "Un abonnement actif est requis.";
-    const advancedActions = context.careerStatus === "recreational" ? "" : `
-      <article class="v2-gym-action-card${composerDisabled ? " locked" : ""}" aria-labelledby="v2-gym-custom-title">
-        <div class="v2-gym-action-heading"><span>Personnalisé</span><small>Contrôle complet</small></div>
-        <h3 id="v2-gym-custom-title">Bâtir ma séance</h3><p>${escapeHTML(customReason)}</p>
-        <button type="button" class="secondary-button" data-v2-compose-session${composerDisabled}>Choisir mes exercices</button>
-      </article>
-      <article class="v2-gym-action-card${privateTrainerDisabled ? " locked" : ""}" aria-labelledby="v2-gym-private-title">
-        <div class="v2-gym-action-heading"><span>Spécialisé</span><small>Service payant</small></div>
-        <h3 id="v2-gym-private-title">${escapeHTML(context.privateTrainer.name)}</h3><p id="v2-gym-private-trainer-reason">${escapeHTML(privateReason)}</p>
-        <button type="button" class="secondary-button" data-v2-boxing-trainer${privateTrainerDisabled}>${escapeHTML(context.privateTrainer.actionLabel)}</button>
-      </article>
-      ${renderSparringCard(context)}`;
 
     return `<div class="v2-gym-view v2-place-view" data-career-status="${context.careerStatus}" data-membership-active="${context.membership.active}">
       <header class="v2-gym-header v2-place-header">
@@ -354,27 +363,10 @@
               <span>Temps disponible <b>${context.condition.availableMinutes} min</b></span>
             </div>
           </section>
-          <section class="v2-gym-actions-panel v2-place-card v2-place-actions" aria-labelledby="v2-gym-actions-title">
-            <div class="v2-gym-actions-heading"><p class="eyebrow">Activités du GYM</p><h3 id="v2-gym-actions-title">Choisis comment t’entraîner</h3><p>${context.careerStatus === "recreational" ? "Commence simplement avec le cours de groupe proposé par l’entraîneur." : "Utilise la recommandation rapide ou prends le contrôle de ta séance."}</p></div>
-            <div class="v2-gym-action-list">
-              <article class="v2-gym-coach-card v2-gym-action-card recommended" aria-labelledby="v2-gym-coach-title">
-                <div class="v2-gym-action-heading"><span>Recommandé</span><small>${context.coach.durationMinutes} min</small></div>
-                <p class="eyebrow">Préparée par ${escapeHTML(context.coach.name)}</p>
-                <h3 id="v2-gym-coach-title">${escapeHTML(context.coach.sessionTitle)}</h3>
-                <p>${escapeHTML(context.coach.sessionSummary)}</p>
-                ${coachNotice}
-                <button type="button" class="${coachButtonClass}" data-v2-coach-session aria-pressed="${context.coach.planned}"${coachDisabled}>${coachButtonLabel}</button>
-              </article>
-              ${advancedActions}
-            </div>
-          </section>
           <section class="v2-gym-membership v2-place-card ${context.membership.active ? "active" : "inactive"}">
             <span>Réception du GYM</span><strong>${escapeHTML(context.membership.active ? context.membership.label : "Inscription requise")}</strong><p>${escapeHTML(context.membership.detail)}</p>
-            <ul class="v2-gym-access-preview" aria-label="${context.membership.active ? "Activités comprises" : "Activités déverrouillées après l’inscription"}">${accessItems.map(item => `<li><span aria-hidden="true">${context.membership.active ? "✓" : "🔒"}</span>${escapeHTML(item)}</li>`).join("")}</ul>
-            <div class="v2-gym-membership-price"><span>1 mois · ou 3 mois à rabais</span><strong>${context.membership.monthlyPrice} $</strong><small>${escapeHTML(priceDetail)}</small></div>
-            <button type="button" class="${context.membership.active ? "secondary-button" : "primary-button"}" data-v2-gym-zone="reception" aria-label="${escapeHTML(`${membershipButton}. ${priceDetail}`)}">${escapeHTML(membershipButton)}</button>
+            <p class="v2-gym-membership-hint">Utilise le bouton <strong>Accueil</strong> dans le GYM pour ${context.membership.active ? "gérer l’accès" : "t’inscrire"}.</p>
           </section>
-          ${recreationalPath(context)}
         </aside>
       </div>
     </div>`;
@@ -454,5 +446,5 @@
     </section>`;
   }
 
-  return Object.freeze({ EXERCISES, ZONES, PRESETS, normalizeContext, render, renderComposer, renderResult });
+  return Object.freeze({ EXERCISES, ZONES, PRESETS, normalizeContext, render, renderMenu, renderComposer, renderResult });
 });

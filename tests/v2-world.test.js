@@ -64,19 +64,19 @@ test("donne priorité à l'étape déterministe du nouveau tutoriel", () => {
     gymWeeks: 0,
     v2Onboarding: { mode: "guided", week: 3, remyWeek: 6 },
     v2OnboardingStep: {
-      id: "week-3-mitts",
-      type: "objective",
-      title: "Travailler aux mitaines",
-      detail: "Applique une combinaison simple.",
-      locationId: "boxing-gym",
+      id: "week-3-skip-work",
+      type: "work-priority",
+      title: "Libérer du temps d’entraînement",
+      detail: "Une absence réelle libère de la capacité.",
+      locationId: "work",
       required: false,
     },
   });
   const current = world.objective(career);
 
-  assert.equal(current.id, "week-3-mitts");
-  assert.equal(current.title, "Travailler aux mitaines");
-  assert.equal(current.locationId, "boxing-gym");
+  assert.equal(current.id, "week-3-skip-work");
+  assert.equal(current.title, "Libérer du temps d’entraînement");
+  assert.equal(current.locationId, "work");
   assert.equal(current.required, false);
   assert.equal(current.onboarding, true);
   assert.equal(current.week, 3);
@@ -109,7 +109,7 @@ test("affiche textuellement le caractère obligatoire ou facultatif et la progre
   const optional = world.render(baseCareer({
     ...common,
     v2Onboarding: { mode: "guided", week: 4, remyWeek: 6 },
-    v2OnboardingStep: { ...common.v2OnboardingStep, id: "week-4-defense", required: false },
+    v2OnboardingStep: { ...common.v2OnboardingStep, id: "week-4-roadwork", required: false },
   }));
   assert.match(optional, /v2-objective-requirement optional">Facultatif/);
   assert.match(optional, /<progress max="6" value="4">4\/6<\/progress>/);
@@ -184,6 +184,39 @@ test("guide la journée de repos depuis la maison avec la même action que la zo
   assert.match(map, /data-v2-location="home">M’y rendre/);
   assert.match(home, /À la maison, appuie sur « Journée de repos »/);
   assert.match(home, /data-v2-home-action="rest">Ajouter une journée de repos/);
+});
+
+test("réutilise les vraies commandes pour le plan rapide, le travail, la course et le renouvellement", () => {
+  const cases = [
+    {
+      locationId: "home",
+      step: { id: "week-2-follow-plan", type: "plan-quick", title: "Suivre un plan", detail: "Prépare un plan.", locationId: "map", actionMode: "quick-plan" },
+      expected: /data-v2-week-quick>Suivre le plan rapide/,
+    },
+    {
+      locationId: "work",
+      step: { id: "week-3-skip-work", type: "work-priority", title: "Libérer du temps", detail: "Aucune paie.", locationId: "work" },
+      expected: /data-v2-toggle-work aria-pressed="true">Ne pas travailler cette semaine/,
+    },
+    {
+      locationId: "home",
+      step: { id: "week-4-add-roadwork", type: "roadwork", title: "Tester la course", detail: "Court jog.", locationId: "home" },
+      expected: /data-v2-home-menu="running">Ouvrir le menu Course/,
+    },
+    {
+      locationId: "boxing-gym",
+      step: { id: "week-5-renew-membership", type: "membership-renewal", title: "Renouveler", detail: "Paie le forfait.", locationId: "boxing-gym" },
+      expected: /data-v2-gym-zone="reception">Renouveler à l’accueil/,
+    },
+  ];
+
+  for (const item of cases) {
+    const html = world.renderLocationGuide(baseCareer({
+      v2Onboarding: { mode: "guided", week: Number(item.step.id.match(/week-(\d+)/)?.[1] || 2), remyWeek: 6 },
+      v2OnboardingStep: { ...item.step, required: false },
+    }), item.locationId);
+    assert.match(html, item.expected);
+  }
 });
 
 test("ignore une étape terminée ou exemptée et conserve les anciens contextes", () => {

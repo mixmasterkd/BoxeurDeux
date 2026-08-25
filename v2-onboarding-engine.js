@@ -41,26 +41,33 @@
       detail: "Suis le programme simple du coach pour découvrir le GYM sans devoir tout planifier.",
     },
     {
-      id: "week-2-group-class", week: 2, locationId: "boxing-gym",
-      title: "Essayer un cours de groupe",
-      detail: "Apprends le rythme, les appuis et les règles du GYM avec les autres récréatifs.",
+      id: "week-2-follow-plan", week: 2, locationId: "map",
+      title: "Suivre un plan préparé",
+      detail: "Le plan rapide conserve ton travail et prépare le cours récréatif avec une journée de repos. Rien ne sera appliqué avant ta confirmation.",
     },
     {
-      id: "week-3-mitts", week: 3, locationId: "boxing-gym",
-      title: "Travailler aux mitaines",
-      detail: "Écoute une consigne courte du coach et applique-la sur une combinaison simple.",
+      id: "week-3-training-priority", week: 3, locationId: "map",
+      title: "Donner priorité à l’entraînement",
+      detail: "Prépare un plan rapide, retire exceptionnellement le travail, puis utilise la capacité libérée pour ajouter un entraînement maison. Tu perdras la paie et recevras une première absence.",
     },
     {
-      id: "week-4-defense", week: 4, locationId: "boxing-gym",
-      title: "Apprendre à sortir proprement",
-      detail: "Travaille la garde, un pivot et une sortie des câbles avant de penser à attaquer.",
+      id: "week-4-roadwork", week: 4, locationId: "home",
+      title: "Tester la course et la récupération",
+      detail: "Le court jog se choisit dans le menu Course et développe surtout le cardio. Ajoute ensuite une journée de repos pour assimiler le travail.",
     },
     {
-      id: "week-5-remy-preparation", week: 5, locationId: "boxing-gym",
-      title: "Préparer le sparring de Rémy",
-      detail: "Le coach révise le jab, la distance et la récupération avant l’évaluation.",
+      id: "week-5-renew-and-prepare", week: 5, locationId: "boxing-gym",
+      title: "Renouveler le GYM et préparer Rémy",
+      detail: "Le premier mois est terminé. Renouvelle réellement ton abonnement, puis suis un dernier plan rapide avant le sparring pédagogique de la semaine 6.",
     },
   ]);
+
+  const OBJECTIVE_ALIASES = Object.freeze({
+    "week-2-group-class": "week-2-follow-plan",
+    "week-3-mitts": "week-3-training-priority",
+    "week-4-defense": "week-4-roadwork",
+    "week-5-remy-preparation": "week-5-renew-and-prepare",
+  });
 
   function deepFreeze(value) {
     if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
@@ -143,6 +150,7 @@
     const known = new Set(OBJECTIVES.map(objective => objective.id));
     return [...new Set((Array.isArray(value) ? value : [])
       .map(cleanId)
+      .map(id => OBJECTIVE_ALIASES[id] || id)
       .filter(id => known.has(id)))];
   }
 

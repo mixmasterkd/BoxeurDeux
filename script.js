@@ -3135,16 +3135,36 @@ function v2OnboardingView(capsule = ensureV2PreviewCapsule()) {
   const onboarding = v2OnboardingSnapshot(capsule);
   if (!onboarding || !window.BoxeurOnboarding) return null;
   const baseStep = window.BoxeurOnboarding.getCurrentStep(onboarding);
-  const plannerEntries = Array.isArray(capsule?.previewRuntime?.weekPlanner?.entries)
-    ? capsule.previewRuntime.weekPlanner.entries
+  const plannerState = capsule?.previewRuntime?.weekPlanner;
+  const plannerEntries = Array.isArray(plannerState?.entries)
+    ? plannerState.entries
     : [];
+  const career = capsule?.previewRuntime?.career || {};
+  const entryFor = (activityId, predicate = () => true) => plannerEntries.find(entry => (
+    entry?.activityId === activityId && predicate(entry)
+  ));
+  const quickGroupClass = entryFor("group-class", entry => entry.source === "quick");
+  const quickRest = entryFor("rest", entry => entry.source === "quick");
+  const homeTraining = entryFor("home-quick");
+  const roadwork = entryFor("roadwork-short");
+  const rest = entryFor("rest");
+  const work = plannerEntries.find(entry => entry?.source === "work");
+  const reviewStep = (id, title, detail) => ({
+    id,
+    type: "review-week",
+    title,
+    detail,
+    locationId: "map",
+    required: false,
+    actionMode: "review-and-confirm",
+  });
   const firstGroupClassPlanned = onboarding.mode === "guided"
     && onboarding.week === 1
     && baseStep?.id === "week-1-first-session"
     && plannerEntries.some(entry => entry?.activityId === "group-class");
   const firstRestPlanned = firstGroupClassPlanned
     && plannerEntries.some(entry => entry?.activityId === "rest");
-  const step = firstGroupClassPlanned && !firstRestPlanned
+  let step = firstGroupClassPlanned && !firstRestPlanned
     ? {
         id: "week-1-add-rest",
         type: "recovery",
@@ -3164,6 +3184,114 @@ function v2OnboardingView(capsule = ensureV2PreviewCapsule()) {
         actionMode: "review-and-confirm",
       }
     : baseStep;
+
+  if (onboarding.mode === "guided" && baseStep?.id === "week-2-follow-plan") {
+    step = quickGroupClass && quickRest
+      ? reviewStep(
+          "week-2-review-program",
+          "Ton plan rapide est prêt",
+          "Le travail, le cours récréatif et le repos sont visibles avant leur exécution. Ouvre le programme pour le vérifier, puis confirme la semaine.",
+        )
+      : {
+          ...baseStep,
+          type: "plan-quick",
+          actionMode: "quick-plan",
+        };
+  }
+
+  if (onboarding.mode === "guided" && baseStep?.id === "week-3-training-priority") {
+    if (!quickGroupClass || !quickRest) {
+      step = {
+        ...baseStep,
+        id: "week-3-prepare-quick-plan",
+        type: "plan-quick",
+        title: "Préparer le point de départ",
+        detail: "Commence par le plan rapide. Tu modifieras ensuite ce programme pour créer une semaine avec davantage d’entraînement.",
+        actionMode: "quick-plan",
+      };
+    } else if (work) {
+      step = {
+        ...baseStep,
+        id: "week-3-skip-work",
+        type: "work-priority",
+        title: "Libérer du temps d’entraînement",
+        detail: "Retire exceptionnellement le travail de cette semaine. Cette décision libère de la capacité, mais tu ne recevras aucune paie et ton employeur enregistrera une première absence.",
+        locationId: "work",
+      };
+    } else if (!homeTraining) {
+      step = {
+        ...baseStep,
+        id: "week-3-add-home-training",
+        type: "home-training",
+        title: "Ajouter un deuxième entraînement",
+        detail: "La capacité libérée permet maintenant d’ajouter l’entraînement maison rapide sans retirer le cours récréatif ni la journée de repos.",
+        locationId: "home",
+      };
+    } else {
+      step = reviewStep(
+        "week-3-review-program",
+        "Ta semaine priorise l’entraînement",
+        "Le cours récréatif et l’entraînement maison sont prévus. Le travail est absent : la paie et l’assiduité seront réellement touchées à la confirmation.",
+      );
+    }
+  }
+
+  if (onboarding.mode === "guided" && baseStep?.id === "week-4-roadwork") {
+    if (!roadwork) {
+      step = {
+        ...baseStep,
+        id: "week-4-add-roadwork",
+        type: "roadwork",
+        title: "Tester la course",
+        detail: "Ouvre le menu Course par la porte, puis ajoute le court jog à ta semaine. C’est la seule sortie disponible pendant le parcours récréatif.",
+        locationId: "home",
+      };
+    } else if (!rest) {
+      step = {
+        ...baseStep,
+        id: "week-4-add-recovery",
+        type: "recovery",
+        title: "Prévoir l’assimilation",
+        detail: "Le court jog dépense de l’énergie et crée de la fatigue. Ajoute une journée de repos pour apprendre comment la récupération aide le boxeur à assimiler ce travail.",
+        locationId: "home",
+      };
+    } else {
+      step = reviewStep(
+        "week-4-review-program",
+        "Course et récupération sont planifiées",
+        "Le court jog et la journée de repos seront appliqués par le même moteur de semaine.",
+      );
+    }
+  }
+
+  if (onboarding.mode === "guided" && baseStep?.id === "week-5-renew-and-prepare") {
+    if (Number(career.gymWeeks || 0) <= 0) {
+      step = {
+        ...baseStep,
+        id: "week-5-renew-membership",
+        type: "membership-renewal",
+        title: "Renouveler l’abonnement au GYM",
+        detail: "Les quatre semaines du premier mois sont terminées. Choisis et paie réellement un nouveau forfait pour reprendre le cours récréatif et conserver l’accès à Rémy.",
+        locationId: "boxing-gym",
+      };
+    } else if (!quickGroupClass || !quickRest) {
+      step = {
+        ...baseStep,
+        id: "week-5-prepare-quick-plan",
+        type: "plan-quick",
+        title: "Préparer la semaine avant Rémy",
+        detail: "Ton abonnement est actif. Suis un dernier plan rapide : il conservera le travail et ajoutera le cours récréatif avec une journée de repos.",
+        locationId: "map",
+        actionMode: "quick-plan",
+      };
+    } else {
+      step = reviewStep(
+        "week-5-review-program",
+        "Dernière semaine avant Rémy",
+        "Ton abonnement est actif et le cours récréatif est prévu avec du repos. Confirme cette semaine; Rémy deviendra accessible seulement à la semaine 6.",
+      );
+    }
+  }
   return {
     state: onboarding,
     gates: window.BoxeurOnboarding.getGates(onboarding),
@@ -3175,16 +3303,32 @@ function v2CompletedOnboardingObjectiveId(onboarding, plannerEntries, executedEn
   if (!onboarding?.state || onboarding.state.mode !== "guided" || !window.BoxeurOnboarding) return null;
   const objective = window.BoxeurOnboarding.getCurrentStep(onboarding.state);
   if (objective?.type !== "objective" || onboarding.state.completedObjectiveIds.includes(objective.id)) return null;
-  const matchesObjective = {
-    "week-1-first-session": entry => entry.activityId === "group-class",
-    "week-2-group-class": entry => entry.activityId === "group-class",
-    "week-3-mitts": entry => entry.activityId === "boxing-custom" && entry.metadata?.blocks?.includes("mitts"),
-    "week-4-defense": entry => entry.activityId === "boxing-custom" && entry.metadata?.blocks?.includes("defense_drills"),
+  const executed = plannerEntries.filter(entry => executedEntryIds.has(entry.id));
+  const hasExecuted = (activityId, predicate = () => true) => executed.some(entry => (
+    entry.activityId === activityId && predicate(entry)
+  ));
+  const completed = {
+    "week-1-first-session": () => hasExecuted("group-class"),
+    "week-2-follow-plan": () => (
+      hasExecuted("group-class", entry => entry.source === "quick")
+      && hasExecuted("rest", entry => entry.source === "quick")
+    ),
+    "week-3-training-priority": () => (
+      hasExecuted("group-class", entry => entry.source === "quick")
+      && hasExecuted("home-quick")
+      && !hasExecuted("work")
+    ),
+    "week-4-roadwork": () => (
+      hasExecuted("roadwork-short")
+      && hasExecuted("rest")
+    ),
+    "week-5-renew-and-prepare": () => (
+      onboarding.state.initialGym.active
+      && hasExecuted("group-class", entry => entry.source === "quick")
+      && hasExecuted("rest", entry => entry.source === "quick")
+    ),
   }[objective.id];
-  if (!matchesObjective) return null;
-  return plannerEntries.some(entry => executedEntryIds.has(entry.id) && matchesObjective(entry))
-    ? objective.id
-    : null;
+  return completed?.() ? objective.id : null;
 }
 
 function applyV2OnboardingEvent(event) {
@@ -3515,6 +3659,42 @@ const V2_HOME_ACTIVITIES = Object.freeze({
     stimulus: { technique: .5, power: 2.8, cardio: .3, defense: 0 },
     xp: 3,
   }),
+  "roadwork-short": Object.freeze({
+    id: "roadwork:short",
+    label: "Court jog",
+    category: "roadwork",
+    duration: 1,
+    energyCost: 10,
+    energyGain: 0,
+    fatigueGain: 6,
+    fatigueRelief: 0,
+    stimulus: { technique: 0, power: 0, cardio: 3.2, defense: 0 },
+    xp: 3,
+  }),
+  "roadwork-long": Object.freeze({
+    id: "roadwork:long",
+    label: "Long jog",
+    category: "roadwork",
+    duration: 2,
+    energyCost: 18,
+    energyGain: 0,
+    fatigueGain: 12,
+    fatigueRelief: 0,
+    stimulus: { technique: 0, power: 0, cardio: 5.5, defense: 0 },
+    xp: 5,
+  }),
+  "roadwork-intervals": Object.freeze({
+    id: "roadwork:intervals",
+    label: "Intervalles",
+    category: "roadwork",
+    duration: 1,
+    energyCost: 16,
+    energyGain: 0,
+    fatigueGain: 13,
+    fatigueRelief: 0,
+    stimulus: { technique: 0, power: .5, cardio: 5, defense: 0 },
+    xp: 5,
+  }),
 });
 
 function v2ActivityOnCurrentDay(timeState, predicate) {
@@ -3584,6 +3764,9 @@ function v2HomeContext() {
       rest: actionState("rest"),
       "home-quick": actionState("home-quick"),
       "home-custom": actionState("home-custom"),
+      "roadwork-short": actionState("roadwork-short"),
+      "roadwork-long": actionState("roadwork-long"),
+      "roadwork-intervals": actionState("roadwork-intervals"),
       meal: { ...actionState("meal"), moneyCost: 15 },
       "play-v1": { available: true, reason: "" },
     },
@@ -3915,10 +4098,11 @@ function v2IsPrimaryPhysicalEvent(event) {
   if (event?.type !== "activity-completed") return false;
   const category = String(event.activityCategory || "");
   const activityId = String(event.activityId || "");
-  return ["training", "boxing-gym-training", "strength-gym-training", "home-training", "private-training", "sparring"].includes(category)
+  return ["training", "boxing-gym-training", "strength-gym-training", "home-training", "roadwork", "private-training", "sparring"].includes(category)
     || activityId.startsWith("boxing-gym-session:")
     || activityId.startsWith("strength-gym-session:")
     || activityId.startsWith("home-session:")
+    || activityId.startsWith("roadwork:")
     || activityId.startsWith("private-trainer:");
 }
 
@@ -4190,7 +4374,7 @@ function v2PlannerHomeAggregate(selectionInput) {
   const selection = hasExplicitSelection
     ? [...new Set(selectionInput.filter(id => V2_HOME_ACTIVITIES[id]?.category === "home-training"))].slice(0, 3)
     : [];
-  const chosen = selection.length ? selection : hasExplicitSelection ? [] : ["shadow-boxing", "jogging"];
+  const chosen = selection.length ? selection : hasExplicitSelection ? [] : ["shadow-boxing", "basement-bag"];
   const totals = chosen.reduce((sum, id) => {
     const activity = V2_HOME_ACTIVITIES[id];
     sum.energyCost += activity.energyCost;
@@ -4280,8 +4464,33 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       },
     };
   }
+  if (["roadwork-short", "roadwork-long", "roadwork-intervals"].includes(id)) {
+    const activity = V2_HOME_ACTIVITIES[id];
+    const capacityMinimum = id === "roadwork-short" ? 5 : 7;
+    return {
+      id,
+      label: activity.label,
+      category: "home",
+      location: "home",
+      physical: true,
+      capacityCost: v2PlannerLoadCost(activity.energyCost, activity.fatigueGain, capacityMinimum),
+      energyCost: activity.energyCost,
+      fatigueDelta: activity.fatigueGain,
+      recreationalAllowed: id === "roadwork-short",
+      metadata: {
+        plannerType: id,
+        runningType: id.replace("roadwork-", ""),
+        xp: activity.xp,
+        familyId: "home",
+        programSignature: `home:${id}`,
+        capacityMinimum,
+        fatigueGain: activity.fatigueGain,
+        fatigueRelief: activity.fatigueRelief,
+      },
+    };
+  }
   if (["home-quick", "home-custom"].includes(id)) {
-    const aggregate = v2PlannerHomeAggregate(id === "home-custom" ? metadata.selection : ["shadow-boxing", "jogging"]);
+    const aggregate = v2PlannerHomeAggregate(id === "home-custom" ? metadata.selection : ["shadow-boxing", "basement-bag"]);
     if (id === "home-custom" && aggregate.selection.length === 0) {
       throw new Error("Choisis au moins une activité pour bâtir l’entraînement maison.");
     }
@@ -4405,7 +4614,7 @@ function v2PlannerActivityAccess(activityId) {
   if (["strength-quick", "strength-custom"].includes(id) && runtime.career.strengthGymWeeks <= 0) {
     return { available: false, reason: "Un abonnement actif au gym de musculation est requis." };
   }
-  if (state.careerStatus === "recreational" && !["group-class", "home-quick", "rest", "meal"].includes(id)) {
+  if (state.careerStatus === "recreational" && !["group-class", "home-quick", "roadwork-short", "rest"].includes(id)) {
     return { available: false, reason: "Cette activité se débloque après le passage amateur." };
   }
   if (id === "private-training") {
@@ -5312,6 +5521,29 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
       xpAward: aggregate.totals.xp * gainMultiplier,
     });
   }
+  if (["roadwork-short", "roadwork-long", "roadwork-intervals"].includes(entry.activityId)) {
+    const activity = V2_HOME_ACTIVITIES[entry.activityId];
+    const totals = {
+      energyCost: activity.energyCost,
+      energyGain: activity.energyGain,
+      fatigueGain: activity.fatigueGain,
+      fatigueRelief: activity.fatigueRelief,
+      stimulus: activity.stimulus,
+    };
+    const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, totals, capsule);
+    sideEffects.supplementState = adjusted.state;
+    if (adjusted.result) sideEffects.supplements.push(adjusted.result);
+    const gainMultiplier = v2PlannerGainMultiplier(entry);
+    return v2PlannerGenericActivity(entry, entry.label, {
+      ...adjusted.totals,
+      stimulus: v2PlannerScaledStimulus(adjusted.totals.stimulus, gainMultiplier),
+    }, {
+      engineId: activity.id,
+      category: "roadwork",
+      duration: activity.duration,
+      xpAward: activity.xp * gainMultiplier,
+    });
+  }
   if (entry.activityId === "rest") {
     const activity = window.BoxeurRecovery.ACTIONS.active_recovery.activity;
     return v2PlannerGenericActivity(entry, entry.label, {
@@ -5966,6 +6198,17 @@ function runV2CoachSession() {
   addV2PlannerActivity(plannerId, {}, { toggle: plannerId === "group-class", reopen: "boxing-gym" });
 }
 
+function renderV2GymMenu(menuId) {
+  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+  if (!sheet || !window.BoxeurGymView?.renderMenu) return;
+  const markup = window.BoxeurGymView.renderMenu(menuId, v2GymContext());
+  if (!markup) return;
+  sheet.dataset.originLocation = "boxing-gym";
+  sheet.classList.add("v2-location-sheet-full");
+  sheet.innerHTML = markup;
+  activateV2LocationSheet(sheet, "[data-v2-coach-session], [data-v2-boxing-trainer], [data-v2-sparring-activity], [data-v2-amateur-transition], [data-v2-gym-menu-close]");
+}
+
 const V2_HOME_ACTION_TO_ENGINE = Object.freeze({
   sleep: "sleep_until_morning",
   recover: "active_recovery",
@@ -5983,6 +6226,17 @@ function renderV2ClassicComputer() {
     <div class="v2-classic-monitor"><iframe src="./?classic=1&amp;arcade=1" title="BoxeurDeux classique dans l’ordinateur de la maison" sandbox="allow-scripts allow-forms allow-modals" loading="eager"></iframe></div>
   </section>`;
   activateV2LocationSheet(sheet, "[data-v2-classic-close]");
+}
+
+function renderV2HomeMenu(menuId) {
+  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+  if (!sheet || !window.BoxeurHomeView?.renderMenu) return;
+  const markup = window.BoxeurHomeView.renderMenu(menuId, v2HomeContext());
+  if (!markup) return;
+  sheet.dataset.originLocation = "home";
+  sheet.classList.add("v2-location-sheet-full");
+  sheet.innerHTML = markup;
+  activateV2LocationSheet(sheet, "[data-v2-home-action], [data-v2-home-menu-close]");
 }
 
 function showV2HomeActivityResult({ title, summary, before, after, stimulusAdded = 0, xpAward = 0, recommendation = "" }) {
@@ -6017,14 +6271,14 @@ function runV2HomeAction(viewActionId) {
     renderV2HomeComposer();
     return;
   }
-  if (!["rest", "home-quick", "meal"].includes(viewActionId)) return;
-  addV2PlannerActivity(viewActionId, {}, { toggle: ["rest", "meal"].includes(viewActionId), reopen: "home" });
+  if (!["rest", "home-quick", "meal", "roadwork-short", "roadwork-long", "roadwork-intervals"].includes(viewActionId)) return;
+  addV2PlannerActivity(viewActionId, {}, { toggle: ["rest", "meal", "roadwork-short", "roadwork-long", "roadwork-intervals"].includes(viewActionId), reopen: "home" });
 }
 
 function renderV2HomeComposer() {
   const sheet = document.querySelector("#v2-world .v2-location-sheet");
   if (!sheet) return;
-  const choices = ["jogging", "shadow-boxing", "basement-bag"].map(id => {
+  const choices = ["shadow-boxing", "basement-bag"].map(id => {
     const activity = V2_HOME_ACTIVITIES[id];
     const selected = v2HomeSelection.includes(id);
     return `<button type="button" class="v2-exercise-choice${selected ? " selected" : ""}" data-v2-home-exercise="${id}" aria-pressed="${selected}"><strong>${escapeHTML(activity.label)}</strong><small>−${activity.energyCost} énergie · +${activity.fatigueGain} fatigue</small></button>`;
@@ -6035,7 +6289,7 @@ function renderV2HomeComposer() {
   sheet.classList.add("v2-location-sheet-full");
   sheet.innerHTML = `<section class="v2-session-composer" aria-labelledby="v2-home-composer-title">
     <header><div><p class="eyebrow">Maison · semaine ${ensureV2PreviewCapsule().timeState.clock.week}</p><h2 id="v2-home-composer-title">Bâtis un entraînement maison</h2></div><button type="button" data-v2-home-composer-close>Fermer</button></header>
-    <p>Choisis une ou deux activités. Cette combinaison comptera comme une seule séance physique dans la semaine.</p>
+    <p>Choisis une ou deux activités du sous-sol. Cette combinaison comptera comme une seule séance physique dans la semaine. La course se planifie séparément par la porte.</p>
     <div class="v2-composer-state" aria-live="polite"><strong>${v2HomeSelection.length} activité${v2HomeSelection.length > 1 ? "s" : ""}</strong><span>−${aggregate.totals.energyCost} énergie</span><span>+${aggregate.totals.fatigueGain} fatigue</span></div>
     <div class="v2-exercise-grid">${choices}</div>
     <footer><button type="button" class="secondary-button" data-v2-home-composer-close>Annuler</button><button type="button" class="primary-button" data-v2-home-custom-confirm${empty ? " disabled aria-disabled=\"true\"" : ""}>Ajouter à ma semaine</button></footer>
@@ -8073,6 +8327,11 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     runV2WorkShift();
     return;
   }
+  const homeMenu = event.target.closest("[data-v2-home-menu]");
+  if (homeMenu) {
+    renderV2HomeMenu(homeMenu.dataset.v2HomeMenu);
+    return;
+  }
   const homeAction = event.target.closest("[data-v2-home-action]");
   if (homeAction) {
     runV2HomeAction(homeAction.dataset.v2HomeAction);
@@ -8095,6 +8354,10 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     openV2Location("home");
     return;
   }
+  if (event.target.closest("[data-v2-home-menu-close]")) {
+    openV2Location("home");
+    return;
+  }
   if (event.target.closest("[data-v2-home-result-close]")) {
     openV2Location("home");
     revealPendingV2LevelAlert();
@@ -8102,6 +8365,10 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
   }
   if (event.target.closest("[data-v2-classic-close]")) {
     openV2Location("home");
+    return;
+  }
+  if (event.target.closest("[data-v2-gym-menu-close]")) {
+    openV2Location("boxing-gym");
     return;
   }
   const strengthActivity = event.target.closest("[data-v2-strength-activity]");
@@ -8236,20 +8503,15 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
   const gymZone = event.target.closest("[data-v2-gym-zone]");
   if (gymZone) {
     if (gymZone.dataset.v2GymZone === "reception") openV2MembershipMenu();
-    else if (gymZone.dataset.v2GymZone === "coach") {
-      const coachSession = document.querySelector("#v2-world [data-v2-coach-session]");
-      coachSession?.scrollIntoView({ behavior: "smooth", block: "center" });
-      coachSession?.focus({ preventScroll: true });
-    }
+    else if (gymZone.dataset.v2GymZone === "coach") renderV2GymMenu("coach");
     else if (gymZone.dataset.v2GymZone === "training") {
       v2ComposerSelection = [];
       renderV2Composer();
-    } else if (gymZone.dataset.v2GymZone === "ring") document.querySelector("#v2-world #v2-gym-sparring-card")?.focus({ preventScroll: false });
-    return;
-  }
-  const homeZone = event.target.closest("[data-v2-home-zone]");
-  if (homeZone?.dataset.v2HomeZone === "basement") {
-    showToast("L’entraînement de dépannage au sous-sol sera branché dans la prochaine tranche V2.");
+    } else if (gymZone.dataset.v2GymZone === "ring") {
+      const context = v2GymContext();
+      if (context?.careerStatus === "recreational" && context.recreational?.remyStatus === "ready") startV2RemySparring();
+      else if (context?.careerStatus !== "recreational") renderV2GymMenu("ring");
+    }
     return;
   }
   const navigation = event.target.closest("[data-v2-nav]");
