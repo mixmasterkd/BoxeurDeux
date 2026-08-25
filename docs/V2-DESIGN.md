@@ -8,7 +8,7 @@ La V2 doit préserver les carrières, l'économie, les compétitions et l'équil
 
 ### État d'implantation actuel
 
-La préversion reste disponible uniquement avec l'option de test `?v2=1`. Elle comprend maintenant le planificateur à énergie hebdomadaire, l'horloge déterministe interne, la migration additive, la carte, le guide récréatif, le gym de boxe, le gym de musculation, les activités de la maison, la récupération, l'emploi initial, les entraîneurs privés, l'inventaire et les suppléments, la fiche Boxeur et les quatre jauges de progression. Le menu caché peut lancer immédiatement un sparring ou un combat réel sans modifier la carrière testée.
+La V2 est maintenant l'interface de carrière officielle. Elle comprend le planificateur à énergie hebdomadaire, l'horloge déterministe interne, la migration additive, la carte, le guide récréatif, le gym de boxe, le gym de musculation, les activités de la maison, la récupération, l'emploi initial, les entraîneurs privés, l'inventaire et les suppléments, la fiche Boxeur et les quatre jauges de progression. Le menu caché peut lancer immédiatement un sparring ou un combat réel sans modifier la carrière testée.
 
 La capsule conserve le détail de l'horloge, de l'historique et des charges en attente pour exécuter chaque programme de façon déterministe. Pour le joueur, la semaine et sa réserve d'énergie sont toutefois le contrat principal : il compose un brouillon modifiable, puis confirme volontairement la semaine. Les champs durables nécessaires au reste du jeu — argent, abonnements, emploi, rythme d'entraînement, énergie, fatigue, statistiques fractionnaires, inventaire, programme privé et progression — sont synchronisés vers la sauvegarde principale afin de survivre au rechargement, à l'importation et à l'exportation.
 
@@ -606,7 +606,7 @@ Les scènes sont validées au minimum en 1440 × 900, 1280 × 720, 390 × 844, 3
 
 La V2 doit ouvrir les sauvegardes actuelles sans supprimer de progression. La migration est versionnée, idempotente et testée sur plusieurs profils : récréatif, amateur débutant, tournoi actif, carrière avancée, sans emploi et profil professionnel de test.
 
-Pendant la transition, la V2 reste une préversion activée explicitement avec `?v2=1`. Sa capsule écrit uniquement les champs durables prévus dans la sauvegarde principale et conserve séparément son historique détaillé. L'ordinateur de la maison permet d'ouvrir la V1 dans un espace isolé qui ne fait pas avancer l'horloge V2. Une carrière déjà avancée ne repasse pas par l'abonnement et l'emploi bloquants destinés uniquement à une nouvelle carrière.
+La V2 est ouverte directement, sans paramètre d'URL. Sa capsule écrit uniquement les champs durables prévus dans la sauvegarde principale et conserve séparément son historique détaillé. L'ordinateur de la maison permet d'ouvrir la V1 comme jeu classique, sans faire avancer l'horloge V2. Une carrière déjà avancée ne repasse pas par l'abonnement et l'emploi bloquants destinés uniquement à une nouvelle carrière.
 
 Principes de conversion :
 

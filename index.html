@@ -431,10 +431,43 @@
 
         <div id="fight-ring-stage" class="fight-ring-stage" data-cue="neutral">
           <img class="ring-backdrop" src="assets/ring-tactique.webp" width="1280" height="720" loading="lazy" decoding="async" alt="Ring de boxe, coin bleu à gauche et coin rouge à droite" />
-          <div class="ring-fighter ring-fighter-player" aria-hidden="true"><div class="ring-fighter-silhouette"></div></div>
-          <div class="ring-fighter ring-fighter-opponent" aria-hidden="true"><div class="ring-fighter-silhouette"></div></div>
+          <img class="sparring-ring-backdrop" src="assets/sparring-remy-ring-v2.png" width="1672" height="941" loading="lazy" decoding="async" alt="Ring d’entraînement du GYM vu légèrement de haut" />
+          <img class="sparring-before-backdrop" src="assets/sparring-remy-before-v2.png" width="1672" height="941" loading="lazy" decoding="async" alt="Le coach prépare le boxeur avant le sparring pendant que Rémy s’échauffe" />
+          <img class="sparring-corner-backdrop" src="assets/sparring-remy-corner-v2.png" width="1672" height="941" loading="lazy" decoding="async" alt="Le boxeur écoute les directives du coach dans son coin" />
+          <img class="sparring-after-backdrop" src="assets/sparring-remy-after-v2.png" width="1672" height="941" loading="lazy" decoding="async" alt="Les deux boxeurs touchent leurs gants après le sparring" />
+          <div class="ring-fighter ring-fighter-player" aria-hidden="true"><div class="ring-fighter-silhouette"></div><img class="sparring-fighter-image" src="assets/sparring-boxer-blue-back.webp" width="640" height="960" alt="" /></div>
+          <div class="ring-fighter ring-fighter-opponent" aria-hidden="true"><div class="ring-fighter-silhouette"></div><img class="sparring-fighter-image" src="assets/sparring-boxer-red-front.webp" width="640" height="960" alt="" /></div>
           <img id="fight-impact-effect" class="fight-impact-effect" src="assets/effet-impact.webp" width="512" height="512" loading="lazy" decoding="async" alt="" aria-hidden="true" />
+          <svg class="sparring-south-ropes" viewBox="0 0 1000 563" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="sparring-front-rope" x1="0" x2="1">
+                <stop offset="0" stop-color="#1d5277" />
+                <stop offset=".2" stop-color="#ddd5c4" />
+                <stop offset=".8" stop-color="#ddd5c4" />
+                <stop offset="1" stop-color="#8f2926" />
+              </linearGradient>
+              <linearGradient id="sparring-blue-post" x1="0" x2="1"><stop stop-color="#12334b" /><stop offset=".5" stop-color="#2c6d91" /><stop offset="1" stop-color="#0b1c29" /></linearGradient>
+              <linearGradient id="sparring-red-post" x1="0" x2="1"><stop stop-color="#5c1718" /><stop offset=".5" stop-color="#a43a32" /><stop offset="1" stop-color="#3d1011" /></linearGradient>
+            </defs>
+            <path class="sparring-front-post post-blue" d="M38 292 L40 492" />
+            <path class="sparring-front-post post-red" d="M962 292 L960 492" />
+            <path class="sparring-front-rope" d="M40 312 Q500 324 960 312" />
+            <path class="sparring-front-rope" d="M40 355 Q500 367 960 355" />
+            <path class="sparring-front-rope" d="M40 398 Q500 410 960 398" />
+            <path class="sparring-front-rope" d="M40 441 Q500 453 960 441" />
+          </svg>
           <div class="ring-position-labels" aria-hidden="true"><span>Câbles bleus</span><strong>Centre</strong><span>Câbles rouges</span></div>
+          <div id="sparring-ring-destinations" class="sparring-ring-destinations" aria-label="Déplacements possibles sur le ring"></div>
+          <aside id="sparring-coach-callout" class="sparring-coach-callout" hidden aria-live="polite"></aside>
+          <div class="sparring-combat-hud">
+            <div class="sparring-player-energy" role="progressbar" aria-label="Énergie du boxeur" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-player-energy-bar"></span></div>
+            <strong id="sparring-round-hud">ROUND 1 / 3</strong>
+          </div>
+          <div id="sparring-perception-hud" class="sparring-perception-hud" role="img" aria-label="Le round semble partagé, lecture très incertaine">
+            <div class="sparring-perception-track"></div>
+            <div class="sparring-perception-zone"></div>
+            <div class="sparring-perception-needle"></div>
+          </div>
         </div>
 
         <div class="ring-scoreboard">
@@ -491,6 +524,7 @@
     <script src="career-calendar.js"></script>
     <script src="tournament-engine.js"></script>
     <script src="combat-engine.js"></script>
+    <script src="sparring-ring-engine.js"></script>
     <script src="career-time-engine.js"></script>
     <script src="career-v2-migration.js"></script>
     <script src="v2-onboarding-engine.js"></script>

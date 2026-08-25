@@ -340,7 +340,7 @@
     const hotspots = LOCATIONS.map(location => `<button class="v2-map-hotspot" type="button" data-v2-location="${location.id}" aria-label="Entrer : ${escapeHTML(location.label)}. ${escapeHTML(locationStatus(location, career))}"><span aria-hidden="true">${location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${escapeHTML(locationStatus(location, career))}</small></button>`).join("");
     return `<div class="v2-world-layout">
       <section class="v2-map-panel" aria-labelledby="v2-map-title">
-        <div class="v2-map-heading"><div><p class="eyebrow">Quartier de carrière</p><h2 id="v2-map-title">Que veux-tu planifier cette semaine, ${escapeHTML(firstName)}?</h2></div><a class="v2-preview-exit" href="./">Retour à l’interface actuelle</a></div>
+        <div class="v2-map-heading"><div><p class="eyebrow">Quartier de carrière</p><h2 id="v2-map-title">Que veux-tu planifier cette semaine, ${escapeHTML(firstName)}?</h2></div></div>
         ${developerTestBanner(career)}
         <div class="v2-map-canvas">
           <picture><source media="(max-width: 640px)" srcset="assets/carte-quartier-v2-mobile.jpg"><img src="assets/carte-quartier-v2-desktop.jpg" width="1440" height="810" alt="Carte illustrée du quartier avec la maison, les deux gyms, le lieu de travail et l’aréna" /></picture>

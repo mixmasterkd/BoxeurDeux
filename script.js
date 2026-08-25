@@ -18,11 +18,12 @@ const RECREATIONAL_START_DATE = "2026-09-07";
 const RECREATIONAL_SPARRING_WEEK = 6;
 const RECREATIONAL_MAX_WEEK = 10;
 const SAVE_KEY = "boxeur-deux-career-v2";
+const CLASSIC_GAME_ACTIVE = new URLSearchParams(window.location.search).get("classic") === "1";
 const DEV_RETURN_SAVE_KEY = `${SAVE_KEY}-dev-return`;
 const DEV_TEST_ACTIVE_KEY = `${SAVE_KEY}-dev-active`;
 const DEV_UNLOCK_CODE = "128";
 const SAVE_VERSION = 5;
-const V2_PREVIEW_ACTIVE = new URLSearchParams(window.location.search).get("v2") === "1";
+const V2_ACTIVE = !CLASSIC_GAME_ACTIVE;
 const V2_PREVIEW_SAVE_KEY = `${SAVE_KEY}-v2-preview`;
 const MAX_SUPPLEMENTS_PER_WEEK = 2;
 const SPONSOR_COOLDOWN_WEEKS = 4;
@@ -444,6 +445,7 @@ let draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
 let weeklyPlan = [];
 let toastTimer;
 let fightState = null;
+let sparringRingState = null;
 let selectedPrivateCoachId = null;
 let draftPortraitId = 0;
 let drugSalesTapCount = 0;
@@ -959,6 +961,7 @@ function hydrateCareer(snapshot) {
       return true;
     });
     fightState = null;
+    sparringRingState = null;
     selectedPrivateCoachId = null;
     applyCareerTheme();
   } catch (error) {
@@ -1044,8 +1047,7 @@ const developerToolDefinitions = Object.freeze([
   { id: "test-fight", label: "Combat immédiat", detail: "Lance un combat complet comparable, sans modifier la carrière ni le bilan." },
   { id: "test-sparring", label: "Sparring immédiat", detail: "Lance quatre échanges par round, sans gagnant officiel ni effet sur la carrière." },
   { id: "next-week", label: "Semaine suivante", detail: "Avance sans action ni dépense ; indisponible lorsqu’un combat est dû." },
-  { id: "v2-preview", label: "Aperçu V2", detail: "Ouvre la nouvelle carte de carrière sans remplacer l’interface actuelle." },
-  { id: "v2-reset", label: "Réinitialiser V2", detail: "Recrée seulement la capsule de test V2 depuis la carrière actuelle." },
+  { id: "v2-reset", label: "Réinitialiser la carte", detail: "Recrée seulement l’état de la carte depuis la carrière actuelle." },
 ]);
 
 function developerPresetSnapshot(id) {
@@ -1163,12 +1165,6 @@ function applyDeveloperCorner(corner) {
 
 function runDeveloperTool(id) {
   if (!state.profile || !developerToolDefinitions.some(tool => tool.id === id)) return;
-  if (id === "v2-preview") {
-    const url = new URL(window.location.href);
-    url.searchParams.set("v2", "1");
-    window.location.assign(url.toString());
-    return;
-  }
   if (id === "v2-reset") {
     invalidateV2PreviewCapsule();
     renderV2WorldPreview(Boolean(state.profile));
@@ -2834,7 +2830,7 @@ function render() {
 
 function renderV2WorldPreview(hasFighter = Boolean(state.profile)) {
   const root = document.querySelector("#v2-world");
-  const active = Boolean(V2_PREVIEW_ACTIVE && hasFighter && window.BoxeurWorld && window.BoxeurCareerV2Migration);
+  const active = Boolean(V2_ACTIVE && hasFighter && window.BoxeurWorld && window.BoxeurCareerV2Migration);
   document.body.classList.toggle("v2-preview", active);
   if (!root) return;
   root.hidden = !active;
@@ -3035,7 +3031,7 @@ function invalidateV2PreviewCapsule() {
 }
 
 function ensureV2PreviewCapsule() {
-  if (!V2_PREVIEW_ACTIVE || !state.profile || !window.BoxeurCareerV2Migration) return null;
+  if (!V2_ACTIVE || !state.profile || !window.BoxeurCareerV2Migration) return null;
   if (v2PreviewCapsule?.previewFingerprint === v2PreviewFingerprint(state)) return v2PreviewCapsule;
   try {
     const stored = JSON.parse(localStorage.getItem(V2_PREVIEW_SAVE_KEY) || "null");
@@ -5974,7 +5970,7 @@ function closeOptionalDialog(dialogId) {
 }
 
 function v2InitialJobSelectionRequired() {
-  if (!V2_PREVIEW_ACTIVE || !state.profile) return false;
+  if (!V2_ACTIVE || !state.profile) return false;
   return v2OnboardingView()?.gates.jobSelection.required === true;
 }
 
@@ -7146,7 +7142,7 @@ async function startFight() {
   if (state.week < state.scheduledFight.week) return showToast(`Combat prévu à la semaine ${state.scheduledFight.week}.`);
   const isDeveloperBout = Boolean(state.scheduledFight.isDeveloperBout);
   if (state.injuryWeeks > 0 && !isDeveloperBout) return showToast("Blessure en cours : ce combat doit être annulé.");
-  const isV2Sparring = Boolean(V2_PREVIEW_ACTIVE && state.scheduledFight.isV2Sparring);
+  const isV2Sparring = Boolean(V2_ACTIVE && state.scheduledFight.isV2Sparring);
   if (!state.scheduledFight.tournamentId && !isV2Sparring && !isDeveloperBout && !applyPreFightPlan()) return;
   if (!state.scheduledFight.travelApplied) {
     applyChanges({ energy: state.scheduledFight.travelEffects?.energy || 0, fatigue: state.scheduledFight.travelEffects?.fatigue || 0 });
@@ -7155,7 +7151,7 @@ async function startFight() {
   const isRecreationalSparring = Boolean(state.scheduledFight.isRecreationalSparring);
   const isPracticeSparring = Boolean(state.scheduledFight.isPracticeSparring);
   const isNonRecordSparring = isRecreationalSparring || isPracticeSparring;
-  const v2FightCareer = V2_PREVIEW_ACTIVE && !state.scheduledFight.tournamentId && !isDeveloperBout
+  const v2FightCareer = V2_ACTIVE && !state.scheduledFight.tournamentId && !isDeveloperBout
     ? v2CareerView()
     : null;
   const difficulty = opponentDifficulty(opponent);
@@ -7209,19 +7205,32 @@ async function startFight() {
     isDeveloperBout,
     remyLesson: !isRecreationalSparring ? state.remyLesson : "",
   };
+  sparringRingState = isRecreationalSparring && window.BoxeurSparringRing
+    ? window.BoxeurSparringRing.createState({
+      seed: fightState.seed,
+      playerCorner: state.profile.corner,
+      playerStats: fightState.fighters.player.stats,
+      opponentStyle: fightState.fighters.opponent.style,
+      coachQuality: fightState.coach.quality,
+    })
+    : null;
   if (!isRecreationalSparring && state.remyLesson) state.remyLesson = "";
   const stage = document.querySelector("#fight-ring-stage");
   stage.dataset.cue = "neutral";
   stage.classList.remove("show-impact");
   configureRingImages();
-  const backdrop = stage.querySelector(".ring-backdrop");
-  if (backdrop) {
-    backdrop.loading = "eager";
-    backdrop.fetchPriority = "high";
+  const backdrops = sparringRingState
+    ? [...stage.querySelectorAll(".sparring-ring-backdrop, .sparring-before-backdrop, .sparring-corner-backdrop, .sparring-after-backdrop, .sparring-fighter-image")]
+    : [stage.querySelector(".ring-backdrop")].filter(Boolean);
+  if (backdrops.length) {
+    backdrops.forEach(image => {
+      image.loading = "eager";
+      image.fetchPriority = "high";
+    });
     let preloadTimer;
     try {
       await Promise.race([
-        backdrop.decode(),
+        Promise.all(backdrops.map(image => image.decode())),
         new Promise(resolve => { preloadTimer = setTimeout(resolve, 1200); }),
       ]);
     } catch {
@@ -7413,7 +7422,7 @@ function turnProfessional() {
 
 function beginAmateurCareer() {
   if (!canPassAmateurCareer()) return;
-  if (V2_PREVIEW_ACTIVE) {
+  if (V2_ACTIVE) {
     const capsule = ensureV2PreviewCapsule();
     const onboarding = v2OnboardingView(capsule);
     if (onboarding && !onboarding.gates.passAmateur.allowed) return showToast(onboarding.gates.passAmateur.reason);
@@ -7659,9 +7668,127 @@ function momentumLabel(fight) {
   return "Équilibrée";
 }
 
+function isRemyRingPrototype() {
+  return Boolean(fightState?.careerMeta?.isRecreationalSparring && sparringRingState && window.BoxeurSparringRing);
+}
+
+function sparringFighterAsset(role, visual) {
+  const corner = role === "opponent" ? "red" : "blue";
+  const pose = visual?.pose === "back" ? "back" : "front";
+  return `assets/sparring-boxer-${corner}-${pose}.webp`;
+}
+
+function renderSparringRing(view) {
+  const dialog = document.querySelector("#fight-dialog");
+  const stage = document.querySelector("#fight-ring-stage");
+  const destinations = document.querySelector("#sparring-ring-destinations");
+  const coachCallout = document.querySelector("#sparring-coach-callout");
+  const prototypeActive = isRemyRingPrototype();
+  dialog?.classList.toggle("sparring-ring-prototype", prototypeActive);
+  if (!stage || !destinations || !coachCallout) return;
+  if (!prototypeActive) {
+    delete stage.dataset.sparringScene;
+    destinations.innerHTML = "";
+    coachCallout.hidden = true;
+    coachCallout.classList.remove("coach-warning");
+    const logDisclosure = document.querySelector(".fight-log-disclosure");
+    if (logDisclosure?.dataset.prototypePrepared) {
+      delete logDisclosure.dataset.prototypePrepared;
+      logDisclosure.open = true;
+    }
+    return;
+  }
+
+  stage.dataset.sparringScene = view.status.finished
+    ? "after"
+    : view.phase === "corner"
+      ? view.round === 1 ? "before" : "corner"
+      : "ring";
+  delete stage.dataset.distance;
+  delete stage.dataset.position;
+  const visualRingState = view.status.finished ? cloneData(sparringRingState) : sparringRingState;
+  if (view.status.finished) {
+    visualRingState.fighters.player = { x: 1.75, y: 3 };
+    visualRingState.fighters.opponent = { x: 2.25, y: 2 };
+  }
+  const ringView = window.BoxeurSparringRing.getView(visualRingState, view.fighters.player.energy);
+  ["player", "opponent"].forEach(role => {
+    const visual = ringView.fighters[role];
+    const fighter = stage.querySelector(`.ring-fighter-${role}`);
+    const image = fighter?.querySelector(".sparring-fighter-image");
+    if (!fighter || !image) return;
+    fighter.style.setProperty("--ring-x", `${visual.xPercent}%`);
+    fighter.style.setProperty("--ring-y", `${visual.yPercent}%`);
+    fighter.style.setProperty("--ring-scale", String(visual.scale));
+    fighter.style.setProperty("--ring-layer", String(visual.layer));
+    fighter.style.setProperty("--fighter-flip", visual.mirrored ? "-1" : "1");
+    fighter.dataset.facing = visual.direction;
+    image.src = sparringFighterAsset(role, visual);
+  });
+
+  const canChooseMovement = view.phase === "exchange" && !view.status.finished && !ringView.pendingMovement;
+  stage.dataset.sparringStep = canChooseMovement ? "movement" : "action";
+  destinations.innerHTML = canChooseMovement
+    ? ringView.movementOptions.map(movement => {
+      const cost = movement.energyCost === 0 ? "0" : `−${movement.energyCost}`;
+      const energyLabel = movement.energyCost === 0
+        ? "aucune énergie"
+        : `${movement.energyCost} point${movement.energyCost > 1 ? "s" : ""} d’énergie`;
+      return `<button type="button" class="sparring-move" data-sparring-move="${movement.id}" data-spaces="${movement.spaces}" data-role="${movement.role}" style="--move-x:${movement.point.xPercent}%;--move-y:${movement.point.yPercent}%;--move-scale:${movement.point.scale}" aria-label="${escapeHTML(`${movement.label}, ${energyLabel}`)}"><span class="sparring-move-target" aria-hidden="true"></span><span class="sparring-move-cost" aria-hidden="true">${cost}</span><span class="sparring-move-label">${escapeHTML(movement.label)}</span></button>`;
+    }).join("")
+    : "";
+
+  const energy = clamp(Math.round(view.fighters.player.energy), 0, 100);
+  const energyTrack = stage.querySelector(".sparring-player-energy");
+  const energyBar = document.querySelector("#sparring-player-energy-bar");
+  const roundHud = document.querySelector("#sparring-round-hud");
+  if (energyBar) energyBar.style.width = `${energy}%`;
+  energyTrack?.setAttribute("aria-valuenow", String(energy));
+  if (roundHud) roundHud.textContent = `ROUND ${Math.min(3, view.round)} / 3`;
+
+  if (view.status.finished) {
+    coachCallout.hidden = true;
+    coachCallout.classList.remove("coach-warning");
+    coachCallout.innerHTML = "";
+    return;
+  }
+  if (view.phase !== "exchange") {
+    coachCallout.hidden = true;
+    coachCallout.classList.remove("coach-warning");
+    return;
+  }
+  const warning = Boolean(view.roundState?.coachRevealedWrong);
+  const movement = ringView.pendingMovement;
+  const directive = view.coach.activeDirective?.label || "Observe avant de t’engager";
+  const detail = warning
+    ? "Ma première lecture ne tient plus. Regarde Rémy et adapte ta réponse."
+    : movement
+      ? `${movement.label} choisi. Maintenant, décide ce que tu fais depuis cette position.`
+      : view.currentExchange?.situation || "Lis la distance avant de t’engager.";
+  coachCallout.hidden = false;
+  coachCallout.classList.toggle("coach-warning", warning);
+  coachCallout.innerHTML = `<span>Ton coach</span><strong>${escapeHTML(warning ? "Change de plan — adapte-toi" : directive)}</strong><small>${escapeHTML(detail)}</small>`;
+}
+
 function renderFightRoundDynamic(view) {
   const container = document.querySelector("#fight-round-dynamic");
   if (!container) return;
+  if (isRemyRingPrototype()) {
+    const perception = window.BoxeurSparringRing.getView(sparringRingState, view.fighters.player.energy).perception;
+    const low = clamp((perception.low + 100) / 2, 0, 100);
+    const high = clamp((perception.high + 100) / 2, 0, 100);
+    const value = clamp((perception.value + 100) / 2, 0, 100);
+    const clarity = perception.uncertainty <= 15 ? "Lecture assez nette" : perception.uncertainty <= 25 ? "Lecture prudente" : "Lecture très incertaine";
+    const hud = document.querySelector("#sparring-perception-hud");
+    if (hud) {
+      hud.style.setProperty("--perception-low", `${low}%`);
+      hud.style.setProperty("--perception-width", `${Math.max(2, high - low)}%`);
+      hud.style.setProperty("--perception-value", `${value}%`);
+      hud.setAttribute("aria-label", `${perception.label}. ${clarity}.`);
+    }
+    container.innerHTML = `<span class="visually-hidden">${escapeHTML(perception.label)}. ${clarity}. Cette perception n’est jamais une carte de juge.</span>`;
+    return;
+  }
   const momentum = clamp(Number(view.ring?.momentum || 0), -2, 2);
   const direction = momentum > 0 ? "player" : momentum < 0 ? "opponent" : "even";
   const label = momentum >= 1.5 ? "Ton coin garde l'initiative récente" : momentum >= .5 ? "Tu reprends légèrement l'initiative" : momentum <= -1.5 ? "L'adversaire impose la séquence récente" : momentum <= -.5 ? "L'adversaire prend légèrement l'initiative" : "Les derniers échanges sont partagés";
@@ -7764,7 +7891,26 @@ function renderFightChoices() {
     return;
   }
   const riskLabels = { low: "Risque faible", medium: "Risque mesuré", high: "Risque élevé" };
-  container.innerHTML = BoxeurCombat.getAvailableActions(fightState).map(action => `<button type="button" data-fight-action="${action.id}" class="${action.directiveAligned ? "coach-match" : ""}"><strong>${escapeHTML(action.label)}</strong><span>${escapeHTML(action.description)} · coût env. ${action.baseEnergyCost.toFixed(1)} E</span><em>${action.directiveAligned ? "Suit la directive du coach" : riskLabels[action.risk] || "Issue incertaine"}</em></button>`).join("");
+  const actions = BoxeurCombat.getAvailableActions(fightState);
+  if (isRemyRingPrototype()) {
+    if (!sparringRingState.pendingMovement) {
+      container.innerHTML = `<p class="sparring-movement-prompt">CHOISIS TA POSITION</p>`;
+      return;
+    }
+    const exits = ["pivot_exit", "lateral_evade", "retreat_step", "retake_center", "clinch", "compact_cover"];
+    const first = actions[0];
+    const attack = actions.find(action => action.family === "attack" && action.risk === "low") || actions.find(action => action.family === "attack") || first;
+    const response = actions.find(action => action.directiveAligned) || actions.find(action => action.family === "defense") || first;
+    const exit = actions.find(action => exits.includes(action.id)) || response;
+    const shortcuts = [
+      { purpose: "attack", label: "Tester", action: attack },
+      { purpose: "defense", label: "Répondre", action: response },
+      { purpose: "exit", label: "Se replacer", action: exit },
+    ].filter(item => item.action);
+    container.innerHTML = shortcuts.map(item => `<button type="button" data-fight-action="${item.action.id}" data-sparring-purpose="${item.purpose}" class="${item.action.directiveAligned ? "coach-match" : ""}" aria-label="${escapeHTML(`${item.label} : ${item.action.label}`)}"><strong>${escapeHTML(item.label)}</strong><span>${escapeHTML(item.action.description)}</span><em>${escapeHTML(item.action.label)} · ${item.action.baseEnergyCost.toFixed(1)} E</em></button>`).join("");
+    return;
+  }
+  container.innerHTML = actions.map(action => `<button type="button" data-fight-action="${action.id}" class="${action.directiveAligned ? "coach-match" : ""}"><strong>${escapeHTML(action.label)}</strong><span>${escapeHTML(action.description)} · coût env. ${action.baseEnergyCost.toFixed(1)} E</span><em>${action.directiveAligned ? "Suit la directive du coach" : riskLabels[action.risk] || "Issue incertaine"}</em></button>`).join("");
 }
 
 function renderFightCoach() {
@@ -7778,9 +7924,24 @@ function renderFightCoach() {
   panel.hidden = false;
   const pending = fightState.coach.pending;
   const remyLesson = fightState.careerMeta?.remyLesson;
-  document.querySelector("#fight-coach-title").textContent = fightState.round === 1 ? "Directive avant le combat" : `Pause du coach avant le round ${fightState.round}`;
-  document.querySelector("#fight-coach-analysis").textContent = `${pending.observation} Lecture proposée : ${pending.prediction}. Confiance ${pending.confidence}.${remyLesson && fightState.round === 1 ? ` Rappel de Rémy : ${remyLesson}` : ""}`;
-  choices.innerHTML = BoxeurCombat.getCoachOptions(fightState).map(option => `<button type="button" data-coach-option="${option.id}"><strong>${escapeHTML(option.label)}${option.recommended ? " · conseillé" : ""}</strong><span>${escapeHTML(option.description)} Compromis : ${escapeHTML(option.tradeoff)}</span></button>`).join("");
+  const remyPrototype = isRemyRingPrototype();
+  document.querySelector("#fight-coach-title").textContent = remyPrototype
+    ? fightState.round === 1 ? "Le coach prépare ton sparring" : `Ton vrai coin · avant le round ${fightState.round}`
+    : fightState.round === 1 ? "Directive avant le combat" : `Pause du coach avant le round ${fightState.round}`;
+  document.querySelector("#fight-coach-analysis").textContent = `${pending.observation} Le coach propose : ${pending.prediction}.${remyLesson && fightState.round === 1 ? ` Rappel : ${remyLesson}` : ""}`;
+  choices.innerHTML = BoxeurCombat.getCoachOptions(fightState).map(option => {
+    let label = option.label;
+    if (remyPrototype) {
+      label = option.kind === "recovery"
+        ? "Souffler"
+        : option.kind === "patient"
+          ? "Observer"
+          : option.recommended
+            ? "Écouter"
+            : "Adapter";
+    }
+    return `<button type="button" data-coach-option="${option.id}" aria-label="${escapeHTML(`${label} : ${option.description} Compromis : ${option.tradeoff}`)}"><strong>${escapeHTML(label)}${option.recommended ? " · conseillé" : ""}</strong><span>${escapeHTML(option.description)} Compromis : ${escapeHTML(option.tradeoff)}</span></button>`;
+  }).join("");
 }
 
 function renderFight(message = "Observe la situation puis choisis une réponse.") {
@@ -7837,6 +7998,7 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   stage.dataset.playerCorner = playerCornerTheme;
   stage.dataset.distance = view.ring.distance;
   stage.dataset.position = view.ring.position === "center" ? "center" : `${view.ring.position === "corner" ? "corner" : "ropes"}-${view.ring.pressured || "player"}`;
+  renderSparringRing(view);
 
   const tell = view.currentExchange?.intention || (view.coach.pending ? `Le coach anticipe : ${view.coach.pending.prediction}.` : "Le plan adverse reste difficile à lire.");
   document.querySelector("#fight-opponent-tell").textContent = tell;
@@ -7868,30 +8030,89 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   }
   document.querySelector("#fight-status").textContent = view.status.finished ? (isSparring ? "Sparring terminé" : view.result.label) : view.phase === "corner" ? "Le coach donne ses directives" : "Décision tactique en cours";
   const instruction = document.querySelector("#fight-instruction");
-  instruction.innerHTML = `<p>${escapeHTML(view.phase === "corner" ? "Choisis entre une directive tactique, une adaptation contextuelle et la récupération." : message)}</p>`;
+  const showSparringTutorial = isRemyRingPrototype() && view.phase === "corner" && view.round === 1 && !view.status.finished;
+  const sparringInstruction = isRemyRingPrototype()
+    ? showSparringTutorial
+      ? "La barre sous le ring montre ton ressenti du round, jamais un score ni une carte de juge."
+      : view.phase === "corner"
+        ? "Choisis une seule priorité avant de repartir."
+        : sparringRingState.pendingMovement
+          ? "Choisis maintenant ton intention depuis cette position."
+          : "Choisis ta destination sur le ring : rester coûte 0, une case coûte 1 et deux cases coûtent 3."
+    : null;
+  instruction.hidden = Boolean(isRemyRingPrototype() && !view.status.finished && !showSparringTutorial);
+  instruction.innerHTML = `<p>${escapeHTML(sparringInstruction || (view.phase === "corner" ? "Choisis entre une directive tactique, une adaptation contextuelle et la récupération." : message))}</p>`;
   const recent = view.history.filter(item => item.text).slice(-7);
   document.querySelector("#fight-log").innerHTML = recent.map(item => `<li>${item.round ? `R${item.round}${item.exchange ? `·E${item.exchange}` : ""} — ` : ""}${escapeHTML(item.text)}</li>`).join("") || "<li>Le combat va commencer.</li>";
+  const logDisclosure = document.querySelector(".fight-log-disclosure");
+  if (isRemyRingPrototype() && logDisclosure && !logDisclosure.dataset.prototypePrepared) {
+    logDisclosure.open = false;
+    logDisclosure.dataset.prototypePrepared = "true";
+  }
   renderFightCoach();
   renderFightChoices();
   if (!view.status.finished) requestAnimationFrame(() => {
-    const selector = view.phase === "corner" ? "#fight-coach-choices button" : "#fight-choices button";
-    document.querySelector(selector)?.focus({ preventScroll: false });
+    const selector = view.phase === "corner"
+      ? "#fight-coach-choices button"
+      : isRemyRingPrototype() && !sparringRingState.pendingMovement
+        ? "#sparring-ring-destinations button"
+        : "#fight-choices button";
+    document.querySelector(selector)?.focus({ preventScroll: isRemyRingPrototype() });
   });
 }
 
 function chooseFightCoachDirective(optionId) {
   if (!fightState || fightState.phase !== "corner") return;
+  const enteringRound = fightState.round;
   const transition = BoxeurCombat.chooseCoachDirective(fightState, optionId);
   fightState = transition.state;
+  if (isRemyRingPrototype() && enteringRound > 1) {
+    sparringRingState = window.BoxeurSparringRing.beginRound(sparringRingState, enteringRound);
+  }
   triggerFightVisual(transition.result);
   renderFight(transition.result.text);
 }
 
-function playRound(actionId) {
+function sparringActionForPurpose(actions, purpose, preferredId) {
+  if (actions.some(action => action.id === preferredId)) return preferredId;
+  const exits = ["pivot_exit", "lateral_evade", "retreat_step", "retake_center", "clinch", "compact_cover"];
+  const fallback = purpose === "coach"
+    ? actions.find(action => action.directiveAligned)
+    : purpose === "attack"
+      ? actions.find(action => action.family === "attack")
+      : purpose === "defense"
+        ? actions.find(action => action.family === "defense")
+        : purpose === "exit"
+          ? actions.find(action => exits.includes(action.id))
+          : null;
+  return (fallback || actions[0])?.id || preferredId;
+}
+
+function applySparringMovement(movementId) {
+  if (!isRemyRingPrototype() || fightState.phase !== "exchange") return;
+  try {
+    const transition = window.BoxeurSparringRing.applyMovement(sparringRingState, fightState, movementId);
+    sparringRingState = transition.state;
+    fightState = transition.combatState;
+    renderFight(transition.result.text);
+  } catch (error) {
+    console.error("[Boxeur Deux] Déplacement de sparring impossible :", error);
+    showToast("Cette position n’est plus accessible.");
+  }
+}
+
+function playRound(actionId, movementPurpose = "hold") {
   if (!fightState || fightState.phase !== "exchange") return;
   try {
+    if (isRemyRingPrototype() && !sparringRingState.pendingMovement) {
+      showToast("Choisis d’abord ta position dans le ring.");
+      return;
+    }
     const beforeView = BoxeurCombat.getPublicState(fightState);
     const transition = BoxeurCombat.resolveExchange(fightState, actionId);
+    if (isRemyRingPrototype()) {
+      sparringRingState = window.BoxeurSparringRing.advanceAfterExchange(sparringRingState, transition, transition.state);
+    }
     fightState = transition.state;
     recordSparringExchange(beforeView, transition);
     triggerFightVisual(transition.result);
@@ -8076,6 +8297,7 @@ function finishFight() {
     document.querySelector("#fight-dialog").close();
     const wasTournament = Boolean(meta.tournamentId);
     fightState = null;
+    sparringRingState = null;
     if (isDeveloperBout) {
       render();
       setTimeout(openDeveloperTestMenu, 0);
@@ -8142,6 +8364,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   state = cloneData(INITIAL_STATE);
   weeklyPlan = [];
   fightState = null;
+  sparringRingState = null;
   selectedPrivateCoachId = null;
   state.profile = {
     firstName: document.querySelector("#first-name").value.trim(),
@@ -8161,7 +8384,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   Object.keys(combatLabels).forEach(key => { state.combatStats[key] = BASE_COMBAT_STAT + styles[style].bonuses[key] + draftStats[key]; });
   state.journal = [{ week: 1, text: `${state.profile.firstName} commence au statut récréatif. Choisis un emploi et active le premier mois de GYM pour lancer le parcours.` }];
   render();
-  if (V2_PREVIEW_ACTIVE) openV2JobMenu();
+  if (V2_ACTIVE) openV2JobMenu();
   else openJobMenu();
   showToast("Nouvelle carrière lancée · statut récréatif");
 });
@@ -8190,6 +8413,7 @@ document.querySelector("#resume-new")?.addEventListener("click", () => {
   state = cloneData(INITIAL_STATE);
   weeklyPlan = [];
   fightState = null;
+  sparringRingState = null;
   selectedPrivateCoachId = null;
   draftPortraitId = 0;
   draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
@@ -8606,13 +8830,13 @@ document.querySelector("#employment").addEventListener("click", event => {
 });
 
 document.querySelector("#job-options").addEventListener("click", event => {
-  if (V2_PREVIEW_ACTIVE && event.target.closest("[data-v2-cancel-job-application]")) {
+  if (V2_ACTIVE && event.target.closest("[data-v2-cancel-job-application]")) {
     cancelV2JobApplication();
     return;
   }
   const job = event.target.closest("[data-select-job]");
   if (job) {
-    if (V2_PREVIEW_ACTIVE) selectV2Job(job.dataset.selectJob);
+    if (V2_ACTIVE) selectV2Job(job.dataset.selectJob);
     else selectJob(job.dataset.selectJob);
   }
 });
@@ -8682,7 +8906,7 @@ document.querySelector("#level-choices")?.addEventListener("click", event => {
   if (!combatLabels[stat] || state.combatStats[stat] >= 99) return;
   state.levelPoints -= 1;
   applyCombatChanges({ [stat]: 1 });
-  if (V2_PREVIEW_ACTIVE) {
+  if (V2_ACTIVE) {
     const capsule = v2PreviewCapsule || ensureV2PreviewCapsule();
     if (capsule?.timeState?.stats) {
       capsule.timeState.stats[stat] = state.combatStats[stat];
@@ -8756,7 +8980,11 @@ document.querySelector("#scheduled-fight").addEventListener("click", event => {
 
 document.querySelector("#fight-choices").addEventListener("click", event => {
   const choice = event.target.closest("[data-fight-action]");
-  if (choice) playRound(choice.dataset.fightAction);
+  if (choice) playRound(choice.dataset.fightAction, choice.dataset.sparringPurpose || "hold");
+});
+document.querySelector("#sparring-ring-destinations").addEventListener("click", event => {
+  const movement = event.target.closest("[data-sparring-move]");
+  if (movement) applySparringMovement(movement.dataset.sparringMove);
 });
 document.querySelector("#fight-coach-choices").addEventListener("click", event => {
   const choice = event.target.closest("[data-coach-option]");
@@ -8788,7 +9016,7 @@ document.querySelector("#membership-button").addEventListener("click", openMembe
 document.querySelector("#membership-options").addEventListener("click", event => {
   const plan = event.target.closest("[data-gym-plan]");
   if (plan) {
-    if (V2_PREVIEW_ACTIVE) selectV2GymPlan(plan.dataset.gymPlan);
+    if (V2_ACTIVE) selectV2GymPlan(plan.dataset.gymPlan);
     else selectGymPlan(plan.dataset.gymPlan);
   }
 });
@@ -8829,6 +9057,7 @@ function resetCareer() {
     state = cloneData(INITIAL_STATE);
     weeklyPlan = [];
     fightState = null;
+    sparringRingState = null;
     applyCareerTheme();
     draftStats = { technique: 0, power: 0, cardio: 0, defense: 0 };
     document.querySelector("#creation-form").reset();

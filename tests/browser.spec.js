@@ -61,7 +61,7 @@ async function openFreshCareer(page) {
   await page.addInitScript(() => localStorage.clear());
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
-  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseURL}/?classic=1`, { waitUntil: "domcontentloaded" });
   await expect(page.locator("#creation-screen")).toBeVisible();
   await expect(page.locator("#resume-dialog")).not.toBeVisible();
 }
@@ -69,7 +69,7 @@ async function openFreshCareer(page) {
 async function openStoredCareer(page, snapshot) {
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
-  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseURL}/?classic=1`, { waitUntil: "domcontentloaded" });
   await page.evaluate(value => {
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
@@ -146,6 +146,11 @@ async function chooseCoachDirective(page) {
 }
 
 async function chooseExchangeAction(page) {
+  const movement = page.locator("[data-sparring-move]").first();
+  if (await movement.isVisible()) {
+    await movement.click();
+    return true;
+  }
   const aligned = page.locator("#fight-choices [data-fight-action].coach-match").first();
   if (await aligned.isVisible()) {
     await aligned.click();
@@ -488,7 +493,7 @@ test("explique et verrouille le GYM V2 avant l’inscription", async ({ page }) 
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
   }, snapshot);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).first().click();
 
@@ -529,7 +534,7 @@ test("affiche le lieu Emploi V2 selon le poste sans modifier sa mécanique", asy
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
   }, officeSnapshot);
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
   await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
@@ -597,7 +602,7 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
   }, snapshot);
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
   const mainBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
@@ -782,7 +787,7 @@ test("réduit progressivement la capacité après l’inactivité sans retirer d
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
   }, snapshot);
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
   const finishWeek = async () => {
@@ -830,11 +835,31 @@ test("fait passer Rémy « Le Tank » du parcours récréatif au statut amateur"
   await expect(page.locator("#recreational-path")).toContainText("Rémy « Le Tank »");
   await page.locator("#start-fight").click();
   await expect(page.locator("#fight-dialog")).toBeVisible();
+  await expect(page.locator("#fight-dialog")).toHaveClass(/sparring-ring-prototype/);
   await expect(page.locator("#fight-week-label")).toContainText("Rémy « Le Tank »");
+  await expect.poll(() => page.locator(".sparring-ring-backdrop").evaluate(image => image.complete ? image.naturalWidth : 0)).toBeGreaterThan(0);
+  await expect.poll(() => page.locator(".sparring-before-backdrop").evaluate(image => image.complete ? image.naturalWidth : 0)).toBeGreaterThan(0);
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "before");
+  await expect(page.locator(".sparring-player-energy")).toBeVisible();
+  await expect(page.locator("#sparring-round-hud")).toHaveText("ROUND 1 / 3");
   await chooseCoachDirective(page);
   await expect(page.locator("#fight-round")).toContainText("échange 1 / 4");
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "ring");
+  await expect(page.locator("#sparring-perception-hud")).toBeVisible();
+  await expect(page.locator("#sparring-perception-hud")).toHaveAttribute("aria-label", /round|lecture/i);
+  expect(await page.locator("[data-sparring-move]").count()).toBeGreaterThan(0);
+  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(0);
+  const energyBeforeMove = Number(await page.locator(".sparring-player-energy").getAttribute("aria-valuenow"));
+  await page.locator('[data-sparring-move][data-spaces="2"]').first().click();
+  await expect(page.locator(".sparring-player-energy")).toHaveAttribute("aria-valuenow", String(energyBeforeMove - 3));
+  await expect(page.locator("[data-sparring-move]")).toHaveCount(0);
+  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(3);
+  await expect(page.locator("#fight-choices")).toContainText("Tester");
+  await expect(page.locator("#fight-choices")).toContainText("Répondre");
+  await expect(page.locator("#fight-choices")).toContainText("Se replacer");
   await completeFight(page);
   await expect(page.locator("#fight-round")).toHaveText("Sparring terminé");
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "after");
   await expect(page.locator("#fight-score-label")).toHaveText("Sparring non comptabilisé");
   await expect(page.locator("#fight-status")).toHaveText("Sparring terminé");
   await expect(page.locator("#fight-instruction")).not.toContainText(/Victoire|Défaite/);
@@ -882,7 +907,7 @@ test("retire le travail, congédie après trois absences puis attend 1 à 3 sema
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
   }, snapshot);
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
   const missWorkWeek = async expectedAbsences => {
@@ -1384,7 +1409,7 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
   test.setTimeout(75_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.evaluate(() => localStorage.clear());
   await createCareer(page, { firstName: "Guide", lastName: "V2" });
 
@@ -1599,7 +1624,7 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
   }, snapshot);
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
@@ -1638,6 +1663,7 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
   let plannedPractice = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
   expect(plannedPractice.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "sparring" && !entry.metadata?.completed)).toBe(true);
   const beforePracticeTime = plannedPractice.timeState;
+  await page.locator("[data-v2-gym-menu-close]").click();
   await page.locator("[data-v2-leave-gym]").click();
   await confirmWeekFromLauncher(page);
   await expect(page.locator("#fight-dialog")).toBeVisible();
@@ -1680,7 +1706,7 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(snapshot));
   }, original);
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
   await expect(page.locator("body")).toHaveClass(/v2-preview/);
@@ -1905,7 +1931,7 @@ test("compose la semaine à la Maison et joue à la V1 sans faire avancer le tem
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
   }, snapshot);
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
   const migrationDialog = page.locator("#division-migration-dialog");
   if (await migrationDialog.isVisible()) {
@@ -2003,7 +2029,7 @@ test("ouvre le menu développeur depuis Travail en V2 et restaure la vraie carri
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(snapshot));
   }, original);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
   await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
@@ -2083,7 +2109,7 @@ test("bloque clairement l’entraînement V2 pendant un repos médical", async (
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(snapshot));
   }, injured);
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
@@ -2323,7 +2349,7 @@ test("reconstruit la capsule V2 depuis une carrière importée avant son premier
     localStorage.clear();
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(snapshot));
   }, previous);
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
   const beforeImport = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
   expect(beforeImport.previewRuntime.career.experience).toBe(110);
@@ -2384,7 +2410,7 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
     localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(snapshot));
   }, original);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(`${baseURL}/?v2=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
   const strengthOpener = page.getByRole("button", { name: /Entrer : Gym de musculation/ }).first();
