@@ -185,19 +185,19 @@ body.v2-preview #v2-world[hidden] {
   pointer-events: none;
 }
 
-.v2-map-canvas picture,
-.v2-map-canvas picture img {
+.v2-map-canvas > picture,
+.v2-map-canvas > picture img {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.v2-map-canvas picture {
+.v2-map-canvas > picture {
   position: absolute;
   inset: 0;
 }
 
-.v2-map-canvas picture img {
+.v2-map-canvas > picture img {
   object-fit: cover;
   object-position: center;
 }
@@ -1031,7 +1031,7 @@ body.v2-preview #v2-world[hidden] {
     background: linear-gradient(90deg, rgba(7, 10, 9, .06), transparent 22%, transparent 78%, rgba(7, 10, 9, .05));
   }
 
-  .v2-map-canvas picture img {
+  .v2-map-canvas > picture img {
     object-position: center top;
   }
 

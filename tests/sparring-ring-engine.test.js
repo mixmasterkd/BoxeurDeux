@@ -90,3 +90,21 @@ test("un déplacement choisi ne peut pas être facturé deux fois dans le même 
   const first = ring.applyMovement(initial, combatState(), "hold");
   assert.throws(() => ring.applyMovement(first.state, first.combatState, "hold"), /déjà été choisi/);
 });
+
+test("les intentions tactiques choisissent un déplacement interne cohérent", () => {
+  const initial = ring.createState({ seed: "automatic-choices" });
+  const combat = combatState();
+  const attack = ring.findSuggestedMovement(initial, combat, "attack");
+  const defense = ring.findSuggestedMovement(initial, combat, "defense");
+  const reading = ring.findSuggestedMovement(initial, combat, "hold");
+
+  assert.equal(attack.role, "advance");
+  assert.equal(attack.spaces, 1);
+  assert.equal(defense.role, "retreat");
+  assert.equal(defense.spaces, 1);
+  assert.equal(reading.id, "hold");
+
+  const moved = ring.applyMovement(initial, combat, attack.id);
+  assert.equal(moved.state.pendingMovement.role, "advance");
+  assert.equal(moved.combatState.fighters.player.energy, 79);
+});

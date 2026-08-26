@@ -179,6 +179,24 @@ test("les actions sont contextuelles et proposent une vraie sortie des câbles",
   assert.ok(actions.some(action => action.family === "attack"));
 });
 
+test("le laboratoire Rémy peut exposer cinq actions sans modifier le format standard", () => {
+  let standard = engine.createFight(baseConfig({ seed: "standard-action-count" }));
+  let remy = engine.createFight(baseConfig({ seed: "remy-action-count", actionChoiceCount: 5 }));
+  standard = engine.chooseCoachDirective(standard, chooseDefaultCoach(standard)).state;
+  remy = engine.chooseCoachDirective(remy, chooseDefaultCoach(remy)).state;
+
+  const standardActions = engine.getAvailableActions(standard);
+  const remyActions = engine.getAvailableActions(remy);
+  assert.equal(standard.format.actionChoiceCount, 4);
+  assert.equal(remy.format.actionChoiceCount, 5);
+  assert.equal(standardActions.length, 4);
+  assert.equal(remyActions.length, 5);
+  assert.equal(new Set(remyActions.map(action => action.id)).size, 5);
+  assert.doesNotThrow(() => engine.resolveExchange(remy, remyActions[4].id));
+  assert.equal(standard.format.judgeCount, 3);
+  assert.equal(remy.format.judgeCount, 3);
+});
+
 test("la récupération du coin échange un plan tactique contre énergie et initiative", () => {
   let state = engine.createFight(baseConfig({
     seed: "corner-recovery",

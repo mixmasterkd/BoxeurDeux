@@ -145,20 +145,24 @@ async function chooseCoachDirective(page) {
   return false;
 }
 
-async function chooseExchangeAction(page) {
-  const movement = page.locator("[data-sparring-move]").first();
-  if (await movement.isVisible()) {
-    await movement.click();
-    return true;
+async function waitForAutomaticSparringResolution(page) {
+  const stage = page.locator("#fight-ring-stage");
+  if (await stage.getAttribute("data-sparring-step") === "resolving") {
+    await expect(stage).not.toHaveAttribute("data-sparring-step", "resolving");
   }
+}
+
+async function chooseExchangeAction(page) {
   const aligned = page.locator("#fight-choices [data-fight-action].coach-match").first();
   if (await aligned.isVisible()) {
     await aligned.click();
+    await waitForAutomaticSparringResolution(page);
     return true;
   }
   const fallback = page.locator("#fight-choices [data-fight-action]").first();
   if (await fallback.isVisible()) {
     await fallback.click();
+    await waitForAutomaticSparringResolution(page);
     return true;
   }
   return false;
@@ -1484,15 +1488,29 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
   await expect.poll(() => page.locator(".sparring-before-backdrop").evaluate(image => image.complete ? image.naturalWidth : 0)).toBeGreaterThan(0);
   await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "before");
   await expect(page.locator(".sparring-player-energy")).toBeVisible();
+  await expect(page.locator(".sparring-opponent-energy")).toBeVisible();
   await expect(page.locator("#sparring-round-hud")).toHaveText("ROUND 1 / 3");
   await chooseCoachDirective(page);
   await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "ring");
   await expect(page.locator("#sparring-perception-hud")).toBeVisible();
   await expect(page.locator("#sparring-perception-hud")).toHaveAttribute("aria-label", /round|lecture/i);
-  const energyBeforeMove = Number(await page.locator(".sparring-player-energy").getAttribute("aria-valuenow"));
-  await page.locator('[data-sparring-move][data-spaces="2"]').first().click();
-  await expect(page.locator(".sparring-player-energy")).toHaveAttribute("aria-valuenow", String(energyBeforeMove - 3));
-  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(3);
+  await expect(page.locator("[data-sparring-move]")).toHaveCount(0);
+  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(5);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileMetrics = await page.evaluate(() => ({ body: document.body.scrollWidth, viewport: window.innerWidth }));
+  expect(mobileMetrics.body).toBeLessThanOrEqual(mobileMetrics.viewport + 1);
+  const mobileChoices = page.locator("#fight-choices [data-fight-action]");
+  for (const choice of await mobileChoices.all()) {
+    const box = await choice.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(44);
+  }
+  const energyBeforeChoice = Number(await page.locator(".sparring-player-energy").getAttribute("aria-valuenow"));
+  await mobileChoices.first().click();
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-step", "resolving");
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-movement", /hold|advance|retreat|lateral/);
+  await waitForAutomaticSparringResolution(page);
+  await expect.poll(async () => Number(await page.locator(".sparring-player-energy").getAttribute("aria-valuenow"))).toBeLessThan(energyBeforeChoice);
+  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(5);
   await completeFight(page);
   await expect(page.locator("#fight-score-label")).toHaveText("Sparring non comptabilisé");
   await expect(page.locator("#fight-score")).toHaveText("—");
@@ -1574,7 +1592,7 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   await expect(page.locator("body")).toHaveClass(/v2-preview/);
   await expect(page.locator("#v2-world")).toBeVisible();
   await expect(page.locator("#v2-world .v2-map-hotspot")).toHaveCount(5);
-  await expect(page.locator("#v2-world .v2-map-canvas img")).toHaveJSProperty("complete", true);
+  await expect(page.locator("#v2-world .v2-map-canvas > picture > img")).toHaveJSProperty("complete", true);
   await expect(page.locator("#v2-world h2").first()).toContainText("Carte");
   await expect(page.locator("#game > .topbar")).toBeHidden();
   const desktopMap = await page.locator(".v2-map-canvas").boundingBox();
@@ -1655,12 +1673,12 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   await page.locator("[data-v2-close-inventory]").click();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect.poll(() => page.locator(".v2-map-canvas img").evaluate(image => image.currentSrc)).toContain("carte-quartier-v2-mobile.jpg");
+  await expect.poll(() => page.locator(".v2-map-canvas > picture > img").evaluate(image => image.currentSrc)).toContain("carte-quartier-v2-mobile.jpg");
   const mobileMetrics = await page.evaluate(() => ({
     body: document.body.scrollWidth,
     document: document.documentElement.scrollWidth,
     viewport: window.innerWidth,
-    currentImage: document.querySelector(".v2-map-canvas img").currentSrc,
+    currentImage: document.querySelector(".v2-map-canvas > picture > img").currentSrc,
   }));
   expect(mobileMetrics.body).toBeLessThanOrEqual(mobileMetrics.viewport + 1);
   expect(mobileMetrics.document).toBeLessThanOrEqual(mobileMetrics.viewport + 1);
@@ -1675,7 +1693,9 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
     expect(box && box.height).toBeGreaterThanOrEqual(44);
   }
 
-  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  const mobileGymOpener = page.getByRole("button", { name: /Entrer : GYM de boxe/ }).first();
+  await mobileGymOpener.click();
+  await expect(page.locator(".v2-location-sheet")).toBeVisible();
   await expect.poll(() => page.locator(".v2-gym-floor img").evaluate(image => image.currentSrc)).toContain("gym-boxe-v2-mobile.jpg");
   await expect(page.locator(".v2-gym-hotspot")).toHaveCount(4);
   const gymMetrics = await page.locator(".v2-gym-view").evaluate(element => ({

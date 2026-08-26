@@ -403,6 +403,8 @@ let legacyPendingPlanForMigration = [];
 let toastTimer;
 let fightState = null;
 let sparringRingState = null;
+let sparringAutoResolveTimer = null;
+let sparringAutoResolving = false;
 let draftPortraitId = 0;
 let drugSalesTapCount = 0;
 let resumeCareerAlertsAfterLevelDialog = false;
@@ -5524,6 +5526,7 @@ async function startDeveloperBout(kind = "fight") {
 
 async function startFight() {
   if (fightState || document.querySelector("#fight-dialog")?.open) return;
+  clearSparringAutoResolve();
   const opponent = scheduledOpponent();
   if (!opponent) return;
   if (state.week < state.scheduledFight.week) return showToast(`Combat prévu à la semaine ${state.scheduledFight.week}.`);
@@ -5554,6 +5557,7 @@ async function startFight() {
     tournamentId: scheduled.tournamentId,
     opponentDifficulty: difficulty,
     exchangesPerRound: isNonRecordSparring ? 4 : 5,
+    actionChoiceCount: isRecreationalSparring ? 5 : 4,
     coachQuality: clamp((isNonRecordSparring ? .58 : .60) + homeStudy, .55, .78),
     studyBonus: Math.max(campStudy, activeEffect?.readAccuracyBonus || 0, homeStudy),
     studyExchangeLimit: activeEffect?.exchangesRemaining,
@@ -5599,6 +5603,7 @@ async function startFight() {
       coachQuality: fightState.coach.quality,
     })
     : null;
+  if (sparringRingState) syncSparringRingContext();
   if (!isRecreationalSparring && state.remyLesson) state.remyLesson = "";
   const stage = document.querySelector("#fight-ring-stage");
   stage.dataset.cue = "neutral";
@@ -6053,6 +6058,11 @@ function isRemyRingPrototype() {
   return Boolean(fightState?.careerMeta?.isRecreationalSparring && sparringRingState && window.BoxeurSparringRing);
 }
 
+function syncSparringRingContext() {
+  if (!isRemyRingPrototype()) return;
+  fightState.ring = window.BoxeurSparringRing.formulas.ringContextFor(sparringRingState, fightState.ring);
+}
+
 function sparringFighterAsset(role, visual) {
   const corner = role === "opponent" ? "red" : "blue";
   const pose = visual?.pose === "back" ? "back" : "front";
@@ -6069,6 +6079,8 @@ function renderSparringRing(view) {
   if (!stage || !destinations || !coachCallout) return;
   if (!prototypeActive) {
     delete stage.dataset.sparringScene;
+    delete stage.dataset.sparringStep;
+    delete stage.dataset.sparringMovement;
     destinations.innerHTML = "";
     coachCallout.hidden = true;
     coachCallout.classList.remove("coach-warning");
@@ -6107,24 +6119,24 @@ function renderSparringRing(view) {
     image.src = sparringFighterAsset(role, visual);
   });
 
-  const canChooseMovement = view.phase === "exchange" && !view.status.finished && !ringView.pendingMovement;
-  stage.dataset.sparringStep = canChooseMovement ? "movement" : "action";
-  destinations.innerHTML = canChooseMovement
-    ? ringView.movementOptions.map(movement => {
-      const cost = movement.energyCost === 0 ? "0" : `−${movement.energyCost}`;
-      const energyLabel = movement.energyCost === 0
-        ? "aucune énergie"
-        : `${movement.energyCost} point${movement.energyCost > 1 ? "s" : ""} d’énergie`;
-      return `<button type="button" class="sparring-move" data-sparring-move="${movement.id}" data-spaces="${movement.spaces}" data-role="${movement.role}" style="--move-x:${movement.point.xPercent}%;--move-y:${movement.point.yPercent}%;--move-scale:${movement.point.scale}" aria-label="${escapeHTML(`${movement.label}, ${energyLabel}`)}"><span class="sparring-move-target" aria-hidden="true"></span><span class="sparring-move-cost" aria-hidden="true">${cost}</span><span class="sparring-move-label">${escapeHTML(movement.label)}</span></button>`;
-    }).join("")
-    : "";
+  stage.dataset.sparringStep = sparringAutoResolving ? "resolving" : "decision";
+  if (sparringAutoResolving && ringView.pendingMovement) stage.dataset.sparringMovement = ringView.pendingMovement.role;
+  else delete stage.dataset.sparringMovement;
+  // La grille 5 × 5 reste le moteur du placement, mais les décisions tactiques
+  // y déplacent maintenant le boxeur automatiquement : aucun clic parasite sur le ring.
+  destinations.innerHTML = "";
 
-  const energy = clamp(Math.round(view.fighters.player.energy), 0, 100);
-  const energyTrack = stage.querySelector(".sparring-player-energy");
-  const energyBar = document.querySelector("#sparring-player-energy-bar");
+  const playerEnergy = clamp(Math.round(view.fighters.player.energy), 0, 100);
+  const opponentEnergy = clamp(Math.round(view.fighters.opponent.energy), 0, 100);
+  const playerEnergyTrack = stage.querySelector(".sparring-player-energy");
+  const opponentEnergyTrack = stage.querySelector(".sparring-opponent-energy");
+  const playerEnergyBar = document.querySelector("#sparring-player-energy-bar");
+  const opponentEnergyBar = document.querySelector("#sparring-opponent-energy-bar");
   const roundHud = document.querySelector("#sparring-round-hud");
-  if (energyBar) energyBar.style.width = `${energy}%`;
-  energyTrack?.setAttribute("aria-valuenow", String(energy));
+  if (playerEnergyBar) playerEnergyBar.style.width = `${playerEnergy}%`;
+  if (opponentEnergyBar) opponentEnergyBar.style.width = `${opponentEnergy}%`;
+  playerEnergyTrack?.setAttribute("aria-valuenow", String(playerEnergy));
+  opponentEnergyTrack?.setAttribute("aria-valuenow", String(opponentEnergy));
   if (roundHud) roundHud.textContent = `ROUND ${Math.min(3, view.round)} / 3`;
 
   if (view.status.finished) {
@@ -6143,8 +6155,8 @@ function renderSparringRing(view) {
   const directive = view.coach.activeDirective?.label || "Observe avant de t’engager";
   const detail = warning
     ? "Ma première lecture ne tient plus. Regarde Rémy et adapte ta réponse."
-    : movement
-      ? `${movement.label} choisi. Maintenant, décide ce que tu fais depuis cette position.`
+    : sparringAutoResolving && movement
+      ? `${movement.label}. Ton choix ajuste automatiquement ta place dans le ring.`
       : view.currentExchange?.situation || "Lis la distance avant de t’engager.";
   coachCallout.hidden = false;
   coachCallout.classList.toggle("coach-warning", warning);
@@ -6182,7 +6194,7 @@ function renderFightRoundDynamic(view) {
   container.innerHTML = `<div><span>Dynamique du round</span><strong>${escapeHTML(label)}</strong></div><div class="fight-dynamic-pips" aria-label="${escapeHTML(label)}">${pips}</div><small>Indicateur de rythme : ce n’est pas une carte de juge.</small>`;
 }
 
-function recordSparringExchange(beforeView, transition) {
+function recordSparringExchange(beforeView, transition, movementPurpose = "hold", movement = null) {
   const meta = fightState?.careerMeta;
   if (!meta?.isRecreationalSparring) return;
   const action = BoxeurCombat.ACTIONS[transition.result.actionId];
@@ -6194,6 +6206,9 @@ function recordSparringExchange(beforeView, transition) {
     situation: exchange.situation || "la situation du ring",
     position: beforeView.ring?.position || "center",
     energy: Number(beforeView.fighters?.player?.energy || 0),
+    movementPurpose,
+    movement: movement?.role || "hold",
+    movementCost: Number(movement?.energyCost || 0),
     side: transition.result.side,
     playerImpact: Number(transition.result.playerImpact || 0),
     opponentImpact: Number(transition.result.opponentImpact || 0),
@@ -6202,20 +6217,20 @@ function recordSparringExchange(beforeView, transition) {
 
 function buildRemySparringDebrief(fight) {
   const notes = fight.careerMeta?.sparringObservations || [];
-  const positive = notes.filter(note => note.side === "player" && note.playerImpact >= note.opponentImpact);
+  const positive = notes.filter(note => note.side === "player" && note.playerImpact > note.opponentImpact);
   const underPressure = notes.filter(note => ["ropes", "corner"].includes(note.position));
   const exits = underPressure.filter(note => ["pivot_exit", "clinch", "compact_cover", "retake_center"].includes(note.actionId));
   const aggressiveMisses = notes.filter(note => /Entrée agressive|Combinaison rapide|Accélération/.test(note.intention) && note.side === "opponent");
   const tiredRisks = notes.filter(note => note.energy < 38 && ["power_hook", "finish_pressure", "fast_combination", "body_attack"].includes(note.actionId));
   const strengths = [];
   const adjustments = [];
-  if (exits.length) strengths.push("Tu as cherché une sortie ou cassé le rythme sous pression : c’est le bon réflexe près des câbles.");
-  if (positive.length) strengths.push(`Au moins ${positive.length} échange${positive.length > 1 ? "s" : ""} a montré que tes choix peuvent retourner la séquence quand la lecture est bonne.`);
-  if (!strengths.length) strengths.push("Tu as vu que chaque intention adverse laisse une fenêtre de réponse : lire avant de frapper compte autant que forcer l’échange.");
-  if (underPressure.length > exits.length) adjustments.push("Quand Rémy te pousse vers les câbles, privilégie le pivot de sortie, la couverture compacte ou le clinch avant de lancer une grosse attaque.");
-  if (aggressiveMisses.length) adjustments.push("Face à une entrée agressive, essaie garde haute, pivot ou contre-attaque : attaquer en même temps reste plus risqué.");
-  if (tiredRisks.length) adjustments.push("Avec peu d’énergie, le jab prudent, le pas de retrait ou le clinch préservent mieux ta lucidité qu’une combinaison lourde.");
-  if (!adjustments.length) adjustments.push("Au prochain combat, compare l’intention annoncée avec la distance et la position : une bonne réponse contextuelle vaut plus qu’un coup puissant répété.");
+  if (exits.length) strengths.push(`Sous pression, tu as choisi ${exits.length} sortie${exits.length > 1 ? "s" : ""} ou rupture${exits.length > 1 ? "s" : ""} de rythme : c’est une base solide près des câbles.`);
+  if (positive.length) strengths.push(`Tu as pris ${positive.length} échange${positive.length > 1 ? "s" : ""} à Rémy grâce à une réponse mieux adaptée.`);
+  if (!strengths.length) strengths.push("Cette séance ne dégage pas encore de point fort net : garde la lecture de Rémy au centre de tes prochains choix.");
+  if (underPressure.length > exits.length) adjustments.push(`Rémy t’a placé ${underPressure.length} fois près des câbles ou du coin sans sortie adaptée à chaque fois : cherche d’abord le pivot, la couverture ou le clinch.`);
+  if (aggressiveMisses.length) adjustments.push(`Tu as subi ${aggressiveMisses.length} réponse${aggressiveMisses.length > 1 ? "s" : ""} en répondant à une entrée forte : garde, pivot ou contre préparé seront plus sûrs.`);
+  if (tiredRisks.length) adjustments.push(`Tu as tenté ${tiredRisks.length} attaque${tiredRisks.length > 1 ? "s" : ""} lourde${tiredRisks.length > 1 ? "s" : ""} sous 38 d’énergie : privilégie le jab, le retrait ou le clinch dans cet état.`);
+  if (!adjustments.length) adjustments.push("Aucun problème ne s’est répété assez souvent pour être isolé : continue de lier la lecture adverse, la distance et ta réserve d’énergie.");
   return {
     strengths: strengths.slice(0, 2),
     adjustments: adjustments.slice(0, 2),
@@ -6265,6 +6280,41 @@ function triggerFightVisual(result) {
   if (important) document.querySelector("#fight-announcer").textContent = result.events?.map(event => event.text).join(" ") || result.text || result.fightResult?.label;
 }
 
+function remyTacticPresentation(action) {
+  const directPresentation = {
+    cautious_jab: { label: "Lire avec le jab", detail: "Teste la distance sans te vider.", purpose: "hold" },
+    double_jab_move: { label: "Jab et angle", detail: "Marque Rémy puis décale-toi de sa ligne.", purpose: "exit" },
+    fast_combination: { label: "Enchaîner proprement", detail: "Travaille vite avant de ressortir.", purpose: "attack" },
+    body_attack: { label: "Travailler au corps", detail: "Use sa réserve, mais garde la tête protégée.", purpose: "attack" },
+    power_hook: { label: "Tenter le crochet", detail: "Cherche un gros coup en acceptant le risque.", purpose: "attack" },
+    feint_attack: { label: "Provoquer l’ouverture", detail: "Force une réaction avant de répondre.", purpose: "hold" },
+    controlled_pressure: { label: "Mettre la pression", detail: "Avance pour obliger Rémy à répondre.", purpose: "attack" },
+    counter_attack: { label: "Piéger et contrer", detail: "Laisse Rémy se découvrir, puis réponds.", purpose: "hold" },
+    cut_ring: { label: "Couper le ring", detail: "Ferme ses sorties sans te jeter.", purpose: "attack" },
+    high_guard: { label: "Fermer la garde", detail: "Couvre ta tête et casse son élan.", purpose: "defense" },
+    parry_counter: { label: "Parer puis répondre", detail: "Dévie son premier coup pour reprendre la main.", purpose: "hold" },
+    lateral_evade: { label: "Changer d’angle", detail: "Quitte sa ligne et crée une nouvelle cible.", purpose: "exit" },
+    roll_under: { label: "Passer sous le coup", detail: "Évite bas puis ressors sur le côté.", purpose: "exit" },
+    retreat_step: { label: "Faire un pas arrière", detail: "Fais-le manquer pour reprendre de l’air.", purpose: "defense" },
+    pivot_exit: { label: "Sortir par le pivot", detail: "Tourne hors des câbles au lieu de reculer droit.", purpose: "exit" },
+    clinch: { label: "Casser l’échange", detail: "Accroche-le brièvement pour reprendre ton souffle.", purpose: "hold" },
+    compact_cover: { label: "Rester compact", detail: "Absorbe la séquence avant de repartir.", purpose: "defense" },
+    retake_center: { label: "Reprendre le centre", detail: "Récupère de l’espace avant de frapper.", purpose: "exit" },
+    protect_body: { label: "Fermer les coudes", detail: "Protège le corps et refuse son travail au ventre.", purpose: "defense" },
+    finish_pressure: { label: "Accélérer", detail: "Profite de son doute sans te découvrir.", purpose: "attack" },
+  };
+  if (directPresentation[action.id]) return directPresentation[action.id];
+  const definition = BoxeurCombat.ACTIONS[action.id] || {};
+  const tags = new Set(definition.tags || []);
+  if (tags.has("jab")) return { label: "Lire avec le jab", detail: "Teste la distance sans te vider.", purpose: "hold" };
+  if (tags.has("feint")) return { label: "Provoquer l’ouverture", detail: "Force une réaction avant de répondre.", purpose: "hold" };
+  if (tags.has("counter") || tags.has("parry")) return { label: "Piéger et contrer", detail: "Laisse Rémy se découvrir, puis réponds.", purpose: "hold" };
+  if (tags.has("guard") || tags.has("clinch") || tags.has("recover") || tags.has("retreat")) return { label: "Fermer la garde", detail: "Casse son rythme et protège-toi.", purpose: "defense" };
+  if (tags.has("exit") || tags.has("pivot") || tags.has("center") || tags.has("ringcraft") || tags.has("angle")) return { label: "Reprendre l’espace", detail: "Sors de sa ligne et retrouve du ring.", purpose: "exit" };
+  if (tags.has("pressure") || action.family === "attack") return { label: "Mettre la pression", detail: "Avance pour obliger Rémy à répondre.", purpose: "attack" };
+  return { label: action.label, detail: action.description, purpose: "hold" };
+}
+
 function renderFightChoices() {
   const container = document.querySelector("#fight-choices");
   if (!fightState || fightState.phase !== "exchange") {
@@ -6274,21 +6324,16 @@ function renderFightChoices() {
   const riskLabels = { low: "Risque faible", medium: "Risque mesuré", high: "Risque élevé" };
   const actions = BoxeurCombat.getAvailableActions(fightState);
   if (isRemyRingPrototype()) {
-    if (!sparringRingState.pendingMovement) {
-      container.innerHTML = `<p class="sparring-movement-prompt">CHOISIS TA POSITION</p>`;
+    if (sparringAutoResolving) {
+      const movement = sparringRingState?.pendingMovement;
+      container.innerHTML = `<p class="sparring-resolution-prompt">${escapeHTML(movement ? `${movement.label}… le ring réagit à ton intention.` : "Le ring réagit à ton intention.")}</p>`;
       return;
     }
-    const exits = ["pivot_exit", "lateral_evade", "retreat_step", "retake_center", "clinch", "compact_cover"];
-    const first = actions[0];
-    const attack = actions.find(action => action.family === "attack" && action.risk === "low") || actions.find(action => action.family === "attack") || first;
-    const response = actions.find(action => action.directiveAligned) || actions.find(action => action.family === "defense") || first;
-    const exit = actions.find(action => exits.includes(action.id)) || response;
-    const shortcuts = [
-      { purpose: "attack", label: "Tester", action: attack },
-      { purpose: "defense", label: "Répondre", action: response },
-      { purpose: "exit", label: "Se replacer", action: exit },
-    ].filter(item => item.action);
-    container.innerHTML = shortcuts.map(item => `<button type="button" data-fight-action="${item.action.id}" data-sparring-purpose="${item.purpose}" class="${item.action.directiveAligned ? "coach-match" : ""}" aria-label="${escapeHTML(`${item.label} : ${item.action.label}`)}"><strong>${escapeHTML(item.label)}</strong><span>${escapeHTML(item.action.description)}</span><em>${escapeHTML(item.action.label)} · ${item.action.baseEnergyCost.toFixed(1)} E</em></button>`).join("");
+    container.innerHTML = actions.slice(0, 5).map(action => {
+      const tactic = remyTacticPresentation(action);
+      const coachHint = action.directiveAligned ? " · conseil du coach" : "";
+      return `<button type="button" data-fight-action="${action.id}" data-sparring-purpose="${tactic.purpose}" class="${action.directiveAligned ? "coach-match" : ""}" aria-label="${escapeHTML(`${tactic.label} : ${action.label}. ${tactic.detail}`)}"><strong>${escapeHTML(tactic.label)}</strong><span>${escapeHTML(tactic.detail)}</span><em>${escapeHTML(action.label)} · −${action.baseEnergyCost.toFixed(1)} E${coachHint}</em></button>`;
+    }).join("");
     return;
   }
   container.innerHTML = actions.map(action => `<button type="button" data-fight-action="${action.id}" class="${action.directiveAligned ? "coach-match" : ""}"><strong>${escapeHTML(action.label)}</strong><span>${escapeHTML(action.description)} · coût env. ${action.baseEnergyCost.toFixed(1)} E</span><em>${action.directiveAligned ? "Suit la directive du coach" : riskLabels[action.risk] || "Issue incertaine"}</em></button>`).join("");
@@ -6297,15 +6342,27 @@ function renderFightChoices() {
 function renderFightCoach() {
   const panel = document.querySelector("#fight-coach-panel");
   const choices = document.querySelector("#fight-coach-choices");
-  if (!fightState || fightState.phase !== "corner") {
+  const remyPrototype = isRemyRingPrototype();
+  const showCoachPanel = Boolean(fightState && (fightState.phase === "corner" || (remyPrototype && fightState.phase === "exchange")));
+  if (!showCoachPanel) {
     panel.hidden = true;
     choices.innerHTML = "";
+    delete panel.dataset.sparringPhase;
     return;
   }
   panel.hidden = false;
+  if (remyPrototype && fightState.phase === "exchange") {
+    panel.dataset.sparringPhase = "round";
+    const directive = fightState.coach.activeDirective?.label || "Observe avant de t’engager";
+    const situation = fightState.currentExchange?.situation || "Lis la distance et les appuis de Rémy avant de t’ouvrir.";
+    document.querySelector("#fight-coach-title").textContent = "Le coach te guide";
+    document.querySelector("#fight-coach-analysis").textContent = `${directive}. ${situation}`;
+    choices.innerHTML = "";
+    return;
+  }
+  delete panel.dataset.sparringPhase;
   const pending = fightState.coach.pending;
   const remyLesson = fightState.careerMeta?.remyLesson;
-  const remyPrototype = isRemyRingPrototype();
   document.querySelector("#fight-coach-title").textContent = remyPrototype
     ? fightState.round === 1 ? "Le coach prépare ton sparring" : `Ton vrai coin · avant le round ${fightState.round}`
     : fightState.round === 1 ? "Directive avant le combat" : `Pause du coach avant le round ${fightState.round}`;
@@ -6417,9 +6474,9 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
       ? "La barre sous le ring montre ton ressenti du round, jamais un score ni une carte de juge."
       : view.phase === "corner"
         ? "Choisis une seule priorité avant de repartir."
-        : sparringRingState.pendingMovement
-          ? "Choisis maintenant ton intention depuis cette position."
-          : "Choisis ta destination sur le ring : rester coûte 0, une case coûte 1 et deux cases coûtent 3."
+        : sparringAutoResolving
+          ? "Ton placement s’ajuste automatiquement à ton intention."
+          : "Choisis une intention : le déplacement se fait naturellement dans le ring."
     : null;
   instruction.hidden = Boolean(isRemyRingPrototype() && !view.status.finished && !showSparringTutorial);
   instruction.innerHTML = `<p>${escapeHTML(sparringInstruction || (view.phase === "corner" ? "Choisis entre une directive tactique, une adaptation contextuelle et la récupération." : message))}</p>`;
@@ -6432,12 +6489,10 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   }
   renderFightCoach();
   renderFightChoices();
-  if (!view.status.finished) requestAnimationFrame(() => {
+  if (!view.status.finished && !sparringAutoResolving) requestAnimationFrame(() => {
     const selector = view.phase === "corner"
       ? "#fight-coach-choices button"
-      : isRemyRingPrototype() && !sparringRingState.pendingMovement
-        ? "#sparring-ring-destinations button"
-        : "#fight-choices button";
+      : "#fight-choices button";
     document.querySelector(selector)?.focus({ preventScroll: isRemyRingPrototype() });
   });
 }
@@ -6445,42 +6500,72 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
 function chooseFightCoachDirective(optionId) {
   if (!fightState || fightState.phase !== "corner") return;
   const enteringRound = fightState.round;
-  const transition = BoxeurCombat.chooseCoachDirective(fightState, optionId);
-  fightState = transition.state;
   if (isRemyRingPrototype() && enteringRound > 1) {
     sparringRingState = window.BoxeurSparringRing.beginRound(sparringRingState, enteringRound);
+    syncSparringRingContext();
   }
+  const transition = BoxeurCombat.chooseCoachDirective(fightState, optionId);
+  fightState = transition.state;
   triggerFightVisual(transition.result);
   renderFight(transition.result.text);
 }
 
-function applySparringMovement(movementId) {
-  if (!isRemyRingPrototype() || fightState.phase !== "exchange") return;
+function clearSparringAutoResolve() {
+  if (sparringAutoResolveTimer) clearTimeout(sparringAutoResolveTimer);
+  sparringAutoResolveTimer = null;
+  sparringAutoResolving = false;
+}
+
+function beginSparringExchange(actionId, movementPurpose = "hold") {
+  if (!isRemyRingPrototype() || fightState?.phase !== "exchange" || sparringAutoResolving) return;
   try {
-    const transition = window.BoxeurSparringRing.applyMovement(sparringRingState, fightState, movementId);
-    sparringRingState = transition.state;
-    fightState = transition.combatState;
-    renderFight(transition.result.text);
+    const initialRingState = sparringRingState;
+    const suggested = window.BoxeurSparringRing.findSuggestedMovement(initialRingState, fightState, movementPurpose);
+    if (!suggested) throw new Error("Aucun placement tactique n’est disponible.");
+    let movementTransition = window.BoxeurSparringRing.applyMovement(initialRingState, fightState, suggested.id);
+    const actionRemainsAvailable = BoxeurCombat.getAvailableActions(movementTransition.combatState)
+      .some(action => action.id === actionId);
+    if (!actionRemainsAvailable && suggested.id !== "hold") {
+      const hold = window.BoxeurSparringRing.getMovementOptions(initialRingState, fightState.fighters.player.energy)
+        .find(movement => movement.id === "hold");
+      if (hold) movementTransition = window.BoxeurSparringRing.applyMovement(initialRingState, fightState, hold.id);
+    }
+    sparringRingState = movementTransition.state;
+    fightState = movementTransition.combatState;
+    sparringAutoResolving = true;
+    const movement = sparringRingState.pendingMovement;
+    renderFight(movement?.label ? `${movement.label} : le placement suit ton choix.` : "Le placement suit ton choix.");
+    sparringAutoResolveTimer = setTimeout(() => {
+      sparringAutoResolveTimer = null;
+      sparringAutoResolving = false;
+      if (!isRemyRingPrototype() || fightState?.phase !== "exchange") return;
+      playRound(actionId, movementPurpose);
+    }, 360);
   } catch (error) {
-    console.error("[Boxeur Deux] Déplacement de sparring impossible :", error);
-    showToast("Cette position n’est plus accessible.");
+    console.error("[Boxeur Deux] Placement automatique du sparring impossible :", error);
+    clearSparringAutoResolve();
+    showToast("Le placement tactique n’est plus disponible.");
+    renderFight();
   }
 }
 
 function playRound(actionId, movementPurpose = "hold") {
   if (!fightState || fightState.phase !== "exchange") return;
   try {
+    if (isRemyRingPrototype() && sparringAutoResolving) return;
     if (isRemyRingPrototype() && !sparringRingState.pendingMovement) {
-      showToast("Choisis d’abord ta position dans le ring.");
+      beginSparringExchange(actionId, movementPurpose);
       return;
     }
     const beforeView = BoxeurCombat.getPublicState(fightState);
+    const movement = isRemyRingPrototype() ? sparringRingState.pendingMovement : null;
     const transition = BoxeurCombat.resolveExchange(fightState, actionId);
     if (isRemyRingPrototype()) {
       sparringRingState = window.BoxeurSparringRing.advanceAfterExchange(sparringRingState, transition, transition.state);
     }
     fightState = transition.state;
-    recordSparringExchange(beforeView, transition);
+    if (isRemyRingPrototype()) syncSparringRingContext();
+    recordSparringExchange(beforeView, transition, movementPurpose, movement);
     triggerFightVisual(transition.result);
     if (fightState.status.finished) finishFight();
     else renderFight(transition.result.text);
@@ -6563,6 +6648,7 @@ function settleV2Sparring(fight, fightFatigue, exposure) {
 
 function finishFight() {
   if (!fightState?.status.finished || fightState.careerApplied) return;
+  clearSparringAutoResolve();
   const fightCountBefore = amateurFightCount();
   const meta = fightState.careerMeta || {};
   const fightResult = fightState.result;
@@ -6660,6 +6746,7 @@ function finishFight() {
   closeButton.textContent = isDeveloperBout ? "Retour au menu test" : meta.tournamentId ? "Retour au tournoi" : isRecreationalSparring ? "Voir le parcours récréatif" : isPracticeSparring ? "Retour au GYM" : "Retour au camp";
   closeButton.addEventListener("click", () => {
     document.querySelector("#fight-dialog").close();
+    clearSparringAutoResolve();
     const wasTournament = Boolean(meta.tournamentId);
     fightState = null;
     sparringRingState = null;
@@ -7273,10 +7360,6 @@ document.querySelector("#scheduled-fight").addEventListener("click", event => {
 document.querySelector("#fight-choices").addEventListener("click", event => {
   const choice = event.target.closest("[data-fight-action]");
   if (choice) playRound(choice.dataset.fightAction, choice.dataset.sparringPurpose || "hold");
-});
-document.querySelector("#sparring-ring-destinations").addEventListener("click", event => {
-  const movement = event.target.closest("[data-sparring-move]");
-  if (movement) applySparringMovement(movement.dataset.sparringMove);
 });
 document.querySelector("#fight-coach-choices").addEventListener("click", event => {
   const choice = event.target.closest("[data-coach-option]");

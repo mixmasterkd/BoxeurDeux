@@ -96,8 +96,12 @@
   }
 
   function movementRole(from, to, opponent) {
-    const before = distanceBetween(from, opponent);
-    const after = distanceBetween(to, opponent);
+    // Le contexte du combat garde sa distance en diagonale, mais l'intention
+    // d'un pas se lit naturellement sur les deux axes : avancer d'une colonne
+    // vers l'adversaire doit compter comme une avance, même si la diagonale ne
+    // change pas encore de zone de distance.
+    const before = Math.abs(from.x - opponent.x) + Math.abs(from.y - opponent.y);
+    const after = Math.abs(to.x - opponent.x) + Math.abs(to.y - opponent.y);
     if (after < before) return "advance";
     if (after > before) return "retreat";
     return "lateral";

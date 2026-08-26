@@ -337,7 +337,10 @@
       : "Lundi · matin";
     const dateLabel = `${clockLabel} · ${career.v2DateLabel || "date à confirmer"}`;
     const moneyLabel = `${Math.round(Number(career.money) || 0)} $`;
-    const hotspots = LOCATIONS.map(location => `<button class="v2-map-hotspot" type="button" data-v2-location="${location.id}" aria-label="Entrer : ${escapeHTML(location.label)}. ${escapeHTML(locationStatus(location, career))}"><span aria-hidden="true">${location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${escapeHTML(locationStatus(location, career))}</small></button>`).join("");
+    const hotspots = LOCATIONS.map(location => {
+      const status = escapeHTML(locationStatus(location, career));
+      return `<button class="v2-map-hotspot" type="button" data-v2-location="${location.id}" aria-label="Entrer : ${escapeHTML(location.label)}. ${status}"><span aria-hidden="true">${location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${status}</small></button>`;
+    }).join("");
     return `<div class="v2-world-layout">
       <section class="v2-map-panel" aria-labelledby="v2-map-title">
         <div class="v2-map-heading"><div><p class="eyebrow">Quartier de carrière</p><h2 id="v2-map-title">Que veux-tu planifier cette semaine, ${escapeHTML(firstName)}?</h2></div></div>

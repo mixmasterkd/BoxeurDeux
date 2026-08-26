@@ -601,7 +601,7 @@ h2 { font-size: 1.65rem; }
 .sparring-ring-prototype .ring-fighter-silhouette { display: none; }
 .sparring-ring-prototype .sparring-ring-backdrop,
 .sparring-ring-prototype .sparring-fighter-image,
-.sparring-ring-prototype .sparring-ring-destinations { display: block; }
+.sparring-ring-prototype .sparring-ring-destinations { display: none; }
 .sparring-ring-prototype .sparring-ring-backdrop,
 .sparring-ring-prototype .sparring-corner-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .sparring-ring-prototype .sparring-ring-backdrop { z-index: 0; }
@@ -775,6 +775,7 @@ h2 { font-size: 1.65rem; }
 @media (prefers-reduced-motion: reduce) {
   .sparring-ring-prototype .ring-fighter,
   .sparring-move { transition: none; }
+  .sparring-ring-prototype .sparring-fighter-image { animation: none; }
 }
 
 /* Laboratoire Rémy v2 — combat centré sur l'image, HUD minimal et grille invisible */
@@ -830,6 +831,11 @@ h2 { font-size: 1.65rem; }
 .sparring-ring-prototype .ring-fighter { z-index: var(--ring-layer, 12); width: clamp(84px, 15.5%, 172px); }
 .sparring-ring-prototype .ring-fighter-player .sparring-fighter-image { filter: grayscale(.88) saturate(.2) brightness(.62) contrast(1.18); }
 .sparring-ring-prototype .ring-fighter-opponent .sparring-fighter-image { filter: saturate(.72) sepia(.12) brightness(.86) contrast(1.07); }
+.sparring-ring-prototype .sparring-fighter-image { display: block; transform-origin: center bottom; animation: sparring-fighter-breathe 2.5s ease-in-out infinite; }
+.sparring-ring-prototype .fight-ring-stage[data-sparring-step="resolving"] .ring-fighter-player .sparring-fighter-image { animation: sparring-fighter-step .36s cubic-bezier(.2,.8,.25,1) both; }
+.sparring-ring-prototype .fight-ring-stage[data-sparring-step="resolving"] .ring-fighter-opponent .sparring-fighter-image { animation-duration: 2.1s; }
+@keyframes sparring-fighter-breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-1.8%) scale(1.012); } }
+@keyframes sparring-fighter-step { 0% { transform: translateX(0) translateY(0) scale(1); } 48% { transform: translateX(5%) translateY(-2%) scale(1.025); } 100% { transform: translateX(0) translateY(0) scale(1); } }
 
 .sparring-ring-prototype .sparring-south-ropes {
   position: absolute;
@@ -898,28 +904,54 @@ h2 { font-size: 1.65rem; }
   right: 14px;
   left: 14px;
   display: grid;
-  grid-template-columns: minmax(92px, 28%) 1fr minmax(92px, 28%);
+  grid-template-columns: minmax(116px, 28%) 1fr minmax(116px, 28%);
   align-items: center;
   pointer-events: none;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,.88));
 }
-.sparring-ring-prototype .sparring-player-energy {
+.sparring-ring-prototype .sparring-player-energy,
+.sparring-ring-prototype .sparring-opponent-energy {
   grid-column: 1;
-  height: 9px;
+  position: relative;
+  align-self: start;
+  height: 15px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.78);
   border-radius: 999px;
   background: rgba(2,3,3,.78);
   box-shadow: inset 0 1px 3px rgba(0,0,0,.82);
+  transform: translateY(-5px);
 }
-.sparring-ring-prototype .sparring-player-energy span {
+.sparring-ring-prototype .sparring-opponent-energy { grid-column: 3; justify-self: end; width: 100%; }
+.sparring-ring-prototype .sparring-player-energy span,
+.sparring-ring-prototype .sparring-opponent-energy span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
   display: block;
   width: 100%;
-  height: 100%;
   border-radius: inherit;
   background: var(--player-hud-color, #cf493e);
   box-shadow: 0 0 10px color-mix(in srgb, var(--player-hud-color, #cf493e) 72%, transparent);
   transition: width .28s ease;
+}
+.sparring-ring-prototype .sparring-opponent-energy span {
+  right: 0;
+  left: auto;
+  background: var(--opponent-hud-color, #bb3d35);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--opponent-hud-color, #bb3d35) 72%, transparent);
+}
+.sparring-ring-prototype .sparring-player-energy b {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  color: #fff;
+  font: 800 clamp(.46rem, .95vw, .62rem)/1 "Barlow Condensed", sans-serif;
+  letter-spacing: .08em;
+  text-shadow: 0 1px 2px #000;
+  transform: translate(-50%, -50%);
 }
 .sparring-ring-prototype #sparring-round-hud {
   grid-column: 2;
@@ -957,7 +989,7 @@ h2 { font-size: 1.65rem; }
   border-radius: 0;
   background: linear-gradient(90deg, var(--opponent-hud-color) 0%, #4c504d 46%, #4c504d 54%, var(--player-hud-color) 100%);
   box-shadow: inset 0 2px 5px rgba(0,0,0,.74);
-  opacity: .82;
+  opacity: .96;
 }
 .sparring-ring-prototype .sparring-perception-hud .sparring-perception-zone {
   position: absolute;
@@ -966,10 +998,10 @@ h2 { font-size: 1.65rem; }
   left: var(--perception-low);
   width: var(--perception-width);
   height: 14px;
-  border: 1px solid rgba(255,255,255,.55);
+  border: 1px solid rgba(255,255,255,.66);
   border-radius: 999px;
-  background: rgba(255,255,255,.24);
-  box-shadow: 0 0 14px rgba(255,255,255,.35);
+  background: linear-gradient(90deg, rgba(255,255,255,.14), rgba(255,255,255,.38), rgba(255,255,255,.14));
+  box-shadow: 0 0 10px rgba(255,255,255,.3);
 }
 .sparring-ring-prototype .sparring-perception-hud .sparring-perception-needle {
   position: absolute;
@@ -990,57 +1022,82 @@ h2 { font-size: 1.65rem; }
   right: auto;
   bottom: 28px;
   left: 12px;
-  width: min(440px, 58%);
-  padding: 7px 10px;
+  width: min(430px, 56%);
+  padding: 7px 10px 8px;
   border: 0;
   border-left: 3px solid var(--gold);
   background: linear-gradient(90deg, rgba(4,5,5,.9), rgba(4,5,5,.55));
   box-shadow: none;
   backdrop-filter: blur(4px);
 }
-.sparring-ring-prototype .sparring-coach-callout span,
-.sparring-ring-prototype .sparring-coach-callout small { display: none; }
+.sparring-ring-prototype .sparring-coach-callout span { display: block; margin-bottom: 2px; color: var(--gold); font: 800 .55rem/1 "Barlow Condensed", sans-serif; letter-spacing: .1em; text-transform: uppercase; }
 .sparring-ring-prototype .sparring-coach-callout strong { margin: 0; font-size: clamp(.74rem, 1.6vw, 1rem); }
+.sparring-ring-prototype .sparring-coach-callout small { display: block; margin-top: 3px; color: #d8d8d2; font-size: clamp(.55rem, 1.1vw, .68rem); line-height: 1.25; }
 
 .sparring-ring-prototype .fight-coach-panel {
-  grid-template-columns: minmax(220px, .72fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(225px, .72fr) minmax(0, 1.28fr);
   align-items: center;
-  gap: 10px 14px;
-  margin: 8px 0 0;
-  padding: 9px;
+  gap: 11px 16px;
+  margin: 9px 0 0;
+  padding: 12px 14px;
   border: 1px solid rgba(221,182,94,.34);
-  background: #0d100e;
+  background: linear-gradient(105deg, rgba(221,182,94,.1), #0d100e 46%);
 }
 .sparring-ring-prototype .fight-coach-panel[hidden] { display: none; }
 .sparring-ring-prototype .fight-coach-panel > div:first-child { align-self: end; }
 .sparring-ring-prototype .fight-coach-panel .eyebrow { display: none; }
-.sparring-ring-prototype .fight-coach-panel h3 { margin: 0; font-size: 1.05rem; }
-.sparring-ring-prototype #fight-coach-analysis { margin: 3px 0 0; color: #c9cbc8; font-size: .68rem; line-height: 1.35; }
+.sparring-ring-prototype .fight-coach-panel h3 { margin: 0; font-size: 1.12rem; }
+.sparring-ring-prototype #fight-coach-analysis { margin: 4px 0 0; color: #d1d3cf; font-size: .72rem; line-height: 1.4; }
+.sparring-ring-prototype .fight-coach-panel[data-sparring-phase="round"] { grid-template-columns: minmax(156px, .42fr) minmax(0, 1fr); }
+.sparring-ring-prototype .fight-coach-panel[data-sparring-phase="round"] #fight-coach-analysis { margin: 0; align-self: center; }
+.sparring-ring-prototype .fight-coach-panel[data-sparring-phase="round"] .fight-coach-choices:empty { display: none; }
 .sparring-ring-prototype .fight-coach-choices { grid-column: 2; grid-row: 1 / span 2; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .sparring-ring-prototype .fight-coach-choices button,
 .sparring-ring-prototype .fight-choices button {
-  min-height: 44px;
-  padding: 7px 8px;
+  min-height: 56px;
+  padding: 8px 9px;
   border: 1px solid rgba(255,255,255,.26);
   border-radius: 0;
   background: #111412;
-  text-align: center;
+  text-align: left;
 }
 .sparring-ring-prototype .fight-coach-choices button:hover,
 .sparring-ring-prototype .fight-coach-choices button:focus-visible,
 .sparring-ring-prototype .fight-choices button:hover,
 .sparring-ring-prototype .fight-choices button:focus-visible { border-color: var(--gold); background: #191d1a; }
 .sparring-ring-prototype .fight-coach-choices strong,
-.sparring-ring-prototype .fight-choices strong { font-size: .86rem; }
+.sparring-ring-prototype .fight-choices strong { font-size: .88rem; }
 .sparring-ring-prototype .fight-coach-choices span,
-.sparring-ring-prototype .fight-choices span,
-.sparring-ring-prototype .fight-choices em { display: none; }
-.sparring-ring-prototype .fight-decision-area { margin-top: 7px; }
-.sparring-ring-prototype .fight-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.sparring-ring-prototype .fight-choices:has(.sparring-movement-prompt) { display: block; }
-.sparring-ring-prototype .sparring-movement-prompt {
+.sparring-ring-prototype .fight-choices span {
+  display: block;
+  margin-top: 3px;
+  color: #c7cac5;
+  font-size: .62rem;
+  line-height: 1.3;
+}
+.sparring-ring-prototype .fight-choices em {
+  display: block;
+  margin-top: 5px;
+  color: #d8b65f;
+  font-size: .54rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: .03em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.sparring-ring-prototype .fight-decision-area {
   margin: 0;
-  padding: 8px;
+  padding: 0 14px 13px;
+  border: 1px solid rgba(221,182,94,.34);
+  border-top: 0;
+  background: #0d100e;
+}
+.sparring-ring-prototype .fight-choices { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
+.sparring-ring-prototype .sparring-resolution-prompt {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px 8px;
   color: #d7d4cc;
   font: 800 .72rem/1 "Barlow Condensed", sans-serif;
   letter-spacing: .1em;
@@ -1057,27 +1114,38 @@ h2 { font-size: 1.65rem; }
   .sparring-ring-prototype .fight-card { padding: 5px; }
   .sparring-ring-prototype .fight-ring-stage { height: auto; aspect-ratio: 16 / 9; margin: 0; }
   .sparring-ring-prototype .ring-fighter { width: 17%; }
-  .sparring-ring-prototype .sparring-combat-hud { top: 7px; right: 8px; left: 8px; grid-template-columns: minmax(76px, 31%) 1fr minmax(76px, 31%); }
-  .sparring-ring-prototype .sparring-player-energy { height: 7px; }
+  .sparring-ring-prototype .sparring-combat-hud { top: 9px; right: 8px; left: 8px; grid-template-columns: minmax(88px, 31%) 1fr minmax(88px, 31%); }
+  .sparring-ring-prototype .sparring-player-energy,
+  .sparring-ring-prototype .sparring-opponent-energy { height: 12px; transform: translateY(-3px); }
+  .sparring-ring-prototype .sparring-player-energy b { font-size: .48rem; }
   .sparring-ring-prototype .sparring-perception-hud { height: 14px; }
   .sparring-ring-prototype .sparring-perception-hud .sparring-perception-track { inset: 3px 0; }
   .sparring-ring-prototype .sparring-perception-hud .sparring-perception-zone { top: 1px; height: 12px; }
   .sparring-ring-prototype .sparring-perception-hud .sparring-perception-needle { height: 12px; }
-  .sparring-ring-prototype .sparring-coach-callout { bottom: 20px; left: 6px; width: min(330px, 68%); padding: 5px 7px; }
-  .sparring-ring-prototype .fight-coach-panel { grid-template-columns: 1fr; gap: 5px; margin-top: 5px; padding: 6px; }
-  .sparring-ring-prototype .fight-coach-panel > div:first-child,
-  .sparring-ring-prototype #fight-coach-analysis { display: none; }
+  .sparring-ring-prototype .sparring-coach-callout { bottom: 20px; left: 6px; width: min(330px, 72%); padding: 5px 7px 6px; }
+  .sparring-ring-prototype .sparring-coach-callout span { font-size: .48rem; }
+  .sparring-ring-prototype .sparring-coach-callout small { font-size: .55rem; }
+  .sparring-ring-prototype .fight-coach-panel,
+  .sparring-ring-prototype .fight-coach-panel[data-sparring-phase="round"] { grid-template-columns: 1fr; gap: 5px; margin-top: 5px; padding: 9px; }
+  .sparring-ring-prototype .fight-coach-panel h3 { font-size: .96rem; }
+  .sparring-ring-prototype #fight-coach-analysis,
+  .sparring-ring-prototype .fight-coach-panel[data-sparring-phase="round"] #fight-coach-analysis { display: block; margin: 0; font-size: .62rem; }
   .sparring-ring-prototype .fight-coach-choices { grid-column: 1; grid-row: auto; }
   .sparring-ring-prototype .fight-coach-choices button,
-  .sparring-ring-prototype .fight-choices button { min-height: 44px; padding: 5px 4px; }
+  .sparring-ring-prototype .fight-choices button { min-height: 58px; padding: 6px; }
   .sparring-ring-prototype .fight-coach-choices strong,
-  .sparring-ring-prototype .fight-choices strong { font-size: .72rem; }
-  .sparring-ring-prototype .fight-decision-area { position: static; margin: 5px 0 0; padding: 0; background: transparent; box-shadow: none; }
+  .sparring-ring-prototype .fight-choices strong { font-size: .74rem; }
+  .sparring-ring-prototype .fight-coach-choices span,
+  .sparring-ring-prototype .fight-choices span { font-size: .55rem; }
+  .sparring-ring-prototype .fight-choices em { margin-top: 3px; font-size: .48rem; }
+  .sparring-ring-prototype .fight-decision-area { position: static; margin: 0; padding: 0 9px 9px; background: #0d100e; box-shadow: none; }
+  .sparring-ring-prototype .fight-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  .sparring-ring-prototype .fight-choices > button:nth-child(5) { grid-column: 1 / -1; }
   .sparring-ring-prototype .fight-instruction { margin-top: 4px; }
 }
 
 @media (max-width: 420px) {
   .sparring-ring-prototype .fight-coach-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .sparring-ring-prototype .fight-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sparring-ring-prototype .fight-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sparring-ring-prototype .sparring-coach-callout { width: calc(100% - 12px); }
 }

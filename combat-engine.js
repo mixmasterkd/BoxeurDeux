@@ -587,6 +587,7 @@
     const seed = source.seed == null ? `${Date.now()}-${Math.random()}` : source.seed;
     const kind = source.kind === "tournament" || source.tournamentId ? "tournament" : "local";
     const exchangesPerRound = Math.round(clamp(source.exchangesPerRound == null ? DEFAULT_EXCHANGES : source.exchangesPerRound, 4, 6));
+    const actionChoiceCount = Math.round(clamp(source.actionChoiceCount == null ? 4 : source.actionChoiceCount, 3, 6));
     const state = {
       engineVersion: VERSION,
       id: source.id || `fight-${hashSeed(seed).toString(16)}`,
@@ -598,6 +599,7 @@
         kind,
         rounds: ROUND_COUNT,
         exchangesPerRound,
+        actionChoiceCount,
         judgeCount: kind === "tournament" ? 5 : 3,
       },
       phase: "setup",
@@ -788,11 +790,12 @@
 
   function availableActions(state) {
     if (!state || state.phase !== "exchange" || !state.currentExchange) return [];
+    const actionChoiceCount = Math.round(clamp(state.format?.actionChoiceCount == null ? 4 : state.format.actionChoiceCount, 3, 6));
     const eligible = Object.values(ACTIONS)
       .filter(action => actionIsAvailable(action, state))
       .map(action => ({ action, score: actionDisplayScore(action, state) }))
       .sort((a, b) => b.score - a.score || a.action.id.localeCompare(b.action.id));
-    const selected = eligible.slice(0, 4);
+    const selected = eligible.slice(0, actionChoiceCount);
     if (!selected.some(item => item.action.family === "defense")) {
       const defensive = eligible.find(item => item.action.family === "defense" && !selected.includes(item));
       if (defensive) selected[selected.length - 1] = defensive;
@@ -801,7 +804,7 @@
       const offensive = eligible.find(item => item.action.family === "attack" && !selected.includes(item));
       if (offensive) selected[selected.length - 1] = offensive;
     }
-    return selected.slice(0, 4).map(({ action }) => ({
+    return selected.slice(0, actionChoiceCount).map(({ action }) => ({
       id: action.id,
       label: action.label,
       description: action.description,
