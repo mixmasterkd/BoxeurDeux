@@ -1175,3 +1175,82 @@ h2 { font-size: 1.65rem; }
   .sparring-ring-prototype .fight-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sparring-ring-prototype .sparring-coach-callout { width: calc(100% - 12px); }
 }
+
+/* Laboratoire combat local — même moteur tactique, mise en scène de gala distincte */
+.local-fight-ring-backdrop,
+.local-fight-before-backdrop,
+.local-fight-corner-backdrop,
+.local-fight-after-backdrop { display: none; }
+
+.local-fight-prototype .sparring-ring-backdrop,
+.local-fight-prototype .sparring-before-backdrop,
+.local-fight-prototype .sparring-corner-backdrop,
+.local-fight-prototype .sparring-after-backdrop { display: none !important; }
+
+.local-fight-prototype .local-fight-ring-backdrop,
+.local-fight-prototype .local-fight-before-backdrop,
+.local-fight-prototype .local-fight-corner-backdrop,
+.local-fight-prototype .local-fight-after-backdrop {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="ring"] .local-fight-ring-backdrop,
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="before"] .local-fight-before-backdrop,
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="corner"] .local-fight-corner-backdrop,
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .local-fight-after-backdrop { display: block; }
+
+.local-fight-prototype .ring-fighter-player .sparring-fighter-image,
+.local-fight-prototype .ring-fighter-opponent .sparring-fighter-image {
+  filter: none;
+}
+.local-fight-prototype .fight-ring-stage[data-player-corner] { --player-hud-color: #4c9cc9; --opponent-hud-color: #bb3d35; }
+
+.local-fight-prototype .fight-ring-stage:not([data-sparring-scene="ring"]) .ring-fighter { display: block; }
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="before"] .ring-fighter-opponent,
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="corner"] .ring-fighter-opponent { display: none; }
+
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="before"] .ring-fighter-player {
+  top: 108%;
+  left: 50% !important;
+  z-index: 12;
+  width: clamp(96px, 17.5%, 190px);
+  transform: translate(-50%, -78%) scale(1);
+}
+
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="corner"] .ring-fighter-player {
+  top: 110%;
+  left: 58% !important;
+  z-index: 12;
+  width: clamp(108px, 20.5%, 220px);
+  transform: translate(-50%, -78%) scale(1) scaleX(-1);
+}
+
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .ring-fighter-player,
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .ring-fighter-opponent {
+  top: 90%;
+  z-index: 14;
+  width: clamp(92px, 16.5%, 178px);
+  transform: translate(-50%, -78%) scale(1);
+}
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .ring-fighter-player { left: 35% !important; }
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .ring-fighter-opponent { left: 65% !important; transform: translate(-50%, -78%) scaleX(-1); }
+.local-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .sparring-combat-hud { display: none; }
+
+.local-fight-prototype .fight-judge-cards:not([hidden]) {
+  margin-top: 8px;
+  border-top: 1px solid rgba(221,182,94,.28);
+}
+
+@media (max-width: 760px) {
+  .local-fight-prototype .fight-ring-stage[data-sparring-scene="before"] .ring-fighter-player { width: 18%; }
+  .local-fight-prototype .fight-ring-stage[data-sparring-scene="corner"] .ring-fighter-player { width: 21%; }
+  .local-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .ring-fighter-player,
+  .local-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .ring-fighter-opponent { width: 17%; }
+}

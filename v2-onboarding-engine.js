@@ -57,7 +57,7 @@
     },
     {
       id: "week-5-renew-and-prepare", week: 5, locationId: "boxing-gym",
-      title: "Renouveler le GYM et préparer Rémy",
+      title: "Renouveler le GYM et préparer l’évaluation",
       detail: "Le premier mois est terminé. Renouvelle réellement ton abonnement, puis suis un dernier plan rapide avant le sparring pédagogique de la semaine 6.",
     },
   ]);
@@ -306,7 +306,7 @@
     if (missingJob) closeWeek = denied("INITIAL_JOB_REQUIRED", "Choisis ton emploi de départ avant de terminer la semaine 1.");
     else if (missingMembership) closeWeek = denied("INITIAL_MEMBERSHIP_REQUIRED", "Active le premier abonnement au GYM de boxe avant de continuer.");
     else if (state.week >= state.remyWeek && state.remyStatus !== "completed") {
-      closeWeek = denied("REMY_SPARRING_REQUIRED", "Le sparring pédagogique de Rémy doit être terminé avant de poursuivre.");
+      closeWeek = denied("REMY_SPARRING_REQUIRED", "Le sparring pédagogique d’évaluation doit être terminé avant de poursuivre.");
     } else if (state.week >= state.maxRecreationalWeek) {
       closeWeek = denied("AMATEUR_TRANSITION_REQUIRED", "La semaine 10 termine le parcours récréatif : confirme maintenant le passage amateur.");
     }
@@ -333,16 +333,16 @@
           : allowed("L’emploi peut maintenant être quitté sans réactiver le tutoriel initial."),
       closeWeek,
       remySparring: remyReady
-        ? allowed("Rémy « Le Tank » est prêt pour le sparring pédagogique.")
+        ? allowed("Le partenaire est prêt pour le sparring pédagogique.")
         : state.remyStatus === "completed"
           ? denied("REMY_ALREADY_COMPLETED", "Le sparring pédagogique est déjà terminé.")
-          : denied("REMY_NOT_READY", `Rémy est réservé pour la semaine ${state.remyWeek}.`),
+          : denied("REMY_NOT_READY", `Le sparring d’évaluation est réservé pour la semaine ${state.remyWeek}.`),
       passAmateur: amateurReady
         ? allowed("Le passage amateur est disponible et doit rester une confirmation explicite.")
-        : denied("REMY_REQUIRED_FOR_AMATEUR", "Termine d’abord le sparring pédagogique avec Rémy."),
+        : denied("REMY_REQUIRED_FOR_AMATEUR", "Termine d’abord le sparring pédagogique d’évaluation."),
       fullCalendar: denied("AMATEUR_STATUS_REQUIRED", "Le calendrier complet se débloque après la confirmation du passage amateur."),
       strengthGym: denied("AMATEUR_STATUS_REQUIRED", "Le gym de musculation se débloque après la confirmation du passage amateur."),
-      fullSparring: denied("AMATEUR_STATUS_REQUIRED", "Le sparring régulier se débloque après le sparring de Rémy et le passage amateur."),
+      fullSparring: denied("AMATEUR_STATUS_REQUIRED", "Le sparring régulier se débloque après le sparring d’évaluation et le passage amateur."),
       groupClasses: allowed("Les cours de groupe sont disponibles seulement pendant le parcours récréatif."),
     };
   }
@@ -369,7 +369,7 @@
       return { id: "purchase-initial-membership", type: "membership", title: "T’inscrire au GYM de boxe", detail: "Ton budget initial protège le prix du premier mois.", locationId: "boxing-gym", required: true };
     }
     if (state.week >= state.remyWeek && state.remyStatus !== "completed") {
-      return { id: "remy-sparring", type: "sparring", title: "Sparring avec Rémy « Le Tank »", detail: "Une évaluation pédagogique interactive, sans gagnant ni défaite au bilan.", locationId: "boxing-gym", required: true };
+      return { id: "remy-sparring", type: "sparring", title: "Sparring d’évaluation", detail: "Une évaluation pédagogique interactive, sans gagnant ni défaite au bilan.", locationId: "boxing-gym", required: true };
     }
     if (state.remyStatus === "completed") {
       const required = state.week >= state.maxRecreationalWeek;

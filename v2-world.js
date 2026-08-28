@@ -23,6 +23,17 @@
       .replaceAll("'", "&#039;");
   }
 
+  function sparringPartner(career = {}) {
+    const supplied = career.v2SparringPartner && typeof career.v2SparringPartner === "object"
+      ? career.v2SparringPartner
+      : {};
+    const firstName = String(supplied.firstName || "Rémy");
+    return {
+      firstName,
+      displayName: String(supplied.displayName || `${firstName} « Le Tank »`),
+    };
+  }
+
   function preparation(career) {
     if (career.v2Preparation && typeof career.v2Preparation === "object") {
       const supplied = career.v2Preparation;
@@ -52,6 +63,9 @@
     const validLocation = locationId === "map" || LOCATIONS.some(location => location.id === locationId);
     const week = Math.max(1, Math.min(999, Number(onboarding?.week ?? career.week) || 1));
     const remyWeek = Math.max(2, Math.min(52, Number(onboarding?.remyWeek) || 6));
+    const partner = step.sparringPartner && typeof step.sparringPartner === "object"
+      ? sparringPartner({ v2SparringPartner: step.sparringPartner })
+      : sparringPartner(career);
     return {
       id: String(step.id || "guided-step"),
       type: String(step.type || "objective"),
@@ -63,6 +77,7 @@
       onboarding: true,
       week,
       remyWeek,
+      sparringPartner: partner,
     };
   }
 
@@ -70,12 +85,13 @@
     const guided = onboardingObjective(career);
     if (guided) return guided;
     if (career.careerStatus === "recreational") {
+      const partner = sparringPartner(career);
       if (!career.jobId && isFirstJobRequired(career)) return { title: "Choisir un emploi", detail: "Ton premier revenu finance le GYM et le début du parcours.", locationId: "work" };
       if (!career.gymWeeks) return { title: "Entrer au GYM de boxe", detail: "Active ton premier abonnement et rencontre le coach.", locationId: "boxing-gym" };
       if (career.recreationalSparringStatus === "completed") return { title: "Passer amateur", detail: "Rémy « Le Tank » a donné son feu vert. Retourne voir le coach.", locationId: "boxing-gym" };
-      if (career.recreationalSparringStatus === "ready" || career.scheduledFight?.isRecreationalSparring) return { title: "Sparring avec Rémy", detail: "Le ring est prêt pour ton évaluation pédagogique.", locationId: "boxing-gym" };
+      if (career.recreationalSparringStatus === "ready" || career.scheduledFight?.isRecreationalSparring) return { title: `Sparring avec ${partner.firstName}`, detail: `Le ring est prêt pour ton évaluation pédagogique contre ${partner.displayName}.`, locationId: "boxing-gym" };
       const progress = Math.max(0, Math.min(10, Number(career.recreationalTrainingWeeks) || 0));
-      return { title: "Bâtir tes bases", detail: `${progress}/10 entraînements possibles. Rémy t’évalue à la semaine 6; tu peux rester récréatif jusqu’à la semaine 10.`, locationId: "boxing-gym" };
+      return { title: "Bâtir tes bases", detail: `${progress}/10 entraînements possibles. ${partner.firstName} t’évalue à la semaine 6; tu peux rester récréatif jusqu’à la semaine 10.`, locationId: "boxing-gym" };
     }
     if (career.activeTournament) return { title: "Tournoi en cours", detail: "La pesée, le prochain combat et la récupération se gèrent à l’aréna.", locationId: "arena" };
     if (career.scheduledFight) return { title: "Préparer le prochain combat", detail: `Combat prévu à la semaine ${career.scheduledFight.week}.`, locationId: "arena" };
@@ -129,7 +145,7 @@
       return "Dans le lieu de travail, appuie sur « Choisir mon emploi », puis sélectionne ton premier poste.";
     }
     if (currentObjective.type === "sparring" && currentLocationId === "boxing-gym") {
-      return "Dans le GYM, va au ring et commence le sparring pédagogique avec Rémy.";
+      return `Dans le GYM, va au ring et commence le sparring pédagogique avec ${currentObjective.sparringPartner?.firstName || "Rémy"}.`;
     }
     if (currentObjective.type === "transition" && currentLocationId === "boxing-gym") {
       return "Dans le GYM, retourne voir l’entraîneur pour confirmer ton passage amateur.";
@@ -195,18 +211,19 @@
     }
 
     const currentWeek = Math.max(1, Math.min(currentObjective.remyWeek, currentObjective.week));
+    const partnerName = currentObjective.sparringPartner?.firstName || "Rémy";
     const requirement = currentObjective.required ? "Obligatoire" : "Facultatif";
     const requirementClass = currentObjective.required ? "required" : "optional";
     const progressLabel = currentObjective.week >= currentObjective.remyWeek
-      ? `Rémy · semaine ${currentObjective.remyWeek}`
+      ? `${partnerName} · semaine ${currentObjective.remyWeek}`
       : `Semaine ${currentObjective.week} sur ${currentObjective.remyWeek}`;
     const actions = guideAction(currentObjective, currentLocationId);
     const instruction = guideInstruction(currentObjective, currentLocationId);
     const locationClass = currentLocationId === "map" ? "" : " v2-location-guide";
     return `<section class="v2-objective-card v2-onboarding-card ${requirementClass}${locationClass}" data-v2-onboarding-step="${escapeHTML(currentObjective.id)}">
       <div class="v2-objective-heading"><p class="eyebrow">Guide récréatif</p><span class="v2-objective-requirement ${requirementClass}">${requirement}</span></div>
-      <div class="v2-onboarding-track" aria-label="Parcours guidé : semaine ${currentWeek} sur ${currentObjective.remyWeek} avant le sparring de Rémy">
-        <div><span>Semaine 1</span><strong>${escapeHTML(progressLabel)}</strong><span>Rémy · semaine ${currentObjective.remyWeek}</span></div>
+      <div class="v2-onboarding-track" aria-label="Parcours guidé : semaine ${currentWeek} sur ${currentObjective.remyWeek} avant le sparring de ${escapeHTML(partnerName)}">
+        <div><span>Semaine 1</span><strong>${escapeHTML(progressLabel)}</strong><span>${escapeHTML(partnerName)} · semaine ${currentObjective.remyWeek}</span></div>
         <progress max="${currentObjective.remyWeek}" value="${currentWeek}">${currentWeek}/${currentObjective.remyWeek}</progress>
       </div>
       <h3>${escapeHTML(currentObjective.title)}</h3><p>${escapeHTML(currentObjective.detail)}</p><p class="v2-guide-instruction"><strong>Comment faire :</strong> ${escapeHTML(instruction)}</p>${actions}

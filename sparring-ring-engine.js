@@ -239,7 +239,7 @@
   function perceptionLabel(value) {
     if (value >= 48) return "Tu sens que tu imposes nettement le sparring";
     if (value >= 16) return "Tu crois avoir une légère emprise";
-    if (value <= -48) return "Tu sens que Rémy impose nettement le rythme";
+    if (value <= -48) return "Tu sens que l’adversaire impose nettement le rythme";
     if (value <= -16) return "Tu as l’impression de subir un peu";
     return "Le round te semble encore partagé";
   }
@@ -317,7 +317,7 @@
     const dy = target.y - fighter.y;
     const corner = role === "player" ? state.playerCorner : state.playerCorner === "blue" ? "red" : "blue";
     // Les silhouettes intégrées ont une orientation naturelle liée à leur rôle :
-    // le boxeur bleu regarde à droite, Rémy en rouge regarde à gauche.
+    // Le boxeur bleu regarde à droite et son adversaire regarde à gauche.
     // Le coin de carrière ne doit donc jamais retourner les deux personnages.
     const baseFacesRight = role === "player";
     const wantsRight = dx === 0 ? baseFacesRight : dx > 0;

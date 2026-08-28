@@ -64,6 +64,8 @@
     const preparationTone = ["positive", "steady", "warning", "critical"].includes(condition.preparationTone)
       ? condition.preparationTone
       : "steady";
+    const partnerSource = recreational.partner && typeof recreational.partner === "object" ? recreational.partner : {};
+    const partnerFirstName = String(partnerSource.firstName || "Rémy");
 
     return {
       profile: {
@@ -114,6 +116,10 @@
         trainingWeeks: wholeNumber(recreational.trainingWeeks, 0, 0, 999),
         targetWeeks: wholeNumber(recreational.targetWeeks, 10, 1, 999),
         sparringWeek: wholeNumber(recreational.sparringWeek, 6, 1, 999),
+        partner: {
+          firstName: partnerFirstName,
+          displayName: String(partnerSource.displayName || `${partnerFirstName} « Le Tank »`),
+        },
         remyStatus: ["locked", "scheduled", "ready", "completed"].includes(recreational.remyStatus)
           ? recreational.remyStatus
           : "locked",
@@ -148,13 +154,14 @@
   function sparringState(context) {
     if (context.careerStatus === "recreational") {
       const remyCompleted = context.recreational.remyStatus === "completed";
+      const partner = context.recreational.partner;
       return {
         available: false,
         status: remyCompleted ? "transition" : "locked",
         label: remyCompleted ? "Passage amateur requis" : "Verrouillé pendant le parcours récréatif",
         detail: remyCompleted
           ? "Rémy a donné son feu vert. Confirme maintenant ton passage amateur auprès de l’entraîneur."
-          : "Complète d’abord le sparring pédagogique avec Rémy « Le Tank », puis confirme ton passage amateur.",
+          : `Complète d’abord le sparring pédagogique avec ${partner.displayName}, puis confirme ton passage amateur.`,
       };
     }
     if (!context.membership.active) {
@@ -254,10 +261,14 @@
 
   function renderAmateurTransitionCard(context) {
     if (context.careerStatus !== "recreational" || context.recreational.remyStatus !== "completed") return "";
+    const partner = context.recreational.partner;
+    const evaluation = partner.firstName === "Rémy"
+      ? "Ton évaluation avec Rémy est terminée."
+      : `Ton opposition avec ${partner.firstName} est terminée et Rémy a donné son feu vert.`;
     return `<article class="v2-gym-action-card recommended" aria-labelledby="v2-gym-amateur-transition-title">
       <div class="v2-gym-action-heading"><span>Parcours terminé</span><small>Rémy a donné son feu vert</small></div>
       <h3 id="v2-gym-amateur-transition-title">Passer amateur</h3>
-      <p>Ton évaluation avec Rémy est terminée. Confirme ton passage amateur avec l’entraîneur.</p>
+      <p>${escapeHTML(evaluation)} Confirme ton passage amateur avec l’entraîneur.</p>
       <button type="button" class="primary-button" data-v2-amateur-transition>Confirmer le passage amateur</button>
     </article>`;
   }
@@ -306,10 +317,10 @@
       }
       if (isRing && context.careerStatus === "recreational") {
         display.detail = remyReady
-          ? "Sparring pédagogique avec Rémy"
+          ? `Sparring pédagogique avec ${context.recreational.partner.firstName}`
           : context.recreational.remyStatus === "completed"
             ? "Passe amateur avec l’entraîneur"
-            : "Débloqué avec Rémy";
+            : `Débloqué avec ${context.recreational.partner.firstName}`;
       }
       const disabled = sparringBlocked
         ? " disabled aria-disabled=\"true\""

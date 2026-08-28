@@ -121,13 +121,18 @@ async function startTacticalFight(page) {
   await page.locator("#start-fight").click();
   const dialog = page.locator("#fight-dialog");
   await expect(dialog).toBeVisible();
-  await expect.poll(() => page.locator(".ring-backdrop").evaluate(image => image.complete ? image.naturalWidth : 0)).toBeGreaterThan(0);
+  await expect(dialog).toHaveClass(/local-fight-prototype/);
+  await expect(dialog).toHaveClass(/sparring-ring-prototype/);
+  await expect.poll(() => page.locator(".local-fight-before-backdrop").evaluate(image => image.complete ? image.naturalWidth : 0)).toBeGreaterThan(0);
+  await expect.poll(() => page.locator(".local-fight-ring-backdrop").evaluate(image => image.complete ? image.naturalWidth : 0)).toBeGreaterThan(0);
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "before");
   await expect(page.locator("#fight-score-label")).toHaveText("Cartes cachées");
   await expect(page.locator("#fight-score")).toHaveText("—");
   await expect(page.locator("#fight-judge-cards")).toBeHidden();
   await expect(page.locator("#fight-judge-cards")).toBeEmpty();
-  await expect(page.locator("#fight-round-dynamic")).toContainText("Dynamique du round");
-  await expect(page.locator("#fight-round-dynamic")).toContainText("ce n’est pas une carte de juge");
+  await expect(page.locator("#fight-round-dynamic")).toContainText("Cette perception n’est jamais une carte de juge");
+  await expect(page.locator("#sparring-perception-hud")).toHaveAttribute("aria-label", /Lecture/);
+  await expect(page.locator("#fight-coach-title")).toHaveText("Le coach prépare ton combat");
   await expect(page.locator("#fight-opponent-tell")).not.toHaveText("Tendance inconnue");
 }
 
@@ -219,7 +224,8 @@ function amateurSnapshot(overrides = {}) {
   return { version: 5, savedAt: "2026-11-16T12:00:00.000Z", weeklyPlan: [], state };
 }
 
-function recreationalReadySnapshot() {
+function recreationalReadySnapshot(overrides = {}) {
+  const { profile: profileOverrides = {}, ...careerOverrides } = overrides;
   const snapshot = amateurSnapshot({
     careerStatus: "recreational",
     careerStartDate: "2026-09-07",
@@ -232,8 +238,9 @@ function recreationalReadySnapshot() {
     recreationalSparringStatus: "training",
     scheduledFight: null,
     journal: [{ week: 6, text: "Rémy attend au GYM." }],
+    ...careerOverrides,
   });
-  snapshot.state.profile = { ...snapshot.state.profile, firstName: "Noa", lastName: "Récréatif" };
+  snapshot.state.profile = { ...snapshot.state.profile, firstName: "Noa", lastName: "Récréatif", ...profileOverrides };
   return snapshot;
 }
 
@@ -1148,6 +1155,10 @@ test("réserve un gala et joue un combat tactique complet avant de révéler les
   const coachBox = await page.locator("#fight-coach-choices [data-coach-option]").first().boundingBox();
   expect(coachBox && coachBox.y + coachBox.height).toBeLessThanOrEqual(viewport.height);
   await chooseCoachDirective(page);
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "ring");
+  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(5);
+  await expect(page.locator(".local-fight-ring-backdrop")).toBeVisible();
+  await expect(page.locator(".sparring-south-ropes")).toBeVisible();
   const actionBox = await page.locator("#fight-choices [data-fight-action]").first().boundingBox();
   expect(actionBox && actionBox.y + actionBox.height).toBeLessThanOrEqual(viewport.height);
 
@@ -1156,6 +1167,8 @@ test("réserve un gala et joue un combat tactique complet avant de révéler les
   await expect(page.locator("#fight-round")).toHaveText("Combat terminé");
   await expect(page.locator("#fight-status")).toContainText(/Victoire|Défaite|KO|TKO/);
   await expect(page.locator("#fight-score-label")).toHaveText(/Décision · 3 juges/);
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "after");
+  await expect(page.locator(".local-fight-after-backdrop")).toBeVisible();
   await expect(page.locator("#fight-judge-cards")).toBeVisible();
   await expect(page.locator("#fight-judge-cards .judge-card")).toHaveCount(3);
   await expect(page.locator("#fight-score")).toHaveText(/^(3–0|2–1|1–2|0–3)$/);
@@ -1218,7 +1231,7 @@ test("reste utilisable à 390 × 844 px sans débordement et avec des actions ta
 
   await chooseCoachDirective(page);
   const tacticalButtons = page.locator("#fight-choices [data-fight-action]:visible");
-  expect(await tacticalButtons.count()).toBeGreaterThanOrEqual(3);
+  expect(await tacticalButtons.count()).toBe(5);
   for (const button of await tacticalButtons.all()) {
     const box = await button.boundingBox();
     expect(box && box.height).toBeGreaterThanOrEqual(44);
@@ -1463,6 +1476,134 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
     "week-4-roadwork",
     "week-5-renew-and-prepare",
   ]);
+});
+
+test("associe les cinq visuels de sparring aux six portraits jouables", async ({ page }) => {
+  await openStoredCareer(page, recreationalReadySnapshot());
+  const identities = [
+    { sex: "male", portraitId: 0, prefix: null },
+    { sex: "male", portraitId: 1, prefix: "male-2" },
+    { sex: "male", portraitId: 2, prefix: "male-3" },
+    { sex: "female", portraitId: 0, prefix: "female-1" },
+    { sex: "female", portraitId: 1, prefix: "female-2" },
+    { sex: "female", portraitId: 2, prefix: "female-3" },
+  ];
+
+  for (const identity of identities) {
+    const actual = await page.evaluate(({ sex, portraitId }) => {
+      state.profile.sex = sex;
+      state.profile.portraitId = portraitId;
+      configureSparringPlayerImages();
+      const visuals = sparringPlayerVisualSet();
+      return {
+        visuals,
+        front: sparringFighterAsset("player", { pose: "front" }),
+        back: sparringFighterAsset("player", { pose: "back" }),
+        opponentFront: sparringFighterAsset("opponent", { pose: "front" }),
+        opponentBack: sparringFighterAsset("opponent", { pose: "back" }),
+        before: document.querySelector(".sparring-before-backdrop")?.getAttribute("src"),
+        corner: document.querySelector(".sparring-corner-backdrop")?.getAttribute("src"),
+        after: document.querySelector(".sparring-after-backdrop")?.getAttribute("src"),
+      };
+    }, identity);
+    const expected = identity.sex === "female"
+      ? {
+        front: `assets/sparring-player-${identity.prefix}-front.png`,
+        back: `assets/sparring-player-${identity.prefix}-back.png`,
+        before: `assets/sparring-nadia-${identity.prefix}-before-v1.png`,
+        corner: `assets/sparring-nadia-${identity.prefix}-corner-v1.png`,
+        after: `assets/sparring-nadia-${identity.prefix}-after-v1.png`,
+      }
+      : identity.prefix
+      ? {
+        front: `assets/sparring-player-${identity.prefix}-front.png`,
+        back: `assets/sparring-player-${identity.prefix}-back.png`,
+        before: `assets/sparring-player-${identity.prefix}-before.png`,
+        corner: `assets/sparring-player-${identity.prefix}-corner.png`,
+        after: `assets/sparring-player-${identity.prefix}-after.png`,
+      }
+      : {
+        front: "assets/sparring-boxer-blue-front-v2.png",
+        back: "assets/sparring-boxer-blue-back-v2.png",
+        before: "assets/sparring-remy-before-v3.png",
+        corner: "assets/sparring-remy-corner-v3.png",
+        after: "assets/sparring-remy-after-v3.png",
+      };
+    const expectedOpponent = identity.sex === "female"
+      ? {
+        opponentFront: "assets/sparring-nadia-front-v1.png",
+        opponentBack: "assets/sparring-nadia-back-v1.png",
+      }
+      : {
+        opponentFront: "assets/sparring-boxer-red-front-v2.png",
+        opponentBack: "assets/sparring-boxer-red-back-v2.png",
+      };
+    expect(actual.visuals).toEqual(expected);
+    expect(actual).toMatchObject({ ...expected, ...expectedOpponent });
+    for (const asset of [...Object.values(expected), ...Object.values(expectedOpponent)]) {
+      const stats = await fs.stat(path.join(PROJECT_ROOT, asset));
+      expect(stats.size).toBeGreaterThan(0);
+    }
+  }
+});
+
+test("utilise seulement des adversaires et portraits féminins dans les combats officiels féminins", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    profile: { sex: "female", firstName: "Jade", weightClass: "W57", portraitId: 2 },
+  }));
+  const audit = await page.evaluate(() => {
+    const local = opponentPool();
+    const tournament = generateTournamentOpponents(tournamentDefs.find(item => item.id === "bronze"));
+    configureRingImages();
+    return {
+      localIds: local.map(opponent => opponent.id),
+      localNames: local.map(opponent => opponent.name),
+      tournamentNames: tournament.map(opponent => opponent.name),
+      femaleTournamentNames: tournamentNamesFemale.map(identity => `${identity[0]} ${identity[1]}`),
+      portrait: opponentPortraitAsset(),
+      playerImage: document.querySelector(".ring-fighter-player .ring-fighter-silhouette")?.style.getPropertyValue("--fighter-image"),
+      opponentImage: document.querySelector(".ring-fighter-opponent .ring-fighter-silhouette")?.style.getPropertyValue("--fighter-image"),
+    };
+  });
+  expect(audit.localIds.every(id => id.startsWith("f-"))).toBe(true);
+  expect(audit.localNames).toContain("Sophie Bouchard");
+  expect(audit.tournamentNames.every(name => audit.femaleTournamentNames.includes(name))).toBe(true);
+  expect(audit.portrait).toMatch(/assets\/boxeuse-coin-(bleu|rouge)\.webp/);
+  expect(audit.playerImage).toMatch(/boxeuse-coin-(bleu|rouge)\.webp/);
+  expect(audit.opponentImage).toMatch(/boxeuse-coin-(bleu|rouge)\.webp/);
+  expect(audit.playerImage).not.toBe(audit.opponentImage);
+});
+
+test("présente Nadia comme première partenaire de sparring du parcours féminin", async ({ page }) => {
+  test.setTimeout(60_000);
+  await openStoredCareer(page, recreationalReadySnapshot({
+    profile: { sex: "female", firstName: "Jade", weightClass: "W57", portraitId: 1 },
+    journal: [{ week: 6, text: "Nadia attend au GYM avec Rémy." }],
+  }));
+
+  await expect(page.locator(".v2-now-panel > .v2-objective-card")).toContainText("Sparring avec Nadia");
+  await expect(page.locator(".v2-now-panel > .v2-objective-card")).toContainText("Nadia Bouchard « La Muraille »");
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  await expect(page.locator('[data-v2-gym-zone="ring"]')).toContainText("Sparring pédagogique avec Nadia");
+  await page.locator('[data-v2-gym-zone="ring"]').click();
+
+  await expect(page.locator("#fight-dialog")).toBeVisible();
+  await expect(page.locator("#fight-week-label")).toContainText("Nadia Bouchard « La Muraille »");
+  await expect(page.locator("#fight-opponent-name")).toHaveText("Nadia Bouchard");
+  await expect(page.locator(".sparring-opponent-energy")).toHaveAttribute("aria-label", "Énergie de Nadia");
+  await expect(page.locator(".sparring-before-backdrop")).toHaveAttribute("src", "assets/sparring-nadia-female-2-before-v1.png");
+  await expect(page.locator(".ring-fighter-opponent .sparring-fighter-image")).toHaveAttribute("src", "assets/sparring-nadia-front-v1.png");
+  await expect.poll(() => page.locator(".sparring-before-backdrop").evaluate(image => image.complete ? image.naturalWidth : 0)).toBeGreaterThan(0);
+  await expect.poll(() => page.locator(".ring-fighter-opponent .sparring-fighter-image").evaluate(image => image.complete ? image.naturalWidth : 0)).toBeGreaterThan(0);
+  await chooseCoachDirective(page);
+  await completeFight(page);
+  await expect(page.locator("#fight-score-label")).toHaveText("Sparring non comptabilisé");
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "after");
+  await expect(page.locator(".sparring-after-backdrop")).toHaveAttribute("src", "assets/sparring-nadia-female-2-after-v1.png");
+  await expect(page.locator("#fight-instruction")).toContainText("Ce que Rémy et Nadia veulent te montrer");
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
+  expect(stored.state.amateurRecord).toEqual({ wins: 0, losses: 0, draws: 0 });
+  expect(stored.state.recreationalSparringStatus).toBe("completed");
 });
 
 test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis confirme le statut amateur", async ({ page }) => {
@@ -2084,9 +2225,16 @@ test("enchaîne pesée, combat à cinq juges et récupération vers le jour suiv
   await expect(nextTournamentStep).toContainText(/Disputer/);
   await nextTournamentStep.click();
 
-  await expect(page.locator("#fight-dialog")).toBeVisible();
+  const fightDialog = page.locator("#fight-dialog");
+  await expect(fightDialog).toBeVisible();
+  await expect(fightDialog).not.toHaveClass(/local-fight-prototype/);
+  await expect(fightDialog).not.toHaveClass(/sparring-ring-prototype/);
+  await expect(page.locator(".ring-backdrop")).toBeVisible();
+  await expect(page.locator(".local-fight-ring-backdrop")).toBeHidden();
   await expect(page.locator("#fight-score-label")).toHaveText("Cartes cachées");
   await expect(page.locator("#fight-judge-cards")).toBeHidden();
+  await chooseCoachDirective(page);
+  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(4);
   await completeFightWithLowImpactActions(page);
 
   await expect(page.locator("#fight-status")).toContainText("Victoire aux points");
