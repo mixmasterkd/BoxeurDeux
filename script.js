@@ -6066,7 +6066,7 @@ function syncSparringRingContext() {
 function sparringFighterAsset(role, visual) {
   const corner = role === "opponent" ? "red" : "blue";
   const pose = visual?.pose === "back" ? "back" : "front";
-  return `assets/sparring-boxer-${corner}-${pose}.webp`;
+  return `assets/sparring-boxer-${corner}-${pose}-v2.png`;
 }
 
 function renderSparringRing(view) {
