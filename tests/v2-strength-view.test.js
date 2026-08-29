@@ -11,6 +11,7 @@ function baseContext(overrides = {}) {
   return {
     careerStatus: "amateur",
     profile: { firstName: "Alex" },
+    clock: { week: 8, dayLabel: "Mardi", timeLabel: "14 h" },
     condition: { energy: 82, fatigue: 18 },
     membership: {
       active: true,
@@ -34,84 +35,107 @@ function baseContext(overrides = {}) {
       itemCount: 2,
       summary: "Deux produits sont prêts à être utilisés avant une séance.",
     },
+    weekCapacity: { total: 55, used: 12, remaining: 43 },
+    weekPlan: {
+      entries: [{ id: "strength-1", label: "Cours de CrossFit", cost: 11, removable: true }],
+    },
+    quick: { available: true, planned: false, plannedCount: 0 },
     ...overrides,
   };
 }
 
-test("expose la même API de vue en CommonJS et dans le navigateur", () => {
+function productFixtures() {
+  return [
+    { id: "protein-bar", label: "Barre protéinée", price: 10, quantity: 2, available: true },
+    { id: "sports-drink", label: "Boisson sportive", price: 14, quantity: 1, available: true },
+    { id: "protein-shake", label: "Shake protéiné", price: 20, quantity: 0, available: true },
+    { id: "preworkout", label: "Pré-entraînement", price: 28, quantity: 3, available: false, reason: "Inventaire plein." },
+  ];
+}
+
+function buttonFor(html, attribute, value) {
+  const suffix = value == null ? "" : `="${value}"`;
+  const match = html.match(new RegExp(`<button[^>]*${attribute}${suffix}[^>]*>`));
+  assert.ok(match, `bouton ${attribute}${suffix} absent`);
+  return match[0];
+}
+
+function cssDeclarationsFor(css, selector) {
+  const declarations = [];
+  for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selectors = match[1].split(",").map(item => item.trim());
+    if (selectors.includes(selector)) declarations.push(match[2]);
+  }
+  assert.ok(declarations.length, `règle CSS ${selector} absente`);
+  return declarations.join("\n");
+}
+
+test("expose l'API de scène, de menus et de boutique en CommonJS et dans le navigateur", () => {
   assert.equal(globalThis.BoxeurStrengthView, strengthView);
   assert.equal(strengthView.STAT_LABELS.power, "Puissance");
+  assert.deepEqual(Object.keys(strengthView.SCENES), ["gym", "shop"]);
+  assert.equal(strengthView.ZONES.length, 5);
   assert.equal(typeof strengthView.render, "function");
+  assert.equal(typeof strengthView.renderMenu, "function");
+  assert.equal(typeof strengthView.renderShop, "function");
   assert.equal(typeof strengthView.renderResult, "function");
 });
 
-test("rend une composition libre avec énergie principale et huit vrais boutons d'activité", () => {
+test("rend le gym comme scène responsive avec exactement cinq bulles", () => {
   const html = strengthView.render(baseContext());
 
-  assert.match(html, /Gym de musculation/);
-  assert.match(html, /Énergie principale/);
-  assert.match(html, /82 % → 64 %/);
-  assert.match(html, /<meter[^>]+aria-label="Énergie prévue après la séance : 64 %"/);
-  assert.match(html, /data-v2-strength-mobile-confirm/);
-  assert.equal((html.match(/data-v2-strength-activity=/g) || []).length, 10, "huit choix et deux raccourcis de retrait");
-  for (const activity of Object.values(strength.ACTIVITIES)) {
-    assert.match(html, new RegExp(`<button[^>]+type="button"[^>]+data-v2-strength-activity="${activity.id}"`));
+  assert.match(html, /data-v2-strength-access="active"/);
+  assert.match(html, /<picture>/);
+  assert.match(html, /<source media="\(max-width: 640px\)" srcset="assets\/gym-musculation-v2-mobile\.png">/);
+  assert.match(html, /<img src="assets\/gym-musculation-v2-desktop\.png"/);
+  assert.equal((html.match(/data-v2-strength-zone=/g) || []).length, 5);
+  for (const id of ["reception", "crossfit", "program", "trainer", "shop"]) {
+    assert.doesNotMatch(buttonFor(html, "data-v2-strength-zone", id), /\sdisabled(?:\s|>)/);
   }
-  assert.match(html, /2 activités/);
-  assert.match(html, /Ta séance en construction/);
-  assert.match(html, /Ajouter cette séance à ma semaine/);
-  assert.doesNotMatch(html, /\bbloc(?:s)?\b/i);
-  assert.doesNotMatch(html, /[0-9]+\s*\/\s*3/);
+  assert.match(html, /Cours de CrossFit/);
+  assert.match(html, /Bâtir mon programme/);
+  assert.match(html, /Entraîneurs privés/);
 });
 
-test("prévisualise coûts, fatigue et XP ciblée entière directement dans chaque activité", () => {
-  const html = strengthView.render(baseContext({ selectedActivities: [] }));
+test("garde le tableau de bord principal informatif et sans commandes cachées", () => {
+  const html = strengthView.render(baseContext());
+  const dashboard = html.match(/<aside class="v2-strength-dashboard[^>]*>[\s\S]*<\/aside>/)?.[0] || "";
 
-  assert.match(html, /Force des jambes/);
-  assert.match(html, /−13 énergie/);
-  assert.match(html, /\+8 fatigue/);
-  assert.match(html, /<b>Puissance<\/b> \+3 XP/);
-  assert.match(html, /Conditionnement sur appareils/);
-  assert.match(html, /<b>Cardio<\/b> \+4 XP/);
-  assert.match(html, /chaque ajout met immédiatement à jour l'énergie, la fatigue et l’XP ciblée prévue/i);
+  assert.ok(dashboard, "tableau de bord absent");
+  assert.match(dashboard, /Capacité restante/);
+  assert.match(dashboard, /43\/55/);
+  assert.match(dashboard, /Énergie <strong>82 %<\/strong>/);
+  assert.match(dashboard, /Fatigue <strong>18 %<\/strong>/);
+  assert.match(dashboard, /Cours de CrossFit/);
+  assert.match(dashboard, /<em>Planifiée<\/em>/);
+  assert.match(dashboard, /Mélanie Tremblay/);
+  assert.match(dashboard, /2 en inventaire/);
+  assert.doesNotMatch(dashboard, /<button\b/);
+  assert.doesNotMatch(dashboard, /data-v2-location-remove/);
+  assert.doesNotMatch(html, /data-v2-strength-activity=/);
+  assert.doesNotMatch(html, /data-v2-strength-plan=/);
+  assert.doesNotMatch(html, /data-v2-strength-quick/);
 });
 
-test("désactive seulement les ajouts trop coûteux et laisse les activités choisies retirables", () => {
-  const html = strengthView.render(baseContext({
-    condition: { energy: 16, fatigue: 30 },
-    selectedActivities: ["lower_body_strength"],
-  }));
-  const selectedButton = html.match(/<button[^>]+data-v2-strength-activity="lower_body_strength"[^>]*>/)[0];
-  const expensiveButton = html.match(/<button[^>]+data-v2-strength-activity="posterior_chain"[^>]*>/)[0];
-
-  assert.match(selectedButton, /aria-pressed="true"/);
-  assert.doesNotMatch(selectedButton, / disabled/);
-  assert.match(expensiveButton, /disabled/);
-  assert.match(expensiveButton, /aria-describedby="v2-strength-activity-posterior_chain-reason"/);
-  assert.match(html, /Il faut 14 % d&#039;énergie; il en reste 3 %/);
-});
-
-test("affiche et bloque clairement le gym pendant le statut récréatif", () => {
-  const html = strengthView.render(baseContext({
+test("verrouille les bulles selon le statut, l'abonnement et la restriction médicale", () => {
+  const recreational = strengthView.render(baseContext({
     careerStatus: "recreational",
     membership: { active: false, balance: 640, plans: strength.MEMBERSHIP_PLANS },
-    selectedActivities: [],
   }));
+  assert.match(recreational, /data-v2-strength-access="recreational-locked"/);
+  assert.equal((recreational.match(/data-v2-strength-zone=[^>]+\sdisabled/g) || []).length, 5);
+  assert.match(recreational, /Débloqué au statut amateur/);
 
-  assert.match(html, /data-v2-strength-access="recreational-locked"/);
-  assert.match(html, /Débloqué au statut amateur/);
-  assert.match(html, /devient accessible après le passage amateur/);
-  assert.equal((html.match(/data-v2-strength-plan=/g) || []).length, 4);
-  assert.equal((html.match(/data-v2-strength-plan=[^>]+disabled/g) || []).length, 4);
-  assert.equal((html.match(/data-v2-strength-activity=[^>]+disabled/g) || []).length, 8);
-});
-
-test("distingue abonnement requis, accès actif et blocage médical", () => {
   const membershipRequired = strengthView.render(baseContext({
     membership: { active: false, balance: 640, plans: strength.MEMBERSHIP_PLANS },
-    selectedActivities: [],
   }));
-  const active = strengthView.render(baseContext());
+  assert.match(membershipRequired, /data-v2-strength-access="membership-required"/);
+  assert.doesNotMatch(buttonFor(membershipRequired, "data-v2-strength-zone", "reception"), /\sdisabled(?:\s|>)/);
+  for (const id of ["crossfit", "program", "trainer", "shop"]) {
+    assert.match(buttonFor(membershipRequired, "data-v2-strength-zone", id), /\sdisabled(?:\s|>)/);
+  }
+  assert.match(membershipRequired, /Inscription requise à l’accueil/);
+
   const medical = strengthView.render(baseContext({
     condition: {
       energy: 82,
@@ -119,109 +143,155 @@ test("distingue abonnement requis, accès actif et blocage médical", () => {
       trainingBlocked: true,
       trainingBlockedReason: "Repos médical obligatoire pendant deux semaines.",
     },
-    selectedActivities: [],
   }));
-
-  assert.match(membershipRequired, /data-v2-strength-access="membership-required"/);
-  assert.match(membershipRequired, /Abonnement requis/);
-  assert.match(active, /data-v2-strength-access="active"/);
-  assert.match(active, /Accès actif/);
   assert.match(medical, /data-v2-strength-access="medical-blocked"/);
+  for (const id of ["crossfit", "program", "trainer"]) {
+    assert.match(buttonFor(medical, "data-v2-strength-zone", id), /\sdisabled(?:\s|>)/);
+  }
+  for (const id of ["reception", "shop"]) {
+    assert.doesNotMatch(buttonFor(medical, "data-v2-strength-zone", id), /\sdisabled(?:\s|>)/);
+  }
   assert.match(medical, /Repos médical obligatoire pendant deux semaines/);
-  assert.match(medical, /data-v2-strength-confirm[^>]+disabled/);
 });
 
-test("affiche exactement les quatre forfaits V1 et respecte budget et blocage injectés", () => {
+test("le menu d'accueil propose exactement les forfaits de un et trois mois", () => {
   const plans = strength.MEMBERSHIP_PLANS.map(plan => ({ ...plan }));
-  plans[0].disabledReason = "Fonds réservés au GYM de boxe.";
   plans[0].available = false;
-  const html = strengthView.render(baseContext({
+  plans[0].disabledReason = "Fonds réservés au GYM de boxe.";
+  const html = strengthView.renderMenu("reception", baseContext({
     membership: {
       active: false,
       balance: 530,
       spendableBalance: 530,
       plans,
     },
-    selectedActivities: [],
   }));
 
-  assert.equal((html.match(/data-v2-strength-plan=/g) || []).length, 4);
+  assert.match(html, /data-v2-strength-menu="reception"/);
+  assert.match(html, /Inscription au gym/);
+  assert.equal((html.match(/data-v2-strength-plan=/g) || []).length, 2);
+  assert.match(html, /data-v2-strength-plan="monthly"/);
   assert.match(html, /1 mois/);
   assert.match(html, /95 \$/);
+  assert.match(html, /data-v2-strength-plan="three-months"/);
   assert.match(html, /3 mois/);
   assert.match(html, /270 \$/);
-  assert.match(html, /6 mois/);
-  assert.match(html, /510 \$/);
-  assert.match(html, /1 an/);
-  assert.match(html, /960 \$/);
   assert.match(html, /Économie de 15 \$/);
-  assert.match(html, /Économie de 60 \$/);
-  assert.match(html, /Économie de 180 \$/);
+  assert.match(buttonFor(html, "data-v2-strength-plan", "monthly"), /\sdisabled(?:\s|>)/);
   assert.match(html, /Fonds réservés au GYM de boxe/);
-  assert.match(html, /data-v2-strength-plan="yearly"[^>]+disabled/);
-  assert.match(html, /Il manque 430 \$/);
-  assert.doesNotMatch(html, /data-v2-strength-plan="six-months"[^>]+disabled/);
+  assert.doesNotMatch(html, /data-v2-strength-plan="(?:six-months|yearly)"/);
+  assert.doesNotMatch(html, />6 mois<|>1 an</);
 });
 
-test("réserve des commandes accessibles au préparateur privé et à la boutique", () => {
-  const active = strengthView.render(baseContext());
-  const locked = strengthView.render(baseContext({
-    careerStatus: "recreational",
-    membership: { active: false, plans: strength.MEMBERSHIP_PLANS },
-    selectedActivities: [],
-  }));
+test("le menu CrossFit conserve la séance strength-quick et ses limites", () => {
+  const available = strengthView.renderMenu("crossfit", baseContext());
 
-  assert.match(active, /Préparateur privé/);
-  assert.match(active, /Mélanie Tremblay/);
-  assert.match(active, /<progress max="5" value="2">/);
-  assert.match(active, /data-v2-strength-trainer(?![^>]+disabled)/);
-  assert.match(active, /Suppléments/);
-  assert.match(active, /2 produits dans ton inventaire/);
-  assert.match(active, /data-v2-strength-shop(?![^>]+disabled)/);
-  assert.match(locked, /data-v2-strength-trainer[^>]+disabled/);
-  assert.match(locked, /data-v2-strength-shop[^>]+disabled/);
+  assert.match(available, /data-v2-strength-menu="crossfit"/);
+  assert.match(available, /Cours de CrossFit/);
+  assert.match(available, /utilise exactement la séance rapide du moteur/);
+  assert.equal((available.match(/data-v2-strength-quick/g) || []).length, 1);
+  assert.match(buttonFor(available, "data-v2-strength-quick"), /aria-pressed="false"/);
+  assert.match(available, /Ajouter le cours à ma semaine/);
+
+  const second = strengthView.renderMenu("crossfit", baseContext({
+    quick: { available: true, planned: true, plannedCount: 1 },
+  }));
+  assert.match(buttonFor(second, "data-v2-strength-quick"), /aria-pressed="true"/);
+  assert.match(second, /Ajouter un deuxième cours/);
+
+  const full = strengthView.renderMenu("crossfit", baseContext({
+    quick: { available: false, planned: true, plannedCount: 2, reason: "Maximum hebdomadaire atteint." },
+  }));
+  assert.match(buttonFor(full, "data-v2-strength-quick"), /\sdisabled(?:\s|>)/);
+  assert.match(full, /Maximum de deux cours atteint/);
+  assert.match(full, /Maximum hebdomadaire atteint/);
 });
 
-test("affiche les séances planifiées avec un retrait direct dans le gym", () => {
-  const html = strengthView.render(baseContext({
-    quick: { available: true, planned: true },
-    weekPlan: { entries: [{ id: "strength-1", label: "Séance rapide", cost: 11, removable: true }] },
-  }));
+test("le menu de programme rend huit exercices et la projection énergie, fatigue et XP", () => {
+  const html = strengthView.renderMenu("program", baseContext());
 
-  assert.match(html, /Séances de musculation planifiées/);
+  assert.match(html, /data-v2-strength-menu="program"/);
+  assert.match(html, /Bâtis ton programme/);
+  assert.equal((html.match(/data-strength-category=/g) || []).length, 8);
+  for (const activity of Object.values(strength.ACTIVITIES)) {
+    assert.match(html, new RegExp(`<button[^>]+data-v2-strength-activity="${activity.id}"`));
+  }
+  assert.match(html, /2 activités/);
+  assert.match(html, /Énergie après<\/span><strong>64 %/);
+  assert.match(html, /Fatigue après<\/span><strong>28 %/);
+  assert.match(html, /<b>Puissance<\/b> \+4 XP/);
+  assert.match(html, /<b>Cardio<\/b> \+2 XP/);
+  assert.match(html, /Force des jambes/);
+  assert.match(html, /−13 énergie/);
+  assert.match(html, /\+8 fatigue/);
+  assert.match(html, /<b>Puissance<\/b> \+3 XP/);
+  assert.equal((html.match(/<li><span>[^<]+<\/span><button type="button" data-v2-strength-activity=/g) || []).length, 2);
   assert.match(html, /data-v2-location-remove="strength-1"/);
-  assert.match(html, /data-v2-strength-quick aria-pressed="true"[^>]*>Retirer la séance rapide/);
+  assert.match(html, /data-v2-strength-confirm/);
+  assert.match(html, /data-v2-strength-mobile-confirm/);
+  assert.doesNotMatch(html, /data-v2-strength-plan=/);
+  assert.doesNotMatch(html, /data-v2-strength-quick/);
 });
 
-test("explique qu'un préparateur produit davantage d’XP ciblée sans donner de point instantané", () => {
-  const html = strengthView.render(baseContext({ trainer: {} }));
+test("le programme bloque seulement les ajouts trop coûteux et garde les choix retirables", () => {
+  const html = strengthView.renderMenu("program", baseContext({
+    condition: { energy: 16, fatigue: 30 },
+    selectedActivities: ["lower_body_strength"],
+  }));
+  const selectedButton = buttonFor(html, "data-v2-strength-activity", "lower_body_strength");
+  const expensiveButton = buttonFor(html, "data-v2-strength-activity", "posterior_chain");
 
-  assert.match(html, /Aucun préparateur choisi/);
-  assert.match(html, /produit davantage d’XP ciblée/);
-  assert.match(html, /ne donne jamais un point de statistique instantané/);
+  assert.match(selectedButton, /aria-pressed="true"/);
+  assert.doesNotMatch(selectedButton, /\sdisabled(?:\s|>)/);
+  assert.match(expensiveButton, /\sdisabled(?:\s|>)/);
+  assert.match(expensiveButton, /aria-describedby="v2-strength-activity-posterior_chain-reason"/);
+  assert.match(html, /Il faut 14 % d&#039;énergie; il en reste 3 %/);
 });
 
-test("échappe toutes les données externes de la vue et des forfaits", () => {
+test("rend la boutique comme décor responsive avec exactement quatre bulles de produits", () => {
+  const html = strengthView.renderShop({ balance: 512, products: productFixtures() });
+
+  assert.match(html, /class="v2-strength-shop v2-place-view v2-supplement-shop"/);
+  assert.match(html, /<picture>/);
+  assert.match(html, /<source media="\(max-width: 640px\)" srcset="assets\/boutique-supplements-v2-mobile\.png">/);
+  assert.match(html, /<img src="assets\/boutique-supplements-v2-desktop\.png"/);
+  assert.equal((html.match(/data-v2-supplement-buy=/g) || []).length, 4);
+  for (const product of productFixtures()) {
+    assert.match(html, new RegExp(`data-v2-supplement-buy="${product.id}"`));
+    assert.match(html, new RegExp(product.label));
+  }
+  assert.match(buttonFor(html, "data-v2-supplement-buy", "preworkout"), /\sdisabled(?:\s|>)/);
+  assert.match(html, /Inventaire plein/);
+  assert.match(html, /Solde disponible · 512 \$/);
+  assert.match(html, /Maximum de deux utilisations par semaine/);
+  assert.match(html, /data-v2-supplement-shop-close/);
+});
+
+test("échappe les données externes de la scène, des menus et de la boutique", () => {
   const attack = `<img src=x onerror="boom()">`;
-  const html = strengthView.render(baseContext({
+  const scene = strengthView.render(baseContext({
     profile: { firstName: attack },
     condition: { energy: 80, fatigue: 10, trainingBlocked: true, trainingBlockedReason: attack },
-    membership: {
-      active: true,
-      weeksRemaining: 2,
-      label: attack,
-      detail: attack,
-      balance: 500,
-      plans: [{ id: "monthly", label: attack, detail: attack }],
-    },
-    trainer: { active: true, name: attack, programLabel: attack, detail: attack },
-    shop: { summary: attack },
-    selectedActivities: [],
+    membership: { active: true, weeksRemaining: 2, label: attack, detail: attack, plans: strength.MEMBERSHIP_PLANS },
+    trainer: { active: true, name: attack },
   }));
+  const reception = strengthView.renderMenu("reception", baseContext({
+    membership: {
+      active: false,
+      balance: 500,
+      plans: [{ id: "monthly", label: attack, detail: attack, weeks: 4, price: 95 }],
+    },
+  }));
+  const shop = strengthView.renderShop({
+    balance: 500,
+    products: [{ id: attack, label: attack, price: 10, quantity: 0, available: false, reason: attack }],
+  });
 
-  assert.doesNotMatch(html, /<img src=x/);
-  assert.doesNotMatch(html, /onerror="boom\(\)"/);
-  assert.match(html, /&lt;img src=x onerror=&quot;boom\(\)&quot;&gt;/);
+  for (const html of [scene, reception, shop]) {
+    assert.doesNotMatch(html, /<img src=x/);
+    assert.doesNotMatch(html, /onerror="boom\(\)"/);
+    assert.match(html, /&lt;img src=x onerror=&quot;boom\(\)&quot;&gt;/);
+  }
 });
 
 test("rend un bilan de séance réutilisable, accessible et échappé", () => {
@@ -244,17 +314,22 @@ test("rend un bilan de séance réutilisable, accessible et échappé", () => {
   assert.doesNotMatch(html, /<script>|<b>|<i>/);
 });
 
-test("le CSS prévoit mobile, défilement sûr, cibles tactiles et mouvement réduit", () => {
+test("le CSS prévoit scènes responsives, bulles transparentes et aucune marque rouge", () => {
   const css = fs.readFileSync(path.join(__dirname, "..", "v2-strength.css"), "utf8");
+  const gymHotspot = cssDeclarationsFor(css, ".v2-strength-hotspot");
+  const shopHotspot = cssDeclarationsFor(css, ".v2-supplement-hotspot");
 
   assert.match(css, /overflow-x:\s*hidden/);
   assert.match(css, /overflow-y:\s*auto/);
   assert.match(css, /min-height:\s*44px/);
-  assert.match(css, /@media \(max-width:\s*760px\)/);
-  assert.match(css, /\.v2-strength-layout\s*\{[\s\S]*?flex-direction:\s*column/);
-  assert.match(css, /\.v2-strength-mobile-summary\s*\{[\s\S]*?position:\s*sticky/);
-  assert.doesNotMatch(css, /\.v2-strength-sidebar\s*\{\s*order:\s*-1/);
-  assert.match(css, /\.v2-strength-plan-grid\s*\{[\s\S]*?overflow-x:\s*auto/);
+  assert.match(gymHotspot, /position:\s*absolute/);
+  assert.match(shopHotspot, /position:\s*absolute/);
+  assert.match(gymHotspot, /background(?:-color)?:[^;]*rgba\([^)]*,\s*(?:0?\.)[0-8]\d*\)/);
+  assert.match(shopHotspot, /background(?:-color)?:[^;]*rgba\([^)]*,\s*(?:0?\.)[0-8]\d*\)/);
+  assert.doesNotMatch(css, /\.v2-strength-hotspot::after\s*\{/);
+  assert.doesNotMatch(css, /\.v2-supplement-hotspot::after\s*\{/);
+  assert.match(css, /@media \(max-width:\s*(?:640|760)px\)/);
+  assert.match(css, /@media \(max-width:\s*(?:640|760)px\)[\s\S]*?\.v2-strength-layout\s*\{[\s\S]*?(?:flex-direction:\s*column|grid-template-columns:\s*minmax\(0,\s*1fr\))/);
   assert.match(css, /@media \(prefers-reduced-motion:\s*reduce\)/);
   assert.doesNotMatch(css, /^\s*width:\s*390px/m);
 });

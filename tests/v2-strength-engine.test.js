@@ -31,20 +31,18 @@ test("expose le moteur en CommonJS et dans le navigateur avec huit activités ut
   assert.doesNotMatch(JSON.stringify(strength.ACTIVITIES), /bodybuilding|crossfit|pattes d['’]ours/i);
 });
 
-test("reprend les quatre forfaits V1 et accepte leurs valeurs injectées par le contexte", () => {
+test("propose seulement les forfaits de un et trois mois et accepte leurs valeurs injectées par le contexte", () => {
   assert.deepEqual(
     strength.MEMBERSHIP_PLANS.map(plan => [plan.id, plan.weeks, plan.price]),
     [
       ["monthly", 4, 95],
       ["three-months", 12, 270],
-      ["six-months", 24, 510],
-      ["yearly", 48, 960],
     ],
   );
   const plans = strength.normalizeMembershipPlans([
     { id: "monthly", weeks: 5, price: 99, label: "Mois test", detail: "Valeurs du contrôleur", available: false, disabledReason: "Budget protégé" },
   ]);
-  assert.equal(plans.length, 4);
+  assert.equal(plans.length, 2);
   assert.deepEqual(plans[0], {
     id: "monthly",
     label: "Mois test",
@@ -56,6 +54,11 @@ test("reprend les quatre forfaits V1 et accepte leurs valeurs injectées par le 
     disabledReason: "Budget protégé",
   });
   assert.equal(plans[1].price, 270, "les forfaits non fournis gardent leur valeur rétrocompatible");
+  assert.equal(
+    strength.resolveAccess({ careerStatus: "amateur", strengthGymWeeks: 48 }).state,
+    "active",
+    "une ancienne sauvegarde conserve toutes ses semaines d'accès déjà payées",
+  );
 });
 
 test("distingue clairement les quatre états d'accès prévus", () => {

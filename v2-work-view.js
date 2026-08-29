@@ -106,6 +106,8 @@
       offers,
       plan: {
         planned: rawPlan.planned !== false,
+        available: rawPlan.available !== false,
+        reason: safeText(rawPlan.reason, "", 260),
         cost: wholeNumber(rawPlan.cost, 0, 0, 100),
       },
       missedWorkWeeks: wholeNumber(raw.missedWorkWeeks, 0, 0, 2),
@@ -116,8 +118,10 @@
   function renderWorkZones(context) {
     if (!context.job) return "";
     const scheduleDetail = context.plan.planned
-      ? `Travail prévu · −${context.plan.cost} énergie`
-      : "Réintégrer le travail à la semaine";
+      ? `Travail prévu · −${context.plan.cost} capacité`
+      : context.plan.available
+        ? "Réintégrer le travail à la semaine"
+        : `Travail indisponible · ${context.plan.reason}`;
     const applicationDetail = context.application
       ? `Candidature : ${context.application.progress}/${context.application.requiredWeeks}`
       : "Voir mon emploi et les offres";
@@ -150,7 +154,7 @@
       return `<section class="v2-work-status-card v2-place-card"><span>Situation d’emploi</span><strong>${escapeHTML(status)}</strong><p>${context.application ? "L’attente avance automatiquement à chaque semaine confirmée." : "Le babillard donne accès aux emplois sans modifier les règles de candidature."}</p></section>`;
     }
     const attendance = context.missedWorkWeeks
-      ? `<p class="v2-work-attendance-warning"><strong>${context.missedWorkWeeks}/3 absence${context.missedWorkWeeks > 1 ? "s" : ""} consécutive${context.missedWorkWeeks > 1 ? "s" : ""}.</strong> La troisième entraîne le congédiement.</p>`
+      ? `<p class="v2-work-attendance-warning"><strong>${context.missedWorkWeeks}/3 absence${context.missedWorkWeeks > 1 ? "s" : ""} injustifiée${context.missedWorkWeeks > 1 ? "s" : ""} cumulée${context.missedWorkWeeks > 1 ? "s" : ""}.</strong> Elles restent au dossier chez cet employeur; la troisième entraîne le congédiement.</p>`
       : "";
     return `<section class="v2-work-status-card v2-place-card"><span>Emploi actuel</span><strong>${escapeHTML(context.job.title)}</strong><dl><div><dt>Paie hebdomadaire</dt><dd>${context.job.wage} $</dd></div><div><dt>Horaire</dt><dd>${escapeHTML(context.job.schedule)}</dd></div></dl><p>${escapeHTML(context.job.detail)}</p>${attendance}</section>`;
   }
@@ -169,9 +173,14 @@
   function renderScheduleMenu(context) {
     if (!context.job) return "";
     const status = context.plan.planned
-      ? `Le travail est prévu cette semaine et réserve ${context.plan.cost} énergie. Tu peux le retirer avant la confirmation.`
-      : "Tu as retiré le travail de cette semaine : l’énergie est libérée, mais tu ne recevras aucune paie et cette semaine comptera comme une absence.";
-    return `<section class="v2-work-menu" aria-labelledby="v2-work-menu-title"><header><div><p class="eyebrow">${escapeHTML(context.job.title)}</p><h2 id="v2-work-menu-title">Horaire de la semaine</h2></div><button type="button" class="secondary-button" data-v2-work-menu-close>Retour à l’emploi</button></header><div class="v2-work-menu-card"><p><strong>Le salaire affiché est hebdomadaire.</strong> ${escapeHTML(status)}</p><button type="button" class="${context.plan.planned ? "secondary-button" : "primary-button"}" data-v2-toggle-work aria-pressed="${context.plan.planned}">${context.plan.planned ? "Retirer le travail de ma semaine" : "Ajouter le travail à ma semaine"}</button></div></section>`;
+      ? `Le travail est prévu cette semaine et réserve ${context.plan.cost} points de capacité. Tu peux le retirer avant la confirmation.`
+      : context.plan.available
+        ? "Tu as retiré le travail de cette semaine : la capacité est libérée, mais tu ne recevras aucune paie et cette semaine comptera comme une absence."
+        : context.plan.reason || "Ton état actuel ne permet pas d’assurer le travail cette semaine.";
+    const buttonLabel = context.plan.planned
+      ? "Retirer le travail de ma semaine"
+      : context.plan.available ? "Ajouter le travail à ma semaine" : "Travail indisponible cette semaine";
+    return `<section class="v2-work-menu" aria-labelledby="v2-work-menu-title"><header><div><p class="eyebrow">${escapeHTML(context.job.title)}</p><h2 id="v2-work-menu-title">Horaire de la semaine</h2></div><button type="button" class="secondary-button" data-v2-work-menu-close>Retour à l’emploi</button></header><div class="v2-work-menu-card"><p><strong>Le salaire affiché est hebdomadaire.</strong> ${escapeHTML(status)}</p><button type="button" class="${context.plan.planned ? "secondary-button" : "primary-button"}" data-v2-toggle-work aria-pressed="${context.plan.planned}"${!context.plan.planned && !context.plan.available ? " disabled aria-disabled=\"true\"" : ""}>${buttonLabel}</button></div></section>`;
   }
 
   function renderJobMenu(context) {

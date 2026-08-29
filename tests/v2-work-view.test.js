@@ -40,7 +40,7 @@ test("rend un environnement adapté à l’emploi actif avec les zones de travai
   assert.match(html, /data-v2-work-zone="mini-game" aria-disabled="true"/);
   assert.match(html, /data-v2-leave-work>Retour à la carte/);
   assert.match(html, /120 \$/);
-  assert.match(html, /30 énergie/);
+  assert.match(html, /30 capacité/);
 });
 
 test("affiche le babillard quand aucun emploi n’est actif", () => {
@@ -65,6 +65,30 @@ test("garde la bascule hebdomadaire dans le menu Horaire", () => {
   assert.match(html, /aucune paie/);
   assert.match(html, /data-v2-toggle-work aria-pressed="false">Ajouter le travail à ma semaine/);
   assert.match(html, /data-v2-work-menu-close>Retour à l’emploi/);
+});
+
+test("présente les absences injustifiées comme un compteur cumulatif chez l’employeur", () => {
+  const html = work.render(activeContext({ missedWorkWeeks: 2 }));
+
+  assert.match(html, /2\/3 absences injustifiées cumulées/);
+  assert.match(html, /restent au dossier chez cet employeur/);
+  assert.match(html, /la troisième entraîne le congédiement/);
+  assert.doesNotMatch(html, /absences consécutives/);
+});
+
+test("explique et verrouille le travail quand la capacité ou la condition ne le permet plus", () => {
+  const html = work.renderMenu("schedule", activeContext({
+    v2WorkPlan: {
+      planned: false,
+      available: false,
+      cost: 30,
+      reason: "Après les 21 points déjà occupés, le travail à 30 points ne tient plus dans la semaine.",
+    },
+  }));
+
+  assert.match(html, /Après les 21 points déjà occupés/);
+  assert.match(html, /data-v2-toggle-work[^>]+disabled/);
+  assert.match(html, /Travail indisponible cette semaine/);
 });
 
 test("échappe les données injectées dans la scène d’emploi", () => {

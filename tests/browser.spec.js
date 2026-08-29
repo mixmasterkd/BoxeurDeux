@@ -894,6 +894,8 @@ test("occupe progressivement la capacité après l’inactivité sans réduire s
   expect(result.capsule.previewRuntime.career.trainingRhythmPenalty).toBe(1);
   expect(result.main.state.fitness).toBe(68);
   expect(result.summaryText).toContain("Rythme fragile");
+  expect(result.summaryText).toContain("Fatigue accumulée");
+  expect(result.capsule.timeState.condition.fatigue).toBeGreaterThan(4);
   await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("max", "50");
   await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("value", "30");
 
@@ -915,7 +917,88 @@ test("occupe progressivement la capacité après l’inactivité sans réduire s
   expect(result.main.state.fitness).toBe(68);
 });
 
-test("retire le travail, congédie après trois absences puis attend 1 à 3 semaines avant la nouvelle embauche", async ({ page }) => {
+test("ne protège plus le travail quand le rythme et la condition occupent déjà trop de capacité", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    week: 12,
+    jobId: "office",
+    jobsHeldCount: 1,
+    gymWeeks: 4,
+    trainingRhythmPenalty: 4,
+    energy: 78,
+    fatigue: 66,
+  }));
+
+  const launcher = page.locator(".v2-week-launcher");
+  await expect(launcher.locator("progress")).toHaveAttribute("max", "50");
+  await expect(launcher.locator("progress")).toHaveAttribute("value", "29");
+  await page.locator("[data-v2-week-detailed]").click();
+  await expect(page.locator(".v2-week-plan")).toContainText("20 par le manque d’entraînement");
+  await expect(page.locator(".v2-week-plan")).toContainText("1 par l’état physique");
+  await page.locator("[data-v2-week-plan-close]").first().click();
+
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await page.locator('[data-v2-work-zone="schedule"]').click();
+  await expect(page.locator(".v2-work-menu")).toContainText("le travail à 30 points ne tient plus");
+  await expect(page.locator("[data-v2-toggle-work]")).toBeDisabled();
+  await expect(page.locator("[data-v2-toggle-work]")).toContainText("Travail indisponible cette semaine");
+});
+
+test("empêche de répéter dix semaines de bureau sans entraînement ni repos", async ({ page }) => {
+  test.setTimeout(45_000);
+  await openStoredCareer(page, amateurSnapshot({
+    week: 3,
+    jobId: "office",
+    jobsHeldCount: 1,
+    gymWeeks: 8,
+    trainingRhythmPenalty: 0,
+    energy: 78,
+    fatigue: 4,
+  }));
+
+  for (let completed = 0; completed < 5; completed += 1) {
+    await confirmWeekFromLauncher(page);
+    await expect(page.locator(".v2-week-summary")).toContainText("Fatigue accumulée");
+    await page.locator("[data-v2-week-summary-close]").click();
+  }
+
+  const saved = await page.evaluate(() => ({
+    main: JSON.parse(localStorage.getItem("boxeur-deux-career-v2")),
+    capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")),
+  }));
+  expect(saved.capsule.previewRuntime.career.trainingRhythmPenalty).toBe(4);
+  expect(saved.capsule.timeState.condition.fatigue).toBeGreaterThanOrEqual(68);
+  expect(saved.capsule.previewRuntime.career.jobWagesEarned).toBe(600);
+
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await page.locator('[data-v2-work-zone="schedule"]').click();
+  await expect(page.locator("[data-v2-toggle-work]")).toBeDisabled();
+  await expect(page.locator(".v2-work-menu")).toContainText("ne tient plus dans la semaine");
+});
+
+test("bloque clairement le travail et l’entraînement lorsque l’état physique est critique", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    week: 8,
+    jobId: "convenience",
+    jobsHeldCount: 1,
+    gymWeeks: 4,
+    energy: 40,
+    fatigue: 84,
+  }));
+
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await page.locator('[data-v2-work-zone="schedule"]').click();
+  await expect(page.locator(".v2-work-menu")).toContainText("L’état physique est critique");
+  await expect(page.locator("[data-v2-toggle-work]")).toBeDisabled();
+  await page.locator("[data-v2-work-menu-close]").click();
+  await page.locator("[data-v2-leave-work]").click();
+
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  await page.locator('[data-v2-gym-zone="coach"]').click();
+  await expect(page.locator(".v2-gym-menu")).toContainText("L’état physique est critique");
+  await expect(page.locator("[data-v2-coach-session]")).toBeDisabled();
+});
+
+test("cumule trois absences espacées, congédie puis attend 1 à 3 semaines avant la nouvelle embauche", async ({ page }) => {
   test.setTimeout(60_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
@@ -960,11 +1043,24 @@ test("retire le travail, congédie après trois absences puis attend 1 à 3 sema
     await page.locator("[data-v2-week-summary-close]").click();
   };
 
+  const workWeekWithoutClearingAbsences = async expectedAbsences => {
+    await confirmWeekFromLauncher(page);
+    await expect(page.locator(".v2-week-summary")).toBeVisible();
+    await expect(page.locator(".v2-week-summary")).toContainText("Présence enregistrée");
+    await expect(page.locator(".v2-week-summary")).toContainText(`${expectedAbsences}/3 absence`);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
+    expect(saved.state.jobId).toBe("convenience");
+    expect(saved.state.missedWorkWeeks).toBe(expectedAbsences);
+    await page.locator("[data-v2-week-summary-close]").click();
+  };
+
   await missWorkWeek(1);
+  await workWeekWithoutClearingAbsences(1);
   await missWorkWeek(2);
+  await workWeekWithoutClearingAbsences(2);
   await missWorkWeek(3);
   await expect(page.locator("#job-loss-dialog")).toBeVisible();
-  await expect(page.locator("#job-loss-copy")).toContainText("trois absences consécutives");
+  await expect(page.locator("#job-loss-copy")).toContainText("trois absences injustifiées cumulées");
   await page.locator("#job-loss-acknowledge").click();
 
   await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
@@ -1546,7 +1642,8 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
   await expect(homeTutorial).toContainText("Course et récupération sont planifiées");
   await homeTutorial.locator("[data-v2-week-handoff]").click();
   await page.locator(".v2-week-plan [data-v2-week-confirm]").click();
-  await expect(page.locator(".v2-week-summary")).toContainText("Assiduité rétablie");
+  await expect(page.locator(".v2-week-summary")).toContainText("Présence enregistrée");
+  await expect(page.locator(".v2-week-summary")).toContainText("1/3 absence injustifiée demeure au dossier");
   await page.locator("[data-v2-week-summary-close]").click();
   await expect(guideCard).toContainText("Renouveler l’abonnement au GYM");
 
@@ -1929,7 +2026,7 @@ test("bloque le sparring amateur pendant un combat, exige 18 énergie et préser
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   const lowCapacityRing = page.locator('[data-v2-gym-zone="ring"]');
   await expect(lowCapacityRing).toBeDisabled();
-  await expect(lowCapacityRing).toHaveAccessibleName(/Énergie insuffisante|capacité hebdomadaire restante est insuffisante/i);
+  await expect(lowCapacityRing).toHaveAccessibleName(/Énergie insuffisante|capacité hebdomadaire restante est insuffisante|état physique est critique/i);
 
   const futureFight = officialFight(3);
   await openStoredCareer(page, amateurSnapshot({ gymWeeks: 4, scheduledFight: futureFight }));
@@ -2691,15 +2788,20 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   const strengthView = page.locator(".v2-strength-view");
   await expect(strengthView).toBeVisible();
   await expect(strengthView).toHaveAttribute("data-v2-strength-access", "membership-required");
-  await expect(page.locator("[data-v2-strength-plan]")).toHaveCount(4);
+  await expect(page.locator("[data-v2-strength-zone]")).toHaveCount(5);
+  await expect(page.locator('.v2-strength-scene img')).toHaveJSProperty("naturalWidth", 1672);
+  await expect(page.locator('[data-v2-strength-zone="reception"]')).toBeEnabled();
+  await expect(page.locator('[data-v2-strength-zone="crossfit"]')).toBeDisabled();
+
+  await page.locator('[data-v2-strength-zone="reception"]').click();
+  await expect(page.locator('[data-v2-strength-menu="reception"]')).toBeVisible();
+  await expect(page.locator("[data-v2-strength-plan]")).toHaveCount(2);
   await expect(page.locator('[data-v2-strength-plan="monthly"]')).toContainText("Choisir 1 mois");
   await expect(page.locator('[data-v2-strength-plan="monthly"]')).toBeEnabled();
   await expect(page.locator('.v2-strength-plan:has([data-v2-strength-plan="monthly"])')).toContainText("95 $");
   await expect(page.locator('.v2-strength-plan:has([data-v2-strength-plan="three-months"])')).toContainText("270 $");
-  await expect(page.locator('.v2-strength-plan:has([data-v2-strength-plan="six-months"])')).toContainText("510 $");
-  await expect(page.locator('.v2-strength-plan:has([data-v2-strength-plan="yearly"])')).toContainText("960 $");
 
-  const desktopStrengthFit = await strengthView.evaluate(element => ({
+  const desktopStrengthFit = await page.locator(".v2-strength-reception-menu").evaluate(element => ({
     scrollWidth: element.scrollWidth,
     clientWidth: element.clientWidth,
     documentWidth: document.documentElement.scrollWidth,
@@ -2710,20 +2812,25 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
 
   await page.locator('[data-v2-strength-plan="monthly"]').click();
   await expect(strengthView).toHaveAttribute("data-v2-strength-access", "active");
-  await expect(page.locator(".v2-strength-membership-current.active")).toContainText("Abonnement actif · 4 sem.");
-  await expect(page.locator(".v2-strength-energy").first()).toContainText("92 % → 92 %");
+  await expect(page.locator(".v2-strength-membership-summary")).toContainText("Abonnement actif · 4 sem.");
+  await expect(page.locator(".v2-strength-access")).toContainText("Énergie 92 %");
+
+  await page.locator('[data-v2-strength-zone="crossfit"]').click();
+  await expect(page.locator('[data-v2-strength-menu="crossfit"]')).toContainText("Cours de CrossFit");
+  await expect(page.locator("[data-v2-strength-quick]")).toContainText("Ajouter le cours à ma semaine");
+  await page.locator("[data-v2-strength-menu-close]").click();
 
   await page.locator("[data-v2-strength-trainer]").click();
   const trainerPanel = page.locator(".v2-trainer-panel");
   await expect(trainerPanel).toBeVisible();
-  await expect(trainerPanel).toContainText("Préparateur privé");
+  await expect(trainerPanel).toContainText("Entraîneurs privés");
   await expect(page.locator('[data-v2-trainer-target="power"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("[data-v2-trainer-start]")).toHaveCount(3);
   await page.locator('[data-v2-trainer-start="club"]').click();
   await expect(page.locator(".v2-trainer-active")).toContainText("Mélanie Côté");
   await expect(page.locator(".v2-trainer-active")).toContainText("0/4 séances complétées");
   await page.locator("[data-v2-trainer-close]").click();
-  await expect(page.locator(".v2-strength-service", { hasText: "Mélanie Côté" })).toBeVisible();
+  await expect(page.locator(".v2-strength-membership-summary", { hasText: "Mélanie Côté" })).toBeVisible();
 
   await page.locator("[data-v2-strength-shop]").click();
   const supplementShop = page.locator(".v2-supplement-shop");
@@ -2732,19 +2839,32 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   const proteinBar = page.locator('[data-v2-supplement-buy="protein-bar"]');
   await expect(proteinBar).toBeEnabled();
   await proteinBar.click();
-  await expect(page.locator('.v2-supplement-card:has([data-v2-supplement-buy="protein-bar"])')).toContainText("inventaire ×1");
+  await expect(page.locator('[data-v2-supplement-buy="protein-bar"]')).toContainText("inventaire ×1");
   await page.locator('[data-v2-supplement-buy="protein-bar"]').click();
-  await expect(page.locator('.v2-supplement-card:has([data-v2-supplement-buy="protein-bar"])')).toContainText("inventaire ×2");
+  await expect(page.locator('[data-v2-supplement-buy="protein-bar"]')).toContainText("inventaire ×2");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".v2-strength-shop-scene img")).toHaveJSProperty("naturalWidth", 941);
+  const mobileShopFit = await page.locator(".v2-strength-shop").evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(mobileShopFit.scrollWidth).toBeLessThanOrEqual(mobileShopFit.clientWidth + 1);
+  expect(mobileShopFit.documentWidth).toBeLessThanOrEqual(mobileShopFit.viewportWidth + 1);
   await page.locator("[data-v2-supplement-shop-close]").click();
   await expect(strengthView).toBeVisible();
-  await expect(page.locator(".v2-strength-service", { hasText: "2 produits dans ton inventaire" })).toBeVisible();
+  await expect(page.locator(".v2-strength-scene img")).toHaveJSProperty("naturalWidth", 941);
+  await expect(page.locator(".v2-strength-membership-summary", { hasText: "2 en inventaire" })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 900 });
 
+  await page.locator('[data-v2-strength-zone="program"]').click();
   await page.locator('[data-v2-strength-activity="dynamic_warmup"]').first().click();
   await page.locator('[data-v2-strength-activity="upper_back_guard"]').first().click();
   await page.locator('[data-v2-strength-activity="mobility_cooldown"]').first().click();
   await expect(page.locator(".v2-strength-selection")).toContainText("3 activités");
-  await expect(page.locator(".v2-strength-energy").first()).toContainText("92 % → 76 %");
-  await expect(page.locator("#v2-strength-week-energy-title")).toHaveText("Capacité restante de la semaine");
+  await expect(page.locator(".v2-strength-selection")).toContainText(/Énergie après\s*76 %/);
+  await expect(page.locator(".v2-strength-menu-header")).toContainText("de capacité disponible");
   await expect(page.locator(".v2-strength-selection")).toContainText("Fatigue après");
   await expect(page.locator("[data-v2-strength-confirm]")).toBeEnabled();
   const beforeStrengthDraft = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));

@@ -84,9 +84,9 @@ Après l'ajout du premier cours de groupe, le guide remplace l'objectif d'entra�
 
 ### 1.4 Rythme d'entraînement et niveau
 
-Une semaine sans entraînement ne retire jamais directement de statistiques. Chez les amateurs et les professionnels, elle fragilise plutôt le rythme : 5 points de la prochaine barre sont occupés, puis 10 après une deuxième semaine inactive. Le maximum affiché ne diminue pas et chaque semaine comprenant un entraînement efface un palier. La fatigue élevée et l'énergie physique basse occupent leur propre portion de la barre selon le même principe.
+Une semaine sans entraînement ne retire jamais directement de statistiques. Chez les amateurs et les professionnels, elle fragilise plutôt le rythme : 5, 10, 15 puis 20 points de la prochaine barre sont occupés après une à quatre semaines inactives. Le maximum affiché ne diminue pas et chaque semaine comprenant un entraînement efface un palier. La fatigue élevée et l'énergie physique basse occupent leur propre portion de la barre selon le même principe.
 
-La capacité permanente commence à 50 et gagne 5 points aux niveaux généraux 5, 10 et 15, jusqu'au plafond de 65. Les autres coûts d'activité restent stables. Aucun point n'est protégé automatiquement pour le repos : sa journée à 10 points concurrence directement le travail et l'entraînement. Une semaine sans repos reste permise, mais une condition fragile réduit la capacité disponible la semaine suivante. Un état critique impose 10 points de repos forcé; un état extrême peut imposer une nuit à l'hôpital, 15 points occupés et des frais médicaux. Ces conséquences reposent sur l'état physique réel, pas sur le simple fait d'avoir rempli la barre.
+La capacité permanente commence à 50 et gagne 5 points aux niveaux généraux 5, 10 et 15, jusqu'au plafond de 65. Les autres coûts d'activité restent stables. Aucun point n'est protégé automatiquement pour le repos : sa journée à 10 points concurrence directement le travail et l'entraînement. Le travail n'est jamais protégé contre la portion déjà occupée; s'il ne tient plus dans la même barre, il devient indisponible pour la semaine. Une semaine chargée sans repos reporte une part de sa dépense en énergie et de sa fatigue à la semaine suivante. Une condition fragile bloque les activités et emplois les plus exigeants, tandis qu'un état critique bloque le travail et tout entraînement. Un état critique impose 10 points de repos forcé; un état extrême peut imposer une nuit à l'hôpital, 15 points occupés et des frais médicaux. Ces conséquences reposent sur l'état physique réel, pas sur le simple fait d'avoir rempli la barre.
 
 Chaque niveau conserve trois points de caractéristiques. Les niveaux ordinaires ajoutent une rotation déterministe de cadeaux du coach — 50 $, un supplément ou un bon couvrant une séance du prochain programme privé — tandis que les niveaux 5, 10 et 15 accordent l'augmentation de capacité.
 
@@ -138,7 +138,11 @@ Le gym de musculation possède une identité distincte :
 - entraîneurs privés spécialisés;
 - comptoir d'abonnement et boutique.
 
-Les abonnements existants de 1, 3, 6 et 12 mois, avec rabais progressifs équilibrés, doivent être conservés. Les achats doivent continuer à protéger le minimum nécessaire au premier abonnement obligatoire du gym de boxe au début de la carrière.
+Le lieu est présenté comme un décor interactif responsive. Cinq bulles transparentes donnent accès à l'accueil, au cours de CrossFit, à la composition libre, aux entraîneurs privés et à la boutique. Chaque bulle ouvre un écran secondaire sans remplacer les moteurs de planification, d'entraînement ou d'achat.
+
+L'accueil propose uniquement les abonnements de 1 et 3 mois. Les achats doivent continuer à protéger le minimum nécessaire au premier abonnement obligatoire du gym de boxe au début de la carrière, et les anciennes sauvegardes conservent toutes les semaines d'accès qu'elles possèdent déjà.
+
+Le « Cours de CrossFit » est le nouveau libellé visuel de la séance rapide de musculation; son identifiant, sa composition et sa limite hebdomadaire demeurent inchangés. La bulle « Bâtir mon programme » ouvre le compositeur libre existant. La boutique possède son propre décor responsive et quatre bulles superposées aux produits du catalogue réel.
 
 ### 2.4 Maison
 
@@ -325,7 +329,7 @@ En amateur, il n'y a aucun match nul. Les combats locaux utilisent trois juges e
 
 Le premier emploi demeure obligatoire au début de la carrière. Sa fenêtre initiale n'offre ni fermeture ni annulation, ne se ferme pas par clic à l'extérieur ou avec la touche Échap et bloque l'avancement tant qu'un emploi n'a pas été choisi. L'emploi est ensuite proposé par défaut dans chaque semaine, mais le joueur peut le retirer avant de confirmer son programme. Retrouver un emploi après une perte demeure facultatif.
 
-La semaine de travail réserve automatiquement une partie de l'énergie hebdomadaire. La paie et la fatigue normale sont simulées sans exiger un clic répétitif. Retirer le travail rembourse cette énergie, supprime la paie et compte comme une absence. Une présence remet le dossier d'assiduité en règle; trois semaines consécutives sans travailler entraînent le congédiement et l'indemnité de vacances historique applicable.
+La semaine de travail réserve automatiquement une partie de l'énergie hebdomadaire. La paie et la fatigue normale sont simulées sans exiger un clic répétitif. Retirer le travail rembourse cette énergie, supprime la paie et compte comme une absence injustifiée. Trois absences injustifiées cumulées chez le même employeur entraînent le congédiement, même si des semaines travaillées les séparent; une blessure ou un tournoi demeure une absence protégée. Le compteur repart à zéro uniquement lors d'un changement d'emploi. L'indemnité de vacances historique applicable est conservée.
 
 En cas de conflit avec un combat, un déplacement ou une séance réservée, le jeu pourra proposer :
 

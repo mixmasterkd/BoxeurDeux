@@ -20,6 +20,25 @@
     defense: "Défense",
   });
 
+  const SCENES = Object.freeze({
+    gym: Object.freeze({
+      desktop: "assets/gym-musculation-v2-desktop.png",
+      mobile: "assets/gym-musculation-v2-mobile.png",
+    }),
+    shop: Object.freeze({
+      desktop: "assets/boutique-supplements-v2-desktop.png",
+      mobile: "assets/boutique-supplements-v2-mobile.png",
+    }),
+  });
+
+  const ZONES = Object.freeze([
+    Object.freeze({ id: "reception", icon: "A", label: "Accueil", detail: "Inscriptions et abonnement" }),
+    Object.freeze({ id: "crossfit", icon: "CF", label: "Cours de CrossFit", detail: "Séance encadrée prête à planifier" }),
+    Object.freeze({ id: "program", icon: "+", label: "Bâtir mon programme", detail: "Composition libre" }),
+    Object.freeze({ id: "trainer", icon: "P", label: "Entraîneurs privés", detail: "Puissance ou cardio" }),
+    Object.freeze({ id: "shop", icon: "$", label: "Boutique", detail: "Suppléments" }),
+  ]);
+
   function escapeHTML(value) {
     return String(value == null ? "" : value)
       .replaceAll("&", "&amp;")
@@ -38,6 +57,15 @@
     return Math.round(Math.min(max, Math.max(min, finiteNumber(value, fallback))));
   }
 
+  function domToken(value, fallback = "item") {
+    const token = String(value == null ? "" : value)
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+    return token || fallback;
+  }
+
   function normalizeCareerStatus(value) {
     const status = String(value || "recreational").toLowerCase();
     return ["recreational", "amateur", "professional"].includes(status) ? status : "recreational";
@@ -53,6 +81,7 @@
     const weekCapacity = raw.weekCapacity && typeof raw.weekCapacity === "object" ? raw.weekCapacity : {};
     const weekPlan = raw.weekPlan && typeof raw.weekPlan === "object" ? raw.weekPlan : {};
     const quick = raw.quick && typeof raw.quick === "object" ? raw.quick : {};
+    const clock = raw.clock && typeof raw.clock === "object" ? raw.clock : {};
     const careerStatus = normalizeCareerStatus(raw.careerStatus || raw.status);
     const selectedActivities = BoxeurStrength.normalizeSelection(raw.selectedActivities || raw.activities);
     const energy = wholeNumber(condition.energy, 100, 0, 100);
@@ -91,7 +120,17 @@
     return {
       profile: { firstName: profile.firstName || "Boxeur" },
       careerStatus,
-      condition: { energy, fatigue },
+      clock: {
+        week: wholeNumber(clock.week, 1, 1, 9999),
+        dayLabel: String(clock.dayLabel || ""),
+        timeLabel: String(clock.timeLabel || ""),
+      },
+      condition: {
+        energy,
+        fatigue,
+        trainingBlocked: condition.trainingBlocked === true,
+        trainingBlockedReason: String(condition.trainingBlockedReason || condition.medicalReason || ""),
+      },
       membership: {
         active: membershipActive,
         weeksRemaining,
@@ -105,6 +144,7 @@
       },
       trainer: {
         available: trainer.available !== false,
+        reason: String(trainer.reason || ""),
         active: trainer.active === true,
         name: trainer.name || "Aucun préparateur choisi",
         programLabel: trainer.programLabel || "Programme physique personnalisé",
@@ -115,6 +155,7 @@
       },
       shop: {
         available: shop.available !== false,
+        reason: String(shop.reason || ""),
         itemCount: wholeNumber(shop.itemCount, 0, 0, 999),
         summary: shop.summary || "Les suppléments seront gérés par leur propre moteur et utilisés avant une séance.",
         actionLabel: shop.actionLabel || "Ouvrir la boutique",
@@ -173,7 +214,7 @@
   function renderMembershipPlans(context) {
     const planMarkup = context.membership.plans.map(plan => {
       const state = membershipPlanState(plan, context);
-      const reasonId = `v2-strength-plan-${plan.id}-reason`;
+      const reasonId = `v2-strength-plan-${domToken(plan.id, "plan")}-reason`;
       const disabled = state.available ? "" : ` disabled aria-disabled="true" aria-describedby="${reasonId}"`;
       const savings = plan.savings > 0 ? `<span class="v2-strength-plan-savings">Économie de ${plan.savings} $</span>` : `<span>Tarif mensuel</span>`;
       const reason = state.reason ? `<small id="${reasonId}" class="v2-strength-plan-reason">${escapeHTML(state.reason)}</small>` : "";
@@ -205,7 +246,7 @@
 
   function renderActivity(activity, context) {
     const state = activityState(activity, context);
-    const reasonId = `v2-strength-activity-${activity.id}-reason`;
+    const reasonId = `v2-strength-activity-${domToken(activity.id, "activity")}-reason`;
     const disabled = state.available ? "" : ` disabled aria-disabled="true" aria-describedby="${reasonId}"`;
     const buttonLabel = state.selected ? `Retirer ${activity.label}` : `Ajouter ${activity.label}`;
     const fatigueDelta = activity.fatigueGain - activity.fatigueRelief;
@@ -249,42 +290,141 @@
     </section>`;
   }
 
-  function renderServices(context) {
-    const trainerLocked = !context.access.available || !context.trainer.available;
-    const trainerDisabled = trainerLocked ? " disabled aria-disabled=\"true\"" : "";
-    const trainerProgress = context.trainer.sessionsTotal > 0
-      ? `<progress max="${context.trainer.sessionsTotal}" value="${Math.min(context.trainer.sessionsCompleted, context.trainer.sessionsTotal)}">${context.trainer.sessionsCompleted}/${context.trainer.sessionsTotal}</progress><small>${context.trainer.sessionsCompleted}/${context.trainer.sessionsTotal} cours complétés</small>`
-      : "";
-    const shopLocked = context.careerStatus === "recreational" || !context.membership.active || !context.shop.available;
-    const shopDisabled = shopLocked ? " disabled aria-disabled=\"true\"" : "";
-    return `<div class="v2-strength-services">
-      <section class="v2-strength-service" aria-labelledby="v2-strength-trainer-title"><p class="eyebrow">Préparateur privé</p><h3 id="v2-strength-trainer-title">${escapeHTML(context.trainer.name)}</h3><strong>${escapeHTML(context.trainer.programLabel)}</strong><p>${escapeHTML(context.trainer.detail)}</p>${trainerProgress}<button type="button" class="secondary-button" data-v2-strength-trainer${trainerDisabled}>${escapeHTML(context.trainer.actionLabel)}</button></section>
-      <section class="v2-strength-service" aria-labelledby="v2-strength-shop-title"><p class="eyebrow">Boutique</p><h3 id="v2-strength-shop-title">Suppléments</h3><strong>${context.shop.itemCount} produit${context.shop.itemCount > 1 ? "s" : ""} dans ton inventaire</strong><p>${escapeHTML(context.shop.summary)}</p><button type="button" class="secondary-button" data-v2-strength-shop${shopDisabled}>${escapeHTML(context.shop.actionLabel)}</button></section>
-    </div>`;
+  function zoneState(zoneId, context) {
+    if (context.careerStatus === "recreational") {
+      return { available: false, reason: "Disponible après le passage amateur." };
+    }
+    if (zoneId === "reception") return { available: true, reason: "" };
+    if (!context.membership.active) {
+      return { available: false, reason: "Inscription requise à l’accueil." };
+    }
+    if (zoneId === "shop") {
+      return context.shop.available
+        ? { available: true, reason: "" }
+        : { available: false, reason: context.shop.reason || "La boutique est indisponible." };
+    }
+    if (zoneId === "trainer") {
+      if (!context.trainer.available) return { available: false, reason: context.trainer.reason || "Les entraîneurs sont indisponibles." };
+      if (!context.access.available) return { available: false, reason: context.access.reason };
+      return { available: true, reason: "" };
+    }
+    if (!context.access.available) return { available: false, reason: context.access.reason };
+    if (zoneId === "crossfit" && !context.quick.available) {
+      return { available: false, reason: context.quick.reason || "Ce cours ne peut pas être planifié." };
+    }
+    return { available: true, reason: "" };
   }
 
-  function renderWeekPlan(context) {
-    if (!context.weekPlan.entries.length) return "";
-    return `<section class="v2-strength-week-plan" aria-labelledby="v2-strength-week-plan-title"><div><p class="eyebrow">Déjà dans la semaine</p><h3 id="v2-strength-week-plan-title">Séances de musculation planifiées</h3></div><ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà faite</em>`}</li>`).join("")}</ul></section>`;
+  function renderHotspot(zone, context) {
+    const state = zoneState(zone.id, context);
+    const reasonId = `v2-strength-zone-${zone.id}-reason`;
+    const legacyAttribute = zone.id === "trainer"
+      ? " data-v2-strength-trainer"
+      : zone.id === "shop" ? " data-v2-strength-shop" : "";
+    const disabled = state.available ? "" : ` disabled aria-disabled="true" aria-describedby="${reasonId}"`;
+    const detail = state.reason || zone.detail;
+    return `<button type="button" class="v2-strength-hotspot zone-${escapeHTML(zone.id)}${state.available ? "" : " locked"}" data-v2-strength-zone="${escapeHTML(zone.id)}"${legacyAttribute}${disabled}>
+      <span aria-hidden="true">${state.available ? escapeHTML(zone.icon) : "🔒"}</span><strong>${escapeHTML(zone.label)}</strong><small id="${reasonId}">${escapeHTML(detail)}</small>
+    </button>`;
+  }
+
+  function renderWeekPlan(context, options = {}) {
+    const interactive = options.interactive !== false;
+    const id = options.id || "v2-strength-week-plan-title";
+    const entries = context.weekPlan.entries.length
+      ? `<ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}</small></span>${interactive && entry.removable ? `<button type="button" class="secondary-button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>${entry.removable ? "Planifiée" : "Déjà faite"}</em>`}</li>`).join("")}</ul>`
+      : `<p class="v2-strength-plan-empty">Aucune séance de musculation n’est encore placée cette semaine.</p>`;
+    return `<section class="v2-strength-week-plan${interactive ? "" : " compact"}" aria-labelledby="${id}"><div><p class="eyebrow">Cette semaine</p><h3 id="${id}">Séances de musculation</h3></div>${entries}</section>`;
+  }
+
+  function renderCapacity(context) {
+    return `<section class="v2-strength-capacity v2-place-week-plan${context.weekCapacity.remaining <= 0 ? " full" : ""}" aria-labelledby="v2-strength-capacity-title">
+      <div class="v2-place-week-plan-heading"><div><p class="eyebrow">Programme hebdomadaire</p><h3 id="v2-strength-capacity-title">Capacité restante</h3></div><strong>${context.weekCapacity.remaining}/${context.weekCapacity.total}</strong></div>
+      <meter min="0" max="${context.weekCapacity.total}" value="${context.weekCapacity.remaining}" aria-label="Capacité hebdomadaire restante : ${context.weekCapacity.remaining} sur ${context.weekCapacity.total}">${context.weekCapacity.remaining}/${context.weekCapacity.total}</meter>
+      <p>${context.weekCapacity.used} points sont déjà réservés par tes activités de la semaine.</p>
+    </section>`;
+  }
+
+  function renderCondition(context) {
+    const accessIcon = context.access.available ? "✓" : context.access.state === BoxeurStrength.ACCESS_STATES.MEDICAL_BLOCKED ? "✚" : "🔒";
+    return `<section class="v2-strength-access v2-place-condition ${escapeHTML(context.access.state)}" role="status"><span aria-hidden="true">${accessIcon}</span><div><strong>${escapeHTML(context.access.label)}</strong><p>${escapeHTML(context.access.reason)}</p></div>
+      <div class="v2-strength-condition-values"><span>Énergie <strong>${context.condition.energy} %</strong></span><span>Fatigue <strong>${context.condition.fatigue} %</strong></span></div>
+    </section>`;
+  }
+
+  function renderMembershipSummary(context) {
+    return `<section class="v2-strength-membership-summary v2-place-card"><p class="eyebrow">Accueil</p><h3>${escapeHTML(context.membership.label)}</h3><p>${escapeHTML(context.membership.detail)}</p><dl><div><dt>Entraîneur</dt><dd>${escapeHTML(context.trainer.name)}</dd></div><div><dt>Suppléments</dt><dd>${context.shop.itemCount} en inventaire</dd></div></dl></section>`;
   }
 
   function render(rawContext) {
     const context = normalizeContext(rawContext);
-    const activities = Object.values(BoxeurStrength.ACTIVITIES).map(activity => renderActivity(activity, context)).join("");
-    const accessIcon = context.access.available ? "✓" : context.access.state === BoxeurStrength.ACCESS_STATES.MEDICAL_BLOCKED ? "✚" : "🔒";
-    const mobileConfirmDisabled = context.preview.canConfirm ? "" : " disabled aria-disabled=\"true\"";
-    return `<div class="v2-strength-view" data-v2-strength-access="${escapeHTML(context.access.state)}" data-career-status="${escapeHTML(context.careerStatus)}">
-      <header class="v2-strength-header"><div><p class="eyebrow">Gym de musculation</p><h2>Préparation physique de ${escapeHTML(context.profile.firstName)}</h2></div><button type="button" class="secondary-button" data-v2-leave-strength-gym>Retour à la carte</button></header>
-      <section class="v2-strength-access ${escapeHTML(context.access.state)}" role="status"><span aria-hidden="true">${accessIcon}</span><div><strong>${escapeHTML(context.access.label)}</strong><p>${escapeHTML(context.access.reason)}</p></div></section>
-      <section class="v2-strength-energy" aria-labelledby="v2-strength-energy-title"><div><p class="eyebrow">Limite naturelle de la séance</p><h3 id="v2-strength-energy-title">Énergie principale</h3></div><div class="v2-strength-energy-meter"><meter min="0" max="100" value="${context.preview.projected.energy}" aria-label="Énergie prévue après la séance : ${context.preview.projected.energy} %">${context.preview.projected.energy} %</meter><strong>${context.condition.energy} % → ${context.preview.projected.energy} %</strong></div><div><span>Fatigue actuelle</span><strong>${context.condition.fatigue} % → ${context.preview.projected.fatigue} %</strong></div></section>
-      <section class="v2-strength-energy" aria-labelledby="v2-strength-week-energy-title"><div><p class="eyebrow">Programme hebdomadaire</p><h3 id="v2-strength-week-energy-title">Capacité restante de la semaine</h3></div><div class="v2-strength-energy-meter"><progress max="${context.weekCapacity.total}" value="${context.weekCapacity.remaining}" aria-label="Capacité hebdomadaire restante : ${context.weekCapacity.remaining} sur ${context.weekCapacity.total}">${context.weekCapacity.remaining}/${context.weekCapacity.total}</progress><strong>${context.weekCapacity.remaining}/${context.weekCapacity.total}</strong></div><div><span>Déjà réservée</span><strong>${context.weekCapacity.used}</strong></div></section>
-      ${renderWeekPlan(context)}
-      <section class="v2-strength-mobile-summary" aria-label="Résumé rapide de la séance" aria-live="polite"><span><strong>${context.selectedActivities.length} activité${context.selectedActivities.length > 1 ? "s" : ""}</strong><small>${context.preview.projected.energy} % énergie · ${context.preview.totals.durationMinutes} min</small></span><button type="button" class="primary-button" data-v2-strength-mobile-confirm${mobileConfirmDisabled}>Ajouter</button></section>
-      <div class="v2-strength-layout">
-        <main class="v2-strength-main"><section class="v2-strength-catalogue" aria-labelledby="v2-strength-catalogue-title"><header><div><p class="eyebrow">Composition libre</p><h3 id="v2-strength-catalogue-title">Choisis selon ton énergie</h3></div><p>Chaque ajout met immédiatement à jour l'énergie, la fatigue et l’XP ciblée prévue.</p><button type="button" class="secondary-button" data-v2-strength-quick aria-pressed="${context.quick.planned}"${context.quick.available ? "" : " disabled aria-disabled=\"true\""}>${context.quick.planned ? "Retirer la séance rapide" : context.quick.plannedCount > 0 ? "Ajouter une 2e séance rapide" : "Ajouter la séance rapide"}</button>${context.quick.reason && !context.quick.available ? `<small>${escapeHTML(context.quick.reason)}</small>` : ""}</header><div class="v2-strength-activity-grid">${activities}</div></section>${renderMembershipPlans(context)}</main>
-        <aside class="v2-strength-sidebar" aria-label="Séance et services">${renderSelection(context)}${renderServices(context)}</aside>
+    const meta = [`Semaine ${context.clock.week}`, context.clock.dayLabel, context.clock.timeLabel].filter(Boolean).join(" · ");
+    return `<div class="v2-strength-view v2-place-view" data-v2-strength-access="${escapeHTML(context.access.state)}" data-career-status="${escapeHTML(context.careerStatus)}">
+      <header class="v2-strength-header v2-place-header"><div><p class="eyebrow">Gym de musculation</p><h2>Préparation physique de ${escapeHTML(context.profile.firstName)}</h2><p class="v2-place-meta">${escapeHTML(meta || `Semaine ${context.clock.week}`)}</p></div><button type="button" class="secondary-button" data-v2-leave-strength-gym>Retour à la carte</button></header>
+      <div class="v2-strength-layout v2-place-layout">
+        <main class="v2-strength-scene v2-place-scene" aria-labelledby="v2-strength-scene-title"><h3 class="sr-only" id="v2-strength-scene-title">Espaces interactifs du gym de musculation</h3>
+          <picture><source media="(max-width: 640px)" srcset="${SCENES.gym.mobile}"><img src="${SCENES.gym.desktop}" alt="Gym de musculation chaleureux avec accueil, aire de CrossFit, poids libres, entraîneurs et boutique."></picture>
+          <div class="v2-strength-hotspots">${ZONES.map(zone => renderHotspot(zone, context)).join("")}</div>
+        </main>
+        <aside class="v2-strength-dashboard v2-place-dashboard" aria-label="État du gym et de la semaine">${renderCapacity(context)}${renderCondition(context)}${renderMembershipSummary(context)}${renderWeekPlan(context, { interactive: false, id: "v2-strength-main-plan-title" })}</aside>
       </div>
     </div>`;
+  }
+
+  function renderMenuHeader(context, eyebrow, title) {
+    return `<header class="v2-strength-menu-header"><div><p class="eyebrow">${escapeHTML(eyebrow)}</p><h2>${escapeHTML(title)}</h2><p>Semaine ${context.clock.week} · ${context.weekCapacity.remaining}/${context.weekCapacity.total} de capacité disponible</p></div><button type="button" class="secondary-button" data-v2-strength-menu-close>Retour au gym</button></header>`;
+  }
+
+  function renderProgramMenu(context) {
+    const activities = Object.values(BoxeurStrength.ACTIVITIES).map(activity => renderActivity(activity, context)).join("");
+    const mobileConfirmDisabled = context.preview.canConfirm ? "" : " disabled aria-disabled=\"true\"";
+    return `<section class="v2-strength-menu v2-strength-program-menu" data-v2-strength-menu="program">
+      ${renderMenuHeader(context, "Composition libre", "Bâtis ton programme")}
+      <section class="v2-strength-mobile-summary" aria-label="Résumé rapide de la séance" aria-live="polite"><span><strong>${context.selectedActivities.length} activité${context.selectedActivities.length > 1 ? "s" : ""}</strong><small>${context.preview.projected.energy} % énergie · ${context.preview.totals.durationMinutes} min</small></span><button type="button" class="primary-button" data-v2-strength-mobile-confirm${mobileConfirmDisabled}>Ajouter</button></section>
+      <div class="v2-strength-program-layout"><main class="v2-strength-catalogue"><header><div><p class="eyebrow">Exercices</p><h3>Choisis selon ton énergie</h3></div><p>Chaque ajout met immédiatement à jour l’énergie, la fatigue et l’XP ciblée prévue.</p></header><div class="v2-strength-activity-grid">${activities}</div></main><aside class="v2-strength-program-sidebar">${renderSelection(context)}${renderWeekPlan(context, { id: "v2-strength-program-plan-title" })}</aside></div>
+    </section>`;
+  }
+
+  function renderCrossfitMenu(context) {
+    const buttonLabel = context.quick.plannedCount >= 2
+      ? "Maximum de deux cours atteint"
+      : context.quick.plannedCount === 1 ? "Ajouter un deuxième cours" : "Ajouter le cours à ma semaine";
+    const disabled = context.quick.available ? "" : " disabled aria-disabled=\"true\"";
+    return `<section class="v2-strength-menu v2-strength-crossfit-menu" data-v2-strength-menu="crossfit">${renderMenuHeader(context, "Cours encadré", "Cours de CrossFit")}
+      <div class="v2-strength-crossfit-layout"><article class="v2-strength-crossfit-card"><span class="v2-strength-crossfit-mark" aria-hidden="true">CF</span><div><p class="eyebrow">Séance complète</p><h3>Échauffement, conditionnement et mobilité</h3><p>Un cours prêt à planifier qui utilise exactement la séance rapide du moteur : échauffement dynamique, appareils et retour au calme.</p><ul><li>Une seule période</li><li>XP ciblée assimilée après récupération</li><li>Compte dans la limite des séances de musculation</li></ul><button type="button" class="primary-button" data-v2-strength-quick aria-pressed="${context.quick.plannedCount > 0}"${disabled}>${escapeHTML(buttonLabel)}</button>${context.quick.reason && !context.quick.available ? `<small class="v2-strength-menu-reason">${escapeHTML(context.quick.reason)}</small>` : ""}</div></article>${renderWeekPlan(context, { id: "v2-strength-crossfit-plan-title" })}</div>
+    </section>`;
+  }
+
+  function renderReceptionMenu(context) {
+    return `<section class="v2-strength-menu v2-strength-reception-menu" data-v2-strength-menu="reception">${renderMenuHeader(context, "Accueil", "Inscription au gym")}
+      <div class="v2-strength-reception-layout"><article class="v2-strength-reception-intro"><span aria-hidden="true">A</span><div><p class="eyebrow">Accès simple</p><h3>Choisis la durée qui te convient</h3><p>Deux forfaits seulement : un mois pour essayer ou trois mois pour t’installer. L’achat conserve exactement les règles actuelles d’accès et de débit hebdomadaire.</p></div></article>${renderMembershipPlans(context)}</div>
+    </section>`;
+  }
+
+  function renderMenu(menuId, rawContext) {
+    const context = normalizeContext(rawContext);
+    if (menuId === "reception") return renderReceptionMenu(context);
+    if (menuId === "crossfit") return renderCrossfitMenu(context);
+    if (menuId === "program") return renderProgramMenu(context);
+    return "";
+  }
+
+  function renderShop(rawContext) {
+    const raw = rawContext && typeof rawContext === "object" ? rawContext : {};
+    const products = Array.isArray(raw.products) ? raw.products.slice(0, 4) : [];
+    const balance = wholeNumber(raw.balance, 0, 0, 9999999);
+    const productMarkup = products.map(product => {
+      const id = String(product?.id || "");
+      const available = product?.available !== false;
+      const safeId = domToken(id, "product");
+      const reasonId = `v2-supplement-${safeId}-reason`;
+      const disabled = available ? "" : ` disabled aria-disabled="true" aria-describedby="${reasonId}"`;
+      return `<button type="button" class="v2-supplement-hotspot product-${safeId}${available ? "" : " locked"}" data-v2-supplement-buy="${escapeHTML(id)}"${disabled}><span aria-hidden="true">${available ? "+" : "🔒"}</span><strong>${escapeHTML(product?.label || "Supplément")}</strong><small>${wholeNumber(product?.price, 0, 0, 9999)} $ · inventaire ×${wholeNumber(product?.quantity, 0, 0, 99)}</small>${available ? "" : `<em id="${reasonId}">${escapeHTML(product?.reason || "Indisponible")}</em>`}</button>`;
+    }).join("");
+    const inventory = products.map(product => `<li><span>${escapeHTML(product?.label || "Supplément")}</span><strong>×${wholeNumber(product?.quantity, 0, 0, 99)}</strong></li>`).join("");
+    return `<section class="v2-strength-shop v2-place-view v2-supplement-shop" aria-labelledby="v2-supplement-shop-title"><header class="v2-place-header"><div><p class="eyebrow">Gym de musculation</p><h2 id="v2-supplement-shop-title">Boutique de suppléments</h2><p class="v2-place-meta">Solde disponible · ${balance} $</p></div><button type="button" class="secondary-button" data-v2-supplement-shop-close>Retour au gym</button></header>
+      <div class="v2-strength-shop-layout v2-place-layout"><main class="v2-strength-shop-scene v2-place-scene"><h3 class="sr-only">Produits disponibles dans la boutique</h3><picture><source media="(max-width: 640px)" srcset="${SCENES.shop.mobile}"><img src="${SCENES.shop.desktop}" alt="Boutique chaleureuse avec boissons sportives, protéines, pré-entraînement et barres protéinées."></picture><div class="v2-supplement-hotspots">${productMarkup}</div></main><aside class="v2-strength-shop-dashboard v2-place-dashboard"><section class="v2-place-card"><p class="eyebrow">Règles</p><h3>Prépare ta prochaine séance</h3><p>Un produit s’utilise avant une seule séance. Maximum de deux utilisations par semaine et jamais deux fois le même produit.</p></section><section class="v2-place-card"><p class="eyebrow">Inventaire</p><h3>Dans ton sac</h3><ul class="v2-strength-shop-inventory">${inventory}</ul></section></aside></div>
+    </section>`;
   }
 
   function renderResult(rawResult) {
@@ -309,10 +449,14 @@
 
   return Object.freeze({
     STAT_LABELS,
+    SCENES,
+    ZONES,
     normalizeContext,
     membershipPlanState,
     renderMembershipPlans,
     render,
+    renderMenu,
+    renderShop,
     renderResult,
   });
 });

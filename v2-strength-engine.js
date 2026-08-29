@@ -206,8 +206,6 @@
   const MEMBERSHIP_PLANS = deepFreeze([
     { id: "monthly", label: "1 mois", weeks: 4, price: 95, savings: 0, detail: "4 semaines d'accès au gym de musculation." },
     { id: "three-months", label: "3 mois", weeks: 12, price: 270, savings: 15, detail: "12 semaines d'accès · 15 $ d'économie." },
-    { id: "six-months", label: "6 mois", weeks: 24, price: 510, savings: 60, detail: "24 semaines d'accès · 60 $ d'économie." },
-    { id: "yearly", label: "1 an", weeks: 48, price: 960, savings: 180, detail: "48 semaines d'accès · 180 $ d'économie." },
   ]);
 
   const ACCESS_STATES = deepFreeze({

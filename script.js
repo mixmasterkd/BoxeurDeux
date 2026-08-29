@@ -6,12 +6,8 @@ const GYM_MONTH_WEEKS = 4;
 const GYM_THREE_MONTH_WEEKS = 12;
 const STRENGTH_GYM_PRICE = 95;
 const STRENGTH_GYM_THREE_MONTH_PRICE = 270;
-const STRENGTH_GYM_SIX_MONTH_PRICE = 510;
-const STRENGTH_GYM_YEAR_PRICE = 960;
 const STRENGTH_GYM_MONTH_WEEKS = 4;
 const STRENGTH_GYM_THREE_MONTH_WEEKS = 12;
-const STRENGTH_GYM_SIX_MONTH_WEEKS = 24;
-const STRENGTH_GYM_YEAR_WEEKS = 48;
 const TOURNAMENT_PREP_WEEKS = 4;
 const RECREATIONAL_START_DATE = "2026-09-07";
 const RECREATIONAL_SPARRING_WEEK = 6;
@@ -595,7 +591,7 @@ function normalizeCareerState(source) {
   const boundedStats = {
     week: [1, 99999], money: [0, 9999999], energy: [0, 100], fitness: [0, 100], morale: [0, 100], reputation: [0, 100],
     injury: [0, 100], fatigue: [0, 100], injuryWeeks: [0, 52], experience: [0, 10000000], level: [1, 999], levelPoints: [0, 9999], privateLessonCredits: [0, 99],
-    gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], boxingInactivityWeeks: [0, 999], boxingTrainingWeek: [0, 99999], trainingRhythmPenalty: [0, 2], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
+    gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], boxingInactivityWeeks: [0, 999], boxingTrainingWeek: [0, 99999], trainingRhythmPenalty: [0, 4], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
     missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999], initialJobLockedUntilWeek: [0, 99999], jobTenureWeeks: [0, 99999], jobsHeldCount: [0, 999], jobVacationEarnedAtTenure: [0, 99999], vacationBankWeeks: [0, MAX_PAID_VACATION_WEEKS], jobWagesEarned: [0, 9999999], recreationalTrainingWeeks: [0, 10],
     supplementWeek: [1, 99999], avoidanceWeeks: [0, 999], lastFightWeek: [0, 99999], injuryStartedWeek: [0, 99999],
   };
@@ -1956,8 +1952,6 @@ const gymPlans = Object.freeze([
 const strengthGymPlans = Object.freeze([
   { id: "monthly", label: "1 mois", weeks: STRENGTH_GYM_MONTH_WEEKS, price: STRENGTH_GYM_PRICE, detail: "4 semaines d’accès au gym de musculation." },
   { id: "three-months", label: "3 mois", weeks: STRENGTH_GYM_THREE_MONTH_WEEKS, price: STRENGTH_GYM_THREE_MONTH_PRICE, detail: "12 semaines d’accès · 15 $ d’économie." },
-  { id: "six-months", label: "6 mois", weeks: STRENGTH_GYM_SIX_MONTH_WEEKS, price: STRENGTH_GYM_SIX_MONTH_PRICE, detail: "24 semaines d’accès · 60 $ d’économie." },
-  { id: "yearly", label: "1 an", weeks: STRENGTH_GYM_YEAR_WEEKS, price: STRENGTH_GYM_YEAR_PRICE, detail: "48 semaines d’accès · 180 $ d’économie." },
 ]);
 
 function accruePaidVacation(job, events, week) {
@@ -1988,11 +1982,10 @@ function settleJobAttendance(worked, events, week, excused = false, paidWork = f
   }
   if (worked) {
     if (state.missedWorkWeeks > 0) {
-      const note = `${job.title} : ta présence remet le dossier d’assiduité en règle.`;
+      const note = `${job.title} : présence enregistrée, mais ${state.missedWorkWeeks}/3 absence${state.missedWorkWeeks > 1 ? "s" : ""} injustifiée${state.missedWorkWeeks > 1 ? "s" : ""} demeure${state.missedWorkWeeks > 1 ? "nt" : ""} au dossier.`;
       events.push(note);
       state.journal.unshift({ week, text: note });
     }
-    state.missedWorkWeeks = 0;
     state.jobTenureWeeks += 1;
     if (paidWork) state.jobWagesEarned += job.wage;
     accruePaidVacation(job, events, week);
@@ -2010,7 +2003,7 @@ function settleJobAttendance(worked, events, week, excused = false, paidWork = f
   if (state.missedWorkWeeks >= 3) {
     const vacationPayout = state.vacationBankWeeks > 0 ? Math.round(state.jobWagesEarned * .04) : 0;
     if (vacationPayout) state.money += vacationPayout;
-    const note = `${job.title} : congédiement après trois semaines consécutives sans travailler.${vacationPayout ? ` Indemnité de vacances : +${vacationPayout} $ (4 % des salaires reçus).` : ""}`;
+    const note = `${job.title} : congédiement après trois absences injustifiées cumulées chez le même employeur.${vacationPayout ? ` Indemnité de vacances : +${vacationPayout} $ (4 % des salaires reçus).` : ""}`;
     events.push(note);
     state.journal.unshift({ week, text: note });
     state.jobId = null;
@@ -2021,7 +2014,7 @@ function settleJobAttendance(worked, events, week, excused = false, paidWork = f
     state.vacationBankWeeks = 0;
     state.jobWagesEarned = 0;
     state.jobReferenceBonus = false;
-    state.jobLossNotice = `Tu as perdu ton emploi de ${job.title} après trois absences consécutives.${vacationPayout ? ` Une indemnité de vacances de ${vacationPayout} $ a été versée.` : ""}`;
+    state.jobLossNotice = `Tu as perdu ton emploi de ${job.title} après trois absences injustifiées cumulées.${vacationPayout ? ` Une indemnité de vacances de ${vacationPayout} $ a été versée.` : ""}`;
     return;
   }
   const remaining = 3 - state.missedWorkWeeks;
@@ -2118,7 +2111,7 @@ function v2PreviewFingerprint(career = state) {
     safeNumber(career.jobWagesEarned, 0, 0, 99999999),
     safeNumber(career.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS),
     safeNumber(career.missedWorkWeeks, 0, 0, 3),
-    safeNumber(career.trainingRhythmPenalty, 0, 0, 2),
+    safeNumber(career.trainingRhythmPenalty, 0, 0, 4),
     career.recoveryConsequence || null,
     safeNumber(career.jobVacationEarnedAtTenure, 0, 0, 9999),
     career.jobApplication || null,
@@ -2170,7 +2163,7 @@ function createV2RuntimeCareer(source = state) {
     jobWagesEarned: safeNumber(source.jobWagesEarned, 0, 0, 99999999),
     vacationBankWeeks: safeNumber(source.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS),
     missedWorkWeeks: safeNumber(source.missedWorkWeeks, 0, 0, 3),
-    trainingRhythmPenalty: safeNumber(source.trainingRhythmPenalty, 0, 0, 2),
+    trainingRhythmPenalty: safeNumber(source.trainingRhythmPenalty, 0, 0, 4),
     recoveryConsequence: normalizeRecoveryConsequence(source.recoveryConsequence),
     jobVacationEarnedAtTenure: safeNumber(source.jobVacationEarnedAtTenure, 0, 0, 9999),
     jobReferenceBonus: source.jobReferenceBonus === true,
@@ -2237,7 +2230,7 @@ function normalizeV2PreviewRuntime(capsule) {
     jobWagesEarned: safeNumber(suppliedCareer.jobWagesEarned, defaults.jobWagesEarned, 0, 99999999),
     vacationBankWeeks: safeNumber(suppliedCareer.vacationBankWeeks, defaults.vacationBankWeeks, 0, MAX_PAID_VACATION_WEEKS),
     missedWorkWeeks: safeNumber(suppliedCareer.missedWorkWeeks, defaults.missedWorkWeeks, 0, 3),
-    trainingRhythmPenalty: safeNumber(suppliedCareer.trainingRhythmPenalty, defaults.trainingRhythmPenalty, 0, 2),
+    trainingRhythmPenalty: safeNumber(suppliedCareer.trainingRhythmPenalty, defaults.trainingRhythmPenalty, 0, 4),
     recoveryConsequence: normalizeRecoveryConsequence(suppliedCareer.recoveryConsequence || defaults.recoveryConsequence),
     jobVacationEarnedAtTenure: safeNumber(suppliedCareer.jobVacationEarnedAtTenure, defaults.jobVacationEarnedAtTenure, 0, 9999),
     jobReferenceBonus: suppliedCareer.jobReferenceBonus == null ? defaults.jobReferenceBonus : suppliedCareer.jobReferenceBonus === true,
@@ -2322,7 +2315,7 @@ function syncV2CapsuleToCareer(capsule) {
   state.jobWagesEarned = safeNumber(career.jobWagesEarned, state.jobWagesEarned, 0, 99999999);
   state.vacationBankWeeks = safeNumber(career.vacationBankWeeks, state.vacationBankWeeks, 0, MAX_PAID_VACATION_WEEKS);
   state.missedWorkWeeks = safeNumber(career.missedWorkWeeks, state.missedWorkWeeks, 0, 3);
-  state.trainingRhythmPenalty = safeNumber(career.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 2);
+  state.trainingRhythmPenalty = safeNumber(career.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 4);
   state.recoveryConsequence = normalizeRecoveryConsequence(career.recoveryConsequence);
   state.jobVacationEarnedAtTenure = safeNumber(career.jobVacationEarnedAtTenure, state.jobVacationEarnedAtTenure, 0, 9999);
   state.jobReferenceBonus = career.jobReferenceBonus === true;
@@ -2709,12 +2702,16 @@ function v2WorkLocationContext() {
   const capsule = ensureV2PreviewCapsule();
   const plannerState = capsule ? ensureV2WeekPlanner(capsule) : null;
   const workEntry = plannerState?.entries?.find(entry => entry.source === "work") || null;
+  const job = jobs.find(item => item.id === career.jobId) || null;
+  const workAccess = capsule && job ? v2PlannerWorkAccess(capsule, job) : { available: false, reason: "" };
   return {
     ...career,
     v2JobOffers: jobs.map(job => ({ id: job.id, title: job.title, wage: job.wage, schedule: job.schedule })),
     v2JobApplicationLabel: jobs.find(job => job.id === career.jobApplication?.jobId)?.title || "",
     v2WorkPlan: {
       planned: Boolean(workEntry),
+      available: Boolean(workEntry || workAccess.available),
+      reason: workEntry ? "" : (plannerState?.workBlockedReason || workAccess.reason || ""),
       entryId: workEntry?.id || null,
       cost: safeNumber(workEntry?.capacityCost, v2PlannerWorkCost(career.v2Job), 0, 100),
     },
@@ -2763,12 +2760,15 @@ function v2GymContext() {
     }
     : { ...baseSparringPlanState, immediate: false, completed: sparringCompleted, fightWeek: false };
   const membershipMissing = career.gymWeeks <= 0;
-  const trainingBlocked = state.injuryWeeks > 0 || membershipMissing || plannerPreview.capacity.remaining <= 0;
+  const conditionAccess = v2ConditionActivityAccess(coachPlannerId, capsule);
+  const trainingBlocked = state.injuryWeeks > 0 || membershipMissing || !conditionAccess.available || plannerPreview.capacity.remaining <= 0;
   const trainingBlockedReason = state.injuryWeeks > 0
     ? prep.detail
     : membershipMissing
       ? "Inscription requise : passe à l’accueil. Le sac au sous-sol demeure accessible comme dépannage."
-      : "La barre d’énergie de la semaine est vide. Retire une activité du programme pour en ajouter une autre.";
+      : !conditionAccess.available
+        ? conditionAccess.reason
+        : "La barre d’énergie de la semaine est vide. Retire une activité du programme pour en ajouter une autre.";
   return {
     profile: state.profile,
     careerStatus: state.careerStatus,
@@ -2862,15 +2862,24 @@ function v2StrengthContext() {
   const reserve = v2ReservedBoxingGymBudget(career);
   const plannerPreview = window.BoxeurWeekPlanner.previewPlan(ensureV2WeekPlanner(capsule));
   const quickState = v2PlannerActionState("strength-quick");
+  const conditionAccess = v2ConditionActivityAccess("strength-quick", capsule);
+  const trainerAccess = v2TrainerAccess("strength-gym", strengthProgram);
+  const shopAvailable = state.careerStatus !== "recreational" && runtime.career.strengthGymWeeks > 0;
   return {
     profile: state.profile,
     careerStatus: state.careerStatus,
+    clock: {
+      ...capsule.timeState.clock,
+      dateLabel: career.v2DateLabel,
+    },
     condition: {
       energy: capsule.timeState.condition.energy,
       fatigue: capsule.timeState.condition.fatigue,
       medicalBlocked: state.injuryWeeks > 0,
       injuryWeeks: state.injuryWeeks,
       medicalReason: state.injuryWeeks > 0 ? v2PreparationView(capsule.timeState).detail : "",
+      trainingBlocked: !conditionAccess.available,
+      trainingBlockedReason: conditionAccess.reason,
     },
     membership: {
       active: runtime.career.strengthGymWeeks > 0,
@@ -2890,6 +2899,8 @@ function v2StrengthContext() {
     selectedActivities: v2StrengthSelection,
     physicalSessionCompletedToday: false,
     trainer: {
+      available: trainerAccess.available,
+      reason: trainerAccess.reason,
       active: Boolean(strengthProgram),
       name: strengthProgram?.trainerLabel || "Aucun préparateur choisi",
       programLabel: strengthProgram ? `${combatLabels[strengthProgram.target]} · programme privé` : "Programme physique personnalisé",
@@ -2901,6 +2912,8 @@ function v2StrengthContext() {
       actionLabel: strengthProgram ? "Continuer mon programme" : "Choisir un préparateur",
     },
     shop: {
+      available: shopAvailable,
+      reason: shopAvailable ? "" : "Un abonnement actif au gym de musculation est requis.",
       itemCount: supplementInventory.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
       summary: "Un seul produit peut être préparé avant une séance; maximum de deux utilisations par semaine.",
     },
@@ -3512,7 +3525,23 @@ function recordV2Work(runtime, weekNumber, grossWages, workShifts = 1) {
 const V2_WEEK_CAPACITY_TOTAL = 50;
 const V2_WEEK_CAPACITY_MILESTONE_GAIN = 5;
 const V2_WEEK_CAPACITY_MAX = 65;
-const V2_WEEK_RULESET_VERSION = 7;
+const V2_WEEK_RULESET_VERSION = 9;
+const V2_CONDITION_CRITICAL_ENERGY = 20;
+const V2_CONDITION_CRITICAL_FATIGUE = 82;
+const V2_CONDITION_FRAGILE_ENERGY = 30;
+const V2_CONDITION_FRAGILE_FATIGUE = 72;
+const V2_DEMANDING_ACTIVITY_IDS = new Set([
+  "boxing-coach",
+  "boxing-custom",
+  "strength-quick",
+  "strength-custom",
+  "sparring",
+  "private-training",
+  "home-custom",
+  "roadwork-long",
+  "roadwork-intervals",
+]);
+const V2_DEMANDING_JOB_IDS = new Set(["courier", "warehouse"]);
 const V2_WEEK_ACTIVITY_LIMITS = Object.freeze({
   "group-class": 1,
   rest: 2,
@@ -3565,22 +3594,83 @@ function v2ActiveRecoveryConsequence(capsule, career = normalizeV2PreviewRuntime
   return consequence?.week === week ? consequence : null;
 }
 
-function v2PlannerUnavailableCapacity(capsule, career, job, total = v2PlannerCapacityTotal()) {
+function v2PlannerUnavailableCapacity(capsule, career, _job, total = v2PlannerCapacityTotal()) {
   const condition = capsule.timeState.condition || {};
   const conditionPenalty = Math.round(
     Math.max(0, Number(condition.fatigue || 0) - 58) / 8
       + Math.max(0, 38 - Number(condition.energy || 0)) / 8,
   );
   const rhythmPenalty = isCompetitiveCareer()
-    ? safeNumber(runtimeCareerTrainingRhythm(career), 0, 0, 2) * 5
+    ? safeNumber(runtimeCareerTrainingRhythm(career), 0, 0, 4) * 5
     : 0;
   const forcedRecoveryCost = v2ActiveRecoveryConsequence(capsule, career)?.capacityCost || 0;
-  const roomAfterWork = Math.max(0, total - v2PlannerWorkCost(job));
-  return Math.min(roomAfterWork, Math.max(conditionPenalty, forcedRecoveryCost) + rhythmPenalty);
+  return Math.min(total, Math.max(conditionPenalty, forcedRecoveryCost) + rhythmPenalty);
 }
 
 function runtimeCareerTrainingRhythm(career = v2CareerView()) {
-  return safeNumber(career?.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 2);
+  return safeNumber(career?.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 4);
+}
+
+function v2ConditionActivityAccess(activityId, capsule = ensureV2PreviewCapsule()) {
+  if (!capsule?.timeState) return { available: false, reason: "État physique indisponible." };
+  const runtime = normalizeV2PreviewRuntime(capsule);
+  const activeRecovery = v2ActiveRecoveryConsequence(capsule, runtime.career);
+  const id = String(activityId || "");
+  if (activeRecovery) {
+    if (id === "rest") {
+      return { available: false, reason: "La récupération obligatoire occupe déjà cette semaine." };
+    }
+    if (id !== "meal") {
+      const label = activeRecovery.kind === "hospital" ? "La nuit à l’hôpital" : "Le repos forcé";
+      return { available: false, reason: `${label} bloque le travail et l’entraînement cette semaine.` };
+    }
+  }
+  if (["rest", "meal"].includes(id)) return { available: true, reason: "" };
+  const energy = Number(capsule.timeState.condition.energy || 0);
+  const fatigue = Number(capsule.timeState.condition.fatigue || 0);
+  if (energy <= V2_CONDITION_CRITICAL_ENERGY || fatigue >= V2_CONDITION_CRITICAL_FATIGUE) {
+    return {
+      available: false,
+      reason: "L’état physique est critique : repose-toi avant de travailler ou de t’entraîner.",
+    };
+  }
+  if (V2_DEMANDING_ACTIVITY_IDS.has(id)
+    && (energy <= V2_CONDITION_FRAGILE_ENERGY || fatigue >= V2_CONDITION_FRAGILE_FATIGUE)) {
+    return {
+      available: false,
+      reason: "L’état physique est trop fragile pour une activité exigeante. Choisis un effort léger ou du repos.",
+    };
+  }
+  return { available: true, reason: "" };
+}
+
+function v2PlannerWorkAccess(capsule, job, total = v2PlannerCapacityTotal()) {
+  if (!job) return { available: false, reason: "Choisis d’abord un emploi." };
+  const runtime = normalizeV2PreviewRuntime(capsule);
+  const activeRecovery = v2ActiveRecoveryConsequence(capsule, runtime.career);
+  if (activeRecovery) {
+    const label = activeRecovery.kind === "hospital" ? "La nuit à l’hôpital" : "Le repos forcé";
+    return { available: false, reason: `${label} empêche de travailler cette semaine.` };
+  }
+  const condition = capsule.timeState.condition || {};
+  const energy = Number(condition.energy || 0);
+  const fatigue = Number(condition.fatigue || 0);
+  if (energy <= V2_CONDITION_CRITICAL_ENERGY || fatigue >= V2_CONDITION_CRITICAL_FATIGUE) {
+    return { available: false, reason: "L’état physique est critique : cette semaine doit servir à récupérer." };
+  }
+  if (V2_DEMANDING_JOB_IDS.has(job.id)
+    && (energy <= V2_CONDITION_FRAGILE_ENERGY || fatigue >= V2_CONDITION_FRAGILE_FATIGUE)) {
+    return { available: false, reason: "Ton état physique est trop fragile pour assurer cet emploi exigeant." };
+  }
+  const unavailable = v2PlannerUnavailableCapacity(capsule, runtime.career, null, total);
+  const workCost = v2PlannerWorkCost(job);
+  if (unavailable + workCost > total) {
+    return {
+      available: false,
+      reason: `Après les ${unavailable} points déjà occupés, le travail à ${workCost} points ne tient plus dans la semaine.`,
+    };
+  }
+  return { available: true, reason: "" };
 }
 
 function v2PlannerSupplementConfig(capsule) {
@@ -3602,6 +3692,7 @@ function v2PlannerBaseConfig(capsule = ensureV2PreviewCapsule()) {
   const career = v2CareerView();
   const job = jobs.find(item => item.id === runtime.career.jobId) || null;
   const capacityTotal = v2PlannerCapacityTotal();
+  const workAccess = job ? v2PlannerWorkAccess(capsule, job, capacityTotal) : { available: false, reason: "" };
   return {
     weekKey: v2PlannerWeekKey(capsule),
     careerStatus: state.careerStatus,
@@ -3610,7 +3701,7 @@ function v2PlannerBaseConfig(capsule = ensureV2PreviewCapsule()) {
       unavailable: v2PlannerUnavailableCapacity(capsule, career, job, capacityTotal),
     },
     condition: cloneData(capsule.timeState.condition),
-    work: job ? {
+    work: job && workAccess.available ? {
       id: job.id,
       title: job.title,
       active: true,
@@ -3623,6 +3714,7 @@ function v2PlannerBaseConfig(capsule = ensureV2PreviewCapsule()) {
       shifts: [{ day: "friday", locked: false }],
       locked: false,
     } : null,
+    workBlockedReason: job && !workAccess.available ? workAccess.reason : "",
     supplements: v2PlannerSupplementConfig(capsule),
     limits: {
       recreationalPhysicalActivities: 2,
@@ -3748,7 +3840,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
     const capacityExtraBase = id === "strength-custom" ? V2_CUSTOM_SESSION_BASE_COST : 0;
     return {
       id,
-      label: id === "strength-quick" ? "Séance de musculation rapide" : "Séance de musculation personnalisée",
+      label: id === "strength-quick" ? "Cours de CrossFit" : "Séance de musculation personnalisée",
       category: "strength",
       location: "strength-gym",
       physical: true,
@@ -3933,6 +4025,8 @@ function v2PlannerActivityAccess(activityId) {
   const id = String(activityId || "");
   const physical = !["rest", "meal"].includes(id);
   if (physical && state.injuryWeeks > 0) return { available: false, reason: v2PreparationView(capsule.timeState).detail };
+  const conditionAccess = v2ConditionActivityAccess(id, capsule);
+  if (!conditionAccess.available) return conditionAccess;
   if (["group-class", "boxing-coach", "boxing-custom", "sparring"].includes(id) && runtime.career.gymWeeks <= 0) {
     return { available: false, reason: "Un abonnement actif au GYM de boxe est requis." };
   }
@@ -3973,6 +4067,7 @@ function v2PlannerRebuild(capsule, previous) {
   if (workOptedOut) baseConfig.work = null;
   let rebuilt = window.BoxeurWeekPlanner.createPlanner(baseConfig);
   rebuilt.workOptedOut = workOptedOut;
+  rebuilt.workBlockedReason = workOptedOut ? "" : (baseConfig.workBlockedReason || "");
   const oldEntries = Array.isArray(previous?.entries) ? previous.entries.filter(entry => !entry.preReserved) : [];
   oldEntries.forEach(entry => {
     try {
@@ -4208,6 +4303,8 @@ function setV2PlannerWorkAttendance(planned) {
   }
   if (workEntry) return null;
   try {
+    const access = v2PlannerWorkAccess(capsule, job);
+    if (!access.available) throw new Error(access.reason);
     const previous = cloneData(plannerState);
     previous.workOptedOut = false;
     const rebuilt = v2PlannerRebuild(capsule, previous);
@@ -4299,6 +4396,7 @@ function v2WeekViewContext() {
     home: "Maison",
   };
   const rhythmPenalty = runtimeCareerTrainingRhythm(career);
+  const rhythmCapacity = isCompetitiveCareer() ? rhythmPenalty * 5 : 0;
   const activeRecovery = v2ActiveRecoveryConsequence(capsule, normalizeV2PreviewRuntime(capsule).career);
   const plannedItems = preview.entries.map(entry => {
     const effects = [];
@@ -4336,7 +4434,7 @@ function v2WeekViewContext() {
   const unavailableDetail = activeRecovery
     ? `${preview.capacity.unavailable} point${preview.capacity.unavailable > 1 ? "s" : ""} occupé${preview.capacity.unavailable > 1 ? "s" : ""} au départ, dont ${activeRecovery.capacityCost} par ${activeRecovery.kind === "hospital" ? "la nuit à l’hôpital" : "le repos forcé"}. Ton maximum permanent reste intact.`
     : preview.capacity.unavailable > 0
-      ? `${preview.capacity.unavailable} point${preview.capacity.unavailable > 1 ? "s" : ""} occupé${preview.capacity.unavailable > 1 ? "s" : ""} au départ par ton état physique${rhythmPenalty > 0 ? " et ton rythme récent" : ""}. Ton maximum permanent reste intact.`
+      ? `${preview.capacity.unavailable} point${preview.capacity.unavailable > 1 ? "s" : ""} occupé${preview.capacity.unavailable > 1 ? "s" : ""} au départ${rhythmCapacity > 0 ? `, dont ${rhythmCapacity} par le manque d’entraînement` : ""}${preview.capacity.unavailable > rhythmCapacity ? `${rhythmCapacity > 0 ? " et" : ", dont"} ${preview.capacity.unavailable - rhythmCapacity} par l’état physique` : ""}. Ton maximum permanent reste intact.`
       : `Ton maximum permanent augmente de ${V2_WEEK_CAPACITY_MILESTONE_GAIN} aux niveaux 5, 10 et 15.`;
   return {
     week: capsule.timeState.clock.week,
@@ -4428,9 +4526,14 @@ function settleV2JobAttendance(runtime, worked, events, week, excused = false) {
   const ledger = v2WeekLedger(runtime, week);
   if (worked) {
     if (career.missedWorkWeeks > 0) {
-      addV2EmploymentEvent(events, week, "Assiduité rétablie", `${job.title} : ton retour au travail remet ton dossier d’assiduité en règle.`, "positive");
+      addV2EmploymentEvent(
+        events,
+        week,
+        "Présence enregistrée",
+        `${job.title} : tu as travaillé, mais ${career.missedWorkWeeks}/3 absence${career.missedWorkWeeks > 1 ? "s" : ""} injustifiée${career.missedWorkWeeks > 1 ? "s" : ""} demeure${career.missedWorkWeeks > 1 ? "nt" : ""} au dossier.`,
+        "neutral",
+      );
     }
-    career.missedWorkWeeks = 0;
     career.jobTenureWeeks += 1;
     career.jobWagesEarned += ledger.grossWages;
     accrueV2PaidVacation(runtime, job, events, week);
@@ -4456,7 +4559,7 @@ function settleV2JobAttendance(runtime, worked, events, week, excused = false) {
   }
   const vacationPayout = career.vacationBankWeeks > 0 ? Math.round(career.jobWagesEarned * .04) : 0;
   if (vacationPayout) career.money += vacationPayout;
-  const detail = `${job.title} : congédiement après trois semaines consécutives sans travailler.${vacationPayout ? ` Indemnité de vacances : +${vacationPayout} $ (4 % des salaires reçus).` : ""}`;
+  const detail = `${job.title} : congédiement après trois absences injustifiées cumulées chez le même employeur.${vacationPayout ? ` Indemnité de vacances : +${vacationPayout} $ (4 % des salaires reçus).` : ""}`;
   addV2EmploymentEvent(events, week, "Emploi perdu", detail, "critical");
   career.jobId = null;
   career.missedWorkWeeks = 0;
@@ -4467,7 +4570,7 @@ function settleV2JobAttendance(runtime, worked, events, week, excused = false) {
   career.jobReferenceBonus = false;
   career.jobApplication = null;
   state.workStreak = 0;
-  state.jobLossNotice = `Tu as perdu ton emploi de ${job.title} après trois absences consécutives.${vacationPayout ? ` Une indemnité de vacances de ${vacationPayout} $ a été versée.` : ""}`;
+  state.jobLossNotice = `Tu as perdu ton emploi de ${job.title} après trois absences injustifiées cumulées.${vacationPayout ? ` Une indemnité de vacances de ${vacationPayout} $ a été versée.` : ""}`;
 }
 
 function advanceV2JobApplication(runtime, events, week) {
@@ -4531,8 +4634,8 @@ function v2WeeklyCompletionEvents(result, runtime, previousWeek) {
   advanceV2JobApplication(runtime, events, previousWeek);
   if (isCompetitiveCareer()) {
     const trained = v2WeekTrainingActivityCount(result.timeState, previousWeek) > 0;
-    const beforeRhythm = safeNumber(runtime.career.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 2);
-    const afterRhythm = trained ? Math.max(0, beforeRhythm - 1) : Math.min(2, beforeRhythm + 1);
+    const beforeRhythm = safeNumber(runtime.career.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 4);
+    const afterRhythm = trained ? Math.max(0, beforeRhythm - 1) : Math.min(4, beforeRhythm + 1);
     runtime.career.trainingRhythmPenalty = afterRhythm;
     state.trainingRhythmPenalty = afterRhythm;
     if (trained && afterRhythm < beforeRhythm) {
@@ -4540,15 +4643,14 @@ function v2WeeklyCompletionEvents(result, runtime, previousWeek) {
         label: afterRhythm === 0 ? "Rythme retrouvé" : "Reprise progressive",
         detail: afterRhythm === 0
           ? "Une semaine active rétablit la capacité normale du prochain programme."
-          : "La reprise est amorcée : encore une semaine active permettra de retrouver toute la capacité.",
+          : `La reprise efface un palier : ${afterRhythm * 5} points resteront occupés la semaine prochaine.`,
         tone: "positive",
       });
     } else if (!trained) {
+      const rhythmLabels = ["Rythme stable", "Rythme fragile", "Rythme faible", "Rythme très faible", "Rythme à reconstruire"];
       events.push({
-        label: afterRhythm >= 2 ? "Rythme faible" : "Rythme fragile",
-        detail: afterRhythm >= 2
-          ? "Deux semaines ou plus sans entraînement : la prochaine barre perd 10 points, sans diminution des statistiques."
-          : "Semaine sans entraînement : la prochaine barre perd 5 points, sans diminution des statistiques.",
+        label: rhythmLabels[afterRhythm],
+        detail: `Semaine sans entraînement : ${afterRhythm * 5} points seront occupés dans la prochaine barre, sans diminution des statistiques.`,
         tone: "warning",
       });
     }
@@ -4556,6 +4658,34 @@ function v2WeeklyCompletionEvents(result, runtime, previousWeek) {
     events.push({ label: "Semaine sans entraînement", detail: "Aucune statistique n’est perdue pendant le parcours récréatif.", tone: "neutral" });
   }
   return events;
+}
+
+function applyV2UnrecoveredWorkload(result, plannerEntries, startingCondition, previousWeek) {
+  const entries = Array.isArray(plannerEntries) ? plannerEntries : [];
+  if (entries.some(entry => entry.activityId === "rest")) return null;
+  const demandingEntries = entries.filter(entry => entry.preReserved || entry.physical === true);
+  if (!demandingEntries.length) return null;
+
+  const capacityLoad = demandingEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry.capacityCost || 0)), 0);
+  const energyLoad = demandingEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry.energyCost || 0)), 0);
+  const fatigueLoad = demandingEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry.fatigueDelta || 0)), 0);
+  const persistentFatigue = Math.min(22, Math.max(6, Math.round((capacityLoad + fatigueLoad) * .35)));
+  const persistentEnergy = Math.min(18, Math.max(4, Math.round((capacityLoad + energyLoad) * .2)));
+  const startEnergy = Number(startingCondition?.energy ?? 100);
+  const startFatigue = Number(startingCondition?.fatigue ?? 0);
+  const energyBefore = Number(result.timeState.condition.energy || 0);
+  const fatigueBefore = Number(result.timeState.condition.fatigue || 0);
+  result.timeState.condition.energy = Math.min(energyBefore, Math.max(0, startEnergy - persistentEnergy));
+  result.timeState.condition.fatigue = Math.max(fatigueBefore, Math.min(100, startFatigue + persistentFatigue));
+  result.summary.conditionDelta.energy += result.timeState.condition.energy - energyBefore;
+  result.summary.conditionDelta.fatigue += result.timeState.condition.fatigue - fatigueBefore;
+  const event = {
+    label: "Fatigue accumulée",
+    detail: `Sans journée de repos, une partie de la charge résiste aux nuits automatiques : −${persistentEnergy} énergie et +${persistentFatigue} fatigue persistent.`,
+    tone: persistentFatigue >= 12 ? "warning" : "neutral",
+  };
+  state.journal.unshift({ week: previousWeek, text: event.detail });
+  return event;
 }
 
 function applyV2RecoveryConsequence(result, runtime, plannerEntries, previousWeek) {
@@ -5051,7 +5181,14 @@ function runV2AutomaticWeek() {
       return ["technique", "defense"].includes(record.primitive?.privateTarget);
     });
     if (boxingDone && isCompetitiveCareer()) state.boxingTrainingWeek = previousWeek;
+    const workloadEvent = applyV2UnrecoveredWorkload(
+      result,
+      execution.plannerEntries,
+      beforeCapsule.timeState.condition,
+      previousWeek,
+    );
     const completionEvents = v2WeeklyCompletionEvents(result, runtime, previousWeek);
+    if (workloadEvent) completionEvents.unshift(workloadEvent);
     const recoveryEvent = applyV2RecoveryConsequence(result, runtime, execution.plannerEntries, previousWeek);
     if (recoveryEvent) completionEvents.unshift(recoveryEvent);
     runtime.weekMode = confirmed.commit.mode === "quick" ? "quick" : "detailed";
@@ -5269,7 +5406,7 @@ function v2SupplementState(capsule = ensureV2PreviewCapsule()) {
 function openV2SupplementShop() {
   const capsule = ensureV2PreviewCapsule();
   const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  if (!capsule || !sheet || !window.BoxeurSupplements) return;
+  if (!capsule || !sheet || !window.BoxeurSupplements || !window.BoxeurStrengthView?.renderShop) return;
   const runtime = normalizeV2PreviewRuntime(capsule);
   if (!["amateur", "professional"].includes(state.careerStatus)) return showToast("La boutique se débloque après le passage amateur.");
   if (runtime.career.strengthGymWeeks <= 0) return showToast("Un abonnement actif au gym de musculation est requis.");
@@ -5277,11 +5414,21 @@ function openV2SupplementShop() {
   const products = Object.values(window.BoxeurSupplements.CATALOG).map(product => {
     const quantity = supplementState.inventory[product.id] || 0;
     const quote = window.BoxeurSupplements.quotePurchase(supplementState, product.id, 1, { money: runtime.career.money });
-    return `<article class="v2-supplement-card"><div><p class="eyebrow">${escapeHTML(product.category)}</p><h3>${escapeHTML(product.label)}</h3></div><strong>${product.price} $ · inventaire ×${quantity}</strong><p>${escapeHTML(product.benefit)}</p><small>Compromis : ${escapeHTML(product.compromise)}</small><button type="button" data-v2-supplement-buy="${product.id}"${quote.ok ? "" : " disabled aria-disabled=\"true\""}>Acheter une unité</button>${quote.ok ? "" : `<small class="v2-service-reason">${escapeHTML(quote.reason)}</small>`}</article>`;
-  }).join("");
+    return {
+      id: product.id,
+      label: product.label,
+      category: product.category,
+      benefit: product.benefit,
+      compromise: product.compromise,
+      price: product.price,
+      quantity,
+      available: quote.ok,
+      reason: quote.reason || "",
+    };
+  });
   sheet.dataset.originLocation = "strength-gym";
   sheet.classList.add("v2-location-sheet-full", "v2-location-sheet-strength");
-  sheet.innerHTML = `<section class="v2-service-panel v2-supplement-shop" aria-labelledby="v2-supplement-shop-title"><header><div><p class="eyebrow">Gym de musculation</p><h2 id="v2-supplement-shop-title">Boutique de suppléments</h2></div><button type="button" class="secondary-button" data-v2-supplement-shop-close>Fermer</button></header><div class="v2-service-balance">Solde disponible <strong>${runtime.career.money} $</strong></div><p>Un produit s’utilise avant une seule séance. Maximum de deux produits par semaine et jamais deux fois le même produit dans la semaine.</p><div class="v2-supplement-grid">${products}</div></section>`;
+  sheet.innerHTML = window.BoxeurStrengthView.renderShop({ balance: runtime.career.money, products });
   activateV2LocationSheet(sheet, "[data-v2-supplement-buy], [data-v2-supplement-shop-close]");
 }
 
@@ -5448,13 +5595,29 @@ function runV2CustomSession() {
   if (outcome) v2ComposerSelection = [];
 }
 
-function renderV2StrengthGym(preferredFocusSelector = "[data-v2-strength-confirm], [data-v2-strength-activity], [data-v2-strength-plan]") {
+function renderV2StrengthGym(preferredFocusSelector = "[data-v2-strength-zone]:not([disabled]), [data-v2-leave-strength-gym]") {
   const sheet = document.querySelector("#v2-world .v2-location-sheet");
   if (!sheet || !window.BoxeurStrengthView) return;
   sheet.dataset.originLocation = "strength-gym";
   sheet.classList.add("v2-location-sheet-full", "v2-location-sheet-strength");
   sheet.innerHTML = window.BoxeurStrengthView.render(v2StrengthContext());
   activateV2LocationSheet(sheet, preferredFocusSelector);
+}
+
+function renderV2StrengthMenu(menuId, preferredFocusSelector = "") {
+  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+  if (!sheet || !window.BoxeurStrengthView?.renderMenu) return;
+  const markup = window.BoxeurStrengthView.renderMenu(menuId, v2StrengthContext());
+  if (!markup) return;
+  sheet.dataset.originLocation = "strength-gym";
+  sheet.classList.add("v2-location-sheet-full", "v2-location-sheet-strength");
+  sheet.innerHTML = markup;
+  const defaultFocus = menuId === "reception"
+    ? "[data-v2-strength-plan]:not([disabled]), [data-v2-strength-menu-close]"
+    : menuId === "crossfit"
+      ? "[data-v2-strength-quick]:not([disabled]), [data-v2-strength-menu-close]"
+      : "[data-v2-strength-activity]:not([disabled]), [data-v2-strength-menu-close]";
+  activateV2LocationSheet(sheet, preferredFocusSelector || defaultFocus);
 }
 
 function toggleV2StrengthActivity(activityId) {
@@ -5468,7 +5631,7 @@ function toggleV2StrengthActivity(activityId) {
   );
   if (!outcome.ok) return showToast(outcome.reason || "Cette activité ne peut pas être ajoutée.");
   v2StrengthSelection = outcome.selection;
-  renderV2StrengthGym(`[data-v2-strength-activity="${safeIdentifier(activityId)}"]`);
+  renderV2StrengthMenu("program", `[data-v2-strength-activity="${safeIdentifier(activityId)}"]`);
 }
 
 function selectV2StrengthPlan(planId) {
@@ -5522,6 +5685,8 @@ function v2TrainerAccess(locationId, program = null) {
   const membershipActive = locationId === "strength-gym" ? career.strengthGymWeeks > 0 : career.gymWeeks > 0;
   if (!membershipActive) return { available: false, reason: "Un abonnement actif dans ce gym est requis." };
   if (state.injuryWeeks > 0) return { available: false, reason: v2PreparationView(capsule.timeState).detail };
+  const conditionAccess = v2ConditionActivityAccess("private-training", capsule);
+  if (!conditionAccess.available) return conditionAccess;
   if (program && v2TrainerLocationForTarget(program.target) !== locationId) {
     const destination = v2TrainerLocationForTarget(program.target) === "strength-gym" ? "gym de musculation" : "GYM de boxe";
     return { available: false, reason: `Ce programme se poursuit au ${destination}.` };
@@ -5591,7 +5756,7 @@ function renderV2TrainerMenu(locationId = "boxing-gym") {
   sheet.classList.add("v2-location-sheet-full");
   sheet.classList.toggle("v2-location-sheet-strength", locationId === "strength-gym");
   sheet.innerHTML = `<section class="v2-service-panel v2-trainer-panel" aria-labelledby="v2-trainer-title">
-    <header><div><p class="eyebrow">Service du ${escapeHTML(locationLabel)}</p><h2 id="v2-trainer-title">${locationId === "strength-gym" ? "Préparateur privé" : "Entraîneur privé"}</h2></div><button type="button" class="secondary-button" data-v2-trainer-close>Fermer</button></header>
+    <header><div><p class="eyebrow">Service du ${escapeHTML(locationLabel)}</p><h2 id="v2-trainer-title">${locationId === "strength-gym" ? "Entraîneurs privés" : "Entraîneur privé"}</h2></div><button type="button" class="secondary-button" data-v2-trainer-close>Fermer</button></header>
     <div class="v2-service-balance">Solde disponible <strong>${runtime.career.money} $</strong></div>${body}
   </section>`;
   activateV2LocationSheet(sheet, active ? "[data-v2-trainer-session], [data-v2-trainer-go-location], [data-v2-trainer-close]" : `[data-v2-trainer-target="${v2TrainerTarget}"]`);
@@ -7634,6 +7799,18 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
   }
   if (event.target.closest("[data-v2-gym-menu-close]")) {
     openV2Location("boxing-gym");
+    return;
+  }
+  const strengthZone = event.target.closest("[data-v2-strength-zone]");
+  if (strengthZone) {
+    const zoneId = strengthZone.dataset.v2StrengthZone;
+    if (["reception", "crossfit", "program"].includes(zoneId)) renderV2StrengthMenu(zoneId);
+    else if (zoneId === "trainer") renderV2TrainerMenu("strength-gym");
+    else if (zoneId === "shop") openV2SupplementShop();
+    return;
+  }
+  if (event.target.closest("[data-v2-strength-menu-close]")) {
+    openV2Location("strength-gym");
     return;
   }
   const strengthActivity = event.target.closest("[data-v2-strength-activity]");
