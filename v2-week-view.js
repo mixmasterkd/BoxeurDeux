@@ -86,9 +86,9 @@
   function capacityMarkup(context, compact = false) {
     const capacity = context.capacity;
     return `<section class="v2-week-capacity ${capacity.zone}" aria-labelledby="v2-week-capacity-title">
-      <div class="v2-week-capacity-heading"><span id="v2-week-capacity-title">Énergie restante de la semaine</span><strong>${capacity.remaining}/${capacity.total}</strong></div>
-      <progress max="${capacity.total}" value="${capacity.remaining}" aria-label="Énergie restante de la semaine : ${capacity.remaining} sur ${capacity.total}">${capacity.remaining}/${capacity.total}</progress>
-      <div class="v2-week-capacity-meta"><b>${escapeHTML(capacity.zoneLabel)}</b><span>${capacity.spent} énergie réservée</span></div>
+      <div class="v2-week-capacity-heading"><span id="v2-week-capacity-title">Capacité restante de la semaine</span><strong>${capacity.remaining}/${capacity.total}</strong></div>
+      <progress max="${capacity.total}" value="${capacity.remaining}" aria-label="Capacité restante de la semaine : ${capacity.remaining} sur ${capacity.total}">${capacity.remaining}/${capacity.total}</progress>
+      <div class="v2-week-capacity-meta"><b>${escapeHTML(capacity.zoneLabel)}</b><span>${capacity.spent} capacité réservée</span></div>
       ${compact ? "" : `<p>${escapeHTML(capacity.detail)}</p>`}
     </section>`;
   }
@@ -117,7 +117,7 @@
   }
 
   function planItemMarkup(item) {
-    const cost = item.cost > 0 ? `−${item.cost} énergie` : item.cost < 0 ? `+${Math.abs(item.cost)} énergie` : "Aucun coût";
+    const cost = item.cost > 0 ? `−${item.cost} capacité` : item.cost < 0 ? `+${Math.abs(item.cost)} capacité` : "Aucun coût";
     const action = item.removable
       ? `<button type="button" data-v2-week-remove="${escapeHTML(item.id)}" aria-label="Retirer ${escapeHTML(item.label)} du plan">Retirer</button>`
       : `<span class="v2-week-item-fixed">Prévu par défaut</span>`;

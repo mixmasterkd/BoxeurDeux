@@ -180,7 +180,7 @@ test("présente le sparring amateur immédiat comme non rejouable et le bloque e
   assert.match(resumed, /Énergie déjà consommée/);
   assert.match(resumed, />Reprendre le sparring<\/button>/);
   assert.match(completed, /data-v2-sparring-state="completed"/);
-  assert.match(completed, /18 points d’énergie hebdomadaire ont déjà été consommés/);
+  assert.match(completed, /18 points de capacité hebdomadaire ont déjà été consommés/);
   assert.match(completed, />Sparring terminé<\/button>/);
   assert.match(fightWeek, /data-v2-sparring-state="fight-week"/);
   assert.match(fightWeek, /Semaine de combat/);
@@ -238,7 +238,7 @@ test("le compositeur est libre et sa limite visible devient l'énergie disponibl
   assert.deepEqual(normalized.selectedExercises, ["jump-rope", "mitt-work", "heavy-bag", "shadow-boxing", "defense", "cooldown"]);
   assert.match(html, /6 activités/);
   assert.match(html, /Durée prévue : 115 min/);
-  assert.match(html, /Énergie restante de la semaine/);
+  assert.match(html, /Capacité restante de la semaine/);
   assert.match(html, /coût estimé 21/);
   assert.match(html, /Énergie après : 60 %/);
   assert.doesNotMatch(html, /<script>/);

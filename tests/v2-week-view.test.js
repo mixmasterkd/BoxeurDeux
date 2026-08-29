@@ -40,9 +40,9 @@ test("le lanceur montre l'énergie restante et mène au bâtisseur avant la conf
   });
 
   assert.match(html, /Semaine 4 · plan modifiable/);
-  assert.match(html, /Énergie restante de la semaine/);
-  assert.match(html, /<progress max="120" value="73" aria-label="Énergie restante de la semaine : 73 sur 120">/);
-  assert.match(html, /47 énergie réservée/);
+  assert.match(html, /Capacité restante de la semaine/);
+  assert.match(html, /<progress max="120" value="73" aria-label="Capacité restante de la semaine : 73 sur 120">/);
+  assert.match(html, /47 capacité réservée/);
   assert.match(html, /2 choix/);
   assert.match(html, /data-v2-week-detailed/);
   assert.match(html, /Confirmer semaine/);

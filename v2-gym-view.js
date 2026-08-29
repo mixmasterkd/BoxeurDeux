@@ -197,7 +197,7 @@
         available: false,
         status: "completed",
         label: "Déjà fait cette semaine",
-        detail: `Les ${context.sparring.cost} points d’énergie hebdomadaire ont déjà été consommés.`,
+        detail: `Les ${context.sparring.cost} points de capacité hebdomadaire ont déjà été consommés.`,
       };
     }
     if (!context.sparring.available) {
@@ -205,7 +205,7 @@
         available: false,
         status: "capacity",
         label: context.sparring.immediate ? "Énergie insuffisante" : "Programme hebdomadaire complet",
-        detail: context.sparring.reason || `Il faut ${context.sparring.cost} points d’énergie disponibles pour participer au sparring.`,
+        detail: context.sparring.reason || `Il faut ${context.sparring.cost} points de capacité disponibles pour participer au sparring.`,
       };
     }
     if (context.sparring.immediate) {
@@ -215,7 +215,7 @@
         label: context.sparring.planned ? "Énergie déjà consommée" : "Prêt à monter sur le ring",
         detail: context.sparring.planned
           ? "Reprends le sparring sans nouveau coût d’énergie."
-          : `${context.sparring.cost} points d’énergie hebdomadaire seront consommés immédiatement.`,
+          : `${context.sparring.cost} points de capacité hebdomadaire seront consommés immédiatement.`,
       };
     }
     return {
@@ -249,12 +249,12 @@
 
   function renderWeekPlan(context) {
     const entries = context.weekPlan.entries.length
-      ? `<ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} énergie` : "Aucun coût d’énergie"}</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
+      ? `<ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
       : `<p class="v2-place-plan-empty">Aucune activité du GYM n’est encore planifiée.</p>`;
     return `<section class="v2-gym-week-plan v2-place-week-plan${context.weekCapacity.remaining <= 0 ? " full" : ""}" aria-labelledby="v2-gym-week-plan-title" aria-live="polite">
       <div class="v2-place-week-plan-heading"><div><p class="eyebrow">Planification</p><h3 id="v2-gym-week-plan-title">Programme de la semaine</h3></div><strong>${context.weekCapacity.remaining} / ${context.weekCapacity.total}</strong></div>
-      <meter min="0" max="${context.weekCapacity.total}" value="${context.weekCapacity.remaining}" aria-label="Énergie hebdomadaire restante : ${context.weekCapacity.remaining} sur ${context.weekCapacity.total}">${context.weekCapacity.remaining} sur ${context.weekCapacity.total}</meter>
-      <p><strong>${context.weekCapacity.remaining > 0 ? `${context.weekCapacity.remaining} énergie encore disponible` : "Énergie hebdomadaire épuisée"}</strong> · ${context.weekCapacity.used} déjà réservée · les choix restent modifiables avant la confirmation.</p>
+      <meter min="0" max="${context.weekCapacity.total}" value="${context.weekCapacity.remaining}" aria-label="Capacité hebdomadaire restante : ${context.weekCapacity.remaining} sur ${context.weekCapacity.total}">${context.weekCapacity.remaining} sur ${context.weekCapacity.total}</meter>
+      <p><strong>${context.weekCapacity.remaining > 0 ? `${context.weekCapacity.remaining} de capacité encore disponible` : "Capacité de semaine épuisée"}</strong> · ${context.weekCapacity.used} déjà réservée · les choix restent modifiables avant la confirmation.</p>
       ${entries}
     </section>`;
   }
@@ -450,7 +450,7 @@
       <header><div><p class="eyebrow">Séance personnalisée</p><h2 id="v2-composer-title">Bâtis ta séance avec ton énergie</h2></div><button type="button" data-v2-close-composer aria-label="Fermer le compositeur">Fermer</button></header>
       <p>Utilise un modèle spécialisé ou compose librement. Une séance complète garde une préparation, un travail principal et un retour au calme.</p>
       ${membershipLocked ? `<p class="v2-composer-membership-note" role="status"><strong>Inscription requise.</strong> Retourne à la réception pour débloquer les activités du GYM.</p>` : ""}
-      <section class="v2-composer-energy" aria-label="Énergie disponible pendant la composition" aria-live="polite"><div><span>Énergie restante de la semaine</span><strong>${projectedWeekEnergy} / ${context.weekCapacity.total}</strong></div><progress max="${context.weekCapacity.total}" value="${projectedWeekEnergy}">${projectedWeekEnergy}/${context.weekCapacity.total}</progress><p>${context.weekCapacity.remaining} disponible avant cette séance · coût estimé ${context.draftWeekCost}</p><div><span>Énergie physique après la séance</span><strong>${projectedEnergy} %</strong></div></section>
+      <section class="v2-composer-energy" aria-label="Capacité disponible pendant la composition" aria-live="polite"><div><span>Capacité restante de la semaine</span><strong>${projectedWeekEnergy} / ${context.weekCapacity.total}</strong></div><progress max="${context.weekCapacity.total}" value="${projectedWeekEnergy}">${projectedWeekEnergy}/${context.weekCapacity.total}</progress><p>${context.weekCapacity.remaining} disponible avant cette séance · coût estimé ${context.draftWeekCost}</p><div><span>Énergie physique après la séance</span><strong>${projectedEnergy} %</strong></div></section>
       <section class="v2-session-presets" aria-labelledby="v2-session-presets-title"><div><p class="eyebrow">Modèles rapides</p><h3 id="v2-session-presets-title">Choisir une spécialisation</h3></div><div>${presets}</div></section>
       <div class="v2-composer-state" aria-live="polite"><strong>${selected.length} activité${selected.length > 1 ? "s" : ""}</strong><span>Durée prévue : ${context.draftDurationMinutes} min</span><span>Énergie après : ${projectedEnergy} %</span><span>Fatigue après : ${projectedFatigue} %</span></div>
       <ul class="v2-session-structure" aria-label="Structure minimale de la séance"><li class="${hasPreparation ? "complete" : "missing"}"><span aria-hidden="true">${hasPreparation ? "✓" : "○"}</span> Préparation</li><li class="${hasWork ? "complete" : "missing"}"><span aria-hidden="true">${hasWork ? "✓" : "○"}</span> Travail principal</li><li class="${hasCooldown ? "complete" : "missing"}"><span aria-hidden="true">${hasCooldown ? "✓" : "○"}</span> Retour au calme</li></ul>

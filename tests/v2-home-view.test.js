@@ -113,10 +113,10 @@ test("normalise le plan sans le modifier et marque clairement les choix déjà p
 
   const html = homeView.render(context);
   assert.match(html, /<strong>1 \/ 3<\/strong>/);
-  assert.match(html, /aria-label="Énergie hebdomadaire restante : 1 sur 3"/);
+  assert.match(html, /aria-label="Capacité hebdomadaire restante : 1 sur 3"/);
   assert.match(html, /data-v2-home-action="rest"[^>]+data-v2-home-planned="true" aria-pressed="true"/);
   assert.match(html, /Planifié pour cette semaine/);
-  assert.match(html, /Journée de repos rapide<small>Aucun coût d’énergie<\/small>/);
+  assert.match(html, /Journée de repos rapide<small>Aucun coût de capacité<\/small>/);
   assert.match(html, /data-v2-location-remove="home-rest-1"/);
 });
 

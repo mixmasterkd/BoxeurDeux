@@ -379,15 +379,15 @@
   function renderWeekPlan(context) {
     const capacity = context.weekCapacity;
     const planned = context.plan.entries.length
-      ? `<ul class="v2-home-planned-list" aria-label="Choix de la maison déjà planifiés">${context.plan.entries.map(entry => `<li><span>${escapeHTML(entry.label)}<small>${entry.cost > 0 ? `−${entry.cost} énergie` : "Aucun coût d’énergie"}</small></span>${entry.removable ? `<button type="button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
+      ? `<ul class="v2-home-planned-list" aria-label="Choix de la maison déjà planifiés">${context.plan.entries.map(entry => `<li><span>${escapeHTML(entry.label)}<small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}</small></span>${entry.removable ? `<button type="button" data-v2-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
       : `<p class="v2-home-plan-empty">Aucun choix de la maison n’est encore planifié.</p>`;
-    const status = capacity.full ? "Énergie hebdomadaire épuisée" : `${capacity.remaining} énergie hebdomadaire encore disponible`;
+    const status = capacity.full ? "Capacité de semaine épuisée" : `${capacity.remaining} de capacité hebdomadaire encore disponible`;
     const meterMax = Math.max(1, capacity.allowed);
     const meterValue = Math.min(meterMax, capacity.remaining);
 
     return `<section class="v2-home-week-plan v2-place-week-plan${capacity.full ? " full" : ""}" aria-labelledby="v2-home-week-plan-title" aria-live="polite">
       <div class="v2-home-week-plan-heading v2-place-week-plan-heading"><div><p class="eyebrow">Planification</p><h3 id="v2-home-week-plan-title">${capacity.full ? "Programme complet" : escapeHTML(context.plan.title)}</h3></div><strong>${capacity.remaining} / ${capacity.allowed}</strong></div>
-      <meter min="0" max="${meterMax}" value="${meterValue}" aria-label="Énergie hebdomadaire restante : ${capacity.remaining} sur ${capacity.allowed}">${capacity.remaining} sur ${capacity.allowed}</meter>
+      <meter min="0" max="${meterMax}" value="${meterValue}" aria-label="Capacité hebdomadaire restante : ${capacity.remaining} sur ${capacity.allowed}">${capacity.remaining} sur ${capacity.allowed}</meter>
       <p><strong>${escapeHTML(status)}</strong> · ${capacity.used} déjà réservée · ${escapeHTML(context.plan.note)}</p>${planned}
     </section>`;
   }

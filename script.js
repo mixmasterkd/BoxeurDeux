@@ -398,6 +398,10 @@ const recreationalBetweenWeekEvents = [
 ];
 
 const allBetweenWeekEvents = [...betweenWeekEvents, ...recreationalBetweenWeekEvents];
+// Les décisions « Entre deux semaines » appartiennent à l'ancienne interface.
+// On garde leur contenu prêt pour une éventuelle réactivation, sans les injecter
+// dans le parcours actuel.
+const betweenWeekEventsEnabled = false;
 
 function betweenWeekEventsForCurrentCareer() {
   return isRecreationalCareer() ? recreationalBetweenWeekEvents : betweenWeekEvents;
@@ -587,7 +591,7 @@ function normalizeCareerState(source) {
   normalized.levelPoints = safeNumber(source.levelPoints, base.levelPoints, 0, 9999);
   normalized.goldenPlacement = [1, 2, 3].includes(Number(source.goldenPlacement)) ? Number(source.goldenPlacement) : null;
   normalized.olympicCompleted = Boolean(source.olympicCompleted);
-  normalized.pendingWeekEvent = allBetweenWeekEvents.some(event => event.id === source.pendingWeekEvent) ? source.pendingWeekEvent : null;
+  normalized.pendingWeekEvent = betweenWeekEventsEnabled && allBetweenWeekEvents.some(event => event.id === source.pendingWeekEvent) ? source.pendingWeekEvent : null;
   normalized.levelNotice = source.levelNotice ? safeText(source.levelNotice, "", 120) : null;
   normalized.levelAnnouncementPending = Boolean(source.levelAnnouncementPending);
   normalized.jobLossNotice = source.jobLossNotice ? safeText(source.jobLossNotice, "", 180) : null;
@@ -1323,8 +1327,11 @@ function showCareerAlertOrContinue() {
     document.querySelector("#level-up-dialog")?.showModal();
     return true;
   }
-  if (state.pendingWeekEvent) showBetweenWeekEvent();
-  else continueAfterWeekTransition();
+  if (betweenWeekEventsEnabled && state.pendingWeekEvent) showBetweenWeekEvent();
+  else {
+    state.pendingWeekEvent = null;
+    continueAfterWeekTransition();
+  }
   return false;
 }
 
@@ -2632,7 +2639,7 @@ function v2GymContext() {
         : !coachPlanState.available
           ? coachPlanState.reason
         : coachPreview.ok
-          ? `Ajout au programme · ${plannerPreview.capacity.remaining}/${plannerPreview.capacity.total} énergie hebdomadaire disponible. ${coachSession.tradeoff}`
+          ? `Ajout au programme · ${plannerPreview.capacity.remaining}/${plannerPreview.capacity.total} de capacité hebdomadaire disponible. ${coachSession.tradeoff}`
           : coachPreview.reason,
     },
     privateTrainer: {
@@ -2882,7 +2889,7 @@ function v2HomeContext() {
       allowed: preview.capacity.total,
       used: preview.capacity.used,
       remaining: preview.capacity.remaining,
-      label: "Énergie de la semaine",
+      label: "Capacité de semaine",
     },
     plan: {
       title: "Programme de la semaine",
@@ -3041,7 +3048,7 @@ function v2InventoryContext() {
     profile: state.profile,
     eyebrow: "Inventaire de carrière",
     title: "Sac et suppléments",
-    introduction: "Les suppléments restent modestes : associe-en un à une séance déjà planifiée pour récupérer un peu d’énergie hebdomadaire. Maximum de deux par semaine.",
+    introduction: "Les suppléments restent modestes : associe-en un à une séance déjà planifiée pour récupérer un peu de capacité hebdomadaire. Maximum de deux par semaine.",
     items: inventory.map(item => {
       const reservedEntry = plannerState.entries.find(entry => entry.id === reservedByProduct[item.id]);
       const available = state.careerStatus !== "recreational"
@@ -3100,7 +3107,7 @@ function openV2SupplementReservation(productId) {
   const entries = plannerState.entries.filter(entry => entry.physical && entry.activityId !== "sparring" && !entry.metadata?.completed);
   const choices = entries.map(entry => {
     const selected = entry.supplementId === productId;
-    return `<article class="v2-supplement-card${selected ? " selected" : ""}"><div><p class="eyebrow">${escapeHTML(V2_PLANNER_DAY_LABELS[entry.day] || entry.day)}</p><h3>${escapeHTML(entry.label)}</h3></div><p>Coût actuel : ${entry.capacityCost} énergie hebdomadaire.</p><button type="button" data-v2-plan-supplement-entry="${escapeHTML(entry.id)}" data-v2-plan-supplement-product="${escapeHTML(productId)}">${selected ? "Garder cette séance" : "Associer ici"}</button>${entry.supplementId && !selected ? `<small>Remplacera ${escapeHTML(window.BoxeurSupplements.CATALOG[entry.supplementId]?.label || "le produit actuel")}.</small>` : ""}${entry.supplementId ? `<button type="button" class="text-button" data-v2-plan-supplement-remove="${escapeHTML(entry.id)}">Retirer le produit actuel</button>` : ""}</article>`;
+    return `<article class="v2-supplement-card${selected ? " selected" : ""}"><div><p class="eyebrow">${escapeHTML(V2_PLANNER_DAY_LABELS[entry.day] || entry.day)}</p><h3>${escapeHTML(entry.label)}</h3></div><p>Coût actuel : ${entry.capacityCost} de capacité hebdomadaire.</p><button type="button" data-v2-plan-supplement-entry="${escapeHTML(entry.id)}" data-v2-plan-supplement-product="${escapeHTML(productId)}">${selected ? "Garder cette séance" : "Associer ici"}</button>${entry.supplementId && !selected ? `<small>Remplacera ${escapeHTML(window.BoxeurSupplements.CATALOG[entry.supplementId]?.label || "le produit actuel")}.</small>` : ""}${entry.supplementId ? `<button type="button" class="text-button" data-v2-plan-supplement-remove="${escapeHTML(entry.id)}">Retirer le produit actuel</button>` : ""}</article>`;
   }).join("");
   sheet.dataset.originLocation = "inventory";
   sheet.classList.add("v2-location-sheet-full");
@@ -3334,7 +3341,7 @@ function recordV2Work(runtime, weekNumber, grossWages, workShifts = 1) {
 }
 
 const V2_WEEK_CAPACITY_TOTAL = 50;
-const V2_WEEK_RULESET_VERSION = 4;
+const V2_WEEK_RULESET_VERSION = 5;
 const V2_WEEK_ACTIVITY_LIMITS = Object.freeze({
   "group-class": 1,
   rest: 2,
@@ -3640,9 +3647,9 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: "recovery",
       location: "home",
       physical: false,
-      capacityCost: 0,
-      energyGain: 10,
-      fatigueDelta: -5,
+      capacityCost: 10,
+      energyGain: 18,
+      fatigueDelta: -12,
       recreationalAllowed: true,
       metadata: { plannerType: id },
     };
@@ -3970,8 +3977,8 @@ function addV2PlannerActivity(activityId, metadata = {}, options = {}) {
     });
     v2PlannerStore(capsule, outcome.state);
     const reservationLabel = outcome.result.capacityReserved > 0
-      ? `−${outcome.result.capacityReserved} énergie hebdomadaire`
-      : "aucun coût d’énergie hebdomadaire";
+      ? `−${outcome.result.capacityReserved} de capacité hebdomadaire`
+      : "aucun coût de capacité hebdomadaire";
     showToast(`${outcome.result.entry.label} ajouté à la semaine · ${reservationLabel}`);
     if (options.reopen) openV2Location(options.reopen);
     return outcome;
@@ -3988,7 +3995,7 @@ function removeV2PlannerActivity(entryId, options = {}) {
     const plannerState = ensureV2WeekPlanner(capsule);
     const entry = plannerState.entries.find(item => item.id === entryId);
     if (entry?.metadata?.immediate) {
-      showToast("Le sparring commencé ne peut pas être retiré : ses 18 points d’énergie ont été consommés.");
+      showToast("Le sparring commencé ne peut pas être retiré : ses 18 points de capacité ont été consommés.");
       return null;
     }
     const outcome = window.BoxeurWeekPlanner.removeActivity(plannerState, entryId);
@@ -4113,7 +4120,8 @@ function v2WeekViewContext() {
     if (entry.pay > 0) effects.push(`+${Math.round(entry.pay)} $ à la fin de la semaine`);
     if (entry.metadata?.moneyCost > 0) effects.push(`−${Math.round(entry.metadata.moneyCost)} $ à la confirmation`);
     if (entry.energyCost > 0) effects.push(`−${Math.round(entry.energyCost)} énergie pendant l’activité`);
-    if (entry.energyGain > 0) effects.push(`+${Math.round(entry.energyGain)} récupération`);
+    if (entry.energyGain > 0) effects.push(`+${Math.round(entry.energyGain)} énergie physique`);
+    if (entry.fatigueDelta < 0) effects.push(`−${Math.round(Math.abs(entry.fatigueDelta))} fatigue`);
     if (entry.supplementId) effects.push(`${window.BoxeurSupplements.CATALOG[entry.supplementId]?.label || "Supplément"} réservé`);
     if (entry.metadata?.gainMultiplier < 1) effects.push("Répétition exacte · 85 % des gains");
     if (entry.metadata?.completed) effects.push("Déjà joué cette semaine");
@@ -4556,14 +4564,13 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     });
   }
   if (entry.activityId === "rest") {
-    const activity = window.BoxeurRecovery.ACTIONS.active_recovery.activity;
     return v2PlannerGenericActivity(entry, entry.label, {
-      energyCost: activity.energyCost,
-      energyGain: activity.energyGain,
-      fatigueGain: activity.fatigueGain,
-      fatigueRelief: activity.fatigueRelief,
-      stimulus: activity.stimulus,
-    }, { engineId: activity.id, category: "recovery", duration: window.BoxeurTime.PERIODS_PER_DAY });
+      energyCost: entry.energyCost,
+      energyGain: entry.energyGain,
+      fatigueGain: Math.max(0, entry.fatigueDelta),
+      fatigueRelief: Math.max(0, -entry.fatigueDelta),
+      stimulus: { technique: 0, power: 0, cardio: 0, defense: 0 },
+    }, { engineId: "home_planned_rest", category: "recovery", duration: window.BoxeurTime.PERIODS_PER_DAY });
   }
   if (entry.activityId === "meal") {
     const activity = V2_HOME_ACTIVITIES.meal;
@@ -5466,8 +5473,12 @@ function endWeek(events) {
   activateReadyJobOffer(events);
   state.supplementWeek = state.week;
   state.supplementsUsed = [];
-  const weekEvents = betweenWeekEventsForCurrentCareer();
-  state.pendingWeekEvent = weekEvents[(state.week - 2) % weekEvents.length].id;
+  if (betweenWeekEventsEnabled) {
+    const weekEvents = betweenWeekEventsForCurrentCareer();
+    state.pendingWeekEvent = weekEvents[(state.week - 2) % weekEvents.length].id;
+  } else {
+    state.pendingWeekEvent = null;
+  }
   state.energy = clamp(state.energy + 6);
   state.morale = clamp(state.morale - 1);
   state.fatigue = clamp(state.fatigue - (state.energy < 35 ? 4 : 6));

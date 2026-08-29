@@ -56,10 +56,10 @@ body.v2-preview #v2-world[hidden] {
 }
 
 .v2-world-bar .v2-now-time {
-  grid-column: 1;
+  grid-column: 1 / -1;
   width: 100%;
-  max-width: min(100%, calc(177.68dvh - 424px));
-  justify-self: center;
+  max-width: none;
+  justify-self: stretch;
   pointer-events: auto;
 }
 
@@ -84,7 +84,7 @@ body.v2-preview #v2-world[hidden] {
   width: min(1540px, 100%);
   min-width: 0;
   margin: 0 auto;
-  padding: clamp(14px, 2vw, 30px) clamp(14px, 2.2vw, 34px) calc(92px + env(safe-area-inset-bottom));
+  padding: 8px clamp(14px, 2.2vw, 34px) calc(92px + env(safe-area-inset-bottom));
 }
 
 .v2-map-panel,
@@ -330,7 +330,7 @@ body.v2-preview #v2-world[hidden] {
 
 .v2-now-panel {
   position: sticky;
-  top: clamp(14px, 2vw, 30px);
+  top: max(10px, env(safe-area-inset-top));
   display: grid;
   gap: 12px;
   max-height: calc(100dvh - 110px);
