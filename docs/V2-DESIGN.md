@@ -76,9 +76,9 @@ Une nouvelle carrière commence avec le statut récréatif et un guide progressi
 - **semaine 1** : payer le premier abonnement obligatoire du gym de boxe, choisir l'emploi initial obligatoire, puis faire la première séance guidée;
 - **semaines 2 à 5** : découvrir graduellement le plan de l'entraîneur, les cours de groupe récréatifs, l'énergie, la fatigue et la journée de repos, sans ouvrir tous les systèmes à la fois;
 - **semaine 6** : effectuer le sparring pédagogique avec Rémy « Le Tank » dans l'interface de ring;
-- **semaines 6 à 10** : après Rémy, afficher clairement le bouton « Passer amateur » et laisser le joueur confirmer lui-même le changement de statut.
+- **fin de la semaine 6** : dès que le sparring avec Rémy est terminé, activer automatiquement le statut amateur et afficher une célébration qui explique les nouveaux accès.
 
-Le guide utilise une prochaine étape visible, le lieu pertinent mis en évidence et de courtes interventions de l'entraîneur. Il ne doit pas devenir une chaîne de fenêtres. Seuls les choix initiaux indispensables — abonnement et emploi — sont bloquants. Le calendrier amateur, le gym de musculation et le sparring ordinaire demeurent verrouillés jusqu'au passage amateur explicite; aucune semaine ne transforme automatiquement le boxeur en amateur.
+Le guide utilise une prochaine étape visible, le lieu pertinent mis en évidence et de courtes interventions de l'entraîneur. Il ne doit pas devenir une chaîne de fenêtres. Seuls les choix initiaux indispensables — abonnement et emploi — sont bloquants. Le calendrier amateur, le gym de musculation et le sparring ordinaire demeurent verrouillés jusqu'à la fin du sparring d'évaluation. La promotion est alors automatique; la célébration qui suit est informative et ne constitue pas une confirmation du changement de statut.
 
 Après l'ajout du premier cours de groupe, le guide remplace l'objectif d'entraînement par deux commandes explicites : « Voir mon programme » et « Confirmer et vivre la semaine ». Il rappelle que le brouillon n'a encore produit aucun salaire, coût, fatigue ni progression. Le premier bilan explique ensuite les indicateurs principaux et annonce l'objectif de la semaine 2 avant de rendre la carte au joueur.
 
@@ -123,7 +123,7 @@ Ces zones correspondent à de vrais boutons accessibles et ouvrent les mêmes se
 
 Le panneau principal présente la séance recommandée du coach en premier. Après le passage amateur, il ajoute la composition libre, l'entraîneur privé et le sparring. Pendant le statut récréatif, ces choix avancés sont retirés du panneau afin de garder seulement le cours de groupe et le parcours vers Rémy « Le Tank ».
 
-Le cours de groupe demeure exclusif au statut récréatif et disparaît une fois le passage amateur confirmé. Le sparring avec Rémy « Le Tank » demeure l'étape pédagogique qui ouvre le passage amateur.
+Le cours de groupe demeure exclusif au statut récréatif et disparaît une fois le passage amateur automatique effectué. Le sparring avec Rémy « Le Tank » demeure l'étape pédagogique qui déclenche ce passage.
 
 À la création d'une carrière, le premier abonnement au gym de boxe est obligatoire et son écran ne peut pas être fermé sans choisir l'offre initiale. Le budget de départ doit toujours permettre ce paiement avant tout achat facultatif. À sa première expiration, le renouvellement redevient facultatif et suit les règles normales d'abonnement.
 
@@ -169,7 +169,7 @@ Chaque gym peut posséder :
 - ses partenaires de sparring;
 - ses tarifs;
 - sa qualité d'encadrement;
-- son ambiance et ses effets sur le moral;
+- son ambiance visuelle;
 - ses disponibilités.
 
 Ce modèle est conçu pour être réutilisé plus tard dans la carrière professionnelle. Voyager pour un camp donnera accès à un lieu temporaire avec ses propres entraîneurs, partenaires, coûts, hébergement et avantages, sans nécessiter un second système de camp.
@@ -182,7 +182,7 @@ La V2 distingue clairement :
 
 - **Énergie de la semaine** : le budget principal de planification, normalement 50 points. L'emploi et les entraînements la réservent; le joueur voit immédiatement ce qui reste.
 - **Énergie physique et fatigue** : l'état persistant du boxeur exécuté jour par jour en arrière-plan. Les lieux montrent leur projection afin d'expliquer les conséquences d'une séance.
-- **Préparation** : un diagnostic calculé, pas une ressource supplémentaire à remplir. Elle résume le cardio, le rythme récent, la fatigue, la santé, le moral et la qualité du camp.
+- **Préparation** : un diagnostic calculé, pas une ressource supplémentaire à remplir. Elle résume l'énergie, la fatigue et la charge d'entraînement qui reste à assimiler.
 
 La préparation est affichée avec des mots — excellente, bonne, moyenne, fragile ou mauvaise — et une explication courte. Elle remplace la forme physique comme jauge indépendante afin d'éviter de pénaliser deux fois le boxeur pour la même cause.
 
@@ -193,10 +193,9 @@ Chaque activité d'entraînement produit :
 - un stimulus dans une ou plusieurs statistiques;
 - une dépense d'énergie;
 - une charge de fatigue;
-- parfois une usure ou un risque de blessure;
 - une durée.
 
-Le stimulus est assimilé pendant la récupération. Une séance exigeante correctement récupérée est productive. Une succession de séances exigeantes sans récupération augmente surtout la fatigue et l'usure, avec un rendement décroissant. Répéter exactement le même programme une deuxième fois dans la semaine conserve 100 % de son coût, de sa fatigue, de son usure et de son risque, mais seulement 85 % de ses gains et de son XP. Retirer la première occurrence rend automatiquement le plein rendement à celle qui reste.
+Le stimulus est assimilé pendant la récupération. Une séance exigeante correctement récupérée est productive. Une succession de séances exigeantes sans récupération augmente surtout la fatigue, avec un rendement décroissant. Répéter exactement le même programme une deuxième fois dans la semaine conserve 100 % de son coût et de sa fatigue, mais seulement 85 % de ses gains et de son XP. Retirer la première occurrence rend automatiquement le plein rendement à celle qui reste.
 
 Chaque statistique possède une jauge de progression visible de 0 à 100. Lorsque la jauge atteint 100, la statistique gagne `+1` et tout débordement demeure dans la jauge suivante. La séance ne donne jamais ce point immédiatement : elle crée du stimulus, puis la récupération l'assimile vers la jauge. Des plafonds et rendements décroissants empêchent d'obtenir plusieurs gains en répétant artificiellement la même charge.
 
@@ -329,7 +328,7 @@ En amateur, il n'y a aucun match nul. Les combats locaux utilisent trois juges e
 
 Le premier emploi demeure obligatoire au début de la carrière. Sa fenêtre initiale n'offre ni fermeture ni annulation, ne se ferme pas par clic à l'extérieur ou avec la touche Échap et bloque l'avancement tant qu'un emploi n'a pas été choisi. L'emploi est ensuite proposé par défaut dans chaque semaine, mais le joueur peut le retirer avant de confirmer son programme. Retrouver un emploi après une perte demeure facultatif.
 
-La semaine de travail réserve automatiquement une partie de l'énergie hebdomadaire. La paie et la fatigue normale sont simulées sans exiger un clic répétitif. Retirer le travail rembourse cette énergie, supprime la paie et compte comme une absence injustifiée. Trois absences injustifiées cumulées chez le même employeur entraînent le congédiement, même si des semaines travaillées les séparent; une blessure ou un tournoi demeure une absence protégée. Le compteur repart à zéro uniquement lors d'un changement d'emploi. L'indemnité de vacances historique applicable est conservée.
+La semaine de travail réserve automatiquement une partie de l'énergie hebdomadaire. La paie et la fatigue normale sont simulées sans exiger un clic répétitif. Retirer le travail rembourse cette énergie, supprime la paie et compte comme une absence injustifiée. Trois absences injustifiées cumulées chez le même employeur entraînent le congédiement, même si des semaines travaillées les séparent; un tournoi demeure une absence protégée. Le compteur repart à zéro uniquement lors d'un changement d'emploi. L'indemnité de vacances historique applicable est conservée.
 
 En cas de conflit avec un combat, un déplacement ou une séance réservée, le jeu pourra proposer :
 
@@ -354,11 +353,11 @@ Les vacances :
 
 Une semaine de vacances peut servir à récupérer ou à faire un camp intensif. Dans le second cas, la paie est conservée, mais la fatigue d'entraînement s'applique normalement.
 
-### 5.3 Mini-jeux facultatifs
+### 5.3 Mini-jeux facultatifs — hors périmètre actuel
 
-Certains emplois peuvent proposer un mini-jeu très court. Le joueur choisit toujours entre « Simuler le quart » et « Jouer le quart ».
+Les mini-jeux d'emploi ne sont pas exposés dans la V2 actuelle. S'ils sont développés et validés plus tard, certains emplois pourraient proposer un mini-jeu très court avec un choix entre simulation et jeu actif.
 
-La simulation donne la paie et les effets normaux. Le mini-jeu n'est jamais requis pour conserver son emploi ou rester compétitif. Sa récompense est limitée : petit bonus d'argent, moral, fatigue légèrement réduite ou sécurité d'emploi.
+La simulation donnerait la paie et les effets normaux. Le mini-jeu ne serait jamais requis pour conserver son emploi ou rester compétitif. Sa récompense serait limitée : petit bonus d'argent, fatigue légèrement réduite ou sécurité d'emploi.
 
 L'emploi de coursier peut inclure un mini-jeu de bourse assumé comme élément ludique. Pour protéger l'économie :
 
@@ -388,8 +387,6 @@ Le style demeure une identité du boxeur et modifie les préférences, les affin
 - énergie quotidienne;
 - fatigue accumulée;
 - préparation calculée;
-- moral;
-- santé et blessures;
 - poids lorsqu'il est pertinent;
 - réputation;
 - argent;
@@ -421,7 +418,6 @@ La dynamique récente n'est jamais présentée comme la carte des juges.
 - précision de lecture;
 - adaptation au style;
 - usure de tournoi;
-- risque de blessure;
 - séquences sans réponse;
 - historique utile aux conseils de l'entraîneur.
 
@@ -514,7 +510,7 @@ Le sparring avec Rémy est interactif et utilise le même ring que les combats. 
 
 Rémy peut interrompre une séquence, expliquer l'erreur et permettre de recommencer sans pénalité. Le sparring ne déclare aucun gagnant et ne modifie pas le bilan de carrière.
 
-Il demeure réservé à partir de la semaine 6 du parcours récréatif. Après l'avoir terminé, le bouton « Passer amateur » devient disponible jusqu'à la semaine 10. Le joueur doit confirmer lui-même ce passage; s'il attend, l'interface explique clairement que le calendrier amateur est prêt, mais encore verrouillé par cette confirmation.
+Il demeure réservé à partir de la semaine 6 du parcours récréatif. Dès qu'il est terminé, le statut amateur est appliqué automatiquement et une célébration explique que le calendrier compétitif, le gym de musculation et le sparring ordinaire sont maintenant ouverts.
 
 Le débrief final montre :
 
@@ -523,7 +519,7 @@ Le débrief final montre :
 - une réponse concrète à essayer;
 - le conseil que Rémy rappellera au premier combat amateur.
 
-Les sparrings futurs peuvent être techniques, légers, intenses ou ciblés contre un style. Leur intensité change la progression, la fatigue et le risque, mais ils utilisent toujours les mêmes commandes de base.
+Les sparrings futurs peuvent être techniques, légers, intenses ou ciblés contre un style. Leur intensité change la progression et la fatigue, mais ils utilisent toujours les mêmes commandes de base.
 
 ## 9. Coin du boxeur entre les rounds
 
@@ -603,7 +599,7 @@ Les scènes sont validées au minimum en 1440 × 900, 1280 × 720, 390 × 844, 3
 - vrais boutons derrière chaque zone graphique;
 - nom accessible décrivant le lieu, la tuile ou l'action;
 - couleurs accompagnées d'un mot, d'une icône ou d'une forme;
-- annonces pour knockdowns, fins de round, blessures, pertes d'emploi et montées de niveau;
+- annonces pour knockdowns, fins de round, pertes d'emploi et montées de niveau;
 - prise en charge de `prefers-reduced-motion`;
 - aucune animation qui bloque, ralentit ou modifie la fenêtre de décision;
 - vue en liste équivalente pour la carte et le ring.
@@ -616,7 +612,8 @@ Le jeu actuel est ouvert directement, sans paramètre d'URL ni ancienne interfac
 
 Principes de conversion :
 
-- conserver l'identité, le sexe, les couleurs, les statistiques, le style, le niveau, l'XP, l'argent, la réputation, le bilan, les blessures, les abonnements, l'emploi, les vacances, les inscriptions et les résultats;
+- conserver l'identité, le sexe, les couleurs, les statistiques, le style, le niveau, l'XP, l'argent, la réputation, le bilan, les abonnements, l'emploi, les vacances, les inscriptions et les résultats;
+- préserver les anciens champs de forme, moral et blessure pour la compatibilité des fichiers, sans les afficher ni les utiliser dans les règles V2;
 - convertir la forme actuelle en données initiales de préparation sans modifier les statistiques permanentes;
 - convertir l'énergie et la fatigue existantes vers les nouvelles échelles avec des bornes sûres;
 - migrer un brouillon hebdomadaire antérieur vers le contrat courant, enrichir ses familles et répétitions, ou le reconstruire proprement s'il est invalide;
@@ -668,6 +665,8 @@ La V2 conserve HTML, CSS et JavaScript sans nouvelle dépendance importante. Les
 
 Aucune règle d'équilibrage ne doit être enfouie dans le rendu d'un écran. Une action déclenchée depuis une image, un bouton rapide ou une vue accessible appelle exactement la même règle.
 
+Le contrat transversal est exposé par `v2-balance-engine.js`. Il centralise la capacité de semaine, les emplois, les abonnements, les récompenses d'adversaire, les courbes de tournoi et les seuils mesurables. Les catalogues propres à un système restent dans leur moteur spécialisé : exercices, entraîneurs privés et suppléments.
+
 ## 14. Équilibre et validation statistique
 
 Avant de modifier les formules, la version actuelle sert de référence. Une suite déterministe simule les mêmes oppositions dans les deux moteurs et compare :
@@ -682,7 +681,19 @@ Avant de modifier les formules, la version actuelle sert de référence. Une sui
 - usure sur les tournois de trois et cinq combats;
 - progression et économie sur plusieurs saisons.
 
-Pour des boxeurs comparables, la cible centrale reste un partage proche de 50/50. Les seuils d'acceptation exacts sont fixés après mesure de la référence actuelle; ils ne sont pas choisis à partir d'une impression visuelle.
+Pour des boxeurs comparables, la cible centrale reste un partage proche de 50/50. Les seuils d'acceptation exacts sont définis dans le contrat d'équilibrage et vérifiés par `tests/v2-balance-engine.test.js` et `tests/balance.test.js`; ils ne sont pas choisis à partir d'une impression visuelle.
+
+### 14.1 Contrat mesuré du lot 2
+
+- La capacité vaut 50 au départ, puis 55, 60 et 65 aux niveaux 5, 10 et 15. Les emplois réservent respectivement 15, 22, 30 et 30 points.
+- Le plan automatique amateur donne la priorité à une séance de boxe, puis au repos, puis à une deuxième séance. Un emploi exigeant réduit donc le volume au lieu de retirer silencieusement la récupération.
+- Avec l'emploi souple, le noyau boxe + musculation + repos occupe 48 points sur 50. Avec les trois autres emplois, travail + boxe + repos tient dans la semaine, mais pas une deuxième séance lourde.
+- Les recommandations ciblées accordent leur stimulus principal à la qualité annoncée. À partir d'une statistique à 39, la première hausse mesurée demande 7 séances en Technique, 7 en Puissance, 10 en Cardio et 8 en Défense, dans une fenêtre acceptée de 7 à 14.
+- Le plus petit salaire laisse 47,50 $ par semaine après l'équivalent de l'abonnement de boxe et 23,75 $ après les deux abonnements. L'entraîneur élite demeure un choix financé par un emploi plus payant ou par l'épargne.
+- Un supplément ne modifie jamais les statistiques, le stimulus ou l'XP; son économie maximale d'énergie immédiate reste sous 20 %, sa qualité de récupération entre 0,97 et 1,03, et deux produits différents au maximum peuvent être utilisés par semaine.
+- Les ouvertures de tournoi, pour un boxeur coté 50, sont 48, 49, 50, 51 et 52 du Bronze à l'Olympique. Les finales atteignent au moins +2 sur trois combats et +8 sur cinq combats. Les dégâts de tête, de corps et la lucidité persistent uniquement pendant le tournoi, puis les choix inter-combats les gèrent.
+- Chaque combat de tournoi reprend le format tactique V2 des galas officiels : cinq intentions, déplacement spatial automatique, trois rounds et cartes cachées de cinq juges. L'ambiance visuelle ne change pas ces règles : les tournois amateurs utilisent quatre scènes à plusieurs rings (avant, combat, coin et résultat), tandis que le parcours olympique possède quatre scènes internationales distinctes.
+- Sur 1 600 simulations déterministes par scénario, la référence du moteur donne 57,7 % de victoires entre profils comparables, 88,6 % en situation favorable et 22,8 % en situation défavorable. Les arrêts sont nuls entre profils frais comparables; le scénario Puissance 75 contre Défense 35 produit 65,2 % d'arrêts, ce qui confirme qu'ils restent liés à une vulnérabilité réelle.
 
 Le nouveau système doit démontrer que :
 
@@ -694,7 +705,7 @@ Le nouveau système doit démontrer que :
 - la défense protège sans rendre invincible;
 - une fatigue moyenne ne rend pas toute victoire improbable;
 - un boxeur bien préparé peut terminer un tournoi sans épuisement artificiel;
-- le moral seul ne provoque jamais un TKO.
+- les anciens champs de moral, forme et blessure n'influencent jamais un résultat V2.
 
 ## 15. Étapes d'implantation réversibles
 
@@ -724,8 +735,8 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 
 - Un nouveau joueur peut expliquer sa prochaine étape en moins de 30 secondes.
 - Une nouvelle carrière ne peut quitter l'inscription initiale sans abonnement au gym et emploi pour la semaine 1.
-- Il trouve Rémy, termine le sparring et voit comment passer amateur sans aide extérieure.
-- Le passage amateur reste une confirmation explicite après Rémy et n'arrive jamais automatiquement.
+- Il trouve Rémy, termine le sparring et voit immédiatement que son statut amateur est activé.
+- Le passage amateur arrive automatiquement après Rémy; la célébration suivante ne fait qu'expliquer ce changement.
 - Tout verrouillage indique une cause et un bouton menant à la solution.
 - Une activité ordinaire se lance en deux interactions ou moins depuis la carte.
 
@@ -767,7 +778,7 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 - Toutes les sauvegardes de test migrent et peuvent être exportées puis réimportées.
 - Les anciennes sauvegardes restent importables sans réactiver l'ancienne interface.
 - Les carrières récréatives, amateurs, en tournoi et avancées reprennent à un état cohérent.
-- Emplois, vacances, abonnements, blessures, argent, réputation, statistiques et bilans sont préservés.
+- Emplois, vacances, abonnements, argent, réputation, statistiques et bilans sont préservés; les anciens champs de blessure restent sérialisés mais inactifs.
 - Le reste du jeu ne dépend plus d'un champ ou d'un écran déclaré obsolète.
 
 ## Décision de conception principale

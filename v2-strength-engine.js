@@ -211,6 +211,7 @@
   const ACCESS_STATES = deepFreeze({
     RECREATIONAL_LOCKED: "recreational-locked",
     MEMBERSHIP_REQUIRED: "membership-required",
+    CONDITION_BLOCKED: "condition-blocked",
     MEDICAL_BLOCKED: "medical-blocked",
     ACTIVE: "active",
   });
@@ -235,27 +236,9 @@
 
   function medicalBlockReason(context = {}) {
     const condition = context.condition && typeof context.condition === "object" ? context.condition : {};
-    const weeks = Math.max(0, finiteNumber(
-      context.injuryWeeks ?? context.medicalRestWeeks ?? condition.injuryWeeks ?? condition.medicalRestWeeks,
-    ));
-    const blocked = context.medicalRestriction === true
-      || context.medicalBlocked === true
-      || context.trainingBlocked === true
-      || condition.medicalRestriction === true
-      || condition.medicalBlocked === true
-      || condition.trainingBlocked === true
-      || weeks > 0;
+    const blocked = context.trainingBlocked === true || condition.trainingBlocked === true;
     if (!blocked) return "";
-    const supplied = context.medicalReason
-      || context.trainingBlockedReason
-      || condition.medicalReason
-      || condition.trainingBlockedReason;
-    if (supplied) return String(supplied);
-    if (weeks > 0) {
-      const rounded = Math.ceil(weeks);
-      return `Repos médical obligatoire pendant ${rounded} semaine${rounded > 1 ? "s" : ""}.`;
-    }
-    return "Une restriction médicale bloque temporairement l'entraînement physique.";
+    return String(context.trainingBlockedReason || condition.trainingBlockedReason || "L'énergie ou la fatigue ne permet pas cette séance aujourd'hui.");
   }
 
   function resolveAccess(context = {}) {
@@ -279,9 +262,9 @@
     const medicalReason = medicalBlockReason(context);
     if (medicalReason) {
       return {
-        state: ACCESS_STATES.MEDICAL_BLOCKED,
+        state: ACCESS_STATES.CONDITION_BLOCKED,
         available: false,
-        label: "Repos médical",
+        label: "Condition insuffisante",
         reason: medicalReason,
       };
     }
@@ -362,7 +345,6 @@
       totals.fatigueRelief += activity.fatigueRelief;
       totals.xp += activity.xp;
       totals.wear += activity.wear;
-      totals.injuryRisk += activity.injuryRisk;
       STAT_KEYS.forEach(key => { totals.stimulus[key] += activity.stimulus[key]; });
     });
     totals.energyCost = roundTo(totals.energyCost);
@@ -582,13 +564,7 @@
       statXpGains,
       xpAward: Math.max(1, Math.round(preview.totals.xp)),
       wear: preview.totals.wear,
-      injuryRiskPercent: roundTo(clamp(
-        preview.totals.injuryRisk
-          + Math.max(0, before.condition.fatigue - 50) * 0.07
-          + Math.max(0, 30 - before.condition.energy) * 0.05,
-        0,
-        20,
-      ), 1),
+      injuryRiskPercent: 0,
       injuryResolved: false,
       warnings: clone(preview.warnings),
     };

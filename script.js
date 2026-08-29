@@ -1,13 +1,15 @@
 const CREATION_POINTS = 5;
 const BASE_COMBAT_STAT = 40;
-const GYM_PRICE = 110;
-const GYM_THREE_MONTH_PRICE = 285;
-const GYM_MONTH_WEEKS = 4;
-const GYM_THREE_MONTH_WEEKS = 12;
-const STRENGTH_GYM_PRICE = 95;
-const STRENGTH_GYM_THREE_MONTH_PRICE = 270;
-const STRENGTH_GYM_MONTH_WEEKS = 4;
-const STRENGTH_GYM_THREE_MONTH_WEEKS = 12;
+const V2_BALANCE = window.BoxeurBalance;
+if (!V2_BALANCE) throw new Error("Boxeur Deux requiert v2-balance-engine.js (BoxeurBalance).");
+const GYM_PRICE = V2_BALANCE.ECONOMY.memberships.boxing.monthly.price;
+const GYM_THREE_MONTH_PRICE = V2_BALANCE.ECONOMY.memberships.boxing.threeMonths.price;
+const GYM_MONTH_WEEKS = V2_BALANCE.ECONOMY.memberships.boxing.monthly.weeks;
+const GYM_THREE_MONTH_WEEKS = V2_BALANCE.ECONOMY.memberships.boxing.threeMonths.weeks;
+const STRENGTH_GYM_PRICE = V2_BALANCE.ECONOMY.memberships.strength.monthly.price;
+const STRENGTH_GYM_THREE_MONTH_PRICE = V2_BALANCE.ECONOMY.memberships.strength.threeMonths.price;
+const STRENGTH_GYM_MONTH_WEEKS = V2_BALANCE.ECONOMY.memberships.strength.monthly.weeks;
+const STRENGTH_GYM_THREE_MONTH_WEEKS = V2_BALANCE.ECONOMY.memberships.strength.threeMonths.weeks;
 const TOURNAMENT_PREP_WEEKS = 4;
 const RECREATIONAL_START_DATE = "2026-09-07";
 const RECREATIONAL_SPARRING_WEEK = 6;
@@ -174,12 +176,7 @@ const LEGACY_PRIVATE_COACHES = Object.freeze([
   { id: "dubois", name: "Victor Dubois", targets: ["power", "cardio"], price: 325, sessions: 6, reward: 3 },
 ]);
 
-const jobs = Object.freeze([
-  { id: "convenience", title: "Commis de dépanneur", schedule: "Horaire souple", wage: 75, interviewWeeks: 1, energy: -14, fatigue: 10, morale: -1, injury: 0, detail: "La solution la moins payante, mais la plus facile à concilier avec le camp." },
-  { id: "courier", title: "Coursier local", schedule: "Horaire variable", wage: 100, interviewWeeks: 2, energy: -20, fatigue: 16, morale: -3, injury: 1, detail: "Une meilleure paie hebdomadaire avec plus de kilomètres et de fatigue dans les jambes." },
-  { id: "office", title: "Employé de bureau", schedule: "Bureau · longues heures", wage: 120, interviewWeeks: 2, energy: -14, fatigue: 7, morale: -2, injury: 0, weekCapacityCost: 30, detail: "Une paie solide et peu de fatigue physique, mais de longues journées de bureau qui occupent une grande partie de la semaine." },
-  { id: "warehouse", title: "Manutention de nuit", schedule: "Horaire exigeant", wage: 130, interviewWeeks: 3, energy: -27, fatigue: 23, morale: -5, injury: 3, detail: "La paie hebdomadaire la plus élevée, au prix d’une lourde dépense physique." },
-]);
+const jobs = V2_BALANCE.JOBS;
 
 const REMY_TANK = Object.freeze({
   id: "remy-le-tank",
@@ -227,7 +224,7 @@ const INITIAL_STATE = {
   profile: null,
   combatStats: { technique: BASE_COMBAT_STAT, power: BASE_COMBAT_STAT, cardio: BASE_COMBAT_STAT, defense: BASE_COMBAT_STAT },
   week: 1,
-  money: 220,
+  money: V2_BALANCE.ECONOMY.startingMoney,
   careerStartDate: RECREATIONAL_START_DATE,
   energy: 72,
   fitness: 25,
@@ -301,6 +298,11 @@ const INITIAL_STATE = {
   lastFightWeek: 0,
   journal: [],
 };
+
+// Champs V1 conservés tels quels dans les sauvegardes pour garantir leur
+// compatibilité. La V2 ne les utilise plus dans ses règles persistantes.
+const V2_LEGACY_CONDITION_KEYS = new Set(["fitness", "morale", "injury", "injuryWeeks", "injuryStartedWeek"]);
+const V2_NEUTRAL_COMBAT_CONDITION = Object.freeze({ fitness: 50, morale: 50, injury: 0 });
 
 const betweenWeekEvents = [
   {
@@ -1012,8 +1014,8 @@ function normalizeCompetitionState() {
           condition: {
             energy: state.energy,
             fatigue: state.fatigue,
-            injury: state.injury,
-            fitness: state.fitness,
+            injury: V2_NEUTRAL_COMBAT_CONDITION.injury,
+            fitness: V2_NEUTRAL_COMBAT_CONDITION.fitness,
             cardio: state.combatStats.cardio,
             headDamage: 0,
             bodyDamage: 0,
@@ -1163,12 +1165,12 @@ const developerPresetDefinitions = Object.freeze([
   { id: "silver-ready", label: "Gants d’argent", detail: "Dix combats au dossier, prêt à vérifier les conditions d’argent." },
   { id: "golden-ready", label: "Gants dorés", detail: "Carrière avancée, budget et statistiques de niveau élevé." },
   { id: "pro-ready", label: "Professionnel · aperçu", detail: "Boxeur déjà passé pro pour tester l’affichage et les couleurs futures." },
-  { id: "recovery-case", label: "Test récupération", detail: "Fatigue, blessure légère et banque de vacances active." },
+  { id: "recovery-case", label: "Test récupération", detail: "Fatigue élevée et banque de vacances active." },
 ]);
 
 const developerToolDefinitions = Object.freeze([
   { id: "funds", label: "Fonds de test", detail: "Fixe le solde à 9 999 $." },
-  { id: "recover", label: "Récupération complète", detail: "Énergie à 100 %, fatigue et blessure à 0." },
+  { id: "recover", label: "Récupération complète", detail: "Énergie à 100 % et fatigue à 0 %." },
   { id: "test-fight", label: "Combat immédiat", detail: "Lance un combat complet comparable, sans modifier la carrière ni le bilan." },
   { id: "test-sparring", label: "Sparring immédiat", detail: "Lance quatre échanges par round, sans gagnant officiel ni effet sur la carrière." },
   { id: "next-week", label: "Semaine suivante", detail: "Avance sans action ni dépense ; indisponible lorsqu’un combat est dû." },
@@ -1545,12 +1547,15 @@ function opponentDifficulty(opponent) {
 }
 
 function opponentReputationReward(difficulty) {
-  const avoidancePenalty = state.avoidanceWeeks >= 3 ? Math.min(2, Math.floor(state.avoidanceWeeks / 3)) : 0;
-  return clamp(Math.round(4 + (difficulty - playerCombatStrength()) * .75) - avoidancePenalty, 2, 12);
+  return V2_BALANCE.opponentReputationReward({
+    difficulty,
+    playerStrength: playerCombatStrength(),
+    avoidanceWeeks: state.avoidanceWeeks,
+  });
 }
 
 function opponentExperienceReward(difficulty) {
-  return clamp(Math.round(18 + (difficulty - playerCombatStrength()) * .9), 14, 26);
+  return V2_BALANCE.opponentExperienceReward({ difficulty, playerStrength: playerCombatStrength() });
 }
 
 function isCompetitiveCareer() {
@@ -1628,7 +1633,6 @@ function tournamentAvailability(id) {
 function boxingGymTournamentAdvice(event, eligibilityNotes = []) {
   if (state.gymWeeks <= 0) return "";
   const count = amateurFightCount();
-  if (state.injuryWeeks > 0 || state.injury >= 45) return "Conseil du coach : ton état physique compte plus que l’inscription; récupère avant de te décider.";
   if (state.fatigue >= 58 || state.energy <= 42) return "Conseil du coach : la fenêtre est intéressante, mais ta fraîcheur est trop basse pour un tournoi maintenant.";
   if (event.tournamentId === "bronze" && count < 3) return "Conseil du coach : tu es admissible, mais quelques galas locaux de plus te donneraient des repères utiles sans fermer la fenêtre.";
   if (event.tournamentId === "silver" && count < 5) return "Conseil du coach : les Gants d’argent sont ouverts, mais tu peux encore privilégier les galas et choisir ton moment.";
@@ -1641,12 +1645,17 @@ function generateTournamentOpponents(tournament) {
   const names = state.profile.sex === "female" ? tournamentNamesFemale : tournamentNames;
   // Les parcours avancés sont surtout plus exigeants par leur longueur et leur progression
   // ronde après ronde; un décalage initial trop élevé les rendait presque impossibles.
-  const stageBonus = { bronze: -2, silver: -1, golden: 0, canadian: -1, olympic: 0 }[tournament.id] ?? 0;
-  const roundStep = { bronze: 2, silver: 2, golden: 2, canadian: 1.5, olympic: 1.5 }[tournament.id] || 2;
+  const curve = V2_BALANCE.TOURNAMENT_CURVES[tournament.id] || V2_BALANCE.TOURNAMENT_CURVES["regional-cup"];
+  const stageBonus = curve.openingOffset;
   const playerRating = playerCombatStrength();
   return Array.from({ length: tournament.rounds }, (_, round) => {
     const identity = names[(seed + round * 3) % names.length];
-    const rating = clamp(Math.round(playerRating + stageBonus + round * roundStep), 32, 98);
+    const rating = V2_BALANCE.tournamentOpponentRating({
+      tournamentId: tournament.id,
+      playerRating,
+      roundIndex: round,
+      baseDifficulty: tournament.baseDifficulty,
+    });
     const wins = Math.max(3, amateurFightCount() + Math.round(stageBonus) + round * 3);
     const losses = Math.max(1, 5 - round);
     const opponent = {
@@ -1695,7 +1704,7 @@ function completeTournament(medal = null, reason = "") {
   }
   if (active.id === "olympic") state.olympicCompleted = true;
   const medalLabel = medal === "gold" ? "médaille d’or" : medal === "silver" ? "médaille d’argent" : medal === "bronze" ? "médaille de bronze" : "aucune médaille";
-  applyChanges({ reputation: medal === "gold" ? 15 : medal ? 9 : 3, experience: medal === "gold" ? 20 : 12, morale: medal ? 8 : -4 });
+  applyChanges({ reputation: medal === "gold" ? 15 : medal ? 9 : 3, experience: medal === "gold" ? 20 : 12 });
   active.status = "completed";
   active.medal = medal;
   const booking = state.bookings.find(item => item.id === active.bookingId);
@@ -1714,9 +1723,11 @@ function resolveTournamentRound(fight, result, method = "decision", score = "") 
   const condition = {
     energy: fight.fighters.player.energy,
     fatigue: state.fatigue,
-    injury: state.injury,
-    fitness: state.fitness,
+    injury: V2_NEUTRAL_COMBAT_CONDITION.injury,
+    fitness: V2_NEUTRAL_COMBAT_CONDITION.fitness,
     cardio: state.combatStats.cardio,
+    // Ces séquelles restent limitées au tournoi. Elles donnent un sens aux
+    // choix Repos/Protection sans réactiver les blessures persistantes V1.
     headDamage: fight.fighters.player.head,
     bodyDamage: fight.fighters.player.body,
     lucidity: fight.fighters.player.lucidity,
@@ -1728,7 +1739,7 @@ function resolveTournamentRound(fight, result, method = "decision", score = "") 
       score,
       opponent: fight.opponent.name,
       condition,
-      medical: { knockedOut: fight.result?.method === "KO" && fight.result?.winner === "opponent", acuteInjury: fight.fighters.player.head >= 82 },
+      medical: { knockedOut: false, acuteInjury: false },
     });
   }
   active.results.push({ round: roundIndex, opponent: fight.opponent.name, result, score: score || method });
@@ -1894,9 +1905,7 @@ function renderFights() {
     return `<article class="tournament-card ${cardClass}"><span class="tournament-medal">${tournament.medal}</span><h3>${tournament.name}</h3><p>${tournament.description}</p>${medalSummary}<p class="tournament-state">${nextEvent ? `${formatDate(nextEvent.startDate)} · inscription dans le calendrier` : availability.label}</p></article>`;
   }).join("");
 
-  const pro = professionalEligibility();
-  const blocked = Boolean(state.scheduledFight || state.activeTournament);
-  proTransition.innerHTML = `<div><strong>Passer professionnel</strong><p>${pro.reason}${blocked && pro.eligible ? " · Termine ou annule d’abord le combat programmé." : ""}</p></div><button id="turn-pro" class="primary-button" type="button" ${!pro.eligible || blocked ? "disabled" : ""}>Passer professionnel</button>`;
+  proTransition.innerHTML = "";
 }
 
 function currentJob() {
@@ -1991,8 +2000,8 @@ function settleJobAttendance(worked, events, week, excused = false, paidWork = f
     accruePaidVacation(job, events, week);
     return;
   }
-  if (excused || state.injuryWeeks > 0) {
-    const note = `${job.title} : absence justifiée par ${excused ? "le tournoi" : "la blessure"}; ton emploi est protégé.`;
+  if (excused) {
+    const note = `${job.title} : absence justifiée par le tournoi; ton emploi est protégé.`;
     events.push(note);
     state.journal.unshift({ week, text: note });
     state.jobTenureWeeks += 1;
@@ -2027,7 +2036,7 @@ function scheduleRecreationalSparring(events = []) {
   if (!isRecreationalCareer() || state.week < RECREATIONAL_SPARRING_WEEK || state.recreationalSparringStatus === "completed" || state.scheduledFight) return;
   const partner = recreationalSparringPartner();
   const partnerView = sparringPartnerView();
-  const scheduledWeek = Math.max(RECREATIONAL_SPARRING_WEEK, state.week + (state.injuryWeeks > 0 ? state.injuryWeeks : 0));
+  const scheduledWeek = Math.max(RECREATIONAL_SPARRING_WEEK, state.week);
   state.recreationalSparringStatus = "ready";
   state.scheduledFight = {
     id: partner.id,
@@ -2646,15 +2655,6 @@ function v2ProgressionSnapshot(capsule = ensureV2PreviewCapsule()) {
 function v2PreparationView(timeState) {
   if (!timeState || !window.BoxeurTime) return null;
   const base = window.BoxeurTime.getPreparation(timeState);
-  if (state.injuryWeeks > 0) {
-    return {
-      ...base,
-      status: "injured",
-      tone: "critical",
-      label: "Repos médical",
-      detail: `${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} avant le retour à l’entraînement de boxe.`,
-    };
-  }
   const tone = base.status === "excellent" || base.status === "good"
     ? "positive"
     : base.status === "fair" ? "steady" : base.status === "fragile" ? "warning" : "critical";
@@ -2761,10 +2761,8 @@ function v2GymContext() {
     : { ...baseSparringPlanState, immediate: false, completed: sparringCompleted, fightWeek: false };
   const membershipMissing = career.gymWeeks <= 0;
   const conditionAccess = v2ConditionActivityAccess(coachPlannerId, capsule);
-  const trainingBlocked = state.injuryWeeks > 0 || membershipMissing || !conditionAccess.available || plannerPreview.capacity.remaining <= 0;
-  const trainingBlockedReason = state.injuryWeeks > 0
-    ? prep.detail
-    : membershipMissing
+  const trainingBlocked = membershipMissing || !conditionAccess.available || plannerPreview.capacity.remaining <= 0;
+  const trainingBlockedReason = membershipMissing
       ? "Inscription requise : passe à l’accueil. Le sac au sous-sol demeure accessible comme dépannage."
       : !conditionAccess.available
         ? conditionAccess.reason
@@ -2875,9 +2873,6 @@ function v2StrengthContext() {
     condition: {
       energy: capsule.timeState.condition.energy,
       fatigue: capsule.timeState.condition.fatigue,
-      medicalBlocked: state.injuryWeeks > 0,
-      injuryWeeks: state.injuryWeeks,
-      medicalReason: state.injuryWeeks > 0 ? v2PreparationView(capsule.timeState).detail : "",
       trainingBlocked: !conditionAccess.available,
       trainingBlockedReason: conditionAccess.reason,
     },
@@ -2936,9 +2931,9 @@ const V2_HOME_ACTIVITIES = Object.freeze({
     category: "home-recovery",
     duration: 1,
     energyCost: 0,
-    energyGain: 9,
+    energyGain: V2_BALANCE.WEEK.recovery.mealEnergyGain,
     fatigueGain: 0,
-    fatigueRelief: 2,
+    fatigueRelief: V2_BALANCE.WEEK.recovery.mealFatigueRelief,
     stimulus: { technique: 0, power: 0, cardio: 0, defense: 0 },
     xp: 0,
   }),
@@ -3024,9 +3019,7 @@ function v2HomeContext() {
   const plannerState = ensureV2WeekPlanner(capsule);
   const preview = window.BoxeurWeekPlanner.previewPlan(plannerState);
   const pendingLoad = Object.values(timeState.stimulus).reduce((sum, value) => sum + Number(value || 0), 0);
-  const recommendation = state.injuryWeeks > 0
-    ? { title: "Le repos médical passe en premier", detail: preparation.detail, tone: "critical" }
-    : timeState.condition.fatigue >= 65
+  const recommendation = timeState.condition.fatigue >= 65
     ? { title: "Une journée de repos est prioritaire", detail: "La fatigue persistante est trop haute pour empiler une autre grosse séance; la nuit sera appliquée automatiquement.", tone: "critical" }
     : pendingLoad >= 48
       ? { title: "Laisse l’XP s’assimiler", detail: "Une nuit transformera une partie de l’XP ciblée en attente en progression permanente.", tone: "warning" }
@@ -3376,8 +3369,6 @@ function v2TrainingContext() {
   return {
     membershipActive: runtimeCareer.gymWeeks > 0,
     careerStatus: state.careerStatus,
-    injury: state.injury,
-    injuryWeeks: state.injuryWeeks,
   };
 }
 
@@ -3522,14 +3513,14 @@ function recordV2Work(runtime, weekNumber, grossWages, workShifts = 1) {
   return ledger;
 }
 
-const V2_WEEK_CAPACITY_TOTAL = 50;
-const V2_WEEK_CAPACITY_MILESTONE_GAIN = 5;
-const V2_WEEK_CAPACITY_MAX = 65;
-const V2_WEEK_RULESET_VERSION = 9;
-const V2_CONDITION_CRITICAL_ENERGY = 20;
-const V2_CONDITION_CRITICAL_FATIGUE = 82;
-const V2_CONDITION_FRAGILE_ENERGY = 30;
-const V2_CONDITION_FRAGILE_FATIGUE = 72;
+const V2_WEEK_CAPACITY_TOTAL = V2_BALANCE.WEEK.baseCapacity;
+const V2_WEEK_CAPACITY_MILESTONE_GAIN = V2_BALANCE.WEEK.milestoneGain;
+const V2_WEEK_CAPACITY_MAX = V2_BALANCE.WEEK.maximumCapacity;
+const V2_WEEK_RULESET_VERSION = 10;
+const V2_CONDITION_CRITICAL_ENERGY = V2_BALANCE.WEEK.condition.criticalEnergy;
+const V2_CONDITION_CRITICAL_FATIGUE = V2_BALANCE.WEEK.condition.criticalFatigue;
+const V2_CONDITION_FRAGILE_ENERGY = V2_BALANCE.WEEK.condition.fragileEnergy;
+const V2_CONDITION_FRAGILE_FATIGUE = V2_BALANCE.WEEK.condition.fragileFatigue;
 const V2_DEMANDING_ACTIVITY_IDS = new Set([
   "boxing-coach",
   "boxing-custom",
@@ -3572,20 +3563,15 @@ function v2PlannerWeekKey(capsule = ensureV2PreviewCapsule()) {
 }
 
 function v2PlannerLoadCost(energyCost, fatigueDelta, minimum = 4, extraBaseCost = 0) {
-  const raw = 2 + Math.max(0, Number(extraBaseCost) || 0) + Math.max(0, Number(energyCost) || 0) * .55 + Math.max(0, Number(fatigueDelta) || 0) * .3;
-  return Math.max(minimum, Math.round(raw));
+  return V2_BALANCE.activityCapacityCost(energyCost, fatigueDelta, { minimum, extraBaseCost });
 }
 
 function v2PlannerWorkCost(job) {
-  if (!job) return 0;
-  const explicitCapacityCost = Number(job.weekCapacityCost);
-  if (Number.isFinite(explicitCapacityCost)) return Math.max(8, Math.round(explicitCapacityCost));
-  return Math.max(8, Math.round(Math.max(0, -Number(job.energy || 0)) * .7 + Math.max(0, Number(job.fatigue || 0)) * .5));
+  return V2_BALANCE.workCapacityCost(job);
 }
 
 function v2PlannerCapacityTotal() {
-  const milestoneCount = Math.floor(Math.max(0, Number(state.level || 1)) / 5);
-  return Math.min(V2_WEEK_CAPACITY_MAX, V2_WEEK_CAPACITY_TOTAL + milestoneCount * V2_WEEK_CAPACITY_MILESTONE_GAIN);
+  return V2_BALANCE.weeklyCapacity(state.level);
 }
 
 function v2ActiveRecoveryConsequence(capsule, career = normalizeV2PreviewRuntime(capsule).career) {
@@ -3736,7 +3722,6 @@ function v2PlannerSignature(capsule = ensureV2PreviewCapsule()) {
     runtime.career.jobId,
     runtime.career.gymWeeks,
     runtime.career.strengthGymWeeks,
-    state.injuryWeeks,
     state.level,
     Math.round(capsule.timeState.condition.energy),
     Math.round(capsule.timeState.condition.fatigue),
@@ -3923,9 +3908,9 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: "recovery",
       location: "home",
       physical: false,
-      capacityCost: 10,
-      energyGain: 18,
-      fatigueDelta: -12,
+      capacityCost: V2_BALANCE.WEEK.recovery.restCapacityCost,
+      energyGain: V2_BALANCE.WEEK.recovery.restEnergyGain,
+      fatigueDelta: -V2_BALANCE.WEEK.recovery.restFatigueRelief,
       recreationalAllowed: true,
       metadata: { plannerType: id },
     };
@@ -3938,10 +3923,10 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       location: "home",
       physical: false,
       capacityCost: 0,
-      energyGain: 9,
-      fatigueDelta: -2,
+      energyGain: V2_BALANCE.WEEK.recovery.mealEnergyGain,
+      fatigueDelta: -V2_BALANCE.WEEK.recovery.mealFatigueRelief,
       recreationalAllowed: true,
-      metadata: { plannerType: id, moneyCost: 15 },
+      metadata: { plannerType: id, moneyCost: V2_BALANCE.WEEK.recovery.mealCost },
     };
   }
   if (id === "private-training") {
@@ -4023,8 +4008,6 @@ function v2PlannerActivityAccess(activityId) {
   const capsule = ensureV2PreviewCapsule();
   const runtime = normalizeV2PreviewRuntime(capsule);
   const id = String(activityId || "");
-  const physical = !["rest", "meal"].includes(id);
-  if (physical && state.injuryWeeks > 0) return { available: false, reason: v2PreparationView(capsule.timeState).detail };
   const conditionAccess = v2ConditionActivityAccess(id, capsule);
   if (!conditionAccess.available) return conditionAccess;
   if (["group-class", "boxing-coach", "boxing-custom", "sparring"].includes(id) && runtime.career.gymWeeks <= 0) {
@@ -4329,10 +4312,13 @@ function applyV2QuickWeekPlan() {
   if (state.careerStatus === "recreational") {
     candidates.push({ id: "group-class", day: "tuesday" }, { id: "rest", day: "sunday" });
   } else {
+    // La récupération est la deuxième priorité du plan automatique. Ainsi, un
+    // emploi exigeant réduit le volume d'entraînement au lieu de supprimer le
+    // repos sans avertissement lorsque la capacité devient serrée.
     candidates.push({ id: "boxing-coach", day: "tuesday" });
+    candidates.push({ id: "rest", day: "sunday" });
     if (v2CareerView().strengthGymWeeks > 0) candidates.push({ id: "strength-quick", day: "thursday" });
     else candidates.push({ id: "home-quick", day: "thursday" });
-    candidates.push({ id: "rest", day: "sunday" });
   }
   const accepted = [];
   for (const candidate of candidates) {
@@ -4423,7 +4409,7 @@ function v2WeekViewContext() {
     id: `system-recovery-${activeRecovery.week}`,
     label: activeRecovery.kind === "hospital" ? "Nuit à l’hôpital" : "Repos forcé",
     detail: activeRecovery.kind === "hospital"
-      ? "Récupération médicale imposée après avoir poussé le boxeur trop loin."
+      ? "Récupération imposée après avoir épuisé toute la réserve physique."
       : "Récupération imposée par l’état physique de la semaine précédente.",
     dayLabel: "Début de semaine",
     cost: activeRecovery.capacityCost,
@@ -4539,7 +4525,7 @@ function settleV2JobAttendance(runtime, worked, events, week, excused = false) {
     accrueV2PaidVacation(runtime, job, events, week);
     return;
   }
-  if (excused || state.injuryWeeks > 0) {
+  if (excused) {
     addV2EmploymentEvent(events, week, "Absence protégée", `${job.title} : l’absence est justifiée; ton emploi demeure protégé.`, "neutral");
     career.jobTenureWeeks += 1;
     accrueV2PaidVacation(runtime, job, events, week);
@@ -4694,7 +4680,6 @@ function applyV2RecoveryConsequence(result, runtime, plannerEntries, previousWee
   const risk = window.BoxeurWeekPlanner.assessRecoveryRisk({
     plannedRest,
     condition: result.timeState.condition,
-    injury: state.injury,
   });
   runtime.career.recoveryConsequence = null;
   if (risk.kind === "none") return null;
@@ -4729,7 +4714,6 @@ function applyV2RecoveryConsequence(result, runtime, plannerEntries, previousWee
     result.finances.money = runtime.career.money;
     result.summary.money.after = runtime.career.money;
     result.summary.money.earned = runtime.career.money - result.summary.money.before;
-    state.injury = Math.max(0, state.injury - 12);
   }
   const event = hospital ? {
     label: "Nuit à l’hôpital",
@@ -4758,9 +4742,17 @@ function v2WeekSummaryView(result, completionEvents = [], options = {}) {
       tone: gainedXp > 0 ? "positive" : "neutral",
     };
   });
+  const conditionTransition = (key, suffix = "") => {
+    const after = Math.round(Number(result.timeState.condition[key] || 0));
+    const delta = Math.round(Number(result.summary.conditionDelta[key] || 0));
+    const before = after - delta;
+    const change = delta === 0 ? "stable" : v2Signed(delta, " pts");
+    return `${before}${suffix} → ${after}${suffix} · ${change}`;
+  };
+  const dateLabel = options.dateLabel || v2CareerView()?.v2DateLabel || "";
   const changes = [
-    { label: "Énergie", detail: v2Signed(result.summary.conditionDelta.energy, " pts"), tone: result.summary.conditionDelta.energy < 0 ? "warning" : "positive" },
-    { label: "Fatigue", detail: v2Signed(result.summary.conditionDelta.fatigue, " pts"), tone: result.summary.conditionDelta.fatigue > 0 ? "warning" : "positive" },
+    { label: "Énergie", detail: conditionTransition("energy", " %"), tone: result.summary.conditionDelta.energy < 0 ? "warning" : result.summary.conditionDelta.energy > 0 ? "positive" : "neutral" },
+    { label: "Fatigue", detail: conditionTransition("fatigue", " %"), tone: result.summary.conditionDelta.fatigue > 0 ? "warning" : result.summary.conditionDelta.fatigue < 0 ? "positive" : "neutral" },
     { label: "Paie brute", detail: v2Signed(grossWages, " $"), tone: grossWages > 0 ? "positive" : "neutral" },
     { label: "Dépenses planifiées", detail: plannedExpenses ? `−${plannedExpenses} $` : "0 $", tone: plannedExpenses ? "warning" : "neutral" },
     { label: "Variation du solde", detail: v2Signed(result.summary.money.earned, " $"), tone: result.summary.money.earned > 0 ? "positive" : result.summary.money.earned < 0 ? "warning" : "neutral" },
@@ -4777,9 +4769,9 @@ function v2WeekSummaryView(result, completionEvents = [], options = {}) {
   return {
     weekFrom: result.summary.from.week,
     weekTo: result.summary.to.week,
-    title: result.status === "week-complete" ? `Bienvenue à la semaine ${result.summary.to.week}` : "Une décision t’attend",
+    title: result.status === "week-complete" ? `Semaine ${result.summary.to.week}${dateLabel ? ` · ${dateLabel}` : ""}` : "Une décision t’attend",
     summary: result.status === "week-complete"
-      ? "Le programme a utilisé les mêmes activités et règles de récupération que le mode détaillé."
+      ? "Voici les valeurs avant et après la semaine, ainsi que les effets réellement appliqués."
       : "Le temps s’est arrêté avant une étape qui ne doit pas être décidée automatiquement.",
     changes,
     events,
@@ -4977,7 +4969,7 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
       fatigueGain: activity.fatigueGain,
       fatigueRelief: activity.fatigueRelief,
       stimulus: activity.stimulus,
-    }, { engineId: activity.id, category: "home-recovery", moneyDelta: -15 });
+    }, { engineId: activity.id, category: "home-recovery", moneyDelta: -V2_BALANCE.WEEK.recovery.mealCost });
   }
   if (entry.activityId === "private-training") {
     const publicProgram = window.BoxeurTrainer.getPublicState(sideEffects.trainerState).activeProgram;
@@ -5167,11 +5159,6 @@ function runV2AutomaticWeek() {
         .filter(record => record.kind === "work")
         .reduce((sum, record) => sum + Math.max(0, Number(record.moneyDelta || 0)), 0);
       recordV2Work(runtime, previousWeek, grossWages, result.summary.counts.work);
-      const currentJob = jobs.find(item => item.id === runtime.career.jobId);
-      if (currentJob) {
-        state.morale = clamp(state.morale + Number(currentJob.morale || 0));
-        state.injury = clamp(state.injury + Number(currentJob.injury || 0));
-      }
     }
     if (state.careerStatus === "recreational" && result.summary.counts.training > 0) runtime.trainingSessions += 1;
     const boxingDone = result.summary.actions.some(record => {
@@ -5684,7 +5671,6 @@ function v2TrainerAccess(locationId, program = null) {
   }
   const membershipActive = locationId === "strength-gym" ? career.strengthGymWeeks > 0 : career.gymWeeks > 0;
   if (!membershipActive) return { available: false, reason: "Un abonnement actif dans ce gym est requis." };
-  if (state.injuryWeeks > 0) return { available: false, reason: v2PreparationView(capsule.timeState).detail };
   const conditionAccess = v2ConditionActivityAccess("private-training", capsule);
   if (!conditionAccess.available) return conditionAccess;
   if (program && v2TrainerLocationForTarget(program.target) !== locationId) {
@@ -5813,7 +5799,7 @@ async function runV2TechnicalSparring(options = {}) {
   }
   const capsule = ensureV2PreviewCapsule();
   if (!capsule || !window.BoxeurTraining) return;
-  if (!["amateur", "professional"].includes(state.careerStatus)) return showToast("Termine d’abord le sparring d’évaluation et confirme ton passage amateur.");
+  if (!["amateur", "professional"].includes(state.careerStatus)) return showToast("Termine d’abord le sparring d’évaluation; le passage amateur se fera automatiquement.");
   const career = v2CareerView();
   if (career.gymWeeks <= 0) return showToast("Un abonnement actif au GYM est requis pour réserver un partenaire.");
   const access = v2PlannerActivityAccess("sparring");
@@ -5896,6 +5882,7 @@ async function startV2RemySparring() {
 
 function applyChanges(changes = {}) {
   Object.entries(changes).forEach(([key, change]) => {
+    if (V2_LEGACY_CONDITION_KEYS.has(key)) return;
     if (key === "money" || key === "experience") state[key] = Math.max(0, state[key] + change);
     else state[key] = clamp(state[key] + change);
   });
@@ -5924,7 +5911,6 @@ function endWeek(events) {
     state.pendingWeekEvent = null;
   }
   state.energy = clamp(state.energy + 6);
-  state.morale = clamp(state.morale - 1);
   state.fatigue = clamp(state.fatigue - (state.energy < 35 ? 4 : 6));
   if (state.profile && !state.activeTournament) {
     const targetWeight = defaultCompetitionWeight(weightClassDefinition(state.profile.weightClass, state.profile.sex));
@@ -5934,7 +5920,6 @@ function endWeek(events) {
       state.currentWeightKg = Math.round((state.currentWeightKg + weeklyAdjustment) * 10) / 10;
     }
   }
-  if (state.preFightTrainingWeek !== endingWeek) state.fitness = clamp(state.fitness - 1);
   if (state.preFightTrainingWeek === endingWeek) state.preFightTrainingWeek = 0;
   const membershipWasActive = state.gymWeeks > 0;
   const strengthMembershipWasActive = state.strengthGymWeeks > 0;
@@ -5942,43 +5927,15 @@ function endWeek(events) {
   if (strengthMembershipWasActive) state.strengthGymWeeks -= 1;
 
   let summary = "La récupération naturelle te rend un peu d'énergie.";
-  if (state.injuryWeeks > 0) {
-    if (state.injuryStartedWeek === endingWeek) {
-      summary = `La récupération obligatoire commence : encore ${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} à ménager le camp.`;
-    } else {
-      state.injuryWeeks -= 1;
-      state.injury = clamp(state.injury - 12);
-      if (!state.injuryWeeks) state.injuryStartedWeek = 0;
-      summary = state.injuryWeeks ? `Tu récupères de ta blessure : encore ${state.injuryWeeks} semaine à ménager le camp.` : "Tu es rétabli : le camp peut reprendre progressivement.";
-    }
+  if (state.energy < 20 || state.fatigue >= 85) {
+    summary = "La fatigue accumulée réduit fortement ta préparation. Il faudrait lever le pied.";
     events.push(summary);
-  } else if (state.injury >= 55 && Math.random() < (state.injury + state.fatigue * .45) / 180) {
-    state.injuryWeeks = state.injury >= 75 || state.fatigue >= 75 ? 2 : 1;
-    state.injuryStartedWeek = endingWeek;
-    state.fitness = clamp(state.fitness - 10);
-    state.morale = clamp(state.morale - 8);
-    const cancelledBookingId = state.scheduledFight?.bookingId;
-    const cancelledFight = state.scheduledFight ? ` Le combat prévu contre ${scheduledOpponent()?.name || "ton adversaire"} est annulé.` : "";
-    const wasRecreationalSparring = Boolean(state.scheduledFight?.isRecreationalSparring);
-    state.scheduledFight = null;
-    if (wasRecreationalSparring) state.recreationalSparringStatus = "ready";
-    const cancelledBooking = state.bookings.find(item => item.id === cancelledBookingId);
-    if (cancelledBooking) cancelledBooking.status = "cancelled";
-    summary = `Blessure au camp : ${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} de récupération obligatoire.${cancelledFight}`;
-    events.push(summary);
-  } else if (state.energy < 20 || state.fatigue >= 85) {
-    state.injury = clamp(state.injury + 6);
-    summary = "La fatigue accumulée augmente ton risque de blessure. Il faudrait lever le pied.";
-    events.push(summary);
-  } else {
-    state.injury = clamp(state.injury - 2);
   }
   if (state.careerStatus === "amateur" && !state.scheduledFight && !state.activeTournament && endingWeek > state.lastFightWeek) {
     state.avoidanceWeeks += 1;
     if (state.avoidanceWeeks >= 3) {
       const warning = state.avoidanceWeeks >= 6 ? "Le coach te prévient : à force d’éviter les combats, ta réputation et la qualité des offres diminuent." : "Le coach te prévient : trois semaines sans combat ralentissent ta réputation et ta progression.";
       state.reputation = clamp(state.reputation - (state.avoidanceWeeks >= 6 ? 2 : 1));
-      state.morale = clamp(state.morale - 1);
       events.push(warning);
       state.journal.unshift({ week: endingWeek, text: warning });
     }
@@ -6088,7 +6045,6 @@ async function startFight() {
   if (!opponent) return;
   if (state.week < state.scheduledFight.week) return showToast(`Combat prévu à la semaine ${state.scheduledFight.week}.`);
   const isDeveloperBout = Boolean(state.scheduledFight.isDeveloperBout);
-  if (state.injuryWeeks > 0 && !isDeveloperBout) return showToast("Blessure en cours : ce combat doit être annulé.");
   const isV2Sparring = Boolean(state.scheduledFight.isV2Sparring);
   if (!state.scheduledFight.travelApplied) {
     applyChanges({ energy: state.scheduledFight.travelEffects?.energy || 0, fatigue: state.scheduledFight.travelEffects?.fatigue || 0 });
@@ -6097,8 +6053,9 @@ async function startFight() {
   const isRecreationalSparring = Boolean(state.scheduledFight.isRecreationalSparring);
   const isPracticeSparring = Boolean(state.scheduledFight.isPracticeSparring);
   const isNonRecordSparring = isRecreationalSparring || isPracticeSparring;
-  const isLocalOfficialFight = !state.scheduledFight.tournamentId && !isNonRecordSparring;
-  const useImmersiveRing = isNonRecordSparring || isLocalOfficialFight;
+  const isTournamentBout = Boolean(state.scheduledFight.tournamentId) && !isNonRecordSparring;
+  const isLocalOfficialFight = !isTournamentBout && !isNonRecordSparring;
+  const useImmersiveRing = isNonRecordSparring || isLocalOfficialFight || isTournamentBout;
   const v2FightCareer = !state.scheduledFight.tournamentId && !isDeveloperBout
     ? v2CareerView()
     : null;
@@ -6127,10 +6084,10 @@ async function startFight() {
       style: styles[state.profile.style].label,
       stats: v2FightCareer?.combatStats || state.combatStats,
       energy: isDeveloperBout ? 100 : v2FightCareer?.energy ?? state.activeTournament?.competition?.condition?.energy ?? state.energy,
-      fitness: state.fitness,
+      fitness: V2_NEUTRAL_COMBAT_CONDITION.fitness,
       fatigue: isDeveloperBout ? 0 : v2FightCareer?.fatigue ?? state.fatigue,
-      injury: isDeveloperBout ? 0 : state.injury,
-      morale: state.morale,
+      injury: V2_NEUTRAL_COMBAT_CONDITION.injury,
+      morale: V2_NEUTRAL_COMBAT_CONDITION.morale,
       experience: state.experience,
       level: state.level,
       head: state.activeTournament?.competition?.condition?.headDamage || 0,
@@ -6150,10 +6107,19 @@ async function startFight() {
     isRecreationalSparring,
     isPracticeSparring,
     isLocalOfficialFight,
+    isTournamentOfficialFight: isTournamentBout,
     isV2Sparring,
     isDeveloperBout,
     deferredScheduledFight: scheduled.deferredScheduledFight ? cloneData(scheduled.deferredScheduledFight) : null,
     remyLesson: !isRecreationalSparring ? state.remyLesson : "",
+    careerBefore: {
+      energy: Math.round(v2FightCareer?.energy ?? state.energy),
+      fatigue: Math.round(v2FightCareer?.fatigue ?? state.fatigue),
+      experience: state.experience,
+      reputation: state.reputation,
+      money: state.money,
+      amateurRecord: cloneData(state.amateurRecord),
+    },
   };
   sparringRingState = useImmersiveRing && window.BoxeurSparringRing
     ? window.BoxeurSparringRing.createState({
@@ -6171,9 +6137,12 @@ async function startFight() {
   stage.classList.remove("show-impact");
   configureRingImages();
   if (isNonRecordSparring) configureSparringPlayerImages();
-  const immersiveBackdropSelector = isLocalOfficialFight
-    ? ".local-fight-ring-backdrop, .local-fight-before-backdrop, .local-fight-corner-backdrop, .local-fight-after-backdrop, .sparring-fighter-image"
-    : ".sparring-ring-backdrop, .sparring-before-backdrop, .sparring-corner-backdrop, .sparring-after-backdrop, .sparring-fighter-image";
+  const tournamentVisualFamily = scheduled.tournamentId === "olympic" ? "olympic" : "amateur";
+  const immersiveBackdropSelector = isTournamentBout
+    ? `.tournament-${tournamentVisualFamily}-ring-backdrop, .tournament-${tournamentVisualFamily}-before-backdrop, .tournament-${tournamentVisualFamily}-corner-backdrop, .tournament-${tournamentVisualFamily}-after-backdrop, .sparring-fighter-image`
+    : isLocalOfficialFight
+      ? ".local-fight-ring-backdrop, .local-fight-before-backdrop, .local-fight-corner-backdrop, .local-fight-after-backdrop, .sparring-fighter-image"
+      : ".sparring-ring-backdrop, .sparring-before-backdrop, .sparring-corner-backdrop, .sparring-after-backdrop, .sparring-fighter-image";
   const backdrops = sparringRingState
     ? [...stage.querySelectorAll(immersiveBackdropSelector)]
     : [stage.querySelector(".ring-backdrop")].filter(Boolean);
@@ -6294,7 +6263,7 @@ function activateTournamentBooking(booking) {
     id: event.id,
     totalBouts: event.rounds,
     started: true,
-    condition: { energy: state.energy, fatigue: state.fatigue, injury: state.injury, fitness: state.fitness, cardio: state.combatStats.cardio, headDamage: 0, bodyDamage: 0, lucidity: 100 },
+    condition: { energy: state.energy, fatigue: state.fatigue, injury: V2_NEUTRAL_COMBAT_CONDITION.injury, fitness: V2_NEUTRAL_COMBAT_CONDITION.fitness, cardio: state.combatStats.cardio, headDamage: 0, bodyDamage: 0, lucidity: 100 },
     weight: { className: category.label, minKg: category.minKg, maxKg: category.maxKg },
   });
   state.activeTournament = {
@@ -6314,7 +6283,7 @@ function activateTournamentBooking(booking) {
     summary: "",
     competition,
   };
-  state.journal.unshift({ week: state.week, text: `${event.name} commence à ${event.venue.city}. Pesée et examen avant chaque combat.` });
+  state.journal.unshift({ week: state.week, text: `${event.name} commence à ${event.venue.city}. Pesée avant chaque combat.` });
   return state.activeTournament;
 }
 
@@ -6446,7 +6415,7 @@ function renderTournamentBoard() {
   const category = weightClassDefinition(state.profile.weightClass, state.profile.sex);
   if (competition && active.status !== "completed") {
     const phaseLabels = {
-      daily_check: "Pesée et contrôle à effectuer",
+      daily_check: "Pesée à effectuer",
       ready: "Autorisé à boxer aujourd’hui",
       in_bout: "Combat en cours",
       inter_bout: "Journée terminée · récupération à choisir",
@@ -6454,8 +6423,7 @@ function renderTournamentBoard() {
       eliminated: "Éliminé du tournoi",
       withdrawn: "Retiré du tournoi",
     };
-    const medicalLabel = competition.medical?.status === "fit_with_warning" ? "apte avec surveillance" : competition.medical?.status === "fit" ? "apte" : "à contrôler";
-    dailyStatus.innerHTML = `<div><span>Jour du tournoi</span><strong>${competition.day} / ${competition.totalBouts}</strong></div><div><span>Poids actuel</span><strong>${Number(state.currentWeightKg).toFixed(1)} kg</strong><small>${category.minKg} à ${category.maxKg} kg</small></div><div><span>Énergie disponible</span><strong>${Math.round(competition.condition.energy)} %</strong><small>Fatigue ${Math.round(competition.condition.fatigue)} %</small></div><div><span>Contrôle</span><strong>${escapeHTML(phaseLabels[competition.phase] || competition.phase)}</strong><small>État : ${medicalLabel}</small></div>`;
+    dailyStatus.innerHTML = `<div><span>Jour du tournoi</span><strong>${competition.day} / ${competition.totalBouts}</strong></div><div><span>Poids actuel</span><strong>${Number(state.currentWeightKg).toFixed(1)} kg</strong><small>${category.minKg} à ${category.maxKg} kg</small></div><div><span>Énergie disponible</span><strong>${Math.round(competition.condition.energy)} %</strong><small>Fatigue ${Math.round(competition.condition.fatigue)} %</small></div><div><span>Étape</span><strong>${escapeHTML(phaseLabels[competition.phase] || competition.phase)}</strong><small>Un combat par jour</small></div>`;
     const showRecovery = competition.phase === BoxeurTournament.PHASES.INTER_BOUT;
     interBout.hidden = !showRecovery;
     if (showRecovery) {
@@ -6482,11 +6450,11 @@ function renderTournamentBoard() {
   button.textContent = remaining > 0
     ? `Début dans ${remaining} semaine${remaining > 1 ? "s" : ""}`
     : competition?.phase === BoxeurTournament.PHASES.DAILY_CHECK
-        ? `${state.injuryWeeks > 0 ? "Passer le contrôle médical" : "Passer la pesée"} du jour ${competition.day}`
+        ? `Passer la pesée du jour ${competition.day}`
         : competition?.phase === BoxeurTournament.PHASES.INTER_BOUT
           ? "Choisis la récupération de la nuit"
           : `Disputer ${roundName(tournament.rounds, active.currentRound).toLowerCase()}`;
-  button.title = state.injuryWeeks > 0 ? "Le contrôle quotidien décidera si le tournoi peut continuer." : "";
+  button.title = "";
 }
 
 function openTournamentBoard() {
@@ -6518,7 +6486,6 @@ function syncTournamentConditionToCareer() {
   if (!condition) return;
   state.energy = clamp(Math.round(condition.energy));
   state.fatigue = clamp(Math.round(condition.fatigue));
-  state.injury = clamp(Math.round(condition.injury));
 }
 
 function applyTournamentRecovery(choiceId) {
@@ -6559,8 +6526,8 @@ function startTournamentRound() {
         minKg: category.minKg,
         maxKg: category.maxKg,
         toleranceKg: 0,
-        restrictionDays: state.injuryWeeks > 0 ? state.injuryWeeks * 7 : 0,
-        acuteInjury: state.injury >= 88,
+        restrictionDays: 0,
+        acuteInjury: false,
       });
       if (active.competition.phase === BoxeurTournament.PHASES.WITHDRAWN) {
         const reason = active.competition.termination?.reason === "weigh_in" ? `disqualification à la pesée (${state.currentWeightKg.toFixed(1)} kg pour une limite de ${category.maxKg} kg)` : "retrait après le contrôle d’aptitude";
@@ -6645,8 +6612,16 @@ function isLocalOfficialFight() {
   return Boolean(fightState?.careerMeta?.isLocalOfficialFight && sparringRingState && window.BoxeurSparringRing);
 }
 
+function isTournamentOfficialFight() {
+  return Boolean(fightState?.careerMeta?.isTournamentOfficialFight && sparringRingState && window.BoxeurSparringRing);
+}
+
+function isOfficialFight() {
+  return isLocalOfficialFight() || isTournamentOfficialFight();
+}
+
 function isImmersiveRingFight() {
-  return isRemyRingPrototype() || isTechnicalSparringPrototype() || isLocalOfficialFight();
+  return isRemyRingPrototype() || isTechnicalSparringPrototype() || isOfficialFight();
 }
 
 function immersiveOpponentFirstName() {
@@ -6747,8 +6722,13 @@ function renderSparringRing(view) {
   const coachCallout = document.querySelector("#sparring-coach-callout");
   const prototypeActive = isImmersiveRingFight();
   const localFightActive = isLocalOfficialFight();
+  const tournamentFightActive = isTournamentOfficialFight();
+  const olympicFightActive = tournamentFightActive && fightState?.careerMeta?.tournamentId === "olympic";
+  const officialFightActive = localFightActive || tournamentFightActive;
   dialog?.classList.toggle("sparring-ring-prototype", prototypeActive);
   dialog?.classList.toggle("local-fight-prototype", localFightActive);
+  dialog?.classList.toggle("tournament-fight-prototype", tournamentFightActive);
+  dialog?.classList.toggle("olympic-fight-prototype", olympicFightActive);
   if (!stage || !destinations || !coachCallout) return;
   if (!prototypeActive) {
     delete stage.dataset.sparringScene;
@@ -6791,7 +6771,7 @@ function renderSparringRing(view) {
     fighter.style.setProperty("--ring-layer", String(visual.layer));
     fighter.style.setProperty("--fighter-flip", visual.mirrored ? "-1" : "1");
     fighter.dataset.facing = visual.direction;
-    image.src = localFightActive
+    image.src = officialFightActive
       ? localFightFighterAsset(role, visual, scene)
       : sparringFighterAsset(role, visual);
   });
@@ -7023,7 +7003,7 @@ function renderFightCoach() {
   const panel = document.querySelector("#fight-coach-panel");
   const choices = document.querySelector("#fight-coach-choices");
   const immersiveFight = isImmersiveRingFight();
-  const localFight = isLocalOfficialFight();
+  const officialFight = isOfficialFight();
   const showCoachPanel = Boolean(fightState && (fightState.phase === "corner" || (immersiveFight && fightState.phase === "exchange")));
   if (!showCoachPanel) {
     panel.hidden = true;
@@ -7046,7 +7026,7 @@ function renderFightCoach() {
   const remyLesson = fightState.careerMeta?.remyLesson;
   document.querySelector("#fight-coach-title").textContent = immersiveFight
     ? fightState.round === 1
-      ? localFight ? "Le coach prépare ton combat" : "Le coach prépare ton sparring"
+      ? officialFight ? "Le coach prépare ton combat" : "Le coach prépare ton sparring"
       : `Ton vrai coin · avant le round ${fightState.round}`
     : fightState.round === 1 ? "Directive avant le combat" : `Pause du coach avant le round ${fightState.round}`;
   document.querySelector("#fight-coach-analysis").textContent = `${pending.observation} Le coach propose : ${pending.prediction}.${remyLesson && fightState.round === 1 ? ` Rappel : ${remyLesson}` : ""}`;
@@ -7155,8 +7135,8 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   const showImmersiveTutorial = immersiveFight && view.phase === "corner" && view.round === 1 && !view.status.finished;
   const immersiveInstruction = immersiveFight
     ? showImmersiveTutorial
-      ? isLocalOfficialFight()
-        ? "La barre sous le ring montre ton ressenti du round. Les cartes des trois juges restent cachées jusqu’au résultat."
+      ? isOfficialFight()
+        ? `La barre sous le ring montre ton ressenti du round. Les cartes des ${view.format.judgeCount} juges restent cachées jusqu’au résultat.`
         : "La barre sous le ring montre ton ressenti du round, jamais un score ni une carte de juge."
       : view.phase === "corner"
         ? "Choisis une seule priorité avant de repartir."
@@ -7301,8 +7281,6 @@ function settleV2Sparring(fight, fightFatigue, exposure) {
     }
     state.recreationalSparringStatus = "completed";
   }
-  state.morale = clamp(state.morale + (isRemy ? 3 : 1));
-  state.injury = clamp(state.injury + Math.max(1, Math.round(exposure * .12)));
   runtime.career.experience += isRemy ? 14 : 8;
   if (!isRemy && isCompetitiveCareer()) state.boxingTrainingWeek = capsule.timeState.clock.week;
   if (!trainedEarlierThisWeek) runtime.trainingSessions = safeNumber(runtime.trainingSessions + 1, 0, 0, 999);
@@ -7334,6 +7312,59 @@ function settleV2Sparring(fight, fightFatigue, exposure) {
   return true;
 }
 
+function fightCareerSnapshot(source = state) {
+  return {
+    energy: Math.round(Number(source.energy ?? state.energy)),
+    fatigue: Math.round(Number(source.fatigue ?? state.fatigue)),
+    experience: Math.round(Number(source.experience ?? state.experience)),
+    reputation: Math.round(Number(source.reputation ?? state.reputation)),
+    money: Math.round(Number(source.money ?? state.money)),
+    amateurRecord: cloneData(source.amateurRecord || state.amateurRecord),
+  };
+}
+
+function buildFightCareerDebrief(fight, before, after, options = {}) {
+  const exchanges = (fight.history || []).filter(item => item?.type === "exchange");
+  const playerEdges = exchanges.filter(item => item.side === "player").length;
+  const opponentEdges = exchanges.filter(item => item.side === "opponent").length;
+  const significant = exchanges.filter(item => item.significant).length;
+  const knockdownsFor = exchanges.filter(item => item.knockdown?.knockedDown === "opponent").length;
+  const knockdownsAgainst = exchanges.filter(item => item.knockdown?.knockedDown === "player").length;
+  const xpDelta = after.experience - before.experience;
+  const reputationDelta = after.reputation - before.reputation;
+  const moneyDelta = after.money - before.money;
+  const recordBefore = before.amateurRecord || { wins: 0, losses: 0, draws: 0 };
+  const recordAfter = after.amateurRecord || recordBefore;
+  const recordChanged = ["wins", "losses", "draws"].some(key => Number(recordAfter[key] || 0) !== Number(recordBefore[key] || 0));
+  const signed = (value, suffix = "") => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value)}${suffix}`;
+  const ringNotes = [
+    `${playerEdges} échange${playerEdges > 1 ? "s" : ""} à ton avantage · ${opponentEdges} à l’adversaire.`,
+    `${significant} échange${significant > 1 ? "s" : ""} marquant${significant > 1 ? "s" : ""}.`,
+  ];
+  if (knockdownsFor || knockdownsAgainst) ringNotes.push(`Comptes : ${knockdownsFor} provoqué${knockdownsFor > 1 ? "s" : ""} · ${knockdownsAgainst} subi${knockdownsAgainst > 1 ? "s" : ""}.`);
+  const progression = options.developer
+    ? "Aucun effet sur la carrière."
+    : `XP ${signed(xpDelta)} · réputation ${signed(reputationDelta)}.`;
+  const finances = options.developer
+    ? "Solde inchangé."
+    : moneyDelta === 0 ? "Aucun gain ni coût supplémentaire." : `Variation du solde : ${signed(moneyDelta, " $")}.`;
+  const record = options.nonRecord
+    ? "Non comptabilisé au bilan amateur."
+    : recordChanged
+      ? `${recordAfter.wins || 0} V · ${recordAfter.losses || 0} D · ${recordAfter.draws || 0} N`
+      : "Bilan amateur inchangé.";
+  return `<section class="fight-career-debrief" aria-labelledby="fight-career-debrief-title">
+    <h3 id="fight-career-debrief-title">Bilan du combat</h3>
+    <div class="fight-career-debrief-grid">
+      <div><strong>Condition</strong><span>Énergie ${before.energy} → ${after.energy} · fatigue ${before.fatigue} → ${after.fatigue}</span></div>
+      <div><strong>Progression</strong><span>${escapeHTML(progression)}</span></div>
+      <div><strong>Finances</strong><span>${escapeHTML(finances)}</span></div>
+      <div><strong>Bilan</strong><span>${escapeHTML(record)}</span></div>
+    </div>
+    <div class="fight-career-debrief-notes"><strong>Repères du ring</strong><ul>${ringNotes.map(note => `<li>${escapeHTML(note)}</li>`).join("")}</ul></div>
+  </section>`;
+}
+
 function finishFight() {
   if (!fightState?.status.finished || fightState.careerApplied) return;
   clearSparringAutoResolve();
@@ -7349,21 +7380,20 @@ function finishFight() {
   const isDeveloperBout = Boolean(meta.isDeveloperBout);
   const exposure = fightResult.exposure?.player || fightState.fighters.player.legacyExposure || 0;
   const fightFatigue = clamp(Math.round(8 + (100 - fightState.fighters.player.energy) * .14 + exposure * .25 - state.combatStats.cardio * .035), 8, 32);
-  const injuryIncrease = clamp(Math.round(2 + exposure * .28 + (won ? 0 : 2) - (state.combatStats.defense - 40) * .025 + fightState.fighters.player.head * .025), 1, 15);
   if (isDeveloperBout) {
     // Un affrontement lancé par le menu caché exerce le vrai moteur, mais ne
     // touche jamais au bilan, aux jauges ni à la semaine de la carrière testée.
   } else if (isNonRecordSparring) {
     if (!isV2Sparring) {
-      applyChanges({ experience: 14, morale: 3, injury: Math.max(1, Math.round(injuryIncrease * .65)), fatigue: Math.round(fightFatigue * .72) });
+      applyChanges({ experience: 14, fatigue: Math.round(fightFatigue * .72) });
       if (isRecreationalSparring) state.recreationalSparringStatus = "completed";
     }
   } else if (won) {
     state.amateurRecord.wins += 1;
-    applyChanges({ reputation: meta.tournamentId ? 6 + (state.activeTournament?.currentRound || 0) : meta.reputationReward, experience: meta.experienceReward, morale: 7, injury: injuryIncrease, fatigue: fightFatigue });
+    applyChanges({ reputation: meta.tournamentId ? 6 + (state.activeTournament?.currentRound || 0) : meta.reputationReward, experience: meta.experienceReward, fatigue: fightFatigue });
   } else {
     state.amateurRecord.losses += 1;
-    applyChanges({ reputation: 2, experience: Math.max(10, (meta.experienceReward || 16) - 6), morale: -5, injury: injuryIncrease + 2, fatigue: fightFatigue + 3 });
+    applyChanges({ reputation: 2, experience: Math.max(10, (meta.experienceReward || 16) - 6), fatigue: fightFatigue + 3 });
   }
   if (!isV2Sparring && !isDeveloperBout) state.energy = clamp(Math.round(fightState.fighters.player.energy));
   if (!isNonRecordSparring && !isDeveloperBout) {
@@ -7373,29 +7403,6 @@ function finishFight() {
   const score = fightResult.method === "decision" ? `décision ${fightResult.decision}` : `${fightResult.label} · R${fightResult.round || fightState.round}`;
   const tournamentNote = isNonRecordSparring || isDeveloperBout ? "" : resolveTournamentRound({ ...fightState, tournamentId: meta.tournamentId, opponent: meta.opponent }, result, fightResult.method, score);
   const unlockedFourthAction = !isNonRecordSparring && !isDeveloperBout && fightCountBefore < 10 && amateurFightCount() >= 10;
-  let injuryEvent = "";
-  if (isDeveloperBout) {
-    injuryEvent = "";
-  } else if (isV2Sparring) {
-    injuryEvent = exposure >= 45 ? " Le coach impose une récupération légère après cette opposition exigeante." : "";
-  } else if (!won && fightResult.method === "KO") {
-    state.injuryWeeks = Math.max(state.injuryWeeks, 2);
-    state.injuryStartedWeek = state.week;
-    injuryEvent = isRecreationalSparring ? " Le coach impose deux semaines de récupération après ce sparring exigeant." : " Une récupération obligatoire de deux semaines suit le KO.";
-  } else if (!won && fightResult.method === "TKO") {
-    state.injuryWeeks = Math.max(state.injuryWeeks, 1);
-    state.injuryStartedWeek = state.week;
-    injuryEvent = isRecreationalSparring ? " Le coach impose une semaine de récupération après ce sparring exigeant." : " Une semaine de récupération obligatoire suit l’arrêt.";
-  } else {
-    const acuteInjuryChance = clamp((state.injury - 58) / 160 + exposure / 240 + fightState.fighters.player.head / 600, 0, .38);
-    if (!state.injuryWeeks && Math.random() < acuteInjuryChance) {
-      state.injuryWeeks = state.injury >= 80 ? 2 : 1;
-      state.injuryStartedWeek = state.week;
-      state.fitness = clamp(state.fitness - 6);
-      state.morale = clamp(state.morale - 3);
-      injuryEvent = ` Une blessure impose ${state.injuryWeeks} semaine${state.injuryWeeks > 1 ? "s" : ""} de récupération.`;
-    } else if (state.injury >= 55) injuryEvent = " Le corps sort marqué du combat.";
-  }
   const methodLabel = isNonRecordSparring ? "Sparring terminé" : fightResult.method === "decision" ? `${fightResult.label} (${fightResult.decision})` : `${won ? "Victoire" : "Défaite"} par ${fightResult.label}`;
   const journalPrefix = isRecreationalSparring ? "Sparring d’évaluation" : isPracticeSparring ? "Sparring technique" : "Combat amateur";
   const partner = sparringPartnerView();
@@ -7409,16 +7416,18 @@ function finishFight() {
     : isPracticeSparring
       ? `Opposition contrôlée contre ${meta.opponent?.name || fightState.fighters.opponent.name}, sans résultat au bilan.`
       : `${methodLabel} contre ${meta.opponent?.name || fightState.fighters.opponent.name}.`;
-  if (!isDeveloperBout) state.journal.unshift({ week: state.week, text: `${journalPrefix} : ${sparringSummary}${tournamentNote ? ` ${tournamentNote}` : ""}${injuryEvent}` });
+  if (!isDeveloperBout) state.journal.unshift({ week: state.week, text: `${journalPrefix} : ${sparringSummary}${tournamentNote ? ` ${tournamentNote}` : ""}` });
   if (unlockedFourthAction) state.journal.unshift({ week: state.week, text: "Dix combats amateurs disputés : le programme hebdomadaire passe définitivement à quatre actions." });
   const booking = state.bookings.find(item => item.id === meta.bookingId);
   if (booking && !meta.tournamentId && !isDeveloperBout) booking.status = "completed";
   fightState.careerApplied = true;
+  let careerAfterFight = fightCareerSnapshot();
   if (isDeveloperBout) {
     state.scheduledFight = developerBoutScheduledBackup;
     developerBoutScheduledBackup = null;
   } else if (isV2Sparring) {
     settleV2Sparring(fightState, fightFatigue, exposure);
+    careerAfterFight = fightCareerSnapshot(v2CareerView());
     if (isRecreationalSparring) completeAmateurCareerAfterSparring();
   }
   else state.scheduledFight = null;
@@ -7438,7 +7447,13 @@ function finishFight() {
     ? `${partner.firstName} a terminé l’opposition et Rémy donne son feu vert. Ton statut amateur est maintenant activé automatiquement.`
     : "Rémy a terminé son évaluation. Ton statut amateur est maintenant activé automatiquement.";
   const sparringReport = sparringDebrief ? `<section class="sparring-debrief" aria-labelledby="sparring-debrief-title"><h3 id="sparring-debrief-title">${escapeHTML(debriefTitle)}</h3><div><strong>À garder</strong><ul>${sparringDebrief.strengths.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div><div><strong>À essayer au prochain combat</strong><ul>${sparringDebrief.adjustments.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div></section>` : "";
-  instruction.innerHTML = `<p><strong>${escapeHTML(methodLabel)}</strong><br>${isDeveloperBout ? "Test terminé : la carrière, le bilan, les jauges et le calendrier sont restés intacts." : isRecreationalSparring ? escapeHTML(evaluationComplete) : isPracticeSparring ? "Le sparring reste une séance d’apprentissage : aucune victoire ni défaite n’est ajoutée au bilan." : meta.tournamentId ? escapeHTML(tournamentNote || "Le tableau est mis à jour.") : "Expérience, réputation, fatigue et état physique ont été mis à jour."}${injuryEvent ? `<br>${escapeHTML(injuryEvent.trim())}` : ""}</p>${sparringReport}`;
+  const careerDebrief = buildFightCareerDebrief(
+    fightState,
+    meta.careerBefore || fightCareerSnapshot(),
+    careerAfterFight,
+    { developer: isDeveloperBout, nonRecord: isNonRecordSparring || isDeveloperBout },
+  );
+  instruction.innerHTML = `<p><strong>${escapeHTML(methodLabel)}</strong><br>${isDeveloperBout ? "Test terminé : la carrière, le bilan, les jauges et le calendrier sont restés intacts." : isRecreationalSparring ? escapeHTML(evaluationComplete) : isPracticeSparring ? "Le sparring reste une séance d’apprentissage : aucune victoire ni défaite n’est ajoutée au bilan." : meta.tournamentId ? escapeHTML(tournamentNote || "Le tableau est mis à jour.") : "Le bilan ci-dessous montre exactement les effets du combat."}</p>${careerDebrief}${sparringReport}`;
   const closeButton = document.createElement("button");
   closeButton.className = "primary-button";
   closeButton.type = "button";

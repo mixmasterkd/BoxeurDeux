@@ -254,6 +254,7 @@ async function chooseLowImpactExchange(page) {
     const action = page.locator(`#fight-choices [data-fight-action="${actionId}"]`);
     if (await action.isVisible()) {
       await action.click();
+      await waitForAutomaticSparringResolution(page);
       return true;
     }
   }
@@ -304,7 +305,8 @@ function legacyV3Snapshot() {
   };
 }
 
-function dueTournamentSnapshot() {
+function dueTournamentSnapshot(tournamentId = "bronze") {
+  const totalBouts = tournamentId === "olympic" || tournamentId === "canadian" ? 5 : 3;
   const condition = {
     energy: 94,
     fatigue: 3,
@@ -315,7 +317,7 @@ function dueTournamentSnapshot() {
     bodyDamage: 0,
     lucidity: 100,
   };
-  const opponents = Array.from({ length: 3 }, (_, index) => ({
+  const opponents = Array.from({ length: totalBouts }, (_, index) => ({
     id: `browser-opponent-${index + 1}`,
     name: `Adversaire test ${index + 1}`,
     nickname: "Le Repère",
@@ -352,9 +354,15 @@ function dueTournamentSnapshot() {
       fatigue: condition.fatigue,
       currentWeightKg: 62.5,
       migrationPending: false,
-      tournaments: { bronze: "entered", silver: "pending", golden: "pending", canadian: "locked", olympic: "locked" },
+      tournaments: {
+        bronze: tournamentId === "bronze" ? "entered" : "won",
+        silver: "pending",
+        golden: tournamentId === "olympic" || tournamentId === "canadian" ? "won" : "pending",
+        canadian: tournamentId === "olympic" ? "won" : tournamentId === "canadian" ? "entered" : "locked",
+        olympic: tournamentId === "olympic" ? "entered" : "locked",
+      },
       activeTournament: {
-        id: "bronze",
+        id: tournamentId,
         startWeek: 8,
         status: "active",
         currentRound: 0,
@@ -364,8 +372,8 @@ function dueTournamentSnapshot() {
         summary: "",
         competition: {
           schemaVersion: 1,
-          id: "browser-bronze-due",
-          totalBouts: 3,
+          id: `browser-${tournamentId}-due`,
+          totalBouts,
           day: 1,
           wins: 0,
           boutsFought: 0,
@@ -624,9 +632,10 @@ test("affiche le lieu Emploi V2 selon le poste sans modifier sa mécanique", asy
   const workView = page.locator(".v2-work-view-office");
   await expect(workView).toBeVisible();
   await expect(workView.locator('.v2-work-scene img')).toHaveAttribute("src", /emploi-bureau-v2-desktop\.png$/);
-  await expect(workView.locator("[data-v2-work-zone]")).toHaveCount(3);
+  await expect(workView.locator("[data-v2-work-zone]")).toHaveCount(2);
   await expect(workView.locator("[data-v2-leave-work]")).toBeVisible();
-  await expect(workView.locator('[data-v2-work-zone="mini-game"]')).toHaveAttribute("aria-disabled", "true");
+  await expect(workView.locator('[data-v2-work-zone="mini-game"]')).toHaveCount(0);
+  await expect(workView).not.toContainText("Faire mon emploi");
 
   const hotspotStyle = await workView.locator('[data-v2-work-zone="schedule"]').evaluate(element => {
     const style = getComputedStyle(element);
@@ -856,6 +865,29 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   expect(mainAfter.state.recreationalTrainingWeeks).toBe(capsule.previewRuntime.trainingSessions);
   expect(mainAfter.state.amateurRecord).toEqual(mainBefore.state.amateurRecord);
   expect(mainAfter.weeklyPlan).toEqual(mainBefore.weeklyPlan);
+});
+
+test("le plan amateur protège le repos lorsque l'emploi ne permet pas deux séances lourdes", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    careerStatus: "amateur",
+    jobId: "courier",
+    gymWeeks: 4,
+    strengthGymWeeks: 4,
+    money: 500,
+  }));
+
+  await page.locator("[data-v2-week-quick]").click();
+  const quickPlan = page.locator(".v2-week-plan");
+  await expect(quickPlan).toBeVisible();
+  await expect(quickPlan).toContainText("Coursier local");
+  await expect(quickPlan).toContainText("Séance de l’entraîneur");
+  await expect(quickPlan).toContainText("Journée de repos");
+  await expect(quickPlan).not.toContainText("Cours de CrossFit");
+
+  const labels = await quickPlan.locator(".v2-week-plan-items li strong").allTextContents();
+  expect(labels).toEqual(expect.arrayContaining(["Coursier local", "Séance de l’entraîneur", "Journée de repos"]));
+  expect(labels).not.toContain("Cours de CrossFit");
+  expect(Number(await quickPlan.locator("progress").getAttribute("value"))).toBeGreaterThanOrEqual(0);
 });
 
 test("occupe progressivement la capacité après l’inactivité sans réduire son maximum ni les statistiques", async ({ page }) => {
@@ -1184,6 +1216,8 @@ test("lance immédiatement le sparring et le combat développeur sans altérer l
   await completeFight(page);
   await expect(page.locator("#fight-score-label")).toHaveText("Sparring non comptabilisé");
   await expect(page.locator("#fight-instruction")).toContainText("la carrière, le bilan, les jauges et le calendrier sont restés intacts");
+  await expect(page.locator(".fight-career-debrief")).toContainText("Bilan du combat");
+  await expect(page.locator(".fight-career-debrief")).toContainText("Aucun effet sur la carrière");
   await page.locator("#fight-instruction button.primary-button", { hasText: "Retour au menu test" }).click();
   await expect(page.locator("#developer-test-dialog")).toBeVisible();
 
@@ -1196,6 +1230,7 @@ test("lance immédiatement le sparring et le combat développeur sans altérer l
   await expect(page.locator("#fight-week-label")).toContainText("Combat immédiat · mode développeur");
   await completeFight(page);
   await expect(page.locator("#fight-instruction")).toContainText("la carrière, le bilan, les jauges et le calendrier sont restés intacts");
+  await expect(page.locator(".fight-career-debrief")).toContainText("Repères du ring");
   await page.locator("#fight-instruction button.primary-button", { hasText: "Retour au menu test" }).click();
   await expect(page.locator("#developer-test-dialog")).toBeVisible();
 
@@ -1354,6 +1389,10 @@ test("réserve un gala et joue un combat tactique complet avant de révéler les
   await expect(page.locator("#fight-judge-cards")).toBeVisible();
   await expect(page.locator("#fight-judge-cards .judge-card")).toHaveCount(3);
   await expect(page.locator("#fight-score")).toHaveText(/^(3–0|2–1|1–2|0–3)$/);
+  await expect(page.locator(".fight-career-debrief")).toContainText("Condition");
+  await expect(page.locator(".fight-career-debrief")).toContainText("Progression");
+  await expect(page.locator(".fight-career-debrief")).toContainText("Finances");
+  await expect(page.locator(".fight-career-debrief")).toContainText(/1 V · 0 D|0 V · 1 D/);
 
   const persistedBeforeClosingResult = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
   expect(persistedBeforeClosingResult.state.week).toBe(2);
@@ -1395,6 +1434,8 @@ test("reste utilisable à 390 × 844 px sans débordement et avec des actions ta
   await page.locator("[data-v2-open-calendar]").first().click();
   await expect(page.locator("#calendar-dialog")).toBeVisible();
   await expect(page.locator("#calendar-dialog-done")).toBeVisible();
+  await expect(page.locator("#pro-transition")).toBeEmpty();
+  await expect(page.locator("#calendar-dialog")).not.toContainText("Passer professionnel");
   await page.locator("#calendar-dialog-done").click();
   await expect(page.locator("#calendar-dialog")).not.toBeVisible();
 
@@ -2438,11 +2479,10 @@ test("ouvre le menu développeur depuis Travail en V2 et restaure la vraie carri
   await page.locator("#resume-load").click();
 
   await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
-  const secretTile = page.getByRole("button", { name: "Vente de stupéfiants — À venir" });
-  await expect(secretTile).toBeVisible();
-  await expect(secretTile).toContainText("Vente de stupéfiants");
-  await expect(secretTile).toContainText("À venir");
-  expect((await secretTile.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  const secretTrigger = page.locator(".v2-work-header [data-v2-developer-secret]");
+  await expect(secretTrigger).toBeVisible();
+  await expect(page.locator(".v2-work-view")).not.toContainText("Vente de stupéfiants");
+  await expect(page.locator(".v2-work-view")).not.toContainText("Faire mon emploi");
   const workFit = await page.locator(".v2-work-view").evaluate(element => ({
     scrollWidth: element.scrollWidth,
     clientWidth: element.clientWidth,
@@ -2451,7 +2491,7 @@ test("ouvre le menu développeur depuis Travail en V2 et restaure la vraie carri
   }));
   expect(workFit.scrollWidth).toBeLessThanOrEqual(workFit.clientWidth + 1);
   expect(workFit.documentWidth).toBeLessThanOrEqual(workFit.viewportWidth + 1);
-  for (let activation = 0; activation < 5; activation += 1) await secretTile.click();
+  for (let activation = 0; activation < 5; activation += 1) await secretTrigger.click();
 
   await expect(page.locator("#developer-code-dialog")).toBeVisible();
   await page.locator("#developer-code-input").fill("128");
@@ -2501,7 +2541,7 @@ test("ouvre le menu développeur depuis Travail en V2 et restaure la vraie carri
   expect(restored.overflow).toBeLessThanOrEqual(1);
 });
 
-test("bloque clairement l’entraînement V2 pendant un repos médical", async ({ page }) => {
+test("préserve les anciennes blessures sans bloquer ni afficher un repos médical", async ({ page }) => {
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
@@ -2518,12 +2558,15 @@ test("bloque clairement l’entraînement V2 pendant un repos médical", async (
   await page.locator("#resume-load").click();
 
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
-  await expect(page.locator(".v2-gym-readiness.critical")).toContainText("Repos médical");
+  await expect(page.locator(".v2-gym-readiness")).not.toContainText("Repos médical");
   await page.locator('[data-v2-gym-zone="coach"]').click();
-  await expect(page.locator("[data-v2-coach-session]")).toBeDisabled();
+  await expect(page.locator("[data-v2-coach-session]")).toBeEnabled();
   await page.locator("[data-v2-gym-menu-close]").click();
-  await expect(page.locator('[data-v2-gym-zone="training"]')).toBeDisabled();
+  await expect(page.locator('[data-v2-gym-zone="training"]')).toBeEnabled();
   await expect(page.locator(".v2-gym-hotspot-reception")).toBeEnabled();
+  const preserved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(preserved.injury).toBe(55);
+  expect(preserved.injuryWeeks).toBe(2);
 });
 
 test("migre une sauvegarde v3, recâble son combat réservé et impose le choix de division", async ({ page }) => {
@@ -2606,7 +2649,7 @@ test("enchaîne pesée, combat à cinq juges et récupération vers le jour suiv
   const tournamentDialog = page.locator("#tournament-dialog");
   await expect(tournamentDialog).toBeVisible();
   await expect(page.locator("#tournament-daily-status")).toContainText("1 / 3");
-  await expect(page.locator("#tournament-daily-status")).toContainText("Pesée et contrôle à effectuer");
+  await expect(page.locator("#tournament-daily-status")).toContainText("Pesée à effectuer");
 
   const nextTournamentStep = page.locator("#tournament-next-fight");
   await expect(nextTournamentStep).toContainText(/Passer la pesée.*jour 1/);
@@ -2618,17 +2661,26 @@ test("enchaîne pesée, combat à cinq juges et récupération vers le jour suiv
   const fightDialog = page.locator("#fight-dialog");
   await expect(fightDialog).toBeVisible();
   await expect(fightDialog).not.toHaveClass(/local-fight-prototype/);
-  await expect(fightDialog).not.toHaveClass(/sparring-ring-prototype/);
-  await expect(page.locator(".ring-backdrop")).toBeVisible();
+  await expect(fightDialog).toHaveClass(/sparring-ring-prototype/);
+  await expect(fightDialog).toHaveClass(/tournament-fight-prototype/);
+  await expect(fightDialog).not.toHaveClass(/olympic-fight-prototype/);
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "before");
+  await expect(page.locator(".tournament-amateur-before-backdrop")).toBeVisible();
+  await expect(page.locator(".ring-backdrop")).toBeHidden();
   await expect(page.locator(".local-fight-ring-backdrop")).toBeHidden();
   await expect(page.locator("#fight-score-label")).toHaveText("Cartes cachées");
   await expect(page.locator("#fight-judge-cards")).toBeHidden();
+  await expect(page.locator("#fight-coach-title")).toHaveText("Le coach prépare ton combat");
   await chooseCoachDirective(page);
-  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(4);
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "ring");
+  await expect(page.locator(".tournament-amateur-ring-backdrop")).toBeVisible();
+  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(5);
   await completeFightWithLowImpactActions(page);
 
   await expect(page.locator("#fight-status")).toContainText("Victoire aux points");
   await expect(page.locator("#fight-score-label")).toHaveText("Décision · 5 juges");
+  await expect(page.locator("#fight-ring-stage")).toHaveAttribute("data-sparring-scene", "after");
+  await expect(page.locator(".tournament-amateur-after-backdrop")).toBeVisible();
   await expect(page.locator("#fight-judge-cards")).toBeVisible();
   await expect(page.locator("#fight-judge-cards .judge-card")).toHaveCount(5);
   await page.locator("#fight-instruction button.primary-button", { hasText: "Retour au tournoi" }).click();
@@ -2641,7 +2693,7 @@ test("enchaîne pesée, combat à cinq juges et récupération vers le jour suiv
 
   await expect(page.locator("#tournament-interbout")).toBeHidden();
   await expect(page.locator("#tournament-daily-status")).toContainText("2 / 3");
-  await expect(page.locator("#tournament-daily-status")).toContainText("Pesée et contrôle à effectuer");
+  await expect(page.locator("#tournament-daily-status")).toContainText("Pesée à effectuer");
   await expect(nextTournamentStep).toContainText(/Passer la pesée.*jour 2/);
 
   const afterRecovery = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
@@ -2663,6 +2715,77 @@ test("enchaîne pesée, combat à cinq juges et récupération vers le jour suiv
   expect(afterDayTwoWeighIn.phase).toBe("ready");
   expect(afterDayTwoWeighIn.weight.history).toHaveLength(2);
   expect(afterDayTwoWeighIn.weight.history.every(entry => entry.passed)).toBe(true);
+});
+
+test("utilise les quatre scènes olympiques avec le combat tactique V2 sur mobile", async ({ page }) => {
+  test.setTimeout(75_000);
+  await page.addInitScript(() => {
+    let value = 3000;
+    try {
+      Object.defineProperty(globalThis.crypto, "getRandomValues", {
+        configurable: true,
+        value(array) {
+          for (let index = 0; index < array.length; index += 1) array[index] = value + index * 19;
+          value += 103;
+          return array;
+        },
+      });
+    } catch {
+      // Les statistiques du snapshot gardent tout de même ce parcours très stable.
+    }
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openStoredCareer(page, dueTournamentSnapshot("olympic"));
+
+  await page.locator("[data-v2-open-calendar]").first().click();
+  await page.locator("#active-tournament [data-open-tournament]").click();
+  await expect(page.locator("#tournament-daily-status")).toContainText("1 / 5");
+  const nextTournamentStep = page.locator("#tournament-next-fight");
+  await nextTournamentStep.click();
+  await expect(page.locator("#tournament-daily-status")).toContainText("Autorisé à boxer aujourd’hui");
+  await nextTournamentStep.click();
+
+  const fightDialog = page.locator("#fight-dialog");
+  const stage = page.locator("#fight-ring-stage");
+  await expect(fightDialog).toHaveClass(/sparring-ring-prototype/);
+  await expect(fightDialog).toHaveClass(/tournament-fight-prototype/);
+  await expect(fightDialog).toHaveClass(/olympic-fight-prototype/);
+  await expect(stage).toHaveAttribute("data-sparring-scene", "before");
+  await expect(page.locator(".tournament-olympic-before-backdrop")).toBeVisible();
+  await expect(page.locator(".tournament-amateur-before-backdrop")).toBeHidden();
+
+  const beforeMetrics = await page.evaluate(() => ({
+    body: document.body.scrollWidth,
+    dialog: document.querySelector("#fight-dialog").scrollWidth,
+    document: document.documentElement.scrollWidth,
+    viewport: window.innerWidth,
+  }));
+  expect(beforeMetrics.body).toBeLessThanOrEqual(beforeMetrics.viewport + 1);
+  expect(beforeMetrics.document).toBeLessThanOrEqual(beforeMetrics.viewport + 1);
+  expect(beforeMetrics.dialog).toBeLessThanOrEqual(beforeMetrics.viewport + 1);
+
+  await chooseCoachDirective(page);
+  await expect(stage).toHaveAttribute("data-sparring-scene", "ring");
+  await expect(page.locator(".tournament-olympic-ring-backdrop")).toBeVisible();
+  const tacticalButtons = page.locator("#fight-choices [data-fight-action]:visible");
+  await expect(tacticalButtons).toHaveCount(5);
+  for (const button of await tacticalButtons.all()) {
+    const box = await button.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(44);
+  }
+
+  for (let exchange = 0; exchange < 5; exchange += 1) {
+    expect(await chooseLowImpactExchange(page)).toBe(true);
+  }
+  await expect(stage).toHaveAttribute("data-sparring-scene", "corner");
+  await expect(page.locator(".tournament-olympic-corner-backdrop")).toBeVisible();
+  await chooseCoachDirective(page);
+  await completeFightWithLowImpactActions(page);
+
+  await expect(stage).toHaveAttribute("data-sparring-scene", "after");
+  await expect(page.locator(".tournament-olympic-after-backdrop")).toBeVisible();
+  await expect(page.locator("#fight-score-label")).toHaveText("Décision · 5 juges");
+  await expect(page.locator("#fight-judge-cards .judge-card")).toHaveCount(5);
 });
 
 test("reconstruit la capsule V2 depuis une carrière importée avant son premier rendu", async ({ page }) => {

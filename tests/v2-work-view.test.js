@@ -37,7 +37,8 @@ test("rend un environnement adapté à l’emploi actif avec les zones de travai
   assert.match(html, /assets\/emploi-bureau-v2-mobile\.png/);
   assert.match(html, /data-v2-work-zone="schedule"/);
   assert.match(html, /data-v2-work-zone="job"/);
-  assert.match(html, /data-v2-work-zone="mini-game" aria-disabled="true"/);
+  assert.doesNotMatch(html, /data-v2-work-zone="mini-game"/);
+  assert.doesNotMatch(html, /Faire mon emploi/);
   assert.match(html, /data-v2-leave-work>Retour à la carte/);
   assert.match(html, /120 \$/);
   assert.match(html, /30 capacité/);

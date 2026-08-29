@@ -117,7 +117,7 @@ test("garde le tableau de bord principal informatif et sans commandes cachées",
   assert.doesNotMatch(html, /data-v2-strength-quick/);
 });
 
-test("verrouille les bulles selon le statut, l'abonnement et la restriction médicale", () => {
+test("verrouille les bulles selon le statut, l'abonnement et la condition visible", () => {
   const recreational = strengthView.render(baseContext({
     careerStatus: "recreational",
     membership: { active: false, balance: 640, plans: strength.MEMBERSHIP_PLANS },
@@ -136,22 +136,22 @@ test("verrouille les bulles selon le statut, l'abonnement et la restriction méd
   }
   assert.match(membershipRequired, /Inscription requise à l’accueil/);
 
-  const medical = strengthView.render(baseContext({
+  const conditionBlocked = strengthView.render(baseContext({
     condition: {
       energy: 82,
       fatigue: 18,
       trainingBlocked: true,
-      trainingBlockedReason: "Repos médical obligatoire pendant deux semaines.",
+      trainingBlockedReason: "La fatigue est trop élevée pour cette séance.",
     },
   }));
-  assert.match(medical, /data-v2-strength-access="medical-blocked"/);
+  assert.match(conditionBlocked, /data-v2-strength-access="condition-blocked"/);
   for (const id of ["crossfit", "program", "trainer"]) {
-    assert.match(buttonFor(medical, "data-v2-strength-zone", id), /\sdisabled(?:\s|>)/);
+    assert.match(buttonFor(conditionBlocked, "data-v2-strength-zone", id), /\sdisabled(?:\s|>)/);
   }
   for (const id of ["reception", "shop"]) {
-    assert.doesNotMatch(buttonFor(medical, "data-v2-strength-zone", id), /\sdisabled(?:\s|>)/);
+    assert.doesNotMatch(buttonFor(conditionBlocked, "data-v2-strength-zone", id), /\sdisabled(?:\s|>)/);
   }
-  assert.match(medical, /Repos médical obligatoire pendant deux semaines/);
+  assert.match(conditionBlocked, /La fatigue est trop élevée pour cette séance/);
 });
 
 test("le menu d'accueil propose exactement les forfaits de un et trois mois", () => {

@@ -69,7 +69,7 @@
       energyCost: 5,
       fatigueGain: 3,
       fatigueRelief: 0,
-      stimulus: { technique: 0.5, power: 0, cardio: 2.5, defense: 0 },
+      stimulus: { technique: 0.5, power: 0, cardio: 4, defense: 0 },
       xp: 2,
       wear: 0.4,
       injuryRisk: 0.15,
@@ -179,7 +179,7 @@
   const TARGETED_BLOCKS = deepFreeze({
     technique: ["shadow_boxing", "mitts", "cooldown"],
     power: ["jump_rope", "heavy_bag", "cooldown"],
-    cardio: ["jump_rope", "mitts", "cooldown"],
+    cardio: ["jump_rope", "shadow_boxing", "cooldown"],
     defense: ["shadow_boxing", "defense_drills", "cooldown"],
   });
 
@@ -209,12 +209,10 @@
   }
 
   function mandatoryRecoveryReason(context = {}) {
-    const recoveryWeeks = Math.max(0, Number(context.injuryWeeks || context.medicalRestWeeks || 0));
-    if (recoveryWeeks <= 0 && context.medicalRestriction !== true) return null;
-    const duration = recoveryWeeks > 0
-      ? `${Math.ceil(recoveryWeeks)} semaine${Math.ceil(recoveryWeeks) > 1 ? "s" : ""}`
-      : "la période prescrite";
-    return `Repos médical obligatoire : aucun entraînement de boxe pendant ${duration}.`;
+    // Les blessures persistantes appartiennent au modèle V1. La V2 conserve
+    // les anciennes valeurs dans les sauvegardes, mais elles ne bloquent plus
+    // une séance et ne participent plus à son résultat.
+    return null;
   }
 
   function hashText(value) {
@@ -414,7 +412,6 @@
       totals.fatigueRelief += block.fatigueRelief;
       totals.xp += block.xp;
       totals.wear += block.wear;
-      totals.injuryRisk += block.injuryRisk;
       STAT_KEYS.forEach(key => { totals.stimulus[key] += block.stimulus[key]; });
     });
     totals.energyCost = roundTo(totals.energyCost);
@@ -567,13 +564,7 @@
   function businessResult(before, after, preview) {
     const preparation = BoxeurTime.getPreparation(before);
     const effortModifier = 0.85 + preparation.score / 500;
-    const startingFatiguePenalty = Math.max(0, before.condition.fatigue - 50) * 0.08;
-    const lowEnergyPenalty = Math.max(0, 35 - before.condition.energy) * 0.06;
-    const injuryRiskPercent = roundTo(clamp(
-      preview.totals.injuryRisk + startingFatiguePenalty + lowEnergyPenalty,
-      0,
-      20,
-    ), 1);
+    const injuryRiskPercent = 0;
     const statGains = {};
     const statXpGains = {};
     STAT_KEYS.forEach(key => {

@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const combat = require("../combat-engine.js");
+const balance = require("../v2-balance-engine.js");
 
 // Banc de non-régression statistique. Sa graine et sa taille sont fixes par
 // défaut, mais BALANCE_SAMPLES permet une campagne plus longue en CI sans
@@ -219,7 +220,10 @@ test("le banc déterministe mesure le nouveau moteur contre le résolveur histor
   assert.equal(results.comparable.samples, SAMPLE_COUNT);
   assert.equal(results.comparable.invalid, 0);
   assert.ok(results.comparable.legacyRate >= 0.43 && results.comparable.legacyRate <= 0.57);
-  assert.ok(results.comparable.newRate >= 0.45 && results.comparable.newRate <= 0.63);
+  assert.ok(
+    results.comparable.newRate >= balance.ACCEPTANCE.combat.comparableWinRateMinimum
+      && results.comparable.newRate <= balance.ACCEPTANCE.combat.comparableWinRateMaximum,
+  );
   assert.ok(
     Math.abs(results.comparable.newRate - results.comparable.legacyRate) <= 0.12,
     "un profil comparable ne doit pas être déplacé de plus de 12 points de pourcentage",
@@ -254,7 +258,10 @@ test("les arrêts sont rares à niveau comparable et liés à une vulnérabilit�
     difficulty: 45,
   }, Math.max(600, Math.round(SAMPLE_COUNT * 0.5)));
   t.diagnostic(formatMetrics(danger));
-  assert.ok(results.comparable.stoppageRate <= 0.05, "KO/TKO doit rester rare entre boxeurs frais comparables");
+  assert.ok(
+    results.comparable.stoppageRate <= balance.ACCEPTANCE.combat.comparableStoppageMaximum,
+    "KO/TKO doit rester rare entre boxeurs frais comparables",
+  );
   assert.ok(danger.stoppageRate >= 0.10, "une puissance élevée face à une défense faible doit augmenter les arrêts");
   assert.ok(danger.stoppageRate <= 0.75, "même un net avantage ne doit pas garantir automatiquement un arrêt");
   assert.ok(danger.ko > 0, "la voie KO doit être atteignable");

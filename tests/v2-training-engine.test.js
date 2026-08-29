@@ -80,7 +80,7 @@ test("l'aperçu agrège durée, énergie, fatigue et stimulus sans rien modifier
   assert.deepEqual(preview.totals.stimulus, {
     technique: 1,
     power: 5.5,
-    cardio: 2.5,
+    cardio: 4,
     defense: 0,
   });
   assert.equal(preview.projected.energy, 77);
@@ -138,14 +138,10 @@ test("refuse l'absence d'abonnement, le manque d'énergie, la surcharge et les s
   });
   assert.equal(training.previewSession(overloaded, normal, GYM).code, "OVERLOAD_RISK");
 
-  const injuredContext = { ...GYM, injury: 65, injuryWeeks: 2 };
-  const injuredPreview = training.previewSession(initial, normal, injuredContext);
-  assert.equal(injuredPreview.code, "MEDICAL_REST_REQUIRED");
-  assert.match(injuredPreview.reason, /repos médical obligatoire/i);
-  assert.throws(
-    () => training.executeSession(initial, normal, injuredContext),
-    error => error.code === "MEDICAL_REST_REQUIRED",
-  );
+  const legacyInjuryContext = { ...GYM, injury: 65, injuryWeeks: 2, medicalRestriction: true };
+  const legacyInjuryPreview = training.previewSession(initial, normal, legacyInjuryContext);
+  assert.equal(legacyInjuryPreview.ok, true, "les anciens champs de blessure ne bloquent plus la V2");
+  assert.equal(training.executeSession(initial, normal, legacyInjuryContext).result.injuryRiskPercent, 0);
 
   assert.equal(training.createCustomSession(["mitts"]).blocks.length, 1);
   assert.throws(
@@ -234,7 +230,7 @@ test("l'exécution ne modifie ni l'état source, ni la séance, ni le contexte c
   assert.deepEqual(context.career, { money: 250, xp: 12, wear: 3 });
   assert.ok(outcome.result.xpAward > 0);
   assert.ok(outcome.result.wear >= 0);
-  assert.ok(outcome.result.injuryRiskPercent >= 0);
+  assert.equal(outcome.result.injuryRiskPercent, 0);
   assert.equal(outcome.result.injuryResolved, false);
   assert.equal("xp" in outcome.timeState, false);
   assert.equal("wear" in outcome.timeState, false);

@@ -86,7 +86,7 @@
         fatigue: wholeNumber(condition.fatigue, 0, 0, 100),
         availableMinutes: wholeNumber(condition.availableMinutes, 60, 0, 240),
         trainingBlocked: condition.trainingBlocked === true,
-        trainingBlockedReason: condition.trainingBlockedReason || "Une restriction médicale bloque temporairement l’entraînement de boxe.",
+        trainingBlockedReason: condition.trainingBlockedReason || "L’énergie ou la fatigue bloque temporairement l’entraînement de boxe.",
       },
       coach: {
         name: coach.name || "Ton entraîneur",
@@ -324,7 +324,7 @@
       const isRing = zone.id === "ring";
       const remyReady = isRing && context.careerStatus === "recreational" && context.recreational.remyStatus === "ready";
       const recreationalBlocked = context.careerStatus === "recreational" && !["coach", "reception"].includes(zone.id) && !remyReady;
-      const medicallyBlocked = context.membership.active && context.condition.trainingBlocked && !["coach", "reception"].includes(zone.id);
+      const conditionBlocked = context.membership.active && context.condition.trainingBlocked && !["coach", "reception"].includes(zone.id);
       const membershipBlocked = !context.membership.active && zone.id !== "reception";
       const sparringBlocked = isRing && !sparring.available && !remyReady;
       const display = {
@@ -359,7 +359,7 @@
         ? " aria-disabled=\"true\""
         : recreationalBlocked
         ? " disabled aria-disabled=\"true\""
-        : medicallyBlocked
+        : conditionBlocked
         ? " disabled aria-disabled=\"true\""
         : "";
       const reason = sparringBlocked
@@ -368,7 +368,7 @@
         ? " Verrouillé : inscription au GYM requise."
         : recreationalBlocked
         ? " Indisponible pendant l’initiation : commence par les cours de groupe."
-        : medicallyBlocked
+        : conditionBlocked
         ? ` Indisponible : ${context.condition.trainingBlockedReason}`
         : "";
       const lock = membershipBlocked || sparringBlocked || recreationalBlocked ? `<span class="v2-gym-hotspot-lock" aria-hidden="true">🔒</span>` : "";

@@ -45,9 +45,7 @@
     }
     const energy = Math.max(0, Math.min(100, Number(career.energy) || 0));
     const fatigue = Math.max(0, Math.min(100, Number(career.fatigue) || 0));
-    const injury = Math.max(0, Math.min(100, Number(career.injury) || 0));
-    const score = energy - fatigue * 0.55 - injury * 0.35;
-    if (career.injuryWeeks > 0) return { label: "Blessé", tone: "critical", detail: `${career.injuryWeeks} semaine${career.injuryWeeks > 1 ? "s" : ""} de récupération obligatoire.` };
+    const score = energy - fatigue * 0.55;
     if (score >= 62) return { label: "Très bonne", tone: "positive", detail: "Le corps est frais et disponible pour une séance productive." };
     if (score >= 38) return { label: "Correcte", tone: "steady", detail: "Une séance modérée demeure raisonnable aujourd’hui." };
     return { label: "Fragile", tone: "warning", detail: "La récupération devrait passer avant une autre grosse charge." };
@@ -267,7 +265,7 @@
       return "Facultatif";
     }
     if (location.id === "arena") return career.scheduledFight || career.activeTournament ? "Rendez-vous actif" : career.careerStatus === "recreational" ? "Verrouillé · amateur requis" : "Événements disponibles";
-    return career.injuryWeeks > 0 ? "Récupération recommandée" : "Toujours accessible";
+    return "Toujours accessible";
   }
 
   function locationAccess(locationInput, career = {}) {
@@ -294,14 +292,7 @@
   }
 
   function workDeveloperTile() {
-    return `<section class="v2-work-actions" aria-labelledby="v2-work-actions-title">
-      <div><p class="eyebrow">Possibilités du quartier</p><h3 id="v2-work-actions-title">Autres revenus</h3></div>
-      <button class="v2-future-work-tile" type="button" data-v2-developer-secret aria-label="Vente de stupéfiants — À venir">
-        <span class="v2-future-work-icon" aria-hidden="true">!</span>
-        <span><strong>Vente de stupéfiants</strong><small>À venir</small></span>
-      </button>
-      <p>Cette activité et ses conséquences judiciaires ne font pas encore partie de la carrière.</p>
-    </section>`;
+    return "";
   }
 
   function workManagement(career) {
@@ -327,7 +318,6 @@
         <dl><div><dt>Paie de la semaine</dt><dd>${Math.round(Number(job.wage) || 0)} $</dd></div><div><dt>Horaire</dt><dd>${escapeHTML(job.schedule || "Horaire régulier")}</dd></div></dl>
         <p><strong>Le salaire affiché est hebdomadaire.</strong> Un emploi plus payant réserve davantage d’énergie et laisse moins de place au camp.</p>
         <p>${escapeHTML(workStatus)}</p>${attendance}${applicationCopy}
-        <p><small>Plus tard, un mini-jeu de travail facultatif pourra donner un petit bonus d’argent sans remplacer cette règle hebdomadaire.</small></p>
         <div class="v2-work-management-actions">${shiftButton}<button class="secondary-button" type="button" data-v2-open-job-menu>Voir mon emploi</button></div>
       </section>`;
     }
@@ -399,9 +389,10 @@
     const objectiveHere = objective(career).locationId === location.id;
     const workContent = location.id === "work" ? `${workManagement(career)}${workDeveloperTile()}` : "";
     const previewNote = location.id === "work"
-      ? "Les candidatures avancent automatiquement chaque semaine. Les vacances et les mini-jeux facultatifs seront enrichis progressivement."
-      : "L’intérieur interactif de ce lieu sera branché à la prochaine étape de la V2.";
-    return `<div class="v2-location-card" data-location="${location.id}"><div><p class="eyebrow">${objectiveHere ? "Destination recommandée" : "Lieu du quartier"}</p><h2>${escapeHTML(location.label)}</h2><p>${escapeHTML(location.detail)}</p></div><div class="v2-location-status"><span>État du lieu</span><strong>${escapeHTML(locationStatus(location, career))}</strong></div>${workContent}<p class="v2-location-preview-note">${previewNote}</p><button class="secondary-button" type="button" data-v2-close-location>Retour à la carte</button></div>`;
+      ? "Les candidatures avancent automatiquement à chaque semaine confirmée."
+      : location.id === "arena" ? "Les galas, les tournois et les combats réservés se gèrent dans le calendrier." : "";
+    const actions = location.id === "arena" ? `<button class="primary-button" type="button" data-v2-open-calendar>Ouvrir le calendrier</button>` : "";
+    return `<div class="v2-location-card" data-location="${location.id}"><div><p class="eyebrow">${objectiveHere ? "Destination recommandée" : "Lieu du quartier"}</p><h2>${escapeHTML(location.label)}</h2><p>${escapeHTML(location.detail)}</p></div><div class="v2-location-status"><span>État du lieu</span><strong>${escapeHTML(locationStatus(location, career))}</strong></div>${workContent}${previewNote ? `<p class="v2-location-preview-note">${previewNote}</p>` : ""}${actions}<button class="secondary-button" type="button" data-v2-close-location>Retour à la carte</button></div>`;
   }
 
   return Object.freeze({ LOCATIONS, preparation, onboardingObjective, objective, renderObjectiveCard, renderLocationGuide, renderWorkDeveloperTile: workDeveloperTile, isFirstJobRequired, nextAppointment, locationStatus, locationAccess, render, renderLocation });

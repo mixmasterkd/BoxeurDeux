@@ -26,7 +26,7 @@ function baseCareer(overrides = {}) {
   };
 }
 
-test("calcule une préparation qualitative bornée et donne priorité à une blessure", () => {
+test("calcule la préparation avec l'énergie et la fatigue en ignorant les blessures V1", () => {
   assert.deepEqual(world.preparation(baseCareer({ energy: 100, fatigue: 0, injury: 0 })), {
     label: "Très bonne",
     tone: "positive",
@@ -36,9 +36,9 @@ test("calcule une préparation qualitative bornée et donne priorité à une ble
   assert.equal(world.preparation(baseCareer({ energy: 60, fatigue: 30, injury: 10 })).label, "Correcte");
   assert.equal(world.preparation(baseCareer({ energy: -50, fatigue: 500, injury: 500 })).label, "Fragile");
 
-  const injured = world.preparation(baseCareer({ energy: 100, injuryWeeks: 2 }));
-  assert.equal(injured.label, "Blessé");
-  assert.match(injured.detail, /2 semaines/);
+  const legacyInjury = world.preparation(baseCareer({ energy: 100, injury: 100, injuryWeeks: 2 }));
+  assert.equal(legacyInjury.label, "Très bonne");
+  assert.doesNotMatch(legacyInjury.detail, /bless|médical/i);
 });
 
 test("guide le parcours récréatif sans masquer les étapes obligatoires", () => {
@@ -352,18 +352,19 @@ test("rend une fiche de lieu accessible et refuse une destination inconnue", () 
   assert.match(gym, /Séance du coach/);
   assert.match(gym, /<button\b[^>]*type="button"[^>]*data-v2-close-location/);
   assert.match(gym, />Retour à la carte<\/button>/);
+  const arena = world.renderLocation("arena", baseCareer({ careerStatus: "amateur" }));
+  assert.match(arena, /data-v2-open-calendar>Ouvrir le calendrier/);
+  assert.doesNotMatch(arena, /sera branché|prochaine étape de la V2/i);
   assert.equal(world.renderLocation("does-not-exist", career), "");
 });
 
-test("place la tuile développeur uniquement dans le lieu Travail", () => {
+test("masque les fonctions de travail incomplètes", () => {
   const career = baseCareer({ careerStatus: "recreational" });
   const work = world.renderLocation("work", career);
   const gym = world.renderLocation("boxing-gym", career);
 
-  assert.match(work, /data-v2-developer-secret/);
-  assert.match(work, /Vente de stupéfiants/);
-  assert.match(work, /À venir/);
-  assert.match(work, /aria-label="Vente de stupéfiants — À venir"/);
+  assert.doesNotMatch(work, /data-v2-developer-secret/);
+  assert.doesNotMatch(work, /Vente de stupéfiants|mini-jeu|À venir/i);
   assert.match(work, /Emploi actuel/);
   assert.match(work, /data-v2-open-job-menu/);
   assert.match(work, /data-v2-toggle-work/);

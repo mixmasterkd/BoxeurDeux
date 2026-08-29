@@ -102,12 +102,7 @@
       condition: {
         energy,
         fatigue,
-        medicalRestriction: condition.medicalRestriction === true,
-        medicalBlocked: condition.medicalBlocked === true,
         trainingBlocked: condition.trainingBlocked === true,
-        injuryWeeks: condition.injuryWeeks,
-        medicalRestWeeks: condition.medicalRestWeeks,
-        medicalReason: condition.medicalReason,
         trainingBlockedReason: condition.trainingBlockedReason,
       },
       strengthSessionCompletedToday: raw.strengthSessionCompletedToday === true,
@@ -346,7 +341,7 @@
   }
 
   function renderCondition(context) {
-    const accessIcon = context.access.available ? "✓" : context.access.state === BoxeurStrength.ACCESS_STATES.MEDICAL_BLOCKED ? "✚" : "🔒";
+    const accessIcon = context.access.available ? "✓" : context.access.state === BoxeurStrength.ACCESS_STATES.CONDITION_BLOCKED ? "!" : "🔒";
     return `<section class="v2-strength-access v2-place-condition ${escapeHTML(context.access.state)}" role="status"><span aria-hidden="true">${accessIcon}</span><div><strong>${escapeHTML(context.access.label)}</strong><p>${escapeHTML(context.access.reason)}</p></div>
       <div class="v2-strength-condition-values"><span>Énergie <strong>${context.condition.energy} %</strong></span><span>Fatigue <strong>${context.condition.fatigue} %</strong></span></div>
     </section>`;

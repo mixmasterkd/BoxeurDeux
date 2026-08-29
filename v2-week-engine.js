@@ -218,12 +218,7 @@
       category: String(detail.category == null ? activity.category : detail.category),
       xpAward: Math.round(finiteNumber(detail.xpAward, 0, 0, Number.MAX_SAFE_INTEGER)),
       wear: roundTo(finiteNumber(detail.wear, 0, 0, Number.MAX_SAFE_INTEGER)),
-      injuryRiskPercent: roundTo(finiteNumber(
-        detail.injuryRiskPercent == null ? detail.injuryRisk : detail.injuryRiskPercent,
-        0,
-        0,
-        100,
-      ), 1),
+      injuryRiskPercent: 0,
     };
   }
 
@@ -431,7 +426,7 @@
       nightRecoveries: events.filter(event => event.type === "night-recovery").length,
       xpAward: Math.round(finiteNumber(detail.xpAward, 0, 0, Number.MAX_SAFE_INTEGER)),
       wear: finiteNumber(detail.wear, 0, 0, Number.MAX_SAFE_INTEGER),
-      injuryRiskPercent: finiteNumber(detail.injuryRiskPercent, 0, 0, 100),
+      injuryRiskPercent: 0,
       category: detail.category == null ? null : String(detail.category),
       primitive: clone(primitive),
     };

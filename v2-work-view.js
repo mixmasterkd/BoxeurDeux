@@ -128,7 +128,6 @@
     return `<div class="v2-work-hotspots" aria-label="Zones interactives de l’emploi">
       <button type="button" class="v2-work-hotspot v2-work-hotspot-schedule" data-v2-work-zone="schedule" aria-label="Horaire de la semaine. ${escapeHTML(scheduleDetail)}"><strong>Horaire</strong><small>${escapeHTML(scheduleDetail)}</small></button>
       <button type="button" class="v2-work-hotspot v2-work-hotspot-job" data-v2-work-zone="job" aria-label="Mon emploi. ${escapeHTML(applicationDetail)}"><strong>Mon emploi</strong><small>${escapeHTML(applicationDetail)}</small></button>
-      <button type="button" class="v2-work-hotspot v2-work-hotspot-minigame" data-v2-work-zone="mini-game" aria-disabled="true" aria-label="Faire son emploi — bientôt disponible"><strong><span aria-hidden="true">🔒</span> Faire mon emploi</strong></button>
     </div>`;
   }
 
@@ -165,7 +164,7 @@
       ? `<section class="v2-work-scene v2-place-scene" aria-labelledby="v2-work-scene-title"><h3 id="v2-work-scene-title" class="sr-only">Zones interactives de l’emploi</h3><picture><source media="(max-width: 640px)" srcset="${escapeHTML(context.scene.mobile)}"><img src="${escapeHTML(context.scene.desktop)}" width="1672" height="941" alt="${escapeHTML(context.scene.alt)}"></picture>${renderWorkZones(context)}</section>`
       : renderBoard(context);
     return `<div class="v2-work-view v2-place-view${context.job ? ` v2-work-view-${escapeHTML(context.job.id)}` : " v2-work-view-unemployed"}">
-      <header class="v2-work-header v2-place-header"><div><p class="eyebrow">Emploi</p><h2>${context.job ? escapeHTML(context.job.title) : "Bureau d’emploi"}</h2><p class="v2-place-meta">Semaine ${context.clock.week} · ${escapeHTML(context.clock.dayLabel)} · ${escapeHTML(context.clock.dateLabel)}</p></div><button type="button" class="secondary-button" data-v2-leave-work>Retour à la carte</button></header>
+      <header class="v2-work-header v2-place-header"><div><p class="eyebrow">Emploi</p><h2 data-v2-developer-secret>${context.job ? escapeHTML(context.job.title) : "Bureau d’emploi"}</h2><p class="v2-place-meta">Semaine ${context.clock.week} · ${escapeHTML(context.clock.dayLabel)} · ${escapeHTML(context.clock.dateLabel)}</p></div><button type="button" class="secondary-button" data-v2-leave-work>Retour à la carte</button></header>
       <div class="v2-work-layout v2-place-layout">${scene}<aside class="v2-work-dashboard v2-place-dashboard" aria-label="Situation d’emploi">${renderStatus(context)}</aside></div>
     </div>`;
   }

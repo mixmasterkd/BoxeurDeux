@@ -140,21 +140,21 @@ test("rend le CTA de sparring dans son menu et explique chaque blocage", () => {
     careerStatus: "amateur",
     membership: { active: false, monthlyPrice: 110, balance: 75 },
   }));
-  const medicalBlocked = gymView.renderMenu("ring", baseContext({
+  const conditionBlocked = gymView.renderMenu("ring", baseContext({
     careerStatus: "amateur",
     condition: {
       energy: 80,
       fatigue: 20,
       trainingBlocked: true,
-      trainingBlockedReason: "Repos médical obligatoire.",
+      trainingBlockedReason: "La fatigue est trop élevée pour un sparring.",
     },
   }));
 
   assert.match(membershipBlocked, /data-v2-sparring-state="membership"/);
   assert.match(membershipBlocked, /Abonnement requis/);
-  assert.match(medicalBlocked, /data-v2-sparring-state="unavailable"/);
-  assert.match(medicalBlocked, /Repos médical obligatoire/);
-  assert.match(medicalBlocked, /data-v2-sparring-activity="cta"[^>]+aria-disabled="true"[^>]+aria-describedby="v2-gym-sparring-reason"/);
+  assert.match(conditionBlocked, /data-v2-sparring-state="unavailable"/);
+  assert.match(conditionBlocked, /La fatigue est trop élevée/);
+  assert.match(conditionBlocked, /data-v2-sparring-activity="cta"[^>]+aria-disabled="true"[^>]+aria-describedby="v2-gym-sparring-reason"/);
 });
 
 test("présente le sparring amateur immédiat comme non rejouable et le bloque en semaine de combat", () => {
@@ -288,28 +288,28 @@ test("affiche les activités du GYM planifiées avec un retrait direct", () => {
   assert.match(gymView.renderMenu("coach", baseContext({ coach: { planned: true } })), /data-v2-coach-session aria-pressed="true"[^>]*>Retirer de ma semaine/);
 });
 
-test("rend la restriction médicale visible et bloque les zones d’entraînement", () => {
+test("rend une condition insuffisante visible et bloque les zones d’entraînement", () => {
   const html = gymView.render(baseContext({
     careerStatus: "amateur",
     condition: {
       energy: 85,
       fatigue: 12,
       trainingBlocked: true,
-      trainingBlockedReason: "Repos médical obligatoire pendant 2 semaines.",
+      trainingBlockedReason: "La réserve physique est critique.",
     },
     coach: {
       name: "Coach",
       available: false,
-      notice: "Repos médical obligatoire pendant 2 semaines.",
+      notice: "La réserve physique est critique.",
     },
   }));
 
-  assert.match(html, /Repos médical obligatoire pendant 2 semaines/);
+  assert.match(html, /La réserve physique est critique/);
   assert.match(html, /data-v2-gym-zone="training"[^>]+disabled[^>]+aria-disabled="true"/);
   assert.doesNotMatch(html, /data-v2-gym-zone="reception"[^>]+disabled/);
   assert.match(gymView.renderMenu("coach", baseContext({
     careerStatus: "amateur",
-    condition: { trainingBlocked: true, trainingBlockedReason: "Repos médical obligatoire pendant 2 semaines." },
+    condition: { trainingBlocked: true, trainingBlockedReason: "La réserve physique est critique." },
     coach: { available: false },
   })), /data-v2-coach-session[^>]+disabled[^>]+aria-disabled="true"/);
 });

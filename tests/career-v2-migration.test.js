@@ -196,7 +196,13 @@ test("borne les données invalides et produit quand même un état temps sain", 
 });
 
 test("synchronise seulement semaine, condition et stats vers une copie carrière", () => {
-  const source = v5Snapshot();
+  const source = v5Snapshot({ state: {
+    fitness: 23,
+    morale: 81,
+    injury: 67,
+    injuryWeeks: 3,
+    injuryStartedWeek: 16,
+  } });
   const sourceBefore = structuredClone(source);
   const capsule = migration.migrateV5ToV2(source, { migratedAt: MIGRATED_AT });
   let nextTime = time.advanceTime(capsule.timeState, 21, () => 0.5);
@@ -216,4 +222,15 @@ test("synchronise seulement semaine, condition et stats vers une copie carrière
   assert.deepEqual(synced.state.amateurRecord, source.state.amateurRecord);
   assert.deepEqual(synced.state.professionalRecord, source.state.professionalRecord);
   assert.deepEqual(synced.state.unknownFutureField, source.state.unknownFutureField);
+  assert.deepEqual(
+    {
+      fitness: synced.state.fitness,
+      morale: synced.state.morale,
+      injury: synced.state.injury,
+      injuryWeeks: synced.state.injuryWeeks,
+      injuryStartedWeek: synced.state.injuryStartedWeek,
+    },
+    { fitness: 23, morale: 81, injury: 67, injuryWeeks: 3, injuryStartedWeek: 16 },
+    "les champs V1 restent sérialisés même s'ils sont inactifs en V2",
+  );
 });

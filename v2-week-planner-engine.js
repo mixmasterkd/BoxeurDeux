@@ -923,7 +923,6 @@
     const condition = source.condition && typeof source.condition === "object" ? source.condition : {};
     const energy = finiteNumber(condition.energy, 100, 0, 100);
     const fatigue = finiteNumber(condition.fatigue, 0, 0, 100);
-    const injury = finiteNumber(source.injury, 0, 0, 100);
     const hasRest = source.plannedRest === true || (Array.isArray(source.entries) && plannedRest(source.entries));
     if (hasRest) {
       return {
@@ -935,7 +934,7 @@
         detail: "La journée de repos protège la condition du boxeur pour la semaine suivante.",
       };
     }
-    if (energy <= 8 || fatigue >= 92 || injury >= 80) {
+    if (energy <= 8 || fatigue >= 92) {
       return {
         kind: "hospital",
         tone: "critical",

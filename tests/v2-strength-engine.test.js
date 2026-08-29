@@ -61,7 +61,7 @@ test("propose seulement les forfaits de un et trois mois et accepte leurs valeur
   );
 });
 
-test("distingue clairement les quatre états d'accès prévus", () => {
+test("distingue les accès et ignore les anciennes restrictions médicales", () => {
   assert.deepEqual(strength.resolveAccess({ careerStatus: "recreational", membershipActive: true }), {
     state: "recreational-locked",
     available: false,
@@ -70,13 +70,13 @@ test("distingue clairement les quatre états d'accès prévus", () => {
   });
   assert.equal(strength.resolveAccess({ careerStatus: "amateur" }).state, "membership-required");
   assert.equal(strength.resolveAccess({ careerStatus: "professional", membershipActive: true }).state, "active");
-  const medical = strength.resolveAccess({
+  const legacyMedical = strength.resolveAccess({
     careerStatus: "amateur",
     membershipActive: true,
     injuryWeeks: 2,
+    medicalRestriction: true,
   });
-  assert.equal(medical.state, "medical-blocked");
-  assert.match(medical.reason, /2 semaines/);
+  assert.equal(legacyMedical.state, "active");
 });
 
 test("compose librement plus de trois activités sans plafond artificiel", () => {
@@ -186,7 +186,7 @@ test("une séance personnalisée exige préparation, travail principal et retour
   assert.equal(complete.canConfirm, true);
 });
 
-test("refuse les activités inconnues, les doublons, l'accès verrouillé et le repos médical", () => {
+test("refuse les activités inconnues, les doublons et l'accès verrouillé sans réactiver les blessures V1", () => {
   assert.throws(
     () => strength.aggregateSelection(["lower_body_strength", "inconnue"]),
     error => error.code === "UNKNOWN_ACTIVITY",
@@ -204,10 +204,12 @@ test("refuse les activités inconnues, les doublons, l'accès verrouillé et le 
     strength.previewSession(state, ["boxing_core"], { careerStatus: "amateur" }).code,
     "MEMBERSHIP_REQUIRED",
   );
-  assert.equal(
-    strength.previewSession(state, ["boxing_core"], { ...ACTIVE_GYM, medicalRestriction: true }).code,
-    "MEDICAL_BLOCKED",
+  const legacyMedical = strength.previewSession(
+    state,
+    ["dynamic_warmup", "boxing_core", "mobility_cooldown"],
+    { ...ACTIVE_GYM, medicalRestriction: true, injuryWeeks: 3 },
   );
+  assert.equal(legacyMedical.ok, true);
 });
 
 test("prévoit explicitement le verrou d'une seule activité physique principale par jour", () => {
@@ -257,7 +259,7 @@ test("l'exécution reste pure et déterministe avec une source aléatoire inject
   assert.equal(JSON.stringify(context), snapshots[2]);
   assert.equal(first.result.label, "Puissance et moteur");
   assert.ok(first.result.xpAward > 0);
-  assert.ok(first.result.injuryRiskPercent >= 0);
+  assert.equal(first.result.injuryRiskPercent, 0);
   assert.equal(first.result.injuryResolved, false);
 });
 
