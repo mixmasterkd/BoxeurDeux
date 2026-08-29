@@ -43,7 +43,7 @@ Le nombre de séances est limité par trois règles lisibles, plutôt que par un
 - une seule séance physique par journée lors de l'exécution interne;
 - les plafonds par famille : cours de groupe 1, boxe 2, musculation 2, maison 2 et sparring 1.
 
-Le parcours récréatif reste volontairement plus simple : deux activités physiques au maximum, dont un seul entraînement maison. Le repos et le repas occupent une journée dans la simulation, mais ne retirent pas de points de la barre hebdomadaire. Les nuits demeurent automatiques et la semaine ne change jamais avant la confirmation du joueur.
+Le parcours récréatif reste volontairement plus simple : deux activités physiques au maximum, dont un seul entraînement maison. Le repos occupe une journée et 10 points de capacité; le repas occupe du temps, mais ne retire aucun point de la barre hebdomadaire. Les nuits demeurent automatiques et la semaine ne change jamais avant la confirmation du joueur.
 
 L'horloge détaillée — date, jour, périodes, rendez-vous, nuits et déplacements — reste la couche d'exécution interne. Elle empêche deux activités physiques le même jour, arrête la simulation avant une vraie décision et garantit qu'un même entraînement, salaire ou effet de récupération n'est appliqué qu'une fois.
 
@@ -84,9 +84,11 @@ Après l'ajout du premier cours de groupe, le guide remplace l'objectif d'entra�
 
 ### 1.4 Rythme d'entraînement et niveau
 
-Une semaine sans entraînement ne retire jamais directement de statistiques. Chez les amateurs et les professionnels, elle fragilise plutôt le rythme : la prochaine barre passe de 50 à 45 points, puis à 40 après une deuxième semaine inactive. Chaque semaine comprenant un entraînement efface un palier. Ce rendement décroissant oblige à reprendre progressivement sans rendre le boxeur artificiellement trop faible.
+Une semaine sans entraînement ne retire jamais directement de statistiques. Chez les amateurs et les professionnels, elle fragilise plutôt le rythme : 5 points de la prochaine barre sont occupés, puis 10 après une deuxième semaine inactive. Le maximum affiché ne diminue pas et chaque semaine comprenant un entraînement efface un palier. La fatigue élevée et l'énergie physique basse occupent leur propre portion de la barre selon le même principe.
 
-La montée de niveau réduit légèrement le coût calculé des entraînements, avec un plafond conservateur. Elle permet donc un peu plus de volume au boxeur expérimenté sans recréer une quatrième action cachée ni bouleverser la progression historique.
+La capacité permanente commence à 50 et gagne 5 points aux niveaux généraux 5, 10 et 15, jusqu'au plafond de 65. Les autres coûts d'activité restent stables. Aucun point n'est protégé automatiquement pour le repos : sa journée à 10 points concurrence directement le travail et l'entraînement. Une semaine sans repos reste permise, mais une condition fragile réduit la capacité disponible la semaine suivante. Un état critique impose 10 points de repos forcé; un état extrême peut imposer une nuit à l'hôpital, 15 points occupés et des frais médicaux. Ces conséquences reposent sur l'état physique réel, pas sur le simple fait d'avoir rempli la barre.
+
+Chaque niveau conserve trois points de caractéristiques. Les niveaux ordinaires ajoutent une rotation déterministe de cadeaux du coach — 50 $, un supplément ou un bon couvrant une séance du prochain programme privé — tandis que les niveaux 5, 10 et 15 accordent l'augmentation de capacité.
 
 ## 2. Carte et lieux visitables
 
@@ -151,7 +153,7 @@ La maison regroupe les activités qui ne nécessitent pas un autre lieu :
 
 L'entraînement au sous-sol reste volontairement limité. Il évite un blocage complet sans rendre l'abonnement au gym inutile : son coût hebdomadaire est proche d'une séance en établissement, mais son stimulus et son encadrement sont moindres. Son avantage est l'absence d'abonnement, pas une progression supérieure.
 
-La nuit et le sommeil ne constituent pas une activité à sélectionner : ils sont résolus automatiquement par l'horloge. Une journée de repos est un choix gratuit en énergie hebdomadaire, tandis qu'un entraînement au sous-sol réserve une vraie séance physique.
+La nuit et le sommeil ne constituent pas une activité à sélectionner : ils sont résolus automatiquement par l'horloge. Une journée de repos est un choix de récupération à 10 points de capacité, tandis qu'un entraînement au sous-sol réserve une vraie séance physique.
 
 ### 2.5 Identité des lieux et futurs camps professionnels
 

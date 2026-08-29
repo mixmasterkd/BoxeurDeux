@@ -278,6 +278,13 @@ test("rend l’emploi facultatif après un premier poste et n’invente aucun qu
   assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "boxing-gym"), baseCareer({ gymWeeks: 0 })), "Inscription requise");
   assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "strength-gym"), baseCareer()), "Verrouillé · amateur requis");
   assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "strength-gym"), baseCareer({ careerStatus: "amateur" })), "Abonnement facultatif");
+  assert.deepEqual(world.locationAccess("strength-gym", baseCareer()), {
+    locked: true,
+    reason: "Disponible après le passage amateur.",
+  });
+  assert.equal(world.locationAccess("arena", baseCareer()).locked, true);
+  assert.equal(world.locationAccess("home", baseCareer()).locked, false);
+  assert.equal(world.locationAccess("strength-gym", baseCareer({ careerStatus: "amateur" })).locked, false);
 });
 
 test("oriente le boxeur amateur vers le gala ou le tournoi pertinent", () => {
@@ -315,6 +322,11 @@ test("rend les cinq destinations et les deux compositions illustrées avec de vr
   assert.equal((html.match(/<button\b/g) || []).length, 11);
   assert.equal((html.match(/<button\b[^>]*\btype="button"/g) || []).length, 11);
   assert.equal((html.match(/class="v2-map-hotspot"/g) || []).length, 5);
+  assert.equal((html.match(/data-v2-locked="true"/g) || []).length, 2);
+  assert.match(html, /data-v2-location="strength-gym"[^>]+disabled aria-disabled="true"/);
+  assert.match(html, /data-v2-location="arena"[^>]+disabled aria-disabled="true"/);
+  assert.match(html, /Accès verrouillé : Gym de musculation\. Disponible après le passage amateur\./);
+  assert.match(html, /Accès verrouillé : Aréna\. Disponible après le passage amateur\./);
 });
 
 test("échappe les données de sauvegarde avant de les insérer dans le HTML", () => {

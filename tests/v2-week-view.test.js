@@ -18,7 +18,31 @@ test("normalise la capacité hebdomadaire et déduit une zone lisible", () => {
     zone: "low",
     zoneLabel: "Réserve faible",
     detail: "La réserve inutilisée aide la récupération de la prochaine semaine.",
+    unavailable: 0,
   });
+});
+
+test("n’affiche aucune réserve automatique et présente un risque de récupération sans bloquer la confirmation", () => {
+  const context = {
+    capacity: {
+      total: 50,
+      remaining: 32,
+      spent: 18,
+    },
+    risk: {
+      kind: "forced-rest",
+      tone: "critical",
+      title: "Repos forcé probable",
+      detail: "Sans repos, 10 points pourraient être occupés la semaine suivante.",
+    },
+  };
+  const launcher = view.renderLauncher(context);
+  const plan = view.renderPlan(context);
+  assert.doesNotMatch(launcher, /gardés pour le repos|data-v2-week-rest-reserve/);
+  assert.match(plan, /Repos forcé probable/);
+  assert.match(plan, /10 points pourraient être occupés/);
+  assert.match(plan, /data-v2-week-confirm/);
+  assert.doesNotMatch(plan, /data-v2-week-rest-reserve/);
 });
 
 test("le lanceur montre l'énergie restante et mène au bâtisseur avant la confirmation", () => {

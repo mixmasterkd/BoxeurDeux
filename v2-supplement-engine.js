@@ -51,7 +51,7 @@
       category: "hydratation",
       detail: "À préparer pour ta prochaine séance.",
       benefit: "Réduit modestement le coût d'énergie de la séance.",
-      compromise: "N'améliore ni le stimulus, ni la progression, ni la récupération de nuit.",
+      compromise: "N’améliore ni l’XP ciblée, ni la progression, ni la récupération de nuit.",
       effects: {
         energyCostMultiplier: 0.9,
         fatigueGainMultiplier: 1,

@@ -249,6 +249,7 @@ body.v2-preview #v2-world[hidden] {
   border-radius: 12px;
   color: #fff;
   background: rgba(12, 15, 13, .28);
+  opacity: .7;
   box-shadow: 0 7px 22px rgba(0, 0, 0, .38);
   transform: translate(-50%, -50%);
   cursor: pointer;
@@ -301,6 +302,30 @@ body.v2-preview #v2-world[hidden] {
   background: rgba(20, 24, 22, .97);
   box-shadow: 0 9px 28px rgba(0, 0, 0, .48), 0 0 0 3px rgba(221, 182, 94, .2);
   transform: translate(-50%, calc(-50% - 3px));
+}
+
+.v2-map-hotspot:disabled {
+  opacity: .7;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, .28);
+  color: #dedbd3;
+  background: rgba(10, 12, 11, .72);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .34);
+  filter: saturate(.35);
+  cursor: not-allowed;
+}
+
+.v2-map-hotspot:disabled > span {
+  color: #f2eee4;
+  background: #4a4c49;
+}
+
+.v2-map-hotspot:disabled:hover {
+  z-index: auto;
+  border-color: rgba(255, 255, 255, .28);
+  background: rgba(10, 12, 11, .72);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .34);
+  transform: translate(-50%, -50%);
 }
 
 .v2-map-hotspot[data-v2-location="home"] {
@@ -1383,6 +1408,16 @@ body.v2-preview #v2-world[hidden] {
   align-self: end;
   margin-top: auto;
 }
+
+.v2-trainer-offer .v2-trainer-gift {
+  padding: 7px 9px;
+  border-left: 3px solid var(--gold);
+  color: #ead7a8;
+  background: rgba(221, 182, 94, .08);
+  line-height: 1.35;
+}
+
+.v2-trainer-offer s { color: #a7a39a; font-weight: 500; }
 
 .v2-trainer-active {
   max-width: 620px;

@@ -185,7 +185,7 @@
       return "Ton énergie demeure basse : garde la prochaine période légère.";
     }
     if (stimulusLoad > 0 && nightCount === 0) {
-      return "Ton entraînement est encore à assimiler; une nuit de sommeil transformera ce stimulus en progression.";
+      return "Ton XP ciblée est encore en attente; une nuit de sommeil permettra d’en assimiler une partie.";
     }
     if (preparation.score >= 80) {
       return "Ta préparation est excellente; inutile d'empiler d'autres récupérations courtes.";
@@ -223,6 +223,7 @@
     const newEvents = eventsAddedAfter(source, next);
     const nightEvents = newEvents.filter(event => event.type === "night-recovery");
     const assimilated = sumNightValues(nightEvents, "assimilated");
+    const statXpGains = sumNightValues(nightEvents, "statXpGains");
     const gains = sumNightValues(nightEvents, "statGains");
     const deltas = {
       energy: roundTo(next.condition.energy - source.condition.energy),
@@ -245,6 +246,7 @@
       deltas,
       assimilated,
       stimulusAssimilated: clone(assimilated),
+      statXpGains,
       statGains: gains,
       advice,
       ui: {

@@ -43,19 +43,15 @@
   function xpForLevel(level) {
     const safeLevel = Math.max(1, Math.round(boundedNumber(level, 1, 1, 999)));
     if (safeLevel <= 1) return 0;
-    const steps = safeLevel - 2;
-    return 100 + steps * 180 + ((steps * (steps - 1)) / 2) * 80;
+    const steps = safeLevel - 1;
+    return steps * 40 + ((steps * (steps - 1)) / 2) * 10;
   }
 
   function normalizeLevel(raw, level, experience) {
     const currentFloor = xpForLevel(level);
     const nextFloor = xpForLevel(level + 1);
-    const supplied = raw.levelProgress;
-    const percentage = supplied == null
-      ? (experience - currentFloor) / Math.max(1, nextFloor - currentFloor) * 100
-      : supplied;
     return {
-      progress: Math.round(boundedNumber(percentage, 0, 0, 100)),
+      progress: Math.round(boundedNumber(experience / Math.max(1, nextFloor) * 100, 0, 0, 100)),
       currentFloor,
       nextFloor,
       remaining: Math.max(0, nextFloor - experience),
@@ -80,7 +76,12 @@
       sessionsTotal,
       sessionsCompleted,
       progress: Math.round(sessionsCompleted / sessionsTotal * 100),
-      pendingGaugePoints: Math.round(boundedNumber(rawProgram.pendingGaugePoints, 0, 0, 9999)),
+      pendingTargetedXp: Math.round(boundedNumber(
+        rawProgram.pendingTargetedXp == null ? rawProgram.pendingGaugePoints : rawProgram.pendingTargetedXp,
+        0,
+        0,
+        9999,
+      )),
     };
   }
 
@@ -88,7 +89,7 @@
     const raw = rawContext && typeof rawContext === "object" ? rawContext : {};
     const profile = raw.profile && typeof raw.profile === "object" ? raw.profile : {};
     const rawStats = raw.combatStats && typeof raw.combatStats === "object" ? raw.combatStats : {};
-    const rawProgress = raw.statProgress && typeof raw.statProgress === "object" ? raw.statProgress : {};
+    const rawStatXp = raw.statXpProgress && typeof raw.statXpProgress === "object" ? raw.statXpProgress : {};
     const status = ["recreational", "amateur", "professional"].includes(raw.careerStatus)
       ? raw.careerStatus
       : "recreational";
@@ -109,17 +110,21 @@
       money: Math.round(boundedNumber(raw.money, 0, 0, 99999999)),
       level,
       experience,
+      privateLessonCredits: Math.round(boundedNumber(raw.privateLessonCredits, 0, 0, 99)),
       levelProgress: normalizeLevel(raw, level, experience),
       record: normalizeRecord(raw.amateurRecord),
       stats: Object.fromEntries(STAT_KEYS.map(key => {
         const supplied = boundedNumber(rawStats[key], 40, 0, 99.9999);
         return [key, Math.floor(supplied)];
       })),
-      progress: Object.fromEntries(STAT_KEYS.map(key => {
-        const supplied = rawProgress[key] == null
-          ? (boundedNumber(rawStats[key], 40, 0, 99.9999) % 1) * 100
-          : rawProgress[key];
-        return [key, Math.round(boundedNumber(supplied, 0, 0, 99.9999))];
+      statXp: Object.fromEntries(STAT_KEYS.map(key => {
+        const source = rawStatXp[key] && typeof rawStatXp[key] === "object" ? rawStatXp[key] : {};
+        const nextThreshold = Math.round(boundedNumber(source.nextThreshold, 40, 1, 99999999));
+        return [key, {
+          total: Math.round(boundedNumber(source.total, 0, 0, nextThreshold)),
+          nextThreshold,
+          pendingXp: Math.round(boundedNumber(source.pendingXp, 0, 0, 9999)),
+        }];
       })),
       privateProgram: normalizePrivateProgram(raw.privateProgram || raw.privateTrainerProgram),
     };
@@ -131,22 +136,26 @@
 
   function renderStat(key, context) {
     const value = context.stats[key];
-    const progress = context.progress[key];
+    const xp = context.statXp[key];
     const label = STAT_LABELS[key];
+    const progress = Math.round(xp.total / Math.max(1, xp.nextThreshold) * 100);
+    const pendingLabel = xp.pendingXp > 0
+      ? `+${xp.pendingXp} XP en attente de récupération`
+      : "Toute l’XP est assimilée";
     return `<article class="v2-fighter-stat" aria-labelledby="v2-fighter-stat-${key}">
       <div><span id="v2-fighter-stat-${key}">${label}</span><strong>${value}</strong></div>
-      <div class="v2-fighter-progress" role="progressbar" aria-label="Progression ${label.toLocaleLowerCase("fr-CA")}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
+      <div class="v2-fighter-progress" role="progressbar" aria-label="XP ${label.toLocaleLowerCase("fr-CA")} : ${xp.total} sur ${xp.nextThreshold}" aria-valuemin="0" aria-valuemax="${xp.nextThreshold}" aria-valuenow="${xp.total}">
         <span style="width:${progress}%"></span>
       </div>
-      <small>${progress} %</small>
+      <div class="v2-fighter-stat-meta"><small><strong>${xp.total} / ${xp.nextThreshold} XP</strong></small><small class="${xp.pendingXp > 0 ? "pending" : "clear"}">${pendingLabel}</small></div>
     </article>`;
   }
 
   function renderLevelProgress(context) {
     const progress = context.levelProgress.progress;
     return `<div class="v2-fighter-level-progress">
-      <div><span>Progression générale</span><strong>${progress} %</strong></div>
-      <div class="v2-fighter-progress" role="progressbar" aria-label="Progression vers le niveau ${context.level + 1}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
+      <div><span>XP générale</span><strong>${context.experience} / ${context.levelProgress.nextFloor} XP</strong></div>
+      <div class="v2-fighter-progress" role="progressbar" aria-label="XP générale : ${context.experience} sur ${context.levelProgress.nextFloor} avant le niveau ${context.level + 1}" aria-valuemin="0" aria-valuemax="${context.levelProgress.nextFloor}" aria-valuenow="${context.experience}">
         <span style="width:${progress}%"></span>
       </div>
     </div>`;
@@ -157,8 +166,8 @@
     if (!program) {
       return `<p class="v2-fighter-empty">Aucun programme privé actif.<br><small>Les entraîneurs privés font progresser une qualité graduellement; ils n’accordent jamais un point complet instantanément.</small></p>`;
     }
-    const pending = program.pendingGaugePoints > 0
-      ? `<small>${program.pendingGaugePoints} point${program.pendingGaugePoints > 1 ? "s" : ""} de progression potentielle créé${program.pendingGaugePoints > 1 ? "s" : ""} par le programme</small>`
+    const pending = program.pendingTargetedXp > 0
+      ? `<small>${program.pendingTargetedXp} XP ciblée créée par le programme</small>`
       : `<small>Les gains seront assimilés avec la récupération.</small>`;
     return `<article class="v2-fighter-private-program">
       <div><span><strong>${escapeHTML(program.trainerLabel)}</strong><small>Cible : ${escapeHTML(program.targetLabel)}</small></span><b>${program.sessionsCompleted}/${program.sessionsTotal} séances</b></div>
@@ -194,17 +203,22 @@
             <div><dt>Catégorie</dt><dd>${escapeHTML(context.weightLabel)}</dd></div>
             <div><dt>Bilan</dt><dd>${escapeHTML(record)}</dd></div>
             <div><dt>Argent</dt><dd class="money">${context.money} $</dd></div>
+            ${context.privateLessonCredits > 0 ? `<div><dt>Cours privé offert</dt><dd>${context.privateLessonCredits} bon${context.privateLessonCredits > 1 ? "s" : ""}</dd></div>` : ""}
           </dl>
         </aside>
         <div class="v2-fighter-details">
           <section aria-labelledby="v2-fighter-progression-title">
-            <div class="v2-fighter-section-heading"><div><p class="eyebrow">Progression permanente</p><h3 id="v2-fighter-progression-title">Tes quatre qualités de boxe</h3></div><p>Les séances créent du travail à assimiler. Une barre complète améliore automatiquement la qualité et conserve l’excédent.</p></div>
+            <div class="v2-fighter-section-heading"><div><p class="eyebrow">XP ciblée cumulative</p><h3 id="v2-fighter-progression-title">Tes quatre qualités de boxe</h3></div><p>L’entraînement crée de l’XP ciblée. Les nuits l’assimilent; atteindre le prochain seuil donne +1 à la qualité sans perdre l’excédent.</p></div>
             <div class="v2-fighter-stats">${STAT_KEYS.map(key => renderStat(key, context)).join("")}</div>
             <div data-v2-level-up-slot data-level-points="${context.levelProgress.manualPoints}" hidden></div>
           </section>
           <section class="v2-fighter-private" aria-labelledby="v2-fighter-private-title">
-            <div class="v2-fighter-section-heading"><div><p class="eyebrow">Développement ciblé</p><h3 id="v2-fighter-private-title">Programme privé</h3></div><p>Un entraîneur plus expérimenté coûte davantage, mais produit plus de progression fractionnaire vers la qualité choisie.</p></div>
+            <div class="v2-fighter-section-heading"><div><p class="eyebrow">Développement ciblé</p><h3 id="v2-fighter-private-title">Programme privé</h3></div><p>Un entraîneur plus expérimenté coûte davantage, mais produit plus d’XP ciblée vers la qualité choisie.</p></div>
             ${renderPrivateProgram(context)}
+          </section>
+          <section class="v2-fighter-save" aria-labelledby="v2-fighter-save-title">
+            <div><p class="eyebrow">Sauvegarde externe</p><h3 id="v2-fighter-save-title">Conserver une copie de ta carrière</h3><p>Le fichier contient ta progression complète et pourra être réimporté depuis l’écran d’accueil.</p></div>
+            <button type="button" class="primary-button" data-v2-export-career>Télécharger la sauvegarde JSON</button>
           </section>
         </div>
       </div>

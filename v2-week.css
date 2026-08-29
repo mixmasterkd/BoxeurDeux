@@ -138,6 +138,35 @@
   line-height: 1.4;
 }
 
+.v2-week-risk {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(239, 179, 95, .45);
+  border-radius: 10px;
+  background: rgba(239, 179, 95, .08);
+}
+
+.v2-week-risk > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #18130a;
+  background: #efb35f;
+  font-weight: 900;
+}
+
+.v2-week-risk strong,
+.v2-week-risk p { display: block; margin: 0; }
+.v2-week-risk strong { color: #f5e7ca; font-size: .72rem; }
+.v2-week-risk p { margin-top: 3px; color: #d0cbc0; font-size: .65rem; line-height: 1.4; }
+.v2-week-risk.critical { border-color: rgba(240, 113, 103, .56); background: rgba(240, 113, 103, .1); }
+.v2-week-risk.critical > span { color: #fff; background: #b74841; }
+
 .v2-week-compact-items,
 .v2-week-plan-items,
 .v2-week-summary-changes,

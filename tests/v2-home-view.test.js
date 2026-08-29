@@ -82,7 +82,7 @@ test("affiche le repère de semaine, les jauges et le conseil avant de planifier
   assert.match(html, /Mercredi · 9 septembre 2026/);
   assert.match(html, /Énergie<\/span><strong>72 %/);
   assert.match(html, /Fatigue<\/span><strong>28 %/);
-  assert.match(html, /Charge à assimiler<\/span><strong>36 %/);
+  assert.match(html, /XP ciblée en attente<\/span><strong>36 XP/);
   assert.match(html, /Une semaine plus calme serait utile/);
   assert.match(html, /Conseil avant de planifier/);
 });
@@ -151,6 +151,20 @@ test("un programme complet bloque les nouveaux choix, mais pas un choix à retir
   }
   const html = homeView.render(context);
   assert.match(html, /Programme complet/);
+});
+
+test("le repos doit concurrencer les autres activités lorsque la semaine est pleine", () => {
+  const context = homeView.normalizeContext(baseContext({
+    careerStatus: "amateur",
+    plan: { entries: [{ actionId: "work" }, { actionId: "boxing-quick" }] },
+    weekCapacity: { allowed: 50, used: 50, remaining: 0 },
+    actions: { rest: { available: true } },
+  }));
+  assert.equal(context.actions.rest.available, false);
+  assert.equal(context.actions.rest.planned, false);
+  assert.match(context.actions.rest.reason, /programme de la semaine est complet/i);
+  const html = homeView.render(context);
+  assert.match(html, /data-v2-home-action="rest"[^>]+aria-disabled="true"/);
 });
 
 test("la séance maison personnalisée reste visible et verrouillée seulement au statut récréatif", () => {

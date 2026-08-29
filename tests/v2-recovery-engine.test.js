@@ -74,7 +74,7 @@ test("la nuit de dimanche fait passer à la semaine suivante", () => {
   assert.equal(result.nightCount, 1);
 });
 
-test("seule une nuit assimile le stimulus et produit des gains de statistiques", () => {
+test("seule une nuit assimile l’XP ciblée et la conserve jusqu’au prochain seuil", () => {
   const initial = time.createState({
     time: { week: 1, day: "monday", period: "evening" },
     condition: { energy: 45, fatigue: 35 },
@@ -85,8 +85,9 @@ test("seule une nuit assimile le stimulus et produit des gains de statistiques",
 
   assert.equal(result.nightCount, 1);
   assert.ok(result.assimilated.technique > 0);
-  assert.ok(result.statGains.technique > 0);
-  assert.ok(result.state.stats.technique > initial.stats.technique);
+  assert.ok(result.statXpGains.technique > 0);
+  assert.equal(result.state.stats.technique, initial.stats.technique);
+  assert.ok(result.state.statXp.technique > initial.statXp.technique);
   assert.deepEqual(result.ui.stimulusAssimilated, result.assimilated);
   assert.equal(typeof result.advice, "string");
 });
@@ -112,7 +113,7 @@ test("détecte la récupération nocturne même lorsque l'historique de 500 entr
   assert.equal(result.state.sequence, 502);
   assert.equal(result.nightCount, 1);
   assert.ok(result.assimilated.technique > 0);
-  assert.ok(result.statGains.technique > 0);
+  assert.ok(result.statXpGains.technique > 0);
   assert.equal(result.state.history.at(-2).id, "time-event-501");
   assert.equal(result.state.history.at(-2).type, "night-recovery");
 });

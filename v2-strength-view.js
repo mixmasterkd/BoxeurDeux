@@ -108,7 +108,7 @@
         active: trainer.active === true,
         name: trainer.name || "Aucun préparateur choisi",
         programLabel: trainer.programLabel || "Programme physique personnalisé",
-        detail: trainer.detail || "Un préparateur privé accélère graduellement un stimulus ciblé; il ne donne jamais un point de statistique instantané.",
+        detail: trainer.detail || "Un préparateur privé produit davantage d’XP ciblée; il ne donne jamais un point de statistique instantané.",
         sessionsCompleted: wholeNumber(trainer.sessionsCompleted, 0, 0, 999),
         sessionsTotal: wholeNumber(trainer.sessionsTotal, 0, 0, 999),
         actionLabel: trainer.actionLabel || (trainer.active === true ? "Voir mon programme" : "Choisir un préparateur"),
@@ -147,8 +147,9 @@
 
   function stimulusMarkup(stimulus, options = {}) {
     const entries = Object.entries(stimulus || {})
-      .filter(([, value]) => finiteNumber(value) > 0)
-      .map(([key, value]) => `<span><b>${escapeHTML(STAT_LABELS[key] || key)}</b> +${escapeHTML(finiteNumber(value).toFixed(value % 1 ? 1 : 0))}</span>`);
+      .map(([key, value]) => [key, Math.round(finiteNumber(value))])
+      .filter(([, value]) => value > 0)
+      .map(([key, value]) => `<span><b>${escapeHTML(STAT_LABELS[key] || key)}</b> +${value} XP</span>`);
     if (!entries.length) return options.empty ? `<span class="empty">${escapeHTML(options.empty)}</span>` : "";
     return entries.join("");
   }
@@ -214,7 +215,7 @@
       <div class="v2-strength-activity-icon" aria-hidden="true">${escapeHTML(activity.icon)}</div>
       <div class="v2-strength-activity-copy"><h4>${escapeHTML(activity.label)}</h4><p>${escapeHTML(activity.benefit)}</p>
         <div class="v2-strength-activity-costs"><span>${activity.durationMinutes} min</span><strong>−${activity.energyCost} énergie</strong><span>${fatigueLabel} fatigue</span></div>
-        <div class="v2-strength-stimuli" aria-label="Stimuli prévus">${stimulusMarkup(activity.stimulus, { empty: "Récupération" })}</div>
+        <div class="v2-strength-stimuli" aria-label="XP ciblée prévue">${stimulusMarkup(activity.stimulus, { empty: "Récupération" })}</div>
         <small class="v2-strength-tradeoff">Compromis : ${escapeHTML(activity.compromise)}</small>${reason}
       </div>
       <button type="button" data-v2-strength-activity="${escapeHTML(activity.id)}" aria-pressed="${state.selected}" aria-label="${escapeHTML(buttonLabel)}"${disabled}>${state.selected ? "Retirer" : "Ajouter"}</button>
@@ -241,7 +242,7 @@
         <div><span>Énergie après</span><strong>${preview.projected.energy} %</strong></div>
         <div><span>Fatigue après</span><strong>${preview.projected.fatigue} %</strong></div>
       </div>
-      <div class="v2-strength-total-stimuli"><span>Stimuli de la séance</span><div>${stimulusMarkup(preview.totals.stimulus, { empty: "Aucun pour le moment" })}</div></div>
+      <div class="v2-strength-total-stimuli"><span>XP ciblée de la séance</span><div>${stimulusMarkup(preview.totals.stimulus, { empty: "Aucune pour le moment" })}</div></div>
       ${warnings}
       <p id="v2-strength-confirm-reason" class="v2-strength-confirm-reason">${escapeHTML(preview.reason)}</p>
       <button type="button" class="primary-button" data-v2-strength-confirm${disabled}>Ajouter cette séance à ma semaine</button>
@@ -280,7 +281,7 @@
       ${renderWeekPlan(context)}
       <section class="v2-strength-mobile-summary" aria-label="Résumé rapide de la séance" aria-live="polite"><span><strong>${context.selectedActivities.length} activité${context.selectedActivities.length > 1 ? "s" : ""}</strong><small>${context.preview.projected.energy} % énergie · ${context.preview.totals.durationMinutes} min</small></span><button type="button" class="primary-button" data-v2-strength-mobile-confirm${mobileConfirmDisabled}>Ajouter</button></section>
       <div class="v2-strength-layout">
-        <main class="v2-strength-main"><section class="v2-strength-catalogue" aria-labelledby="v2-strength-catalogue-title"><header><div><p class="eyebrow">Composition libre</p><h3 id="v2-strength-catalogue-title">Choisis selon ton énergie</h3></div><p>Chaque ajout met immédiatement à jour l'énergie, la fatigue et les stimuli prévus.</p><button type="button" class="secondary-button" data-v2-strength-quick aria-pressed="${context.quick.planned}"${context.quick.available ? "" : " disabled aria-disabled=\"true\""}>${context.quick.planned ? "Retirer la séance rapide" : context.quick.plannedCount > 0 ? "Ajouter une 2e séance rapide" : "Ajouter la séance rapide"}</button>${context.quick.reason && !context.quick.available ? `<small>${escapeHTML(context.quick.reason)}</small>` : ""}</header><div class="v2-strength-activity-grid">${activities}</div></section>${renderMembershipPlans(context)}</main>
+        <main class="v2-strength-main"><section class="v2-strength-catalogue" aria-labelledby="v2-strength-catalogue-title"><header><div><p class="eyebrow">Composition libre</p><h3 id="v2-strength-catalogue-title">Choisis selon ton énergie</h3></div><p>Chaque ajout met immédiatement à jour l'énergie, la fatigue et l’XP ciblée prévue.</p><button type="button" class="secondary-button" data-v2-strength-quick aria-pressed="${context.quick.planned}"${context.quick.available ? "" : " disabled aria-disabled=\"true\""}>${context.quick.planned ? "Retirer la séance rapide" : context.quick.plannedCount > 0 ? "Ajouter une 2e séance rapide" : "Ajouter la séance rapide"}</button>${context.quick.reason && !context.quick.available ? `<small>${escapeHTML(context.quick.reason)}</small>` : ""}</header><div class="v2-strength-activity-grid">${activities}</div></section>${renderMembershipPlans(context)}</main>
         <aside class="v2-strength-sidebar" aria-label="Séance et services">${renderSelection(context)}${renderServices(context)}</aside>
       </div>
     </div>`;
@@ -289,7 +290,7 @@
   function renderResult(rawResult) {
     const result = rawResult && typeof rawResult === "object" ? rawResult : {};
     const title = result.title || "Séance de musculation terminée";
-    const summary = result.summary || "Le stimulus est enregistré. La récupération déterminera la progression assimilée.";
+    const summary = result.summary || "L’XP ciblée est enregistrée. La récupération déterminera la quantité assimilée.";
     const durationMinutes = wholeNumber(result.durationMinutes, 0, 0, 360);
     const activities = Array.isArray(result.activities) ? result.activities.slice(0, Object.keys(BoxeurStrength.ACTIVITIES).length) : [];
     const changes = Array.isArray(result.changes) ? result.changes.slice(0, 8) : [];

@@ -19,7 +19,9 @@ function assertAllPhysicalValuesAreBounded(state) {
 
 test("expose la même API en CommonJS et sur globalThis", () => {
   assert.equal(globalThis.BoxeurTime, time);
-  assert.equal(time.SCHEMA_VERSION, 1);
+  assert.equal(time.SCHEMA_VERSION, 2);
+  assert.equal(time.STAT_XP_VERSION, 1);
+  assert.deepEqual([0, 1, 2, 3].map(time.statXpForRank), [40, 90, 150, 220]);
   assert.equal(time.PERIODS_PER_WEEK, 21);
   assert.deepEqual(time.DAYS, ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
   assert.deepEqual(time.PERIODS, ["morning", "afternoon", "evening"]);
@@ -215,8 +217,9 @@ test("la récupération nocturne restaure l'énergie, réduit la fatigue et assi
   for (const key of time.STAT_KEYS) {
     assert.ok(state.stimulus[key] < before.stimulus[key] || before.stimulus[key] === 0);
     assert.ok(state.stats[key] >= before.stats[key]);
+    assert.ok(state.statXp[key] >= before.statXp[key]);
   }
-  assert.ok(state.stats.technique > before.stats.technique);
+  assert.ok(state.statXp.technique > before.statXp.technique);
   assert.equal(state.history[0].type, "night-recovery");
   assertAllPhysicalValuesAreBounded(state);
 });
@@ -259,6 +262,30 @@ test("dix séances ciblées gardent une progression proche du système historiqu
   const techniqueGain = state.stats.technique - 40;
   assert.ok(techniqueGain >= 0.9 && techniqueGain <= 1.15, `gain obtenu : ${techniqueGain}`);
   assert.ok(state.stats.power < 40.01, "une séance technique ne doit pas augmenter la puissance");
+});
+
+test("l’XP ciblée est entière, cumulative et conserve l’excédent au changement de statistique", () => {
+  let state = time.createState({
+    time: { week: 1, day: "monday", period: "evening" },
+    stats: { technique: 40, power: 40, cardio: 40, defense: 40 },
+    statXp: { technique: 39 },
+    statXpRanks: { technique: 0 },
+    stimulus: { technique: 6 },
+  });
+
+  state = time.advanceTime(state, 1, fixedRng(.5));
+
+  assert.equal(state.stats.technique, 41);
+  assert.equal(state.statXp.technique, 41);
+  assert.equal(state.statXpRanks.technique, 1);
+  assert.deepEqual(time.statXpProgress(state, "technique"), {
+    total: 41,
+    rank: 1,
+    currentFloor: 40,
+    nextThreshold: 90,
+    remaining: 49,
+    pendingXp: 4,
+  });
 });
 
 test("la source aléatoire seedée et l'injection reproduisent exactement une récupération", () => {

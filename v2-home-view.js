@@ -290,7 +290,7 @@
       condition: {
         energy: wholeNumber(condition.energy, 80, 0, 100),
         fatigue: wholeNumber(condition.fatigue, 10, 0, 100),
-        pendingLoad: wholeNumber(pendingLoad, 0, 0, 100),
+        pendingLoad: wholeNumber(pendingLoad, 0, 0, 400),
         recommendation: safeText(condition.recommendation || raw.nextRecommendation, "Garde une semaine équilibrée.", 180),
         recommendationDetail: safeText(condition.recommendationDetail, "Compare ta récupération aux choix déjà prévus avant d’ajouter une autre charge.", 320),
         recommendationTone,
@@ -415,7 +415,7 @@
           <section class="v2-home-condition v2-place-condition" aria-label="État de récupération actuel">
             <div><span>Énergie</span><strong>${context.condition.energy} %</strong><meter min="0" max="100" value="${context.condition.energy}">${context.condition.energy} %</meter></div>
             <div><span>Fatigue</span><strong>${context.condition.fatigue} %</strong><meter min="0" max="100" value="${context.condition.fatigue}">${context.condition.fatigue} %</meter></div>
-            <div><span>Charge à assimiler</span><strong>${context.condition.pendingLoad} %</strong><meter min="0" max="100" value="${context.condition.pendingLoad}">${context.condition.pendingLoad} %</meter></div>
+            <div><span>XP ciblée en attente</span><strong>${context.condition.pendingLoad} XP</strong><meter min="0" max="400" value="${context.condition.pendingLoad}">${context.condition.pendingLoad} XP</meter></div>
           </section>
           <section class="v2-home-recommendation v2-place-card ${context.condition.recommendationTone}" aria-labelledby="v2-home-recommendation-title">
             <p class="eyebrow">Conseil avant de planifier</p><h3 id="v2-home-recommendation-title">${escapeHTML(context.condition.recommendation)}</h3>

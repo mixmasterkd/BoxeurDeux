@@ -74,33 +74,28 @@ test("rollback restitue exactement le snapshot initial et une copie indépendant
   assert.equal(capsule.legacySnapshot.state.money, 875);
 });
 
-test("progression partielle devient un stimulus résiduel sans hausse immédiate", () => {
+test("progression partielle devient de l’XP ciblée cumulative sans hausse immédiate", () => {
   const source = v5Snapshot();
   const capsule = migration.migrateV5ToV2(source, { migratedAt: MIGRATED_AT });
-  const expected = migration.progressToResidualStimulus(4, 52);
-
   assert.equal(capsule.timeState.stats.technique, 52, "la migration ne doit accorder aucun point");
-  assert.equal(capsule.timeState.stimulus.technique, expected.appliedStimulus);
+  assert.equal(capsule.timeState.statXp.technique, 16);
+  assert.equal(capsule.timeState.statXp.cardio, 36);
   assert.equal(capsule.migrationAudit.trainingProgress.technique.intendedGain, 0.4);
   assert.equal(capsule.timeState.stimulus.power, 0);
-  assert.ok(capsule.timeState.stimulus.cardio > capsule.timeState.stimulus.technique);
+  assert.ok(Object.values(capsule.timeState.stimulus).every(value => value === 0));
 
   const extreme = migration.migrateV5ToV2(v5Snapshot({ state: {
     combatStats: { technique: 100, power: 100, cardio: 100, defense: 100 },
     trainingProgress: { technique: 9, power: 9, cardio: 9, defense: 9 },
   } }), { migratedAt: MIGRATED_AT });
-  assert.equal(extreme.timeState.stimulus.technique, 100);
+  assert.equal(extreme.timeState.statXp.technique, 36);
+  assert.equal(extreme.timeState.stimulus.technique, 0);
   const extremeAudit = extreme.migrationAudit.trainingProgress.technique;
   const extremeCarry = extreme.legacyTrainingCarry;
   assert.ok(extremeAudit.overflowStimulus > 0);
   assert.equal(extremeCarry.unit, "legacy-stat-gain");
   assert.equal(extremeCarry.intendedStatGain.technique, 0.9);
   assert.equal(extremeCarry.stimulusReserve.technique, extremeAudit.overflowStimulus);
-  assert.equal(
-    Number((extreme.timeState.stimulus.technique + extremeCarry.stimulusReserve.technique).toFixed(4)),
-    extremeCarry.totalStimulus.technique,
-    "le plafond de la jauge ne doit perdre aucune partie du stimulus prévu",
-  );
   assert.equal(extreme.timeState.stats.technique, 99, "la réserve ne doit pas devenir un point immédiat");
 });
 
@@ -116,13 +111,29 @@ test("répare rétrocompatiblement une capsule V2 antérieure sans réserve", ()
   const repaired = migration.migrateV5ToV2(olderCapsule);
   assert.equal(repaired.version, 2, "le correctif reste additif au format de capsule existant");
   assert.equal(repaired.legacyTrainingCarry.intendedStatGain.technique, 0.9);
-  assert.equal(
-    Number((repaired.timeState.stimulus.technique
-      + repaired.legacyTrainingCarry.stimulusReserve.technique).toFixed(4)),
-    repaired.legacyTrainingCarry.totalStimulus.technique,
-  );
+  assert.equal(repaired.timeState.statXp.technique, 36);
+  assert.equal(repaired.timeState.stimulus.technique, 0);
   assert.equal("legacyTrainingCarry" in olderCapsule, false, "la réparation doit demeurer immutable");
   assert.deepEqual(migration.migrateV5ToV2(repaired), repaired, "une capsule réparée redevient idempotente");
+});
+
+test("met à niveau une ancienne capsule à statistiques fractionnaires sans perdre sa progression", () => {
+  const current = migration.migrateV5ToV2(v5Snapshot(), { migratedAt: MIGRATED_AT });
+  const olderCapsule = structuredClone(current);
+  delete olderCapsule.timeState.statXpVersion;
+  delete olderCapsule.timeState.statXp;
+  delete olderCapsule.timeState.statXpRanks;
+  olderCapsule.timeState.schemaVersion = 1;
+  olderCapsule.timeState.stats.technique = 52.25;
+  olderCapsule.timeState.stimulus.technique = 10;
+
+  const upgraded = migration.migrateV5ToV2(olderCapsule);
+
+  assert.equal(upgraded.timeState.stats.technique, 52);
+  assert.equal(upgraded.timeState.statXp.technique, 10);
+  assert.ok(upgraded.timeState.stimulus.technique > 0);
+  assert.equal(upgraded.timeState.statXpVersion, 1);
+  assert.equal("statXp" in olderCapsule.timeState, false, "la mise à niveau doit rester immutable");
 });
 
 test("le stimulus actif et sa réserve représentent exactement chaque fraction héritée", () => {

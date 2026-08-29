@@ -219,7 +219,11 @@
    * legacySnapshot; no V5 field is deleted, renamed or executed here.
    */
   function migrateV5ToV2(snapshot, options = {}) {
-    if (isV2Capsule(snapshot)) return ensureLegacyTrainingCarry(snapshot);
+    if (isV2Capsule(snapshot)) {
+      const upgraded = ensureLegacyTrainingCarry(snapshot);
+      upgraded.timeState = BoxeurTime.upgradeState(upgraded.timeState);
+      return upgraded;
+    }
 
     const legacySnapshot = clone(snapshot);
     const career = stateFromSnapshot(snapshot);
@@ -227,11 +231,17 @@
     const stats = normalizeCombatStats(career);
     const progress = normalizeTrainingProgress(career);
     const progressAudit = {};
+    const statXp = {};
+    const statXpRanks = {};
     const stimulus = {};
 
     STAT_KEYS.forEach(key => {
       progressAudit[key] = progressToResidualStimulus(progress[key], stats[key]);
-      stimulus[key] = progressAudit[key].appliedStimulus;
+      const fractionalXp = Math.round((stats[key] - Math.floor(stats[key])) * BoxeurTime.STAT_XP_FIRST_THRESHOLD);
+      const legacyCounterXp = Math.round(progress[key] / 10 * BoxeurTime.STAT_XP_FIRST_THRESHOLD);
+      statXp[key] = Math.min(BoxeurTime.STAT_XP_FIRST_THRESHOLD - 1, Math.max(fractionalXp, legacyCounterXp));
+      statXpRanks[key] = 0;
+      stimulus[key] = 0;
     });
 
     const seed = String(options.seed == null
@@ -246,7 +256,9 @@
         energy: clampNumber(career.energy, 72, 0, 100),
         fatigue: clampNumber(career.fatigue, 0, 0, 100),
       },
-      stats,
+      stats: Object.fromEntries(STAT_KEYS.map(key => [key, Math.floor(stats[key])])),
+      statXp,
+      statXpRanks,
       stimulus,
     });
     const legacyPendingPlan = clone(legacyWeeklyPlanFrom(snapshot, career));

@@ -400,7 +400,7 @@ test("un plan fourni exécute une activité générique physique avec ses financ
   assert.equal(result.summary.budget.executed.trainingSessions, 1);
   assert.equal(result.summary.money.earned, -25);
   assert.equal(result.finances.money, 175);
-  assert.equal(result.summary.xpAward, 7.5);
+  assert.equal(result.summary.xpAward, 8);
   assert.equal(result.summary.wear, 3);
   assert.equal(result.summary.maximumSingleActionInjuryRiskPercent, 12.4);
   assert.equal(result.summary.actions[0].category, "home-training");

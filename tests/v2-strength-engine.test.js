@@ -272,6 +272,6 @@ test("la récupération assimile ensuite le stimulus selon le moteur temporel co
   const recovered = time.advanceTime(trained, 20, fixedRng());
 
   assert.equal(trained.stats.power, 30);
-  assert.ok(recovered.stats.power > 30);
+  assert.ok(recovered.statXp.power > trained.statXp.power);
   assert.ok(recovered.stimulus.power < trained.stimulus.power);
 });

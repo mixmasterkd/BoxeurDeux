@@ -197,7 +197,7 @@
       wear: 0,
       injuryRisk: 0,
       benefit: "Réduit une partie de la fatigue immédiate et termine la séance proprement.",
-      compromise: "Consomme du temps sans créer un gros stimulus physique.",
+      compromise: "Consomme du temps sans créer beaucoup d’XP ciblée.",
       icon: "M",
       countsAsWork: false,
     },
@@ -557,7 +557,11 @@
       fatigue: roundTo(clamp(before.condition.fatigue + preview.totals.fatigueDelta)),
     };
     const statGains = {};
-    STAT_KEYS.forEach(key => { statGains[key] = roundTo(after.stats[key] - before.stats[key]); });
+    const statXpGains = {};
+    STAT_KEYS.forEach(key => {
+      statGains[key] = roundTo(after.stats[key] - before.stats[key]);
+      statXpGains[key] = Math.max(0, Math.round((after.statXp?.[key] || 0) - (before.statXp?.[key] || 0)));
+    });
     return {
       type: "strength-gym-session",
       activities: clone(preview.aggregate.activityIds),
@@ -577,6 +581,7 @@
       plannedStimulus: clone(preview.totals.stimulus),
       remainingStimulus: clone(after.stimulus),
       statGains,
+      statXpGains,
       xpAward: Math.max(1, Math.round(preview.totals.xp)),
       wear: preview.totals.wear,
       injuryRiskPercent: roundTo(clamp(

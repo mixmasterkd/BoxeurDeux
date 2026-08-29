@@ -35,12 +35,16 @@ test("expose un moteur UMD/CommonJS et un catalogue central immuable", () => {
   assert.equal(Object.isFrozen(trainers.TRAINERS[0]), true);
 });
 
-test("un entraîneur plus cher produit davantage de points fractionnaires estimés", () => {
+test("un entraîneur plus cher produit davantage d’XP ciblée entière estimée", () => {
   const offers = trainers.listOffers({ statValue: 40 });
   assert.deepEqual(offers.map(offer => offer.cost), [60, 120, 220]);
   assert.ok(offers[0].estimatedGaugePointsPerSession < offers[1].estimatedGaugePointsPerSession);
   assert.ok(offers[1].estimatedGaugePointsPerSession < offers[2].estimatedGaugePointsPerSession);
-  offers.forEach(offer => assert.ok(offer.estimatedGaugePointsPerSession > 0 && offer.estimatedGaugePointsPerSession < 100));
+  offers.forEach(offer => {
+    assert.equal(Number.isInteger(offer.estimatedTargetedXpPerSession), true);
+    assert.equal(offer.estimatedTargetedXpPerSession, offer.estimatedGaugePointsPerSession);
+    assert.ok(offer.estimatedTargetedXpPerSession > 0 && offer.estimatedTargetedXpPerSession < 100);
+  });
 });
 
 test("les séances réelles respectent aussi l'ordre de rendement du catalogue", () => {
@@ -61,12 +65,13 @@ test("les séances réelles respectent aussi l'ordre de rendement du catalogue",
   });
 });
 
-test("le rendement estimé diminue graduellement avec une statistique avancée", () => {
+test("l’estimation XP reste entière et indépendante de l’ancienne jauge en pourcentage", () => {
   const beginner = trainers.estimateGaugePoints("elite", 20);
   const intermediate = trainers.estimateGaugePoints("elite", 55);
   const advanced = trainers.estimateGaugePoints("elite", 90);
-  assert.ok(beginner > intermediate);
-  assert.ok(intermediate > advanced);
+  assert.equal(beginner, intermediate);
+  assert.equal(intermediate, advanced);
+  assert.equal(Number.isInteger(advanced), true);
   assert.ok(advanced > 0);
 });
 
@@ -86,6 +91,21 @@ test("démarrer un programme déduit son coût par contrat sans muter les financ
   assert.equal(outcome.state.activeProgram.target, "defense");
   assert.equal(outcome.state.activeProgram.sessionsCompleted, 0);
   assert.equal(outcome.state.activeProgram.costPaid, 120);
+});
+
+test("un bon de cours privé paie exactement une séance du prochain programme", () => {
+  const outcome = trainers.startProgram(trainerState(), {
+    trainerId: "specialist",
+    target: "technique",
+    startedWeek: 5,
+  }, { balance: 100, freeSessions: 1 });
+
+  assert.equal(outcome.result.regularCost, 120);
+  assert.equal(outcome.result.discount, 30);
+  assert.equal(outcome.result.moneyDelta, -90);
+  assert.equal(outcome.result.remainingBalance, 10);
+  assert.equal(outcome.result.freeSessionsUsed, 1);
+  assert.equal(outcome.state.activeProgram.costPaid, 90);
 });
 
 test("refuse un programme sans argent, avec une cible invalide ou pendant un programme actif", () => {
@@ -122,8 +142,10 @@ test("une séance privée crée seulement du stimulus ciblé et retourne énergi
   assert.equal(outcome.result.fatigueDelta, 10);
   assert.equal(outcome.result.target, "power");
   assert.ok(outcome.result.gaugePointsCreated > 0);
+  assert.equal(outcome.result.targetedXpCreated, Math.round(outcome.result.stimulusAccepted));
   assert.equal(outcome.state.activeProgram.sessionsCompleted, 1);
   assert.equal(outcome.state.activeProgram.pendingGaugePoints, outcome.result.gaugePointsCreated);
+  assert.equal(outcome.state.activeProgram.pendingTargetedXp, outcome.result.targetedXpCreated);
 });
 
 test("le reçu de séance empêche de payer la fatigue ou le stimulus deux fois", () => {
@@ -197,6 +219,7 @@ test("l'état public expose le programme pour la fiche Boxeur sans les reçus in
   assert.equal(publicState.activeProgram.target, "defense");
   assert.equal(publicState.activeProgram.progress, 25);
   assert.ok(publicState.activeProgram.pendingGaugePoints > 0);
+  assert.equal(publicState.activeProgram.pendingTargetedXp, publicState.activeProgram.pendingGaugePoints);
   assert.equal("sessionReceipts" in publicState, false);
 });
 
@@ -223,4 +246,5 @@ test("normalise une ancienne structure privateProgram sans inventer de gain", ()
   assert.equal(migrated.activeProgram.trainerId, "specialist");
   assert.equal(migrated.activeProgram.sessionsCompleted, 2);
   assert.equal(migrated.activeProgram.pendingGaugePoints, 0);
+  assert.equal(migrated.activeProgram.pendingTargetedXp, 0);
 });

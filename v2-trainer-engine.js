@@ -127,13 +127,17 @@
     const sessionsTotal = Math.round(clamp(source.sessionsTotal == null ? trainer.sessions : source.sessionsTotal, 1, 99));
     const sessionsCompleted = Math.round(clamp(source.sessionsCompleted, 0, sessionsTotal));
     if (sessionsCompleted >= sessionsTotal) return null;
+    const pendingTargetedXp = Math.round(clamp(source.pendingTargetedXp, 0, 99999));
     return {
       id: normalizeId(source.id) || `${trainer.id}:${target}:migrated`,
       trainerId: trainer.id,
       target,
       sessionsTotal,
       sessionsCompleted,
-      pendingGaugePoints: roundTo(clamp(source.pendingGaugePoints, 0, 99999)),
+      // pendingGaugePoints reste un alias de sauvegarde; seules les nouvelles
+      // valeurs explicitement marquées comme XP sont reprises.
+      pendingGaugePoints: pendingTargetedXp,
+      pendingTargetedXp,
       startedWeek: source.startedWeek == null ? null : String(source.startedWeek),
       costPaid: Math.round(clamp(source.costPaid == null ? trainer.cost : source.costPaid, 0, 999999)),
     };
@@ -181,20 +185,22 @@
     const trainer = getTrainer(trainerId);
     if (!trainer) throw trainerError("UNKNOWN_TRAINER", `Entraîneur inconnu : ${trainerId}.`);
     const progressionApi = resolveProgressionApi(options);
-    const config = progressionApi.DEFAULT_CONFIG || {};
-    const reference = Math.max(1, finiteNumber(config.statDiminishingReference, 120));
-    const minimumEfficiency = clamp(config.minimumStatEfficiency == null ? .08 : config.minimumStatEfficiency, 0, 1);
-    const efficiency = clamp(1 - clamp(statValue, 0, 99) / reference, minimumEfficiency, 1);
-    const pointsPerStimulus = finiteNumber(config.progressPointsPerStimulus, 2.4);
-    return roundTo(trainer.baseStimulus * trainerMultiplier(trainer, progressionApi) * efficiency * pointsPerStimulus);
+    // statValue demeure accepté pour préserver l’API des sauvegardes et vues
+    // existantes. L’XP actuelle ne subit plus l’ancienne conversion en %.
+    void statValue;
+    return Math.max(1, Math.round(trainer.baseStimulus * trainerMultiplier(trainer, progressionApi)));
   }
 
   function listOffers(options = {}) {
     const statValue = options.statValue == null ? 40 : options.statValue;
-    return TRAINERS.map(trainer => ({
-      ...clone(trainer),
-      estimatedGaugePointsPerSession: estimateGaugePoints(trainer.id, statValue, options),
-    }));
+    return TRAINERS.map(trainer => {
+      const targetedXp = estimateGaugePoints(trainer.id, statValue, options);
+      return {
+        ...clone(trainer),
+        estimatedGaugePointsPerSession: targetedXp,
+        estimatedTargetedXpPerSession: targetedXp,
+      };
+    });
   }
 
   function startProgram(state, input = {}, options = {}) {
@@ -206,10 +212,15 @@
     const trainer = getTrainer(String(input.trainerId || ""));
     if (!trainer) throw trainerError("UNKNOWN_TRAINER", `Entraîneur inconnu : ${input.trainerId || "aucun"}.`);
     const target = assertTarget(input.target);
+    const freeSessions = Math.round(clamp(options.freeSessions, 0, trainer.sessions));
+    const discount = Math.round(trainer.cost / trainer.sessions * freeSessions);
+    const price = Math.max(0, trainer.cost - discount);
     const balance = clamp(options.balance, 0, Number.MAX_SAFE_INTEGER);
-    if (balance < trainer.cost) {
-      throw trainerError("INSUFFICIENT_FUNDS", `Il manque ${trainer.cost - balance} $ pour ce programme.`, {
-        cost: trainer.cost,
+    if (balance < price) {
+      throw trainerError("INSUFFICIENT_FUNDS", `Il manque ${price - balance} $ pour ce programme.`, {
+        cost: price,
+        regularCost: trainer.cost,
+        discount,
         balance,
       });
     }
@@ -226,16 +237,20 @@
       sessionsTotal: trainer.sessions,
       sessionsCompleted: 0,
       pendingGaugePoints: 0,
+      pendingTargetedXp: 0,
       startedWeek,
-      costPaid: trainer.cost,
+      costPaid: price,
     };
     return {
       state: next,
       result: {
         program: clone(next.activeProgram),
         trainer: clone(trainer),
-        moneyDelta: -trainer.cost,
-        remainingBalance: balance - trainer.cost,
+        moneyDelta: -price,
+        remainingBalance: balance - price,
+        regularCost: trainer.cost,
+        discount,
+        freeSessionsUsed: freeSessions,
       },
     };
   }
@@ -250,6 +265,7 @@
         energyDelta: 0,
         fatigueDelta: 0,
         gaugePointsCreated: 0,
+        targetedXpCreated: 0,
         programCompleted: false,
       },
     };
@@ -285,13 +301,10 @@
       ...(options.progressionConfig ? { config: options.progressionConfig } : {}),
     });
     const acceptedStimulus = progressionOutcome.result.effectiveAccepted[program.target];
-    const beforeStat = progressionState.stats[program.target];
-    const gaugePointsCreated = acceptedStimulus > 0
-      ? estimateGaugePoints(trainer.id, beforeStat, { progressionApi })
-        * acceptedStimulus / Math.max(.0001, progressionOutcome.result.requested[program.target])
-      : 0;
+    const targetedXpCreated = acceptedStimulus > 0 ? Math.max(1, Math.round(acceptedStimulus)) : 0;
     program.sessionsCompleted += 1;
-    program.pendingGaugePoints = roundTo(program.pendingGaugePoints + gaugePointsCreated);
+    program.pendingTargetedXp = Math.round(program.pendingTargetedXp + targetedXpCreated);
+    program.pendingGaugePoints = program.pendingTargetedXp;
     next.sessionReceipts = [...next.sessionReceipts, sourceId].slice(-RECEIPT_LIMIT);
     const completedProgram = clone(program);
     const programCompleted = program.sessionsCompleted >= program.sessionsTotal;
@@ -313,7 +326,8 @@
         target: program.target,
         energyDelta: -trainer.energyCost,
         fatigueDelta: trainer.fatigue,
-        gaugePointsCreated: roundTo(gaugePointsCreated),
+        gaugePointsCreated: targetedXpCreated,
+        targetedXpCreated,
         stimulusAccepted: acceptedStimulus,
         progression: progressionOutcome.result,
       },

@@ -89,7 +89,7 @@
       wear: 0.25,
       injuryRisk: 0.05,
       benefit: "Répète les gestes et les déplacements à faible risque.",
-      compromise: "Le stimulus est plus léger que sur une cible ou avec opposition.",
+      compromise: "L’XP ciblée est plus légère que sur une cible ou avec opposition.",
     },
     heavy_bag: {
       id: "heavy_bag",
@@ -164,7 +164,7 @@
       wear: 0,
       injuryRisk: 0,
       benefit: "Réduit la charge immédiate et facilite la récupération.",
-      compromise: "Prend la place d'un bloc qui aurait créé plus de stimulus.",
+      compromise: "Prend la place d'un bloc qui aurait créé plus d’XP ciblée.",
     },
   });
 
@@ -288,7 +288,7 @@
       focus,
       focusLabel: FOCUS_LABELS[focus],
       rationale: String(options.rationale || "Une séance composée librement au gym de boxe, dans la limite de l'énergie disponible."),
-      benefit: String(options.benefit || `Stimulus principalement orienté vers la ${FOCUS_LABELS[focus]}.`),
+      benefit: String(options.benefit || `XP ciblée principalement orientée vers la ${FOCUS_LABELS[focus]}.`),
       tradeoff: String(options.tradeoff || "La spécialisation laisse nécessairement d'autres qualités moins travaillées."),
       blocks: blocks.map(block => clone(block)),
     };
@@ -349,7 +349,7 @@
         rationale: recreational
           ? "Le coach privilégie les bases et une charge facile à assimiler."
           : "Le coach relie technique et défense sans transformer la séance en sparring.",
-        benefit: "Répartit le stimulus sur plusieurs qualités.",
+        benefit: "Répartit l’XP ciblée sur plusieurs qualités.",
         tradeoff: recreational
           ? "Très sécuritaire, mais la puissance reste peu travaillée."
           : "Plus d'usure et aucun correctif aussi marqué qu'une séance ciblée.",
@@ -366,7 +366,7 @@
       label: "Entretien et récupération",
       rationale: "Le coach réduit volontairement le volume de la séance.",
       benefit: `Entretient la ${FOCUS_LABELS[focus]} avec une charge contenue.`,
-      tradeoff: "Préserve davantage l'énergie, mais crée moins de stimulus.",
+      tradeoff: "Préserve davantage l'énergie, mais crée moins d’XP ciblée.",
     });
   }
 
@@ -541,7 +541,7 @@
 
       const warnings = [];
       if (projectedFatigue >= 75) warnings.push("Fatigue élevée après la séance");
-      if (averagePendingStimulus >= 50) warnings.push("Beaucoup de charge reste à assimiler");
+      if (averagePendingStimulus >= 50) warnings.push("Beaucoup d’XP ciblée reste à assimiler");
       if (projectedEnergy <= 25) warnings.push("Peu d'énergie restera disponible");
       return {
         ok: true,
@@ -575,8 +575,10 @@
       20,
     ), 1);
     const statGains = {};
+    const statXpGains = {};
     STAT_KEYS.forEach(key => {
       statGains[key] = roundTo(after.stats[key] - before.stats[key]);
+      statXpGains[key] = Math.max(0, Math.round((after.statXp?.[key] || 0) - (before.statXp?.[key] || 0)));
     });
     const afterSession = {
       energy: roundTo(clamp(before.condition.energy - preview.totals.energyCost)),
@@ -611,6 +613,7 @@
       plannedStimulus: clone(preview.totals.stimulus),
       remainingStimulus,
       statGains,
+      statXpGains,
       xpAward: Math.max(1, Math.round(preview.totals.xp * effortModifier)),
       wear: roundTo(preview.totals.wear * (1 + Math.max(0, before.condition.fatigue - 40) / 100), 1),
       injuryRiskPercent,

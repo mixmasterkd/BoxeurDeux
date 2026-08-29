@@ -23,7 +23,7 @@
   const DEFAULT_SUPPLEMENT_LIMIT = 2;
   const REPEAT_GAIN_MULTIPLIER = 0.85;
   const MAX_ENTRIES = 64;
-  const MAX_CAPACITY = 50;
+  const MAX_CAPACITY = 65;
   const DEFAULT_FAMILY_LIMITS = deepFreeze({
     group: 1,
     boxing: 2,
@@ -369,21 +369,24 @@
     const source = config && typeof config === "object" ? config : {};
     const weekKey = cleanId(source.weekKey == null ? source.week : source.weekKey) || "untracked";
     const careerStatus = normalizeCareerStatus(source.careerStatus);
+    const capacitySource = source.capacity && typeof source.capacity === "object" ? source.capacity : {};
     const capacityTotal = wholeNumber(
       source.capacity && typeof source.capacity === "object" ? source.capacity.total : source.capacity,
       DEFAULT_WEEKLY_CAPACITY,
       1,
       MAX_CAPACITY,
     );
+    const unavailableCapacity = wholeNumber(capacitySource.unavailable, 0, 0, capacityTotal);
     const entries = recalculateRepetition(workEntries(source.work, weekKey));
     if (new Set(entries.map(entry => entry.id)).size !== entries.length) {
       throw plannerError("DUPLICATE_ENTRY_ID", "Deux quarts de travail utilisent le même identifiant.");
     }
     const workCapacity = entries.reduce((sum, entry) => sum + entry.capacityCost, 0);
-    if (workCapacity > capacityTotal) {
+    if (workCapacity + unavailableCapacity > capacityTotal) {
       throw plannerError("WORK_EXCEEDS_CAPACITY", "Le travail pré-réservé dépasse la capacité de la semaine.", {
         capacityTotal,
         workCapacity,
+        unavailableCapacity,
       });
     }
     return {
@@ -395,7 +398,7 @@
       careerStatus,
       revision: 0,
       nextEntrySequence: 1,
-      capacity: { total: capacityTotal },
+      capacity: { total: capacityTotal, unavailable: unavailableCapacity },
       condition: normalizeCondition(source.condition),
       limits: {
         recreationalPhysicalActivities: wholeNumber(
@@ -488,6 +491,18 @@
     return roundTo(entries.reduce((sum, entry) => sum + finiteNumber(entry.capacityCost), 0));
   }
 
+  function plannedRest(entries) {
+    return entries.some(entry => entry.activityId === "rest");
+  }
+
+  function unavailableCapacity(state) {
+    return wholeNumber(state.capacity?.unavailable, 0, 0, state.capacity.total);
+  }
+
+  function occupiedCapacity(state, entries = state.entries) {
+    return roundTo(usedCapacity(entries) + unavailableCapacity(state));
+  }
+
   function occupiedPhysicalDays(entries, excludedEntryId) {
     const occupied = new Set();
     entries.forEach(entry => {
@@ -513,8 +528,10 @@
     const activity = normalizeActivity(activityInput);
     const access = accessForActivity(state, activity);
     if (!access.ok) return { ...access, activity };
-    const used = usedCapacity(state.entries);
-    if (used + activity.capacityCost > state.capacity.total) {
+    const nextEntries = [...state.entries, { activityId: activity.activityId, capacityCost: activity.capacityCost }];
+    const used = occupiedCapacity(state);
+    const usedAfter = occupiedCapacity(state, nextEntries);
+    if (usedAfter > state.capacity.total) {
       return {
         ok: false,
         code: "WEEKLY_CAPACITY_EXCEEDED",
@@ -574,8 +591,8 @@
       dayIndex,
       capacity: {
         total: state.capacity.total,
-        usedAfter: used + activity.capacityCost,
-        remainingAfter: state.capacity.total - used - activity.capacityCost,
+        usedAfter,
+        remainingAfter: state.capacity.total - usedAfter,
       },
     };
   }
@@ -901,6 +918,63 @@
     return { id: "fresh", label: "Charge légère" };
   }
 
+  function assessRecoveryRisk(input = {}) {
+    const source = input && typeof input === "object" ? input : {};
+    const condition = source.condition && typeof source.condition === "object" ? source.condition : {};
+    const energy = finiteNumber(condition.energy, 100, 0, 100);
+    const fatigue = finiteNumber(condition.fatigue, 0, 0, 100);
+    const injury = finiteNumber(source.injury, 0, 0, 100);
+    const hasRest = source.plannedRest === true || (Array.isArray(source.entries) && plannedRest(source.entries));
+    if (hasRest) {
+      return {
+        kind: "none",
+        tone: "positive",
+        capacityCost: 0,
+        medicalCost: 0,
+        title: "Récupération planifiée",
+        detail: "La journée de repos protège la condition du boxeur pour la semaine suivante.",
+      };
+    }
+    if (energy <= 8 || fatigue >= 92 || injury >= 80) {
+      return {
+        kind: "hospital",
+        tone: "critical",
+        capacityCost: 15,
+        medicalCost: 75,
+        title: "Risque d’hospitalisation",
+        detail: "Sans repos dans cet état extrême, une nuit à l’hôpital pourrait occuper 15 points de la prochaine semaine et coûter 75 $.",
+      };
+    }
+    if (energy <= 22 || fatigue >= 78) {
+      return {
+        kind: "forced-rest",
+        tone: "critical",
+        capacityCost: 10,
+        medicalCost: 0,
+        title: "Repos forcé probable",
+        detail: "Sans repos, l’état projeté pourrait imposer 10 points de récupération au début de la prochaine semaine.",
+      };
+    }
+    if (energy <= 35 || fatigue >= 68) {
+      return {
+        kind: "warning",
+        tone: "warning",
+        capacityCost: 0,
+        medicalCost: 0,
+        title: "Récupération fragile",
+        detail: "Tu peux continuer sans repos, mais la prochaine barre commencera moins pleine si ton boxeur termine trop fatigué.",
+      };
+    }
+    return {
+      kind: "none",
+      tone: "neutral",
+      capacityCost: 0,
+      medicalCost: 0,
+      title: "Récupération sous contrôle",
+      detail: "Aucun repos n’est imposé; la condition réelle déterminera la capacité disponible la semaine suivante.",
+    };
+  }
+
   function sortEntries(entries) {
     return [...entries].sort((left, right) => (
       left.dayIndex - right.dayIndex
@@ -912,7 +986,9 @@
   function previewPlan(source) {
     const state = assertPlannerState(source);
     const entries = sortEntries(state.entries).map(clone);
-    const capacityUsed = usedCapacity(entries);
+    const entryCapacity = usedCapacity(entries);
+    const capacityUnavailable = unavailableCapacity(state);
+    const capacityUsed = roundTo(entryCapacity + capacityUnavailable);
     const workCapacity = usedCapacity(entries.filter(entry => entry.preReserved));
     const totals = entries.reduce((sum, entry) => ({
       energyCost: roundTo(sum.energyCost + finiteNumber(entry.energyCost)),
@@ -951,10 +1027,15 @@
     });
     const reserve = energyZone(projectedEnergy);
     const fatigue = fatigueZone(projectedFatigue);
+    const recoveryRisk = assessRecoveryRisk({
+      entries,
+      condition: { energy: projectedEnergy, fatigue: projectedFatigue },
+    });
     const warnings = [];
     if (state.capacity.total - capacityUsed <= 1) warnings.push("La capacité de la semaine est presque entièrement réservée.");
     if (["low", "critical"].includes(reserve.id)) warnings.push(reserve.label + ".");
     if (["high", "critical"].includes(fatigue.id)) warnings.push(fatigue.label + ".");
+    if (!["none"].includes(recoveryRisk.kind)) warnings.push(recoveryRisk.detail);
     return {
       weekKey: state.weekKey,
       status: state.status,
@@ -967,7 +1048,9 @@
         used: capacityUsed,
         remaining: roundTo(state.capacity.total - capacityUsed),
         workReserved: workCapacity,
-        discretionaryReserved: roundTo(capacityUsed - workCapacity),
+        unavailable: capacityUnavailable,
+        restPlanned: plannedRest(entries),
+        discretionaryReserved: roundTo(entryCapacity - workCapacity),
       },
       condition: {
         before: clone(state.condition),
@@ -975,6 +1058,7 @@
         energyReserve: { value: projectedEnergy, ...reserve },
         fatigueZone: { value: projectedFatigue, ...fatigue },
       },
+      recoveryRisk,
       totals,
       families: Object.fromEntries(Object.entries(state.limits.family || {}).map(([familyId, limit]) => [familyId, {
         used: familyCounts[familyId] || 0,
@@ -1012,6 +1096,11 @@
       || state.capacity.total < 1
       || state.capacity.total > MAX_CAPACITY) {
       errors.push(validationError("INVALID_WEEKLY_CAPACITY", "La capacité hebdomadaire est invalide."));
+    }
+    if (!Number.isInteger(state.capacity.unavailable || 0)
+      || (state.capacity.unavailable || 0) < 0
+      || (state.capacity.unavailable || 0) > state.capacity.total) {
+      errors.push(validationError("INVALID_UNAVAILABLE_CAPACITY", "La capacité de départ indisponible est invalide."));
     }
     if (state.entries.length > MAX_ENTRIES) {
       errors.push(validationError("PLAN_ENTRY_LIMIT", "Le plan contient trop d'activités."));
@@ -1091,7 +1180,7 @@
         reservations.push({ entryId: entry.id, productId: entry.supplementId });
       }
     });
-    const capacityUsed = usedCapacity(state.entries);
+    const capacityUsed = occupiedCapacity(state);
     if (capacityUsed > state.capacity.total) {
       errors.push(validationError("WEEKLY_CAPACITY_EXCEEDED", "La capacité hebdomadaire est dépassée."));
     }
@@ -1230,6 +1319,7 @@
     reserveSupplement,
     unreserveSupplement,
     previewPlan,
+    assessRecoveryRisk,
     validatePlan,
     confirmPlan,
   });

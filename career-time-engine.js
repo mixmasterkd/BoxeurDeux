@@ -26,7 +26,8 @@
    * the career state makes save/reload and automated simulations reproducible.
    */
 
-  const SCHEMA_VERSION = 1;
+  const SCHEMA_VERSION = 2;
+  const STAT_XP_VERSION = 1;
   const DAYS = Object.freeze(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
   const DAY_LABELS = Object.freeze(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]);
   const PERIODS = Object.freeze(["morning", "afternoon", "evening"]);
@@ -39,11 +40,12 @@
   const MAX_RECURRENCES = 52;
   const MAX_APPOINTMENT_HORIZON = PERIODS_PER_WEEK * 260;
   const MAX_HISTORY = 500;
-  // L'ancien système accorde environ +1 à une statistique après dix séances
-  // ciblées. Le stimulus V2 peut être assimilé sur plusieurs nuits : cette
-  // échelle garde sa progression totale près de cette référence au lieu de
-  // transformer chaque exercice en hausse directe de plusieurs points.
+  // Conservé uniquement pour convertir les anciennes sauvegardes qui stockaient
+  // une fraction de statistique. La progression active utilise maintenant de
+  // l'XP entière et cumulative.
   const STAT_GAIN_SCALE = 0.024;
+  const STAT_XP_FIRST_THRESHOLD = 40;
+  const STAT_XP_THRESHOLD_STEP = 10;
 
   const DAY_ALIASES = Object.freeze({
     monday: 0, lundi: 0,
@@ -241,6 +243,29 @@
     }, {});
   }
 
+  function normalizeIntegerVector(source, fallback = 0, max = Number.MAX_SAFE_INTEGER) {
+    const input = source && typeof source === "object" ? source : {};
+    return STAT_KEYS.reduce((result, key) => {
+      result[key] = Math.round(clamp(input[key] == null ? fallback : input[key], 0, max));
+      return result;
+    }, {});
+  }
+
+  /** Cumulative target: 40, 90, 150, 220... */
+  function statXpForRank(rankInput) {
+    const rank = Math.max(0, Math.trunc(Number(rankInput) || 0));
+    const steps = rank + 1;
+    return steps * STAT_XP_FIRST_THRESHOLD
+      + (STAT_XP_THRESHOLD_STEP * rank * steps) / 2;
+  }
+
+  function rankForStatXp(xpInput) {
+    const xp = Math.max(0, Math.round(Number(xpInput) || 0));
+    let rank = 0;
+    while (rank < 1000 && xp >= statXpForRank(rank)) rank += 1;
+    return rank;
+  }
+
   function normalizeCondition(source) {
     const input = source && typeof source === "object" ? source : {};
     return {
@@ -256,9 +281,69 @@
   }
 
   function assertState(state) {
-    if (!state || typeof state !== "object" || !state.clock || !state.condition || !state.stats || !state.stimulus) {
+    if (!state || typeof state !== "object" || !state.clock || !state.condition || !state.stats || !state.stimulus
+      || !state.statXp || !state.statXpRanks || state.statXpVersion !== STAT_XP_VERSION) {
       throw createError("INVALID_STATE", "État BoxeurTime invalide.");
     }
+  }
+
+  function statXpProgress(state, key) {
+    if (!STAT_KEYS.includes(key)) throw createError("INVALID_STAT", `Statistique inconnue : ${key}.`);
+    assertState(state);
+    const rank = state.statXpRanks[key];
+    const total = state.statXp[key];
+    const currentFloor = rank === 0 ? 0 : statXpForRank(rank - 1);
+    const nextThreshold = statXpForRank(rank);
+    return {
+      total,
+      rank,
+      currentFloor,
+      nextThreshold,
+      remaining: Math.max(0, nextThreshold - total),
+      pendingXp: state.stimulus[key],
+    };
+  }
+
+  /** Adds the cumulative integer-XP fields to a pre-XP BoxeurTime save. */
+  function upgradeState(stateInput) {
+    if (!stateInput || typeof stateInput !== "object" || !stateInput.clock || !stateInput.condition
+      || !stateInput.stats || !stateInput.stimulus) {
+      throw createError("INVALID_STATE", "État BoxeurTime invalide.");
+    }
+    const next = clone(stateInput);
+    const alreadyCurrent = next.statXpVersion === STAT_XP_VERSION && next.statXp && next.statXpRanks;
+    const originalStats = normalizeStats(next.stats, 20);
+    next.schemaVersion = SCHEMA_VERSION;
+    next.statXpVersion = STAT_XP_VERSION;
+    next.stats = STAT_KEYS.reduce((result, key) => {
+      result[key] = Math.floor(originalStats[key]);
+      return result;
+    }, {});
+
+    if (alreadyCurrent) {
+      next.statXp = normalizeIntegerVector(next.statXp, 0);
+      next.statXpRanks = normalizeIntegerVector(next.statXpRanks, 0, 1000);
+      next.stimulus = normalizeIntegerVector(next.stimulus, 0, 100);
+      return next;
+    }
+
+    next.statXp = {};
+    next.statXpRanks = {};
+    const convertedPending = {};
+    STAT_KEYS.forEach(key => {
+      const fractionalProgress = originalStats[key] - Math.floor(originalStats[key]);
+      next.statXp[key] = Math.min(
+        STAT_XP_FIRST_THRESHOLD - 1,
+        Math.max(0, Math.round(fractionalProgress * STAT_XP_FIRST_THRESHOLD)),
+      );
+      next.statXpRanks[key] = 0;
+      const legacyStimulus = clamp(next.stimulus[key], 0, 100);
+      const diminishingReturn = clamp(1 - originalStats[key] / 120, 0.08, 1);
+      const equivalentXp = Math.round(legacyStimulus * diminishingReturn * STAT_GAIN_SCALE * STAT_XP_FIRST_THRESHOLD);
+      convertedPending[key] = legacyStimulus > 0 ? Math.max(1, equivalentXp) : 0;
+    });
+    next.stimulus = convertedPending;
+    return next;
   }
 
   /**
@@ -273,15 +358,33 @@
     };
     const absoluteSlot = config.absoluteSlot == null ? toAbsoluteSlot(start) : toAbsoluteSlot(config.absoluteSlot);
     const seed = String(config.seed == null ? "boxeur-time" : config.seed);
+    const suppliedStats = normalizeStats(config.stats, 20);
+    const suppliedXp = config.statXp && typeof config.statXp === "object" ? config.statXp : null;
+    const suppliedRanks = config.statXpRanks && typeof config.statXpRanks === "object" ? config.statXpRanks : null;
+    const stats = {};
+    const statXp = {};
+    const statXpRanks = {};
+    STAT_KEYS.forEach(key => {
+      stats[key] = Math.floor(suppliedStats[key]);
+      statXp[key] = suppliedXp
+        ? Math.round(clamp(suppliedXp[key], 0, Number.MAX_SAFE_INTEGER))
+        : Math.min(STAT_XP_FIRST_THRESHOLD - 1, Math.max(0, Math.round((suppliedStats[key] - stats[key]) * STAT_XP_FIRST_THRESHOLD)));
+      statXpRanks[key] = suppliedRanks
+        ? Math.round(clamp(suppliedRanks[key], 0, 1000))
+        : suppliedXp ? rankForStatXp(statXp[key]) : 0;
+    });
     let state = {
       schemaVersion: SCHEMA_VERSION,
+      statXpVersion: STAT_XP_VERSION,
       seed,
       rngState: hashSeed(seed),
       randomCounter: 0,
       clock: fromAbsoluteSlot(absoluteSlot),
       condition: normalizeCondition(config.condition),
-      stats: normalizeStats(config.stats, 20),
-      stimulus: normalizeStats(config.stimulus, 0),
+      stats,
+      statXp,
+      statXpRanks,
+      stimulus: normalizeIntegerVector(config.stimulus, 0, 100),
       appointments: [],
       completedAppointments: [],
       history: [],
@@ -318,7 +421,7 @@
       energyGain: roundTo(clamp(source.energyGain)),
       fatigueGain: roundTo(clamp(source.fatigueGain)),
       fatigueRelief: roundTo(clamp(source.fatigueRelief)),
-      stimulus: normalizeStats(source.stimulus, 0),
+      stimulus: normalizeIntegerVector(source.stimulus, 0, 100),
     };
   }
 
@@ -499,8 +602,8 @@
     const reasons = [];
     if (state.condition.energy < 35) reasons.push("Énergie basse");
     if (state.condition.fatigue > 65) reasons.push("Fatigue persistante élevée");
-    if (stimulusLoad > 50) reasons.push("Charge d'entraînement à assimiler");
-    if (!reasons.length && score >= 65) reasons.push("Charge bien récupérée");
+    if (stimulusLoad > 50) reasons.push("Beaucoup d’XP ciblée en attente");
+    if (!reasons.length && score >= 65) reasons.push("XP ciblée bien assimilée");
     if (!reasons.length) reasons.push("Récupération à surveiller");
     return { score, status, label, reasons, stimulusLoad: roundTo(stimulusLoad, 1) };
   }
@@ -515,6 +618,8 @@
     const before = {
       condition: clone(state.condition),
       stats: clone(state.stats),
+      statXp: clone(state.statXp),
+      statXpRanks: clone(state.statXpRanks),
       stimulus: clone(state.stimulus),
     };
     const qualityModifier = clamp(recoveryQuality == null ? 1 : recoveryQuality, 0.75, 1.25);
@@ -531,15 +636,23 @@
     );
     const assimilationRate = clamp(0.28 * quality * recoveryCapacity, 0.08, 0.32);
     const assimilated = {};
+    const statXpGains = {};
     const statGains = {};
     STAT_KEYS.forEach(key => {
-      const processedStimulus = Math.min(state.stimulus[key], state.stimulus[key] * assimilationRate);
-      const diminishingReturn = clamp(1 - state.stats[key] / 120, 0.08, 1);
-      const statGain = processedStimulus * diminishingReturn * STAT_GAIN_SCALE;
-      state.stimulus[key] = roundTo(clamp(state.stimulus[key] - processedStimulus));
-      state.stats[key] = roundTo(clamp(state.stats[key] + statGain));
-      assimilated[key] = roundTo(processedStimulus);
-      statGains[key] = roundTo(statGain);
+      const beforeStat = state.stats[key];
+      const pendingXp = state.stimulus[key];
+      const processedXp = pendingXp > 0
+        ? Math.min(pendingXp, Math.max(1, Math.round(pendingXp * assimilationRate)))
+        : 0;
+      state.stimulus[key] -= processedXp;
+      state.statXp[key] += processedXp;
+      while (state.stats[key] < 99 && state.statXp[key] >= statXpForRank(state.statXpRanks[key])) {
+        state.stats[key] += 1;
+        state.statXpRanks[key] += 1;
+      }
+      assimilated[key] = processedXp;
+      statXpGains[key] = processedXp;
+      statGains[key] = state.stats[key] - beforeStat;
     });
     appendHistory(state, {
       type: "night-recovery",
@@ -550,9 +663,12 @@
       after: {
         condition: clone(state.condition),
         stats: clone(state.stats),
+        statXp: clone(state.statXp),
+        statXpRanks: clone(state.statXpRanks),
         stimulus: clone(state.stimulus),
       },
       assimilated,
+      statXpGains,
       statGains,
     });
   }
@@ -611,7 +727,7 @@
       fatigue: roundTo(clamp(state.condition.fatigue + activity.fatigueGain - activity.fatigueRelief)),
     };
     const stimulus = STAT_KEYS.reduce((result, key) => {
-      result[key] = roundTo(clamp(state.stimulus[key] + activity.stimulus[key]));
+      result[key] = Math.round(clamp(state.stimulus[key] + activity.stimulus[key]));
       return result;
     }, {});
     return { immediate, stimulus };
@@ -679,6 +795,7 @@
     const before = {
       condition: clone(next.condition),
       stimulus: clone(next.stimulus),
+      statXp: clone(next.statXp),
       preparation: preparationFrom(next),
     };
     next.condition = clone(check.immediate);
@@ -686,6 +803,7 @@
     const afterImmediate = {
       condition: clone(next.condition),
       stimulus: clone(next.stimulus),
+      statXp: clone(next.statXp),
     };
     const startSlot = next.clock.absoluteSlot;
     advanceClockMutable(next, check.activity.duration, rng, options && options.recoveryQuality);
@@ -711,6 +829,7 @@
       after: {
         condition: clone(next.condition),
         stimulus: clone(next.stimulus),
+        statXp: clone(next.statXp),
         preparation: preparationFrom(next),
       },
     });
@@ -756,6 +875,9 @@
       clock: clone(state.clock),
       condition: clone(state.condition),
       stats: clone(state.stats),
+      statXp: clone(state.statXp),
+      statXpRanks: clone(state.statXpRanks),
+      statXpProgress: Object.fromEntries(STAT_KEYS.map(key => [key, statXpProgress(state, key)])),
       stimulus: clone(state.stimulus),
       preparation: preparationFrom(state),
       agenda: getAgenda(state),
@@ -764,6 +886,9 @@
 
   return Object.freeze({
     SCHEMA_VERSION,
+    STAT_XP_VERSION,
+    STAT_XP_FIRST_THRESHOLD,
+    STAT_XP_THRESHOLD_STEP,
     DAYS,
     DAY_LABELS,
     PERIODS,
@@ -778,6 +903,9 @@
     ACTIVITY_PRESETS,
     createSeededRng,
     createState,
+    upgradeState,
+    statXpForRank,
+    statXpProgress,
     toAbsoluteSlot,
     fromAbsoluteSlot,
     normalizeActivity,

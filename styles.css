@@ -84,6 +84,15 @@ h2 { font-size: 1.65rem; }
 .level-notice { color: var(--gold) !important; font-weight: 800; line-height: 1.35; }
 .level-notice[hidden] { display: none; }
 .career-alert-dialog .service-lead { margin: 20px 0; font-size: .9rem; line-height: 1.55; }
+.level-up-rewards { display: grid; gap: 9px; margin: -4px 0 20px; }
+.level-up-rewards article { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px; border: 1px solid rgba(221,182,94,.36); background: linear-gradient(135deg, rgba(221,182,94,.1), rgba(255,255,255,.025)); }
+.level-up-rewards article > span { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; color: #17130b; background: var(--gold); font: 900 1rem/1 Inter; box-shadow: 0 0 0 4px rgba(221,182,94,.12); }
+.level-up-rewards small, .level-up-rewards strong, .level-up-rewards p { display: block; margin: 0; }
+.level-up-rewards small { color: var(--muted); font-size: .62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.level-up-rewards strong { margin-top: 2px; color: var(--ink); font: 800 1.05rem "Barlow Condensed"; text-transform: uppercase; }
+.level-up-rewards p { margin-top: 3px; color: var(--muted); font-size: .7rem; line-height: 1.4; }
+.level-up-rewards article.capacity { border-color: rgba(102,223,134,.42); background: linear-gradient(135deg, rgba(102,223,134,.11), rgba(221,182,94,.04)); }
+.level-up-rewards article.capacity > span { background: var(--green); }
 .service-dialog.onboarding-guide-dialog { width: min(980px, calc(100% - 32px)); overflow: hidden; }
 .onboarding-guide-dialog .service-card { height: min(640px, calc(100dvh - 32px)); padding: 0; overflow: hidden; border-top-color: var(--gold); }
 .onboarding-welcome-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); height: 100%; min-height: 0; }

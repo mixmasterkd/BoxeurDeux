@@ -266,8 +266,18 @@
       if (career.jobApplication) return "Candidature en cours";
       return "Facultatif";
     }
-    if (location.id === "arena") return career.scheduledFight || career.activeTournament ? "Rendez-vous actif" : career.careerStatus === "recreational" ? "Verrouillé · récréatif" : "Événements disponibles";
+    if (location.id === "arena") return career.scheduledFight || career.activeTournament ? "Rendez-vous actif" : career.careerStatus === "recreational" ? "Verrouillé · amateur requis" : "Événements disponibles";
     return career.injuryWeeks > 0 ? "Récupération recommandée" : "Toujours accessible";
+  }
+
+  function locationAccess(locationInput, career = {}) {
+    const locationId = typeof locationInput === "string" ? locationInput : locationInput?.id;
+    const locked = career.careerStatus === "recreational"
+      && ["strength-gym", "arena"].includes(locationId);
+    return {
+      locked,
+      reason: locked ? "Disponible après le passage amateur." : "",
+    };
   }
 
   function developerTestBanner(career) {
@@ -350,7 +360,14 @@
     const moneyLabel = `${Math.round(Number(career.money) || 0)} $`;
     const hotspots = LOCATIONS.map(location => {
       const status = escapeHTML(locationStatus(location, career));
-      return `<button class="v2-map-hotspot" type="button" data-v2-location="${location.id}" aria-label="Entrer : ${escapeHTML(location.label)}. ${status}"><span aria-hidden="true">${location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${status}</small></button>`;
+      const access = locationAccess(location, career);
+      const accessAttributes = access.locked
+        ? ` data-v2-locked="true" disabled aria-disabled="true" title="${escapeHTML(access.reason)}"`
+        : "";
+      const accessibleLabel = access.locked
+        ? `Accès verrouillé : ${location.label}. ${access.reason}`
+        : `Entrer : ${location.label}. ${locationStatus(location, career)}`;
+      return `<button class="v2-map-hotspot" type="button" data-v2-location="${location.id}" aria-label="${escapeHTML(accessibleLabel)}"${accessAttributes}><span aria-hidden="true">${access.locked ? "🔒" : location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${status}</small></button>`;
     }).join("");
     return `<header class="v2-world-bar">
       <div class="v2-now-time"><span>Semaine</span><strong>${String(career.week || 1).padStart(2, "0")}</strong><small><span>${escapeHTML(dateLabel)}</span><b class="v2-now-money" aria-label="Argent disponible ${escapeHTML(moneyLabel)}">${escapeHTML(moneyLabel)}</b></small></div>
@@ -387,5 +404,5 @@
     return `<div class="v2-location-card" data-location="${location.id}"><div><p class="eyebrow">${objectiveHere ? "Destination recommandée" : "Lieu du quartier"}</p><h2>${escapeHTML(location.label)}</h2><p>${escapeHTML(location.detail)}</p></div><div class="v2-location-status"><span>État du lieu</span><strong>${escapeHTML(locationStatus(location, career))}</strong></div>${workContent}<p class="v2-location-preview-note">${previewNote}</p><button class="secondary-button" type="button" data-v2-close-location>Retour à la carte</button></div>`;
   }
 
-  return Object.freeze({ LOCATIONS, preparation, onboardingObjective, objective, renderObjectiveCard, renderLocationGuide, renderWorkDeveloperTile: workDeveloperTile, isFirstJobRequired, nextAppointment, locationStatus, render, renderLocation });
+  return Object.freeze({ LOCATIONS, preparation, onboardingObjective, objective, renderObjectiveCard, renderLocationGuide, renderWorkDeveloperTile: workDeveloperTile, isFirstJobRequired, nextAppointment, locationStatus, locationAccess, render, renderLocation });
 });

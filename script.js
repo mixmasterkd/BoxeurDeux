@@ -21,6 +21,8 @@ const DEV_TEST_ACTIVE_KEY = `${SAVE_KEY}-dev-active`;
 const DEV_UNLOCK_CODE = "128";
 const SAVE_VERSION = 5;
 const V2_PREVIEW_SAVE_KEY = `${SAVE_KEY}-v2-preview`;
+const JSON_EXPORT_KIND = "boxeur-deux-complete-career";
+const JSON_EXPORT_VERSION = 1;
 const MAX_SUPPLEMENTS_PER_WEEK = 2;
 const MAX_LEGACY_PLAN_ITEMS = 32;
 const FIRST_PAID_VACATION_WEEKS = 8;
@@ -243,6 +245,8 @@ const INITIAL_STATE = {
   experience: 0,
   level: 1,
   levelPoints: 0,
+  privateLessonCredits: 0,
+  levelRewardsPending: [],
   gymWeeks: 0,
   strengthGymWeeks: 0,
   trainingProgress: { technique: 0, power: 0, cardio: 0, defense: 0 },
@@ -250,6 +254,7 @@ const INITIAL_STATE = {
   boxingInactivityWeeks: 0,
   boxingTrainingWeek: 0,
   trainingRhythmPenalty: 0,
+  recoveryConsequence: null,
   amateurRecord: { wins: 0, losses: 0, draws: 0 },
   professionalRecord: { wins: 0, losses: 0, draws: 0 },
   careerStatus: "recreational",
@@ -461,6 +466,17 @@ const safeNumber = (value, fallback = 0, min = 0, max = 100, integer = true) => 
 };
 const safeIdentifier = (value, fallback = "") => safeText(value, fallback, 180).replace(/[^a-zA-Z0-9._:-]/g, "-");
 
+function normalizeRecoveryConsequence(source) {
+  if (!source || typeof source !== "object" || !["forced-rest", "hospital"].includes(source.kind)) return null;
+  const hospital = source.kind === "hospital";
+  return {
+    kind: hospital ? "hospital" : "forced-rest",
+    week: safeNumber(source.week, 1, 1, 99999),
+    capacityCost: hospital ? 15 : 10,
+    medicalCost: hospital ? safeNumber(source.medicalCost, 75, 0, 9999) : 0,
+  };
+}
+
 function normalizeStoredBooking(booking, index) {
   if (!booking || typeof booking !== "object") return null;
   const eventId = safeIdentifier(booking.eventId || booking.event?.id, `legacy-event-${index}`);
@@ -578,7 +594,7 @@ function normalizeCareerState(source) {
   };
   const boundedStats = {
     week: [1, 99999], money: [0, 9999999], energy: [0, 100], fitness: [0, 100], morale: [0, 100], reputation: [0, 100],
-    injury: [0, 100], fatigue: [0, 100], injuryWeeks: [0, 52], experience: [0, 10000000], level: [1, 999], levelPoints: [0, 9999],
+    injury: [0, 100], fatigue: [0, 100], injuryWeeks: [0, 52], experience: [0, 10000000], level: [1, 999], levelPoints: [0, 9999], privateLessonCredits: [0, 99],
     gymWeeks: [0, 52], strengthGymWeeks: [0, 52], boxingNeglectWeeks: [0, 3], boxingInactivityWeeks: [0, 999], boxingTrainingWeek: [0, 99999], trainingRhythmPenalty: [0, 2], workStreak: [0, 999], sponsorAvailableWeek: [1, 99999],
     missedWorkWeeks: [0, 3], jobAttendanceWeek: [0, 99999], initialJobLockedUntilWeek: [0, 99999], jobTenureWeeks: [0, 99999], jobsHeldCount: [0, 999], jobVacationEarnedAtTenure: [0, 99999], vacationBankWeeks: [0, MAX_PAID_VACATION_WEEKS], jobWagesEarned: [0, 9999999], recreationalTrainingWeeks: [0, 10],
     supplementWeek: [1, 99999], avoidanceWeeks: [0, 999], lastFightWeek: [0, 99999], injuryStartedWeek: [0, 99999],
@@ -592,8 +608,17 @@ function normalizeCareerState(source) {
   normalized.goldenPlacement = [1, 2, 3].includes(Number(source.goldenPlacement)) ? Number(source.goldenPlacement) : null;
   normalized.olympicCompleted = Boolean(source.olympicCompleted);
   normalized.pendingWeekEvent = betweenWeekEventsEnabled && allBetweenWeekEvents.some(event => event.id === source.pendingWeekEvent) ? source.pendingWeekEvent : null;
-  normalized.levelNotice = source.levelNotice ? safeText(source.levelNotice, "", 120) : null;
+  normalized.levelNotice = source.levelNotice ? safeText(source.levelNotice, "", 500) : null;
   normalized.levelAnnouncementPending = Boolean(source.levelAnnouncementPending);
+  normalized.levelRewardsPending = Array.isArray(source.levelRewardsPending)
+    ? source.levelRewardsPending.slice(-12).map(reward => ({
+        level: safeNumber(reward?.level, normalized.level, 2, 999),
+        type: ["money", "supplement", "private-lesson", "capacity"].includes(reward?.type) ? reward.type : "money",
+        title: safeText(reward?.title, "Cadeau du coach", 80),
+        detail: safeText(reward?.detail, "Récompense ajoutée à ta carrière.", 180),
+    }))
+    : [];
+  normalized.recoveryConsequence = normalizeRecoveryConsequence(source.recoveryConsequence);
   normalized.jobLossNotice = source.jobLossNotice ? safeText(source.jobLossNotice, "", 180) : null;
   normalized.jobId = jobs.some(job => job.id === source.jobId) ? source.jobId : null;
   const inferredJobsHeld = source.jobsHeldCount ?? (normalized.jobId || (!source.introJobRequired && source.careerStatus !== "recreational") ? 1 : 0);
@@ -686,8 +711,64 @@ function normalizeCareerState(source) {
 
 function xpForLevel(level) {
   if (level <= 1) return 0;
-  const steps = level - 2;
-  return 100 + steps * 180 + ((steps * (steps - 1)) / 2) * 80;
+  const steps = level - 1;
+  return steps * 40 + ((steps * (steps - 1)) / 2) * 10;
+}
+
+const LEVEL_GIFT_ROTATION = Object.freeze(["money", "supplement", "private-lesson"]);
+const LEVEL_GIFT_SUPPLEMENTS = Object.freeze(["protein-bar", "sports-drink", "protein-shake", "preworkout"]);
+
+function addLevelGiftSupplement(level) {
+  if (!window.BoxeurSupplements) return null;
+  const supplementState = window.BoxeurSupplements.createState(state.v2SupplementState || state, { weekKey: state.week });
+  const preferredIndex = Math.max(0, level - 2) % LEVEL_GIFT_SUPPLEMENTS.length;
+  const productId = LEVEL_GIFT_SUPPLEMENTS
+    .map((_, offset) => LEVEL_GIFT_SUPPLEMENTS[(preferredIndex + offset) % LEVEL_GIFT_SUPPLEMENTS.length])
+    .find(id => Number(supplementState.inventory[id] || 0) < 9);
+  if (!productId) return null;
+  supplementState.inventory[productId] += 1;
+  state.v2SupplementState = window.BoxeurSupplements.createState(supplementState, { weekKey: state.week });
+  return window.BoxeurSupplements.CATALOG[productId];
+}
+
+function grantLevelReward(level) {
+  if (level % 5 === 0 && level <= 15) {
+    const capacity = Math.min(65, 50 + Math.floor(level / 5) * 5);
+    return {
+      level,
+      type: "capacity",
+      title: "+5 capacité hebdomadaire",
+      detail: `Ton maximum permanent passe à ${capacity} points par semaine.`,
+    };
+  }
+  const giftType = LEVEL_GIFT_ROTATION[Math.max(0, level - 2) % LEVEL_GIFT_ROTATION.length];
+  if (giftType === "supplement") {
+    const product = addLevelGiftSupplement(level);
+    if (product) {
+      return {
+        level,
+        type: "supplement",
+        title: `${product.label} en cadeau`,
+        detail: "Le supplément a été placé directement dans ton inventaire.",
+      };
+    }
+  }
+  if (giftType === "private-lesson") {
+    state.privateLessonCredits = Math.min(99, safeNumber(state.privateLessonCredits, 0, 0, 99) + 1);
+    return {
+      level,
+      type: "private-lesson",
+      title: "Un cours privé offert",
+      detail: "Le bon réduira automatiquement le prix de ton prochain programme privé d’une séance.",
+    };
+  }
+  state.money = Math.max(0, safeNumber(state.money, 0, 0, 9999999) + 50);
+  return {
+    level,
+    type: "money",
+    title: "+50 $",
+    detail: "La prime du coach a été ajoutée à ton solde.",
+  };
 }
 
 function syncLevelProgress() {
@@ -699,10 +780,15 @@ function syncLevelProgress() {
     state.level += 1;
     state.levelPoints += 3;
     levelsGained += 1;
-    if (state.journal) state.journal.unshift({ week: state.week, text: `Niveau ${state.level} atteint : trois points de combat sont disponibles.` });
+    const reward = grantLevelReward(state.level);
+    state.levelRewardsPending = [...(Array.isArray(state.levelRewardsPending) ? state.levelRewardsPending : []), reward].slice(-12);
+    if (state.journal) state.journal.unshift({ week: state.week, text: `Niveau ${state.level} atteint : trois points de combat et ${reward.title.toLocaleLowerCase("fr-CA")} obtenus.` });
   }
   if (levelsGained && state.profile) {
-    const message = levelsGained === 1 ? `Niveau ${state.level} atteint · 3 points à répartir` : `Niveau ${state.level} atteint · ${levelsGained * 3} points à répartir`;
+    const rewards = state.levelRewardsPending.slice(-levelsGained).map(reward => reward.title).join(" · ");
+    const message = levelsGained === 1
+      ? `Niveau ${state.level} atteint · 3 points à répartir · ${rewards}`
+      : `Niveau ${state.level} atteint · ${levelsGained * 3} points à répartir · ${rewards}`;
     state.levelNotice = message;
     state.levelAnnouncementPending = true;
   }
@@ -715,6 +801,49 @@ function applyCareerTheme() {
 
 function careerSnapshot() {
   return { version: SAVE_VERSION, savedAt: new Date().toISOString(), state: cloneData(state), weeklyPlan: [] };
+}
+
+function completeCareerExportSnapshot() {
+  const capsule = ensureV2PreviewCapsule();
+  if (capsule) persistV2PreviewCapsule();
+  return {
+    ...careerSnapshot(),
+    export: {
+      kind: JSON_EXPORT_KIND,
+      version: JSON_EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+    },
+    v2PreviewCapsule: capsule ? cloneData(capsule) : null,
+  };
+}
+
+function exportCareerJson() {
+  if (!state.profile) return;
+  try {
+    const snapshot = completeCareerExportSnapshot();
+    const json = JSON.stringify(snapshot, null, 2);
+    const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const slug = [state.profile.firstName, state.profile.lastName]
+      .filter(Boolean)
+      .join("-")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "carriere";
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `boxeur-deux-${slug}-semaine-${state.week}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    showToast("Sauvegarde JSON téléchargée");
+  } catch (error) {
+    console.error("[Boxeur Deux] Export JSON impossible :", error);
+    showToast("Impossible de télécharger la sauvegarde JSON.");
+  }
 }
 
 function persistCareer() {
@@ -1001,10 +1130,23 @@ function loadSavedSnapshot() {
 
 function restoreCareer(snapshot, options = {}) {
   try {
+    const suppliedCapsule = snapshot?.v2PreviewCapsule;
+    if (suppliedCapsule != null && !window.BoxeurCareerV2Migration?.isV2Capsule(suppliedCapsule)) {
+      throw new TypeError("La capsule complète de la sauvegarde JSON est invalide.");
+    }
     hydrateCareer(snapshot);
     // Une importation doit reconstruire sa capsule depuis les données qui
     // viennent d'être validées, avant que le premier rendu V2 puisse la lire.
-    if (options.invalidateV2 === true) invalidateV2PreviewCapsule();
+    if (options.invalidateV2 === true) {
+      invalidateV2PreviewCapsule();
+      if (suppliedCapsule) {
+        v2PreviewCapsule = window.BoxeurCareerV2Migration.migrateV5ToV2(suppliedCapsule);
+        normalizeV2PreviewRuntime(v2PreviewCapsule);
+        syncV2CapsuleToCareer(v2PreviewCapsule);
+        v2PreviewCapsule.previewFingerprint = v2PreviewFingerprint(state);
+        localStorage.setItem(V2_PREVIEW_SAVE_KEY, JSON.stringify(v2PreviewCapsule));
+      }
+    }
     render();
     maybeShowDivisionMigration();
     showToast("Carrière restaurée");
@@ -1280,7 +1422,6 @@ function renderLevel() {
   const level = state.level;
   const currentFloor = xpForLevel(level);
   const nextFloor = xpForLevel(level + 1);
-  const currentXp = state.experience - currentFloor;
   const needed = nextFloor - currentFloor;
   const levelNode = document.querySelector("#level");
   const xpProgress = document.querySelector("#xp-progress");
@@ -1292,8 +1433,8 @@ function renderLevel() {
   const choices = document.querySelector("#level-choices");
   const notice = document.querySelector("#level-notice");
   if (levelNode) levelNode.textContent = level;
-  if (xpProgress) xpProgress.textContent = `XP ${currentXp} / ${needed}`;
-  if (xpMeter) xpMeter.style.width = `${clamp((currentXp / needed) * 100)}%`;
+  if (xpProgress) xpProgress.textContent = `XP ${Math.round(state.experience)} / ${nextFloor}`;
+  if (xpMeter) xpMeter.style.width = `${clamp(((state.experience - currentFloor) / needed) * 100)}%`;
   if (points) points.textContent = state.levelPoints;
   if (openButton) openButton.disabled = state.levelPoints < 1;
   if (buttonLabel) buttonLabel.textContent = state.levelPoints ? "Répartir ·" : "Points :";
@@ -1323,7 +1464,12 @@ function showCareerAlertOrContinue() {
   }
   if (state.levelAnnouncementPending && state.levelNotice && state.levelPoints > 0) {
     document.querySelector("#level-up-title").textContent = `Niveau ${state.level} atteint`;
-    document.querySelector("#level-up-copy").textContent = `${state.levelNotice}. Tes points restent disponibles tant que tu ne les répartis pas.`;
+    document.querySelector("#level-up-copy").textContent = `Tu reçois toujours trois points de caractéristiques par niveau. Tes points restent disponibles tant que tu ne les répartis pas.`;
+    const rewards = document.querySelector("#level-up-rewards");
+    if (rewards) {
+      const icons = { money: "$", supplement: "+", "private-lesson": "★", capacity: "↗" };
+      rewards.innerHTML = (state.levelRewardsPending || []).map(reward => `<article class="${escapeHTML(reward.type)}"><span aria-hidden="true">${icons[reward.type] || "+"}</span><div><small>Niveau ${reward.level}</small><strong>${escapeHTML(reward.title)}</strong><p>${escapeHTML(reward.detail)}</p></div></article>`).join("");
+    }
     document.querySelector("#level-up-dialog")?.showModal();
     return true;
   }
@@ -1962,6 +2108,7 @@ function v2PreviewFingerprint(career = state) {
     safeNumber(career.gymWeeks, 0, 0, 5200),
     safeNumber(career.strengthGymWeeks, 0, 0, 5200),
     safeNumber(career.experience, 0, 0, 99999999),
+    safeNumber(career.privateLessonCredits, 0, 0, 99),
     career.initialGymRequired === true,
     career.introJobRequired === true,
     safeNumber(career.initialJobLockedUntilWeek, 0, 0, 99999),
@@ -1972,6 +2119,7 @@ function v2PreviewFingerprint(career = state) {
     safeNumber(career.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS),
     safeNumber(career.missedWorkWeeks, 0, 0, 3),
     safeNumber(career.trainingRhythmPenalty, 0, 0, 2),
+    career.recoveryConsequence || null,
     safeNumber(career.jobVacationEarnedAtTenure, 0, 0, 9999),
     career.jobApplication || null,
     safeNumber(career.recreationalTrainingWeeks, 0, 0, 999),
@@ -2023,12 +2171,14 @@ function createV2RuntimeCareer(source = state) {
     vacationBankWeeks: safeNumber(source.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS),
     missedWorkWeeks: safeNumber(source.missedWorkWeeks, 0, 0, 3),
     trainingRhythmPenalty: safeNumber(source.trainingRhythmPenalty, 0, 0, 2),
+    recoveryConsequence: normalizeRecoveryConsequence(source.recoveryConsequence),
     jobVacationEarnedAtTenure: safeNumber(source.jobVacationEarnedAtTenure, 0, 0, 9999),
     jobReferenceBonus: source.jobReferenceBonus === true,
     jobApplication: source.jobApplication && typeof source.jobApplication === "object"
       ? cloneData(source.jobApplication)
       : null,
     experience: safeNumber(source.experience, 0, 0, 99999999),
+    privateLessonCredits: safeNumber(source.privateLessonCredits, 0, 0, 99),
     v2SupplementState: window.BoxeurSupplements
       ? window.BoxeurSupplements.createState(source.v2SupplementState || source, { weekKey: sourceWeek })
       : source.v2SupplementState && typeof source.v2SupplementState === "object" ? cloneData(source.v2SupplementState) : null,
@@ -2088,6 +2238,7 @@ function normalizeV2PreviewRuntime(capsule) {
     vacationBankWeeks: safeNumber(suppliedCareer.vacationBankWeeks, defaults.vacationBankWeeks, 0, MAX_PAID_VACATION_WEEKS),
     missedWorkWeeks: safeNumber(suppliedCareer.missedWorkWeeks, defaults.missedWorkWeeks, 0, 3),
     trainingRhythmPenalty: safeNumber(suppliedCareer.trainingRhythmPenalty, defaults.trainingRhythmPenalty, 0, 2),
+    recoveryConsequence: normalizeRecoveryConsequence(suppliedCareer.recoveryConsequence || defaults.recoveryConsequence),
     jobVacationEarnedAtTenure: safeNumber(suppliedCareer.jobVacationEarnedAtTenure, defaults.jobVacationEarnedAtTenure, 0, 9999),
     jobReferenceBonus: suppliedCareer.jobReferenceBonus == null ? defaults.jobReferenceBonus : suppliedCareer.jobReferenceBonus === true,
     jobApplication: suppliedCareer.jobApplication && jobs.some(job => job.id === suppliedCareer.jobApplication.jobId)
@@ -2104,6 +2255,7 @@ function normalizeV2PreviewRuntime(capsule) {
         }
       : null,
     experience: safeNumber(suppliedCareer.experience, defaults.experience, 0, 99999999),
+    privateLessonCredits: safeNumber(suppliedCareer.privateLessonCredits, defaults.privateLessonCredits, 0, 99),
     initialGymRequired: suppliedCareer.initialGymRequired == null ? defaults.initialGymRequired : suppliedCareer.initialGymRequired === true,
     introJobRequired: suppliedCareer.introJobRequired == null ? defaults.introJobRequired : suppliedCareer.introJobRequired === true,
     initialJobLockedUntilWeek: safeNumber(suppliedCareer.initialJobLockedUntilWeek, defaults.initialJobLockedUntilWeek, 0, 99999),
@@ -2171,10 +2323,12 @@ function syncV2CapsuleToCareer(capsule) {
   state.vacationBankWeeks = safeNumber(career.vacationBankWeeks, state.vacationBankWeeks, 0, MAX_PAID_VACATION_WEEKS);
   state.missedWorkWeeks = safeNumber(career.missedWorkWeeks, state.missedWorkWeeks, 0, 3);
   state.trainingRhythmPenalty = safeNumber(career.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 2);
+  state.recoveryConsequence = normalizeRecoveryConsequence(career.recoveryConsequence);
   state.jobVacationEarnedAtTenure = safeNumber(career.jobVacationEarnedAtTenure, state.jobVacationEarnedAtTenure, 0, 9999);
   state.jobReferenceBonus = career.jobReferenceBonus === true;
   state.jobApplication = career.jobApplication ? cloneData(career.jobApplication) : null;
   state.experience = safeNumber(career.experience, state.experience, 0, 99999999);
+  state.privateLessonCredits = safeNumber(career.privateLessonCredits, state.privateLessonCredits, 0, 99);
   Object.keys(combatLabels).forEach(key => {
     state.combatStats[key] = safeNumber(capsule.timeState.stats?.[key], state.combatStats[key], 0, 99, false);
   });
@@ -2184,6 +2338,9 @@ function syncV2CapsuleToCareer(capsule) {
   state.progressionState = career.progressionState ? cloneData(career.progressionState) : null;
   state.recreationalTrainingWeeks = safeNumber(runtime.trainingSessions, state.recreationalTrainingWeeks, 0, 999);
   syncLevelProgress();
+  career.money = state.money;
+  career.privateLessonCredits = state.privateLessonCredits;
+  career.v2SupplementState = state.v2SupplementState ? cloneData(state.v2SupplementState) : null;
   if (state.careerStatus === "recreational") scheduleRecreationalSparring([]);
   capsule.previewFingerprint = v2PreviewFingerprint(state);
 }
@@ -2473,10 +2630,14 @@ function v2ProgressionSnapshot(capsule = ensureV2PreviewCapsule()) {
   window.BoxeurProgression.STAT_KEYS.forEach(key => {
     const raw = safeNumber(capsule.timeState.stats[key], state.combatStats[key], 0, 99);
     integerStats[key] = Math.floor(raw);
-    const fractionalProgress = Math.round((raw - Math.floor(raw)) * 10000) / 100;
-    progress[key] = previous?.stats?.[key] === integerStats[key] && fractionalProgress === 0
-      ? safeNumber(previous.progress?.[key], 0, 0, 100)
-      : fractionalProgress;
+    const skillXp = window.BoxeurTime?.statXpProgress
+      ? window.BoxeurTime.statXpProgress(capsule.timeState, key)
+      : null;
+    progress[key] = skillXp
+      ? Math.round((skillXp.total - skillXp.currentFloor) / Math.max(1, skillXp.nextThreshold - skillXp.currentFloor) * 10000) / 100
+      : previous?.stats?.[key] === integerStats[key]
+        ? safeNumber(previous.progress?.[key], 0, 0, 100)
+        : 0;
   });
   runtime.career.progressionState = window.BoxeurProgression.createState({
     stats: integerStats,
@@ -2849,13 +3010,13 @@ function v2HomeContext() {
   const preparation = v2PreparationView(timeState);
   const plannerState = ensureV2WeekPlanner(capsule);
   const preview = window.BoxeurWeekPlanner.previewPlan(plannerState);
-  const pendingLoad = Object.values(timeState.stimulus).reduce((sum, value) => sum + Number(value || 0), 0) / window.BoxeurTime.STAT_KEYS.length;
+  const pendingLoad = Object.values(timeState.stimulus).reduce((sum, value) => sum + Number(value || 0), 0);
   const recommendation = state.injuryWeeks > 0
     ? { title: "Le repos médical passe en premier", detail: preparation.detail, tone: "critical" }
     : timeState.condition.fatigue >= 65
     ? { title: "Une journée de repos est prioritaire", detail: "La fatigue persistante est trop haute pour empiler une autre grosse séance; la nuit sera appliquée automatiquement.", tone: "critical" }
-    : pendingLoad >= 12
-      ? { title: "Laisse le travail s’assimiler", detail: "Une nuit transformera une partie de la charge du GYM en progression permanente.", tone: "warning" }
+    : pendingLoad >= 48
+      ? { title: "Laisse l’XP s’assimiler", detail: "Une nuit transformera une partie de l’XP ciblée en attente en progression permanente.", tone: "warning" }
       : preparation.score >= 80
         ? { title: "Tu peux ajouter une séance", detail: "Compare le coût hebdomadaire du GYM et de la maison avant de confirmer.", tone: "positive" }
         : { title: "Prévois une récupération", detail: "Une journée plus calme préservera une partie de ta réserve pour la semaine suivante.", tone: "steady" };
@@ -2904,8 +3065,10 @@ function v2FighterContext() {
   const runtime = capsule ? normalizeV2PreviewRuntime(capsule) : null;
   const career = v2CareerView();
   const progression = v2ProgressionSnapshot(capsule);
-  const timeStats = progression?.stats || capsule?.timeState?.stats || state.combatStats;
-  const explicitProgress = progression?.progress;
+  const timeStats = capsule?.timeState?.stats || progression?.stats || state.combatStats;
+  const statXpProgress = capsule?.timeState && window.BoxeurTime
+    ? window.BoxeurTime.getPublicState(capsule.timeState).statXpProgress
+    : null;
   const supplementState = runtime?.career?.v2SupplementState;
   const trainerState = runtime?.career?.v2TrainerState;
   return {
@@ -2917,10 +3080,11 @@ function v2FighterContext() {
     money: career.money,
     level: state.level,
     levelPoints: state.levelPoints,
+    privateLessonCredits: career.privateLessonCredits,
     experience: career.experience,
     amateurRecord: state.amateurRecord,
     combatStats: timeStats,
-    statProgress: explicitProgress,
+    statXpProgress,
     supplementInventory: window.BoxeurSupplements && supplementState
       ? window.BoxeurSupplements.inventoryList(supplementState)
       : [],
@@ -2981,6 +3145,12 @@ function activateV2LocationSheet(sheet, preferredFocusSelector) {
 function openV2Location(locationId) {
   const sheet = document.querySelector("#v2-world .v2-location-sheet");
   if (!sheet) return;
+  const career = v2CareerView();
+  const access = window.BoxeurWorld?.locationAccess?.(locationId, career);
+  if (access?.locked) {
+    showToast(access.reason || "Ce lieu se débloque après le passage amateur.");
+    return;
+  }
   if (sheet.hidden) {
     const currentFocus = document.activeElement;
     v2LocationReturnFocus = currentFocus instanceof HTMLElement && currentFocus !== document.body
@@ -2992,7 +3162,6 @@ function openV2Location(locationId) {
   const isStrengthGym = locationId === "strength-gym" && window.BoxeurStrengthView;
   const isHome = locationId === "home" && window.BoxeurHomeView;
   const isWork = locationId === "work" && window.BoxeurWorkView;
-  const career = v2CareerView();
   sheet.classList.toggle("v2-location-sheet-full", Boolean(isBoxingGym || isStrengthGym || isHome || isWork));
   sheet.classList.toggle("v2-location-sheet-strength", Boolean(isStrengthGym));
   sheet.innerHTML = isBoxingGym
@@ -3341,7 +3510,9 @@ function recordV2Work(runtime, weekNumber, grossWages, workShifts = 1) {
 }
 
 const V2_WEEK_CAPACITY_TOTAL = 50;
-const V2_WEEK_RULESET_VERSION = 5;
+const V2_WEEK_CAPACITY_MILESTONE_GAIN = 5;
+const V2_WEEK_CAPACITY_MAX = 65;
+const V2_WEEK_RULESET_VERSION = 7;
 const V2_WEEK_ACTIVITY_LIMITS = Object.freeze({
   "group-class": 1,
   rest: 2,
@@ -3371,13 +3542,9 @@ function v2PlannerWeekKey(capsule = ensureV2PreviewCapsule()) {
   return `week-${capsule?.timeState?.clock?.week || state.week}`;
 }
 
-function v2PlannerTrainingEfficiency() {
-  return 1 - Math.min(.18, Math.max(0, Number(state.level || 1) - 1) * .015);
-}
-
 function v2PlannerLoadCost(energyCost, fatigueDelta, minimum = 4, extraBaseCost = 0) {
   const raw = 2 + Math.max(0, Number(extraBaseCost) || 0) + Math.max(0, Number(energyCost) || 0) * .55 + Math.max(0, Number(fatigueDelta) || 0) * .3;
-  return Math.max(minimum, Math.round(raw * v2PlannerTrainingEfficiency()));
+  return Math.max(minimum, Math.round(raw));
 }
 
 function v2PlannerWorkCost(job) {
@@ -3387,7 +3554,18 @@ function v2PlannerWorkCost(job) {
   return Math.max(8, Math.round(Math.max(0, -Number(job.energy || 0)) * .7 + Math.max(0, Number(job.fatigue || 0)) * .5));
 }
 
-function v2PlannerCapacityTotal(capsule, career, job) {
+function v2PlannerCapacityTotal() {
+  const milestoneCount = Math.floor(Math.max(0, Number(state.level || 1)) / 5);
+  return Math.min(V2_WEEK_CAPACITY_MAX, V2_WEEK_CAPACITY_TOTAL + milestoneCount * V2_WEEK_CAPACITY_MILESTONE_GAIN);
+}
+
+function v2ActiveRecoveryConsequence(capsule, career = normalizeV2PreviewRuntime(capsule).career) {
+  const consequence = normalizeRecoveryConsequence(career?.recoveryConsequence);
+  const week = safeNumber(capsule?.timeState?.clock?.week, state.week, 1, 99999);
+  return consequence?.week === week ? consequence : null;
+}
+
+function v2PlannerUnavailableCapacity(capsule, career, job, total = v2PlannerCapacityTotal()) {
   const condition = capsule.timeState.condition || {};
   const conditionPenalty = Math.round(
     Math.max(0, Number(condition.fatigue || 0) - 58) / 8
@@ -3396,8 +3574,9 @@ function v2PlannerCapacityTotal(capsule, career, job) {
   const rhythmPenalty = isCompetitiveCareer()
     ? safeNumber(runtimeCareerTrainingRhythm(career), 0, 0, 2) * 5
     : 0;
-  let total = Math.max(32, V2_WEEK_CAPACITY_TOTAL - conditionPenalty - rhythmPenalty);
-  return Math.max(v2PlannerWorkCost(job) + 10, total);
+  const forcedRecoveryCost = v2ActiveRecoveryConsequence(capsule, career)?.capacityCost || 0;
+  const roomAfterWork = Math.max(0, total - v2PlannerWorkCost(job));
+  return Math.min(roomAfterWork, Math.max(conditionPenalty, forcedRecoveryCost) + rhythmPenalty);
 }
 
 function runtimeCareerTrainingRhythm(career = v2CareerView()) {
@@ -3422,10 +3601,14 @@ function v2PlannerBaseConfig(capsule = ensureV2PreviewCapsule()) {
   const runtime = normalizeV2PreviewRuntime(capsule);
   const career = v2CareerView();
   const job = jobs.find(item => item.id === runtime.career.jobId) || null;
+  const capacityTotal = v2PlannerCapacityTotal();
   return {
     weekKey: v2PlannerWeekKey(capsule),
     careerStatus: state.careerStatus,
-    capacity: v2PlannerCapacityTotal(capsule, career, job),
+    capacity: {
+      total: capacityTotal,
+      unavailable: v2PlannerUnavailableCapacity(capsule, career, job, capacityTotal),
+    },
     condition: cloneData(capsule.timeState.condition),
     work: job ? {
       id: job.id,
@@ -3466,6 +3649,7 @@ function v2PlannerSignature(capsule = ensureV2PreviewCapsule()) {
     Math.round(capsule.timeState.condition.energy),
     Math.round(capsule.timeState.condition.fatigue),
     runtimeCareerTrainingRhythm(runtime.career),
+    runtime.career.recoveryConsequence || null,
     supplementState?.inventory || {},
     supplementState?.weeklyUsage || {},
     runtime.career.v2TrainerState?.activeProgram || null,
@@ -4115,7 +4299,8 @@ function v2WeekViewContext() {
     home: "Maison",
   };
   const rhythmPenalty = runtimeCareerTrainingRhythm(career);
-  const items = preview.entries.map(entry => {
+  const activeRecovery = v2ActiveRecoveryConsequence(capsule, normalizeV2PreviewRuntime(capsule).career);
+  const plannedItems = preview.entries.map(entry => {
     const effects = [];
     if (entry.pay > 0) effects.push(`+${Math.round(entry.pay)} $ à la fin de la semaine`);
     if (entry.metadata?.moneyCost > 0) effects.push(`−${Math.round(entry.metadata.moneyCost)} $ à la confirmation`);
@@ -4136,6 +4321,23 @@ function v2WeekViewContext() {
       kindLabel: labels[entry.category] || "Activité",
     };
   });
+  const items = activeRecovery ? [{
+    id: `system-recovery-${activeRecovery.week}`,
+    label: activeRecovery.kind === "hospital" ? "Nuit à l’hôpital" : "Repos forcé",
+    detail: activeRecovery.kind === "hospital"
+      ? "Récupération médicale imposée après avoir poussé le boxeur trop loin."
+      : "Récupération imposée par l’état physique de la semaine précédente.",
+    dayLabel: "Début de semaine",
+    cost: activeRecovery.capacityCost,
+    tone: "critical",
+    removable: false,
+    kindLabel: "Récupération",
+  }, ...plannedItems] : plannedItems;
+  const unavailableDetail = activeRecovery
+    ? `${preview.capacity.unavailable} point${preview.capacity.unavailable > 1 ? "s" : ""} occupé${preview.capacity.unavailable > 1 ? "s" : ""} au départ, dont ${activeRecovery.capacityCost} par ${activeRecovery.kind === "hospital" ? "la nuit à l’hôpital" : "le repos forcé"}. Ton maximum permanent reste intact.`
+    : preview.capacity.unavailable > 0
+      ? `${preview.capacity.unavailable} point${preview.capacity.unavailable > 1 ? "s" : ""} occupé${preview.capacity.unavailable > 1 ? "s" : ""} au départ par ton état physique${rhythmPenalty > 0 ? " et ton rythme récent" : ""}. Ton maximum permanent reste intact.`
+      : `Ton maximum permanent augmente de ${V2_WEEK_CAPACITY_MILESTONE_GAIN} aux niveaux 5, 10 et 15.`;
   return {
     week: capsule.timeState.clock.week,
     capacity: {
@@ -4144,9 +4346,8 @@ function v2WeekViewContext() {
       spent: preview.capacity.used,
       zone,
       zoneLabel: preview.condition.fatigueZone.label,
-      detail: rhythmPenalty > 0
-        ? `Rythme ${rhythmPenalty >= 2 ? "faible" : "fragile"} : une semaine avec entraînement récupérera 5 points de capacité pour la suivante, sans retirer de statistiques.`
-        : `À mesure que ton niveau monte, le coût des entraînements baisse légèrement, jusqu’à un plafond équilibré.`,
+      detail: unavailableDetail,
+      unavailable: preview.capacity.unavailable,
     },
     quick: {
       available: !blocker,
@@ -4165,6 +4366,7 @@ function v2WeekViewContext() {
       label: "Confirmer et vivre la semaine",
       reason: blocker,
     },
+    risk: preview.recoveryRisk,
   };
 }
 
@@ -4356,12 +4558,76 @@ function v2WeeklyCompletionEvents(result, runtime, previousWeek) {
   return events;
 }
 
+function applyV2RecoveryConsequence(result, runtime, plannerEntries, previousWeek) {
+  if (!window.BoxeurWeekPlanner?.assessRecoveryRisk) return null;
+  const plannedRest = plannerEntries.some(entry => entry.activityId === "rest");
+  const risk = window.BoxeurWeekPlanner.assessRecoveryRisk({
+    plannedRest,
+    condition: result.timeState.condition,
+    injury: state.injury,
+  });
+  runtime.career.recoveryConsequence = null;
+  if (risk.kind === "none") return null;
+  if (risk.kind === "warning") {
+    const event = {
+      label: "Récupération fragile",
+      detail: "Aucun repos cette semaine : l’état physique fera commencer la prochaine barre moins pleine.",
+      tone: "warning",
+    };
+    state.journal.unshift({ week: previousWeek, text: event.detail });
+    return event;
+  }
+
+  const hospital = risk.kind === "hospital";
+  runtime.career.recoveryConsequence = {
+    kind: risk.kind,
+    week: safeNumber(result.timeState.clock.week, previousWeek + 1, 1, 99999),
+    capacityCost: risk.capacityCost,
+    medicalCost: risk.medicalCost,
+  };
+  const energyBefore = Number(result.timeState.condition.energy || 0);
+  const fatigueBefore = Number(result.timeState.condition.fatigue || 0);
+  result.timeState.condition.energy = Math.max(energyBefore, hospital ? 45 : 32);
+  result.timeState.condition.fatigue = Math.min(fatigueBefore, hospital ? 50 : 66);
+  result.summary.conditionDelta.energy += result.timeState.condition.energy - energyBefore;
+  result.summary.conditionDelta.fatigue += result.timeState.condition.fatigue - fatigueBefore;
+
+  let charged = 0;
+  if (hospital) {
+    charged = Math.min(risk.medicalCost, runtime.career.money);
+    runtime.career.money -= charged;
+    result.finances.money = runtime.career.money;
+    result.summary.money.after = runtime.career.money;
+    result.summary.money.earned = runtime.career.money - result.summary.money.before;
+    state.injury = Math.max(0, state.injury - 12);
+  }
+  const event = hospital ? {
+    label: "Nuit à l’hôpital",
+    detail: `Le corps a lâché faute de récupération : ${risk.capacityCost} points sont déjà occupés la semaine prochaine${charged > 0 ? ` et ${charged} $ de soins ont été payés` : ""}.`,
+    tone: "critical",
+  } : {
+    label: "Repos forcé",
+    detail: `Le boxeur doit récupérer : ${risk.capacityCost} points sont déjà occupés au début de la prochaine semaine.`,
+    tone: "critical",
+  };
+  state.journal.unshift({ week: previousWeek, text: event.detail });
+  return event;
+}
+
 function v2WeekSummaryView(result, completionEvents = [], options = {}) {
   const grossWages = result.summary.actions
     .filter(record => record.kind === "work")
     .reduce((sum, record) => sum + Math.max(0, Number(record.moneyDelta || 0)), 0);
   const plannedExpenses = result.summary.actions
     .reduce((sum, record) => sum + Math.max(0, -Number(record.moneyDelta || 0)), 0);
+  const statXpChanges = Object.entries(combatLabels).map(([key, label]) => {
+    const gainedXp = Math.round(Number(result.summary.statXpGains?.[key] || 0));
+    return {
+      label: `${label} · XP ciblée`,
+      detail: `${gainedXp > 0 ? "+" : ""}${gainedXp} XP`,
+      tone: gainedXp > 0 ? "positive" : "neutral",
+    };
+  });
   const changes = [
     { label: "Énergie", detail: v2Signed(result.summary.conditionDelta.energy, " pts"), tone: result.summary.conditionDelta.energy < 0 ? "warning" : "positive" },
     { label: "Fatigue", detail: v2Signed(result.summary.conditionDelta.fatigue, " pts"), tone: result.summary.conditionDelta.fatigue > 0 ? "warning" : "positive" },
@@ -4369,7 +4635,8 @@ function v2WeekSummaryView(result, completionEvents = [], options = {}) {
     { label: "Dépenses planifiées", detail: plannedExpenses ? `−${plannedExpenses} $` : "0 $", tone: plannedExpenses ? "warning" : "neutral" },
     { label: "Variation du solde", detail: v2Signed(result.summary.money.earned, " $"), tone: result.summary.money.earned > 0 ? "positive" : result.summary.money.earned < 0 ? "warning" : "neutral" },
     { label: "Entraînement", detail: `${result.summary.counts.training} séance${result.summary.counts.training > 1 ? "s" : ""}`, tone: result.summary.counts.training > 0 ? "positive" : "neutral" },
-    { label: "Progression assimilée", detail: v2Signed(Object.values(result.summary.statGains).reduce((sum, value) => sum + Number(value || 0), 0), " pts"), tone: "positive" },
+    { label: "XP générale", detail: `${result.summary.xpAward > 0 ? "+" : ""}${Math.round(result.summary.xpAward)} XP`, tone: result.summary.xpAward > 0 ? "positive" : "neutral" },
+    ...statXpChanges,
     { label: "Nuits récupérées", detail: String(result.summary.nightRecoveries), tone: "neutral" },
   ];
   const events = [...completionEvents];
@@ -4389,7 +4656,7 @@ function v2WeekSummaryView(result, completionEvents = [], options = {}) {
     ...(options.firstGuidedWeek === true ? {
       guide: {
         title: "Comment lire ton premier bilan",
-        detail: "Énergie et fatigue montrent le coût réel de ton programme. La progression assimilée indique ce que ton boxeur a retenu de ses entraînements.",
+        detail: "Énergie et fatigue montrent le coût réel de ton programme. L’XP ciblée assimilée indique ce que ton boxeur a retenu de ses entraînements.",
         next: "En continuant, le guide affichera l’objectif de la semaine 2.",
       },
       actionLabel: "Continuer vers la semaine 2",
@@ -4785,6 +5052,8 @@ function runV2AutomaticWeek() {
     });
     if (boxingDone && isCompetitiveCareer()) state.boxingTrainingWeek = previousWeek;
     const completionEvents = v2WeeklyCompletionEvents(result, runtime, previousWeek);
+    const recoveryEvent = applyV2RecoveryConsequence(result, runtime, execution.plannerEntries, previousWeek);
+    if (recoveryEvent) completionEvents.unshift(recoveryEvent);
     runtime.weekMode = confirmed.commit.mode === "quick" ? "quick" : "detailed";
     runtime.weeklySummaries.unshift(cloneData(result.summary));
     runtime.weeklySummaries = runtime.weeklySummaries.slice(0, 30);
@@ -5285,7 +5554,7 @@ function renderV2TrainerMenu(locationId = "boxing-gym") {
       <p class="eyebrow">Programme actif</p><h3 id="v2-trainer-active-title">${escapeHTML(active.trainerLabel)}</h3>
       <p><strong>${escapeHTML(v2TrainerTargetLabel(active.target))}</strong> · ${active.sessionsCompleted}/${active.sessionsTotal} séances complétées</p>
       <progress max="${active.sessionsTotal}" value="${active.sessionsCompleted}">${active.sessionsCompleted}/${active.sessionsTotal}</progress>
-      <p>${escapeHTML(otherLocation ? access.reason : `Prochaine séance : ${access.label || "créneau à confirmer"}. Chaque cours produit une charge ciblée qui doit ensuite être assimilée.`)}</p>
+      <p>${escapeHTML(otherLocation ? access.reason : `Prochaine séance : ${access.label || "créneau à confirmer"}. Chaque cours produit de l’XP ciblée qui doit ensuite être assimilée.`)}</p>
       ${otherLocation
         ? `<button type="button" class="primary-button" data-v2-trainer-go-location="${correctLocation}">Aller au ${correctLocation === "strength-gym" ? "gym de musculation" : "GYM de boxe"}</button>`
         : `<button type="button" class="primary-button" data-v2-trainer-session${access.available ? "" : " disabled aria-disabled=\"true\""}>Ajouter la prochaine séance · −${trainer.energyCost} énergie</button>`}
@@ -5294,14 +5563,18 @@ function renderV2TrainerMenu(locationId = "boxing-gym") {
   } else {
     const targetButtons = allowedTargets.map(target => `<button type="button" data-v2-trainer-target="${target}" aria-pressed="${v2TrainerTarget === target}">${escapeHTML(v2TrainerTargetLabel(target))}</button>`).join("");
     const statValue = Number(v2ProgressionSnapshot(capsule)?.stats?.[v2TrainerTarget] || state.combatStats[v2TrainerTarget] || 40);
+    const lessonCredits = safeNumber(runtime.career.privateLessonCredits, 0, 0, 99);
     const offers = window.BoxeurTrainer.listOffers({ statValue }).map(offer => {
-      const insufficient = runtime.career.money < offer.cost;
+      const lessonDiscount = lessonCredits > 0 ? Math.round(offer.cost / offer.sessions) : 0;
+      const currentCost = offer.cost - lessonDiscount;
+      const insufficient = runtime.career.money < currentCost;
       const locked = !access.available || insufficient;
-      const reason = !access.available ? access.reason : insufficient ? `Il manque ${offer.cost - runtime.career.money} $.` : "";
+      const reason = !access.available ? access.reason : insufficient ? `Il manque ${currentCost - runtime.career.money} $.` : "";
       return `<article class="v2-trainer-offer">
         <div><p class="eyebrow">${escapeHTML(offer.tierLabel)}</p><h3>${escapeHTML(offer.label)}</h3></div>
-        <strong>${offer.cost} $ · ${offer.sessions} séances</strong>
-        <p>Environ ${Math.round(offer.estimatedGaugePointsPerSession)} % de jauge par séance à ce niveau, avant assimilation.</p>
+        <strong>${lessonDiscount > 0 ? `<s>${offer.cost} $</s> ${currentCost} $` : `${offer.cost} $`} · ${offer.sessions} séances</strong>
+        ${lessonDiscount > 0 ? `<small class="v2-trainer-gift">Bon cadeau appliqué · une séance offerte (−${lessonDiscount} $)</small>` : ""}
+        <p>Environ ${Math.round(offer.estimatedTargetedXpPerSession ?? offer.estimatedGaugePointsPerSession)} XP ciblée par séance, avant assimilation.</p>
         <small>−${offer.energyCost} énergie · +${offer.fatigue} fatigue par séance</small>
         <button type="button" data-v2-trainer-start="${offer.id}"${locked ? " disabled aria-disabled=\"true\"" : ""}>Choisir ${escapeHTML(offer.label)}</button>
         ${reason ? `<small class="v2-trainer-reason">${escapeHTML(reason)}</small>` : ""}
@@ -5309,7 +5582,7 @@ function renderV2TrainerMenu(locationId = "boxing-gym") {
     }).join("");
     body = `<section class="v2-trainer-picker" aria-labelledby="v2-trainer-picker-title">
       <div><p class="eyebrow">Qualité travaillée</p><h3 id="v2-trainer-picker-title">Choisis une cible</h3><div class="v2-trainer-targets">${targetButtons}</div></div>
-      <p>Le prix couvre le programme complet. Un entraîneur plus cher crée davantage de progression fractionnaire; aucun ne donne un point instantané.</p>
+      <p>Le prix couvre le programme complet. Un entraîneur plus cher crée davantage d’XP ciblée; la récupération reste nécessaire avant tout gain de caractéristique.${lessonCredits > 0 ? ` Tu as ${lessonCredits} bon${lessonCredits > 1 ? "s" : ""} pour un cours offert.` : ""}</p>
       <div class="v2-trainer-offers">${offers}</div>
     </section>`;
   }
@@ -5337,9 +5610,15 @@ function startV2TrainerProgram(trainerId) {
       trainerId,
       target: v2TrainerTarget,
       startedWeek: capsule.timeState.clock.week,
-    }, { balance: runtime.career.money });
+    }, {
+      balance: runtime.career.money,
+      freeSessions: runtime.career.privateLessonCredits > 0 ? 1 : 0,
+    });
     runtime.career.v2TrainerState = outcome.state;
     runtime.career.money = outcome.result.remainingBalance;
+    if (outcome.result.freeSessionsUsed > 0) {
+      runtime.career.privateLessonCredits = Math.max(0, runtime.career.privateLessonCredits - outcome.result.freeSessionsUsed);
+    }
     persistV2PreviewCapsule();
     renderV2WorldPreview(true);
     renderV2TrainerMenu(locationId);
@@ -7242,6 +7521,10 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     setTimeout(showCareerAlertOrContinue, 0);
     return;
   }
+  if (event.target.closest("[data-v2-export-career]")) {
+    exportCareerJson();
+    return;
+  }
   if (event.target.closest("[data-v2-week-plan-close]")) {
     closeV2Location();
     return;
@@ -7530,11 +7813,13 @@ document.querySelector("#level-dialog")?.addEventListener("close", () => {
 });
 document.querySelector("#level-up-later")?.addEventListener("click", () => {
   state.levelAnnouncementPending = false;
+  state.levelRewardsPending = [];
   document.querySelector("#level-up-dialog")?.close();
   persistCareer();
   showCareerAlertOrContinue();
 });
 document.querySelector("#level-up-allocate")?.addEventListener("click", () => {
+  state.levelRewardsPending = [];
   document.querySelector("#level-up-dialog")?.close();
   openLevelDialog(true);
 });

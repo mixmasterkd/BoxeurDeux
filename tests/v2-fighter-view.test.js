@@ -13,19 +13,26 @@ function context(overrides = {}) {
     weightLabel: "M65 · 60 à 65 kg",
     money: 450,
     level: 2,
-    experience: 135,
+    experience: 45,
     levelPoints: 3,
     amateurRecord: { wins: 2, losses: 1, draws: 0 },
     combatStats: { technique: 43.37, power: 40, cardio: 41.995, defense: 42.02 },
+    statXpProgress: {
+      technique: { total: 12, nextThreshold: 40, pendingXp: 4 },
+      power: { total: 45, nextThreshold: 90, pendingXp: 0 },
+      cardio: { total: 89, nextThreshold: 90, pendingXp: 2 },
+      defense: { total: 6, nextThreshold: 40, pendingXp: 0 },
+    },
     supplementInventory: [{ id: "electrolytes", label: "Électrolytes", quantity: 2, detail: "Récupération" }],
     ...overrides,
   };
 }
 
-test("normalise les quatre statistiques et dérive une jauge 0–100 sans ajouter de statistique", () => {
+test("normalise les quatre statistiques et leur XP cumulative sans ajouter de statistique", () => {
   const normalized = fighterView.normalizeContext(context());
   assert.deepEqual(normalized.stats, { technique: 43, power: 40, cardio: 41, defense: 42 });
-  assert.deepEqual(normalized.progress, { technique: 37, power: 0, cardio: 99, defense: 2 });
+  assert.deepEqual(normalized.statXp.technique, { total: 12, nextThreshold: 40, pendingXp: 4 });
+  assert.deepEqual(normalized.statXp.power, { total: 45, nextThreshold: 90, pendingXp: 0 });
 });
 
 test("rend une fiche accessible avec jauges et argent sans dupliquer l’inventaire", () => {
@@ -34,34 +41,40 @@ test("rend une fiche accessible avec jauges et argent sans dupliquer l’inventa
   assert.match(html, /Alex « Le Nord » Roy/);
   assert.match(html, /450 \$/);
   assert.equal((html.match(/role="progressbar"/g) || []).length, 5);
-  assert.match(html, /aria-valuenow="37"/);
-  assert.match(html, />37 %<\/small>/);
+  assert.match(html, /aria-valuemax="40" aria-valuenow="12"/);
+  assert.match(html, /<strong>12 \/ 40 XP<\/strong>/);
+  assert.match(html, /\+4 XP en attente de récupération/);
+  assert.match(html, /Toute l’XP est assimilée/);
   assert.doesNotMatch(html, /37\/100/);
   assert.doesNotMatch(html, /vers \+1 technique/i);
-  assert.doesNotMatch(html, /\+1/);
-  assert.match(html, /Progression générale/);
-  assert.match(html, /Progression vers le niveau 3/);
+  assert.match(html, /XP générale/);
+  assert.match(html, /45 \/ 90 XP/);
+  assert.match(html, /avant le niveau 3/);
   assert.match(html, /Récréatif – Niveau 2|Amateur – Niveau 2/);
   assert.match(html, /data-v2-level-up-slot data-level-points="3" hidden/);
   assert.doesNotMatch(html, /Électrolytes/);
   assert.doesNotMatch(html, /Suppléments/);
   assert.match(html, /data-v2-close-fighter/);
+  assert.match(html, /Sauvegarde externe/);
+  assert.match(html, /Télécharger la sauvegarde JSON/);
+  assert.match(html, /data-v2-export-career/);
 });
 
 test("calcule la progression générale avec la même courbe que la carrière", () => {
   assert.equal(fighterView.xpForLevel(1), 0);
-  assert.equal(fighterView.xpForLevel(2), 100);
-  assert.equal(fighterView.xpForLevel(3), 280);
-  const normalized = fighterView.normalizeContext(context({ level: 2, experience: 190 }));
-  assert.equal(normalized.levelProgress.currentFloor, 100);
-  assert.equal(normalized.levelProgress.nextFloor, 280);
-  assert.equal(normalized.levelProgress.progress, 50);
-  assert.equal(normalized.levelProgress.remaining, 90);
+  assert.equal(fighterView.xpForLevel(2), 40);
+  assert.equal(fighterView.xpForLevel(3), 90);
+  assert.equal(fighterView.xpForLevel(4), 150);
+  const normalized = fighterView.normalizeContext(context({ level: 2, experience: 65 }));
+  assert.equal(normalized.levelProgress.currentFloor, 40);
+  assert.equal(normalized.levelProgress.nextFloor, 90);
+  assert.equal(normalized.levelProgress.progress, 72);
+  assert.equal(normalized.levelProgress.remaining, 25);
 });
 
-test("accepte un pourcentage général explicite et le borne", () => {
-  assert.equal(fighterView.normalizeContext(context({ levelProgress: 145 })).levelProgress.progress, 100);
-  assert.equal(fighterView.normalizeContext(context({ levelProgress: -4 })).levelProgress.progress, 0);
+test("borne la représentation visuelle sans remplacer l’affichage XP cumulatif", () => {
+  assert.equal(fighterView.normalizeContext(context({ experience: 900 })).levelProgress.progress, 100);
+  assert.equal(fighterView.normalizeContext(context({ experience: -4 })).levelProgress.progress, 0);
 });
 
 test("présente un programme privé actif sans promettre de gain instantané", () => {
@@ -80,7 +93,13 @@ test("présente un programme privé actif sans promettre de gain instantané", (
   assert.match(html, /Cible : Défense/);
   assert.match(html, /2\/4 séances/);
   assert.match(html, /aria-valuenow="50"/);
-  assert.match(html, /18 points de progression potentielle créés par le programme/);
+  assert.match(html, /18 XP ciblée créée par le programme/);
+});
+
+test("affiche les bons de cours privé reçus lors des montées de niveau", () => {
+  const html = fighterView.render(context({ privateLessonCredits: 2 }));
+  assert.match(html, /Cours privé offert/);
+  assert.match(html, /2 bons/);
 });
 
 test("le CSS recentre le panneau et rend la fiche elle-même défilable sur mobile", () => {
@@ -89,6 +108,8 @@ test("le CSS recentre le panneau et rend la fiche elle-même défilable sur mobi
   assert.match(css, /margin:\s*0 auto/);
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.v2-fighter-view[\s\S]*?height:\s*100dvh/);
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.v2-fighter-view[\s\S]*?overflow-y:\s*auto/);
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.v2-fighter-save[\s\S]*?display:\s*grid/);
+  assert.match(css, /\.v2-fighter-save button[\s\S]*?min-height:\s*44px/);
 });
 
 test("le statut récréatif masque le bilan et conserve le programme privé séparé", () => {

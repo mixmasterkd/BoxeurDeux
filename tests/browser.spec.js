@@ -694,6 +694,7 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   await expect(launcher).toContainText("Capacité restante de la semaine");
   await expect(launcher.locator("progress")).toHaveAttribute("max", "50");
   await expect(launcher.locator("progress")).toHaveAttribute("value", "50");
+  await expect(launcher).not.toContainText("points gardés pour le repos");
   await expect(page.locator("[data-v2-week-quick]")).toBeDisabled();
   await expect(page.locator(".v2-week-blocker")).toContainText("emploi de départ");
 
@@ -751,6 +752,7 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   await expect(page.locator(".v2-week-plan")).not.toContainText("Journée de repos");
   const capacityAfterRemoval = Number(await page.locator(".v2-week-plan progress").getAttribute("value"));
   expect(capacityAfterRemoval).toBe(capacityBeforeRemoval + 10);
+  await expect(page.locator(".v2-week-plan")).not.toContainText("points gardés pour le repos");
   await page.locator("[data-v2-week-plan-close]").first().click();
 
   await page.getByRole("button", { name: /Entrer : Maison/ }).click();
@@ -856,7 +858,7 @@ test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmat
   expect(mainAfter.weeklyPlan).toEqual(mainBefore.weeklyPlan);
 });
 
-test("réduit progressivement la capacité après l’inactivité sans retirer de statistiques", async ({ page }) => {
+test("occupe progressivement la capacité après l’inactivité sans réduire son maximum ni les statistiques", async ({ page }) => {
   test.setTimeout(45_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
@@ -865,7 +867,7 @@ test("réduit progressivement la capacité après l’inactivité sans retirer d
     careerStatus: "amateur",
     fitness: 68,
     trainingRhythmPenalty: 0,
-    jobId: "courier",
+    jobId: "convenience",
     gymWeeks: 4,
     initialGymRequired: false,
   });
@@ -892,14 +894,16 @@ test("réduit progressivement la capacité après l’inactivité sans retirer d
   expect(result.capsule.previewRuntime.career.trainingRhythmPenalty).toBe(1);
   expect(result.main.state.fitness).toBe(68);
   expect(result.summaryText).toContain("Rythme fragile");
-  await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("max", "45");
+  await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("max", "50");
+  await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("value", "30");
 
   result = await finishWeek();
   expect(result.capsule.previewRuntime.career.trainingRhythmPenalty).toBe(2);
   expect(result.main.state.fitness).toBe(68);
   expect(result.summaryText).toContain("Rythme faible");
   expect(result.summaryText).toContain("sans diminution des statistiques");
-  await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("max", "40");
+  await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("max", "50");
+  await expect(page.locator(".v2-week-launcher progress")).toHaveAttribute("value", "25");
 
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   await page.locator('[data-v2-gym-zone="coach"]').click();
@@ -993,12 +997,9 @@ test("protège le budget du premier GYM de boxe contre les dépenses de musculat
   let saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
   expect(saved.initialGymRequired).toBe(true);
 
-  await page.getByRole("button", { name: /Entrer : Gym de musculation/ }).click();
-  await expect(page.locator(".v2-strength-view")).toBeVisible();
-  await expect(page.locator("[data-v2-strength-plan]")).toHaveCount(4);
-  await expect(page.locator("[data-v2-strength-plan]:not([disabled])")).toHaveCount(0);
-  await expect(page.locator(".v2-strength-membership")).toContainText("Disponible après le passage amateur");
-  await page.locator("[data-v2-leave-strength-gym]").click();
+  const strengthGym = page.locator('.v2-map-hotspot[data-v2-location="strength-gym"]');
+  await expect(strengthGym).toBeDisabled();
+  await expect(strengthGym).toHaveAccessibleName(/Accès verrouillé.*passage amateur/i);
 
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   await page.locator('[data-v2-gym-zone="reception"]').first().click();
@@ -1108,7 +1109,7 @@ test("lance immédiatement le sparring et le combat développeur sans altérer l
 });
 
 test("met en avant les montées de niveau et les congédiements", async ({ page }) => {
-  await openStoredCareer(page, amateurSnapshot({ experience: 95, gymWeeks: 4, initialGymRequired: false }));
+  await openStoredCareer(page, amateurSnapshot({ experience: 39, gymWeeks: 4, initialGymRequired: false }));
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   await page.locator('[data-v2-gym-zone="coach"]').click();
   await page.locator("[data-v2-coach-session]").click();
@@ -1118,6 +1119,7 @@ test("met en avant les montées de niveau et les congédiements", async ({ page 
   await page.locator("[data-v2-week-summary-close]").click();
   await expect(page.locator("#level-up-dialog")).toBeVisible();
   await expect(page.locator("#level-up-title")).toContainText("Niveau 2 atteint");
+  await expect(page.locator("#level-up-rewards")).toContainText("+50 $");
   await page.locator("#level-up-allocate").click();
   await expect(page.locator("#level-dialog")).toBeVisible();
   for (let point = 0; point < 3; point += 1) await page.locator("#level-choices [data-level-stat]:not([disabled])").first().click();
@@ -1125,6 +1127,84 @@ test("met en avant les montées de niveau et les congédiements", async ({ page 
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
   expect(saved.level).toBe(2);
   expect(saved.levelPoints).toBe(0);
+  expect(saved.money).toBe(270);
+});
+
+test("offre un supplément puis un cours privé selon la rotation des niveaux", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({ level: 2, experience: 150, gymWeeks: 4 }));
+  await expect(page.locator("#level-up-dialog")).toBeVisible();
+  await expect(page.locator("#level-up-title")).toContainText("Niveau 4 atteint");
+  await expect(page.locator("#level-up-rewards")).toContainText("Boisson sportive en cadeau");
+  await expect(page.locator("#level-up-rewards")).toContainText("Un cours privé offert");
+  await page.locator("#level-up-later").click();
+
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
+  expect(saved.level).toBe(4);
+  expect(saved.levelPoints).toBe(6);
+  expect(saved.v2SupplementState.inventory["sports-drink"]).toBe(1);
+  expect(saved.privateLessonCredits).toBe(1);
+
+  await page.locator('[data-v2-nav="fighter"]').click();
+  await expect(page.locator(".v2-fighter-identity")).toContainText("Cours privé offert");
+  await expect(page.locator(".v2-fighter-identity")).toContainText("1 bon");
+});
+
+test("augmente la capacité au niveau 5 sans réserver automatiquement le repos", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    level: 4,
+    experience: 220,
+    energy: 60,
+    fatigue: 65,
+    gymWeeks: 4,
+    jobId: "office",
+    jobsHeldCount: 1,
+  }));
+
+  await expect(page.locator("#level-up-dialog")).toBeVisible();
+  await expect(page.locator("#level-up-title")).toContainText("Niveau 5 atteint");
+  await expect(page.locator("#level-up-rewards")).toContainText("+5 capacité hebdomadaire");
+  await expect(page.locator("#level-up-rewards")).toContainText("maximum permanent passe à 55");
+  await page.locator("#level-up-later").click();
+
+  const launcher = page.locator(".v2-week-launcher");
+  await expect(launcher.locator("progress")).toHaveAttribute("max", "55");
+  await expect(launcher).not.toContainText("points gardés pour le repos");
+
+  await page.locator("[data-v2-week-detailed]").click();
+  await expect(page.locator(".v2-week-plan")).toContainText("Ton maximum permanent reste intact");
+  await expect(page.locator('[data-v2-week-rest-reserve]')).toHaveCount(0);
+  await page.locator("[data-v2-week-plan-close]").first().click();
+
+  await page.getByRole("button", { name: /Entrer : Maison/ }).click();
+  const capacityBeforeRest = Number(await page.locator(".v2-home-week-plan meter").getAttribute("value"));
+  await page.locator('[data-v2-home-zone="bed"]').click();
+  const capacityAfterRest = Number(await page.locator(".v2-home-week-plan meter").getAttribute("value"));
+  expect(capacityAfterRest).toBe(capacityBeforeRest - 10);
+  await expect(page.locator(".v2-home-week-plan")).toContainText("Journée de repos");
+});
+
+test("affiche le repos forcé comme capacité déjà occupée dans la semaine suivante", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    week: 4,
+    jobId: null,
+    jobsHeldCount: 0,
+    energy: 60,
+    fatigue: 40,
+    recoveryConsequence: { kind: "forced-rest", week: 4, capacityCost: 10, medicalCost: 0 },
+  }));
+
+  const launcher = page.locator(".v2-week-launcher");
+  await expect(launcher.locator("progress")).toHaveAttribute("max", "50");
+  await expect(launcher.locator("progress")).toHaveAttribute("value", "40");
+  await expect(launcher).toContainText("Repos forcé");
+
+  await page.locator("[data-v2-week-detailed]").click();
+  const plan = page.locator(".v2-week-plan");
+  await expect(plan).toContainText("10 par le repos forcé");
+  const forcedRecovery = plan.locator(".v2-week-plan-items li", { hasText: "Repos forcé" });
+  await expect(forcedRecovery).toContainText("−10 capacité");
+  await expect(forcedRecovery).toContainText("Prévu par défaut");
+  await expect(forcedRecovery.locator("[data-v2-week-remove]")).toHaveCount(0);
 });
 
 test("affiche les deux divisions du même tournoi extérieur et le conseil du coach abonné", async ({ page }) => {
@@ -1638,6 +1718,13 @@ test("joue le sparring interactif de Rémy puis passe automatiquement amateur av
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.locator("#resume-load").click();
 
+  const lockedStrengthGym = page.locator('.v2-map-hotspot[data-v2-location="strength-gym"]');
+  const lockedArena = page.locator('.v2-map-hotspot[data-v2-location="arena"]');
+  await expect(lockedStrengthGym).toBeDisabled();
+  await expect(lockedArena).toBeDisabled();
+  await expect(lockedStrengthGym).toHaveAccessibleName(/Accès verrouillé.*Gym de musculation.*passage amateur/i);
+  await expect(lockedArena).toHaveAccessibleName(/Accès verrouillé.*Aréna.*passage amateur/i);
+
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   await expect(page.locator('[data-v2-gym-zone="ring"]')).toBeEnabled();
   await page.locator('[data-v2-gym-zone="ring"]').click();
@@ -1708,6 +1795,8 @@ test("joue le sparring interactif de Rémy puis passe automatiquement amateur av
   await expect(page.locator("#v2-world")).toBeVisible();
   await expect(page.locator(".v2-now-panel > .v2-onboarding-card")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Entrer : Aréna/ })).toHaveAccessibleName(/Événements disponibles/);
+  await expect(page.locator('.v2-map-hotspot[data-v2-location="arena"]')).toBeEnabled();
+  await expect(page.locator('.v2-map-hotspot[data-v2-location="strength-gym"]')).toBeEnabled();
   const storedAmateur = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
   expect(storedAmateur.state.careerStatus).toBe("amateur");
   expect(storedAmateur.state.week).toBe(1);
@@ -1887,10 +1976,12 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   const desktopMapHotspotAppearance = await page.locator(".v2-map-hotspot").first().evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     borderStyle: getComputedStyle(element).borderStyle,
+    opacity: getComputedStyle(element).opacity,
     markerContent: getComputedStyle(element, "::after").content,
   }));
   expect(desktopMapHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.28)");
   expect(desktopMapHotspotAppearance.borderStyle).toBe("dashed");
+  expect(desktopMapHotspotAppearance.opacity).toBe("0.7");
   expect(desktopMapHotspotAppearance.markerContent).toBe("none");
   await expect(page.locator(".v2-world-bar")).toHaveCSS("position", "relative");
   const desktopHeader = await page.locator(".v2-now-time").boundingBox();
@@ -2091,6 +2182,54 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   expect(stored.state.fatigue).toBe(original.state.fatigue);
   expect(stored.state.v2WeekPlannerState.entries.some(entry => entry.activityId === "boxing-custom")).toBe(true);
   expect(stored.state.v2WeekPlannerState.entries.some(entry => entry.activityId === "rest")).toBe(true);
+});
+
+test("télécharge depuis l’onglet Boxeur une sauvegarde JSON complète et réimportable", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    profile: {
+      firstName: "Éric",
+      lastName: "Export",
+      nickname: "Copie",
+      sex: "male",
+      weightClass: "M65",
+      portraitId: 1,
+      style: "balanced",
+      corner: "blue",
+    },
+    money: 735,
+    trainingProgress: { technique: 4, power: 0, cardio: 0, defense: 0 },
+  }));
+
+  await page.locator('[data-v2-nav="fighter"]').click();
+  const exportButton = page.locator("[data-v2-export-career]");
+  await expect(exportButton).toBeVisible();
+  await expect(exportButton).toHaveText("Télécharger la sauvegarde JSON");
+
+  const downloadPromise = page.waitForEvent("download");
+  await exportButton.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("boxeur-deux-eric-export-semaine-1.json");
+  const downloadPath = await download.path();
+  const exported = JSON.parse(await fs.readFile(downloadPath, "utf8"));
+
+  expect(exported.export).toMatchObject({ kind: "boxeur-deux-complete-career", version: 1 });
+  expect(exported.state.profile).toMatchObject({ firstName: "Éric", lastName: "Export", nickname: "Copie" });
+  expect(exported.state.money).toBe(735);
+  expect(exported.v2PreviewCapsule.kind).toBe("boxeur-deux-career-v2-capsule");
+  expect(exported.v2PreviewCapsule.timeState.statXp.technique).toBe(16);
+  await expect(page.locator("#toast")).toContainText("Sauvegarde JSON téléchargée");
+
+  await page.evaluate(() => {
+    const capsule = JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview"));
+    capsule.timeState.statXp.technique = 0;
+    localStorage.setItem("boxeur-deux-career-v2-v2-preview", JSON.stringify(capsule));
+  });
+  await page.locator("#import-career-file").setInputFiles(downloadPath);
+  await expect(page.locator("#toast")).toContainText("Carrière restaurée");
+  const restoredXp = await page.evaluate(() => JSON.parse(
+    localStorage.getItem("boxeur-deux-career-v2-v2-preview"),
+  ).timeState.statXp.technique);
+  expect(restoredXp).toBe(16);
 });
 
 test("compose la semaine à la Maison sans appliquer le plan avant sa confirmation", async ({ page }) => {

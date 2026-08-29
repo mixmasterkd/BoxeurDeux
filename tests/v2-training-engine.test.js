@@ -193,7 +193,7 @@ test("sépare le coût de la séance du rétablissement nocturne", () => {
   assert.ok(outcome.result.remainingStimulus.cardio < outcome.result.plannedStimulus.cardio);
 });
 
-test("l'entraînement crée du stimulus, mais aucun gain de statistique sans récupération", () => {
+test("l'entraînement crée de l’XP ciblée en attente, assimilée à la récupération", () => {
   const initial = freshState();
   const session = training.createCustomSession(["shadow_boxing", "mitts"], { focus: "technique" });
   const outcome = training.executeSession(initial, session, GYM, fixedRng());
@@ -203,7 +203,8 @@ test("l'entraînement crée du stimulus, mais aucun gain de statistique sans ré
   assert.deepEqual(outcome.result.statGains, { technique: 0, power: 0, cardio: 0, defense: 0 });
 
   const recovered = time.advanceTime(outcome.timeState, 2, fixedRng());
-  assert.ok(recovered.stats.technique > initial.stats.technique);
+  assert.equal(recovered.stats.technique, initial.stats.technique);
+  assert.ok(recovered.statXp.technique > initial.statXp.technique);
   assert.ok(recovered.stimulus.technique < outcome.timeState.stimulus.technique);
 });
 

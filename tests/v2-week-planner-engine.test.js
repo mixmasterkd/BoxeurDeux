@@ -441,6 +441,8 @@ test("l'aperçu expose capacité, réserve d'énergie, zone de fatigue et journ�
     used: 3,
     remaining: 1,
     workReserved: 0,
+    unavailable: 0,
+    restPlanned: false,
     discretionaryReserved: 3,
   });
   assert.deepEqual(preview.condition.projected, { energy: 10, fatigue: 78 });
@@ -449,6 +451,65 @@ test("l'aperçu expose capacité, réserve d'énergie, zone de fatigue et journ�
   assert.equal(preview.perDay[4].physicalEntryId, hard.result.entry.id);
   assert.ok(preview.warnings.some(message => /capacité/i.test(message)));
   assert.ok(preview.warnings.some(message => /critique/i.test(message)));
+});
+
+test("fait du repos un choix normal qui concurrence directement les autres activités", () => {
+  const initial = fresh({
+    work: null,
+    capacity: { total: 20, unavailable: 3 },
+  });
+  const preview = planner.previewPlan(initial);
+  assert.equal(preview.capacity.total, 20);
+  assert.equal(preview.capacity.unavailable, 3);
+  assert.equal(preview.capacity.used, 3);
+  assert.equal(preview.capacity.remaining, 17);
+
+  const training = planner.addActivity(initial, boxing("reserve-limit", { capacityCost: 7 }));
+  assert.equal(training.preview.capacity.remaining, 10);
+  const rest = planner.addActivity(training.state, {
+    id: "rest",
+    label: "Journée de repos",
+    category: "recovery",
+    location: "home",
+    capacityCost: 10,
+  });
+  assert.equal(rest.preview.capacity.remaining, 0);
+  assert.equal(rest.preview.capacity.restPlanned, true);
+
+  const filled = planner.addActivity(initial, {
+    id: "extra-work",
+    label: "Activité supplémentaire",
+    category: "leisure",
+    location: "other",
+    capacityCost: 15,
+  });
+  assert.throws(
+    () => planner.addActivity(filled.state, {
+      id: "rest",
+      label: "Journée de repos",
+      category: "recovery",
+      location: "home",
+      capacityCost: 10,
+    }),
+    error => error.code === "WEEKLY_CAPACITY_EXCEEDED",
+  );
+});
+
+test("évalue les conséquences de récupération selon l’état réel et annule le risque si le repos est planifié", () => {
+  assert.equal(planner.assessRecoveryRisk({ plannedRest: true, condition: { energy: 4, fatigue: 98 } }).kind, "none");
+
+  const warning = planner.assessRecoveryRisk({ condition: { energy: 34, fatigue: 60 } });
+  assert.equal(warning.kind, "warning");
+  assert.equal(warning.capacityCost, 0);
+
+  const forced = planner.assessRecoveryRisk({ condition: { energy: 20, fatigue: 79 } });
+  assert.equal(forced.kind, "forced-rest");
+  assert.equal(forced.capacityCost, 10);
+
+  const hospital = planner.assessRecoveryRisk({ condition: { energy: 7, fatigue: 94 }, injury: 12 });
+  assert.equal(hospital.kind, "hospital");
+  assert.equal(hospital.capacityCost, 15);
+  assert.equal(hospital.medicalCost, 75);
 });
 
 test("confirme en une transaction pure et idempotente avec un inventaire après commit", () => {

@@ -64,16 +64,16 @@ test("rend une composition libre avec énergie principale et huit vrais boutons 
   assert.doesNotMatch(html, /[0-9]+\s*\/\s*3/);
 });
 
-test("prévisualise coûts, fatigue et stimuli directement dans chaque activité", () => {
+test("prévisualise coûts, fatigue et XP ciblée entière directement dans chaque activité", () => {
   const html = strengthView.render(baseContext({ selectedActivities: [] }));
 
   assert.match(html, /Force des jambes/);
   assert.match(html, /−13 énergie/);
   assert.match(html, /\+8 fatigue/);
-  assert.match(html, /<b>Puissance<\/b> \+3\.4/);
+  assert.match(html, /<b>Puissance<\/b> \+3 XP/);
   assert.match(html, /Conditionnement sur appareils/);
-  assert.match(html, /<b>Cardio<\/b> \+3\.8/);
-  assert.match(html, /chaque ajout met immédiatement à jour l'énergie, la fatigue et les stimuli prévus/i);
+  assert.match(html, /<b>Cardio<\/b> \+4 XP/);
+  assert.match(html, /chaque ajout met immédiatement à jour l'énergie, la fatigue et l’XP ciblée prévue/i);
 });
 
 test("désactive seulement les ajouts trop coûteux et laisse les activités choisies retirables", () => {
@@ -193,11 +193,11 @@ test("affiche les séances planifiées avec un retrait direct dans le gym", () =
   assert.match(html, /data-v2-strength-quick aria-pressed="true"[^>]*>Retirer la séance rapide/);
 });
 
-test("explique qu'un préparateur accélère un stimulus sans donner de point instantané", () => {
+test("explique qu'un préparateur produit davantage d’XP ciblée sans donner de point instantané", () => {
   const html = strengthView.render(baseContext({ trainer: {} }));
 
   assert.match(html, /Aucun préparateur choisi/);
-  assert.match(html, /accélère graduellement un stimulus ciblé/);
+  assert.match(html, /produit davantage d’XP ciblée/);
   assert.match(html, /ne donne jamais un point de statistique instantané/);
 });
 

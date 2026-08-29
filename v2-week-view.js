@@ -47,6 +47,7 @@
     const rawCapacity = raw.capacity && typeof raw.capacity === "object" ? raw.capacity : {};
     const rawPlan = raw.plan && typeof raw.plan === "object" ? raw.plan : {};
     const rawQuick = raw.quick && typeof raw.quick === "object" ? raw.quick : {};
+    const rawRisk = raw.risk && typeof raw.risk === "object" ? raw.risk : null;
     const total = wholeNumber(rawCapacity.total, 100, 1, 200);
     const remaining = wholeNumber(rawCapacity.remaining, total, 0, total);
     const spent = wholeNumber(rawCapacity.spent, total - remaining, 0, total);
@@ -62,6 +63,7 @@
         zone,
         zoneLabel: rawCapacity.zoneLabel || ({ comfortable: "Réserve confortable", low: "Réserve faible", critical: "Surcharge probable", blocked: "Capacité épuisée" })[zone],
         detail: rawCapacity.detail || "La réserve inutilisée aide la récupération de la prochaine semaine.",
+        unavailable: wholeNumber(rawCapacity.unavailable, 0, 0, total),
       },
       quick: {
         available: rawQuick.available !== false,
@@ -80,6 +82,12 @@
         label: raw.confirm?.label || "Confirmer la semaine",
         reason: raw.confirm?.reason || raw.confirmReason || "",
       },
+      risk: rawRisk && rawRisk.kind !== "none" ? {
+        kind: rawRisk.kind || "warning",
+        tone: TONES.includes(rawRisk.tone) ? rawRisk.tone : "warning",
+        title: rawRisk.title || "Récupération à surveiller",
+        detail: rawRisk.detail || "La condition du boxeur pourrait réduire la capacité de la prochaine semaine.",
+      } : null,
     };
   }
 
@@ -134,6 +142,7 @@
       <header><div><p class="eyebrow">Semaine ${context.week} · tout reste modifiable</p><h2 id="v2-week-plan-title">${escapeHTML(context.plan.title)}</h2></div><button type="button" data-v2-week-plan-close aria-label="Fermer le plan de la semaine">Fermer</button></header>
       <p>${escapeHTML(context.plan.summary)}</p>
       ${capacityMarkup(context)}
+      ${context.risk ? `<aside class="v2-week-risk ${context.risk.tone}" role="note"><span aria-hidden="true">!</span><div><strong>${escapeHTML(context.risk.title)}</strong><p>${escapeHTML(context.risk.detail)}</p></div></aside>` : ""}
       <ul class="v2-week-plan-items" aria-label="Contenu du programme">${items}</ul>
       <p class="v2-week-engine-note">Les activités ne sont pas encore accomplies. Elles seront résolues seulement lorsque tu confirmeras la semaine.</p>
       ${context.confirm.reason ? `<p class="v2-week-blocker" role="status">${escapeHTML(context.confirm.reason)}</p>` : ""}
