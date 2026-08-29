@@ -15,7 +15,6 @@ const STRENGTH_GYM_YEAR_WEEKS = 48;
 const TOURNAMENT_PREP_WEEKS = 4;
 const RECREATIONAL_START_DATE = "2026-09-07";
 const RECREATIONAL_SPARRING_WEEK = 6;
-const RECREATIONAL_MAX_WEEK = 10;
 const SAVE_KEY = "boxeur-deux-career-v2";
 const DEV_RETURN_SAVE_KEY = `${SAVE_KEY}-dev-return`;
 const DEV_TEST_ACTIVE_KEY = `${SAVE_KEY}-dev-active`;
@@ -259,6 +258,7 @@ const INITIAL_STATE = {
   initialGymRequired: true,
   recreationalTrainingWeeks: 0,
   recreationalSparringStatus: "training",
+  amateurPromotionPending: false,
   remyLesson: "",
   scheduledFight: null,
   calendar: null,
@@ -521,6 +521,8 @@ function normalizeOpponentData(opponent, fallbackWeightClass) {
 function normalizeCareerState(source) {
   if (!source?.profile || typeof source.profile !== "object") throw new Error("Profil manquant");
   const base = cloneData(INITIAL_STATE);
+  const legacyAutomaticAmateurPromotion = source.careerStatus === "amateur_pending"
+    || (source.careerStatus === "recreational" && source.recreationalSparringStatus === "completed");
   const hasCompetitionSex = ["male", "female"].includes(source.profile.sex);
   const profileSex = hasCompetitionSex ? source.profile.sex : "male";
   const allowedWeights = weightClassesForSex(profileSex).map(item => item.id);
@@ -545,8 +547,10 @@ function normalizeCareerState(source) {
       epoch: /^\d{4}-\d{2}-\d{2}$/.test(source.calendar.epoch || "") ? source.calendar.epoch : null,
       seed: safeText(source.calendar.seed, `${profile.firstName}-${profile.lastName}-${profile.sex}`, 120),
     } : null,
-    careerStatus: ["professional", "amateur", "recreational", "amateur_pending"].includes(source.careerStatus)
-      ? source.careerStatus
+    careerStatus: legacyAutomaticAmateurPromotion
+      ? "amateur"
+      : ["professional", "amateur", "recreational"].includes(source.careerStatus)
+        ? source.careerStatus
       : "amateur",
     // La partie entière reste la statistique affichée. La fraction représente
     // la jauge V2 déjà assimilée et doit survivre aux sauvegardes/imports.
@@ -615,7 +619,8 @@ function normalizeCareerState(source) {
   const sparringStates = ["training", "ready", "completed"];
   normalized.recreationalSparringStatus = sparringStates.includes(source.recreationalSparringStatus)
     ? source.recreationalSparringStatus
-    : normalized.careerStatus === "amateur_pending" ? "completed" : "training";
+    : legacyAutomaticAmateurPromotion ? "completed" : "training";
+  normalized.amateurPromotionPending = Boolean(source.amateurPromotionPending) || legacyAutomaticAmateurPromotion;
   normalized.remyLesson = safeText(source.remyLesson, "", 240);
   const inferredStartDate = /^\d{4}-\d{2}-\d{2}$/.test(source.careerStartDate || "")
     ? source.careerStartDate
@@ -1598,17 +1603,14 @@ function professionalEligibility() {
 
 function renderRecreationalCalendar(path, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition) {
   const partner = sparringPartnerView();
-  const sparringCompleted = state.recreationalSparringStatus === "completed";
   const isSparringDue = Boolean(state.scheduledFight?.isRecreationalSparring && state.week >= state.scheduledFight.week);
   document.querySelector("#calendar-dialog-eyebrow").textContent = "Parcours récréatif";
   document.querySelector("#calendar-title").textContent = "Vers le premier combat";
   document.querySelector("#calendar-date-label").textContent = `${formatCareerDate(careerWeekDate(0))} · semaine ${state.week}`;
   document.querySelector("#amateur-fight-count").textContent = "Bilan amateur à venir";
-  document.querySelector("#calendar-dialog-lead").textContent = sparringCompleted
-    ? "Le calendrier compétitif est prêt : tu peux encore rester récréatif jusqu’à la semaine 10 ou confirmer ton passage amateur."
-    : `${partner.displayName} évalue tes bases en semaine ${RECREATIONAL_SPARRING_WEEK}.`;
+  document.querySelector("#calendar-dialog-lead").textContent = `${partner.displayName} évalue tes bases en semaine ${RECREATIONAL_SPARRING_WEEK}. Le statut amateur sera ensuite activé automatiquement.`;
   path.hidden = false;
-  path.innerHTML = `<div><p class="eyebrow">Parcours des bases</p><strong>${escapeHTML(partner.displayName)}</strong><p>${sparringCompleted ? "L’évaluation est terminée. Le coach te laisse continuer à apprendre tranquillement avant de passer amateur." : `Construis tes repères : ${state.recreationalTrainingWeeks}/10 entraînements au GYM complétés. Le sparring arrive en semaine ${RECREATIONAL_SPARRING_WEEK}, pas après dix semaines obligatoires.`}</p><div class="countdown-meter"><span style="width:${Math.min(RECREATIONAL_MAX_WEEK, state.week) * 10}%"></span></div></div><ul><li>Semaines 1 à 5 : emploi, premier abonnement et bases</li><li>Semaine 6 : sparring d’évaluation avec ${escapeHTML(partner.firstName)}</li><li>Semaines 7 à 10 : choix de continuer ou de passer amateur</li></ul>`;
+  path.innerHTML = `<div><p class="eyebrow">Parcours des bases</p><strong>${escapeHTML(partner.displayName)}</strong><p>Construis tes repères avant l’évaluation de la semaine ${RECREATIONAL_SPARRING_WEEK}. Une fois le sparring terminé, le circuit amateur s’ouvrira automatiquement.</p><div class="countdown-meter"><span style="width:${Math.min(100, Math.round((state.week / RECREATIONAL_SPARRING_WEEK) * 100))}%"></span></div></div><ul><li>Semaines 1 à 5 : emploi, premier abonnement et bases</li><li>Semaine 6 : sparring d’évaluation avec ${escapeHTML(partner.firstName)}</li><li>Après le sparring : passage automatique au statut amateur</li></ul>`;
   if (state.scheduledFight?.isRecreationalSparring) {
     const opponent = scheduledOpponent();
     scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Sparring d’évaluation · GYM de boxe</p><strong>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</strong><p>${isSparringDue ? `${escapeHTML(partner.firstName)} est ${state.profile.sex === "female" ? "prête" : "prêt"}. Trois rounds courts pour montrer tes bases; ce sparring ne comptera pas au bilan amateur.` : `Prévu à la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isSparringDue ? `<div class="fight-notice-actions"><button id="start-fight" class="primary-button" type="button">Entrer dans le ring</button></div>` : ""}</div>`;
@@ -1619,26 +1621,8 @@ function renderRecreationalCalendar(path, scheduled, calendarContainer, tourname
   tournamentsContainer.innerHTML = "";
   activeTournamentContainer.innerHTML = "";
   proTransition.innerHTML = "";
-  amateurTransition.hidden = !sparringCompleted;
-  amateurTransition.innerHTML = sparringCompleted ? `<div><strong>Passer amateur</strong><p>${state.week >= RECREATIONAL_MAX_WEEK ? "La période récréative est terminée : confirme le passage pour poursuivre." : "Tu peux confirmer maintenant, ou garder le statut récréatif jusqu’à la semaine 10."}</p></div><button id="turn-amateur" class="primary-button" type="button">Passer amateur</button>` : "";
-}
-
-function renderAmateurTransition(path, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition) {
-  const partner = sparringPartnerView();
-  document.querySelector("#calendar-dialog-eyebrow").textContent = "Dernière étape";
-  document.querySelector("#calendar-title").textContent = "Ton premier statut amateur";
-  document.querySelector("#calendar-date-label").textContent = `${formatCareerDate(careerWeekDate(0))} · transition prête`;
-  document.querySelector("#amateur-fight-count").textContent = "Bilan amateur : 0 combat";
-  document.querySelector("#calendar-dialog-lead").textContent = `Le sparring avec ${partner.displayName} est terminé. Cette décision ouvre officiellement ton calendrier amateur.`;
-  path.hidden = false;
-  path.innerHTML = `<div><p class="eyebrow">Évaluation complétée</p><strong>Rémy « Le Tank » a donné son feu vert.</strong><p>Appuie sur « Passer amateur » pour commencer une nouvelle semaine 1 et faire apparaître les galas et tournois.</p></div>`;
-  scheduled.innerHTML = "";
-  calendarContainer.innerHTML = "";
-  tournamentsContainer.innerHTML = "";
-  activeTournamentContainer.innerHTML = "";
-  proTransition.innerHTML = "";
-  amateurTransition.hidden = false;
-  amateurTransition.innerHTML = `<div><strong>Passer amateur</strong><p>Cette confirmation débloque les galas, les tournois et le calendrier compétitif.</p></div><button id="turn-amateur" class="primary-button" type="button">Passer amateur</button>`;
+  amateurTransition.hidden = true;
+  amateurTransition.innerHTML = "";
 }
 
 function renderFights() {
@@ -1659,12 +1643,6 @@ function renderFights() {
     avoidanceWarning.textContent = state.avoidanceWeeks >= 6 ? "Avertissement du coach : les offres deviennent moins ambitieuses tant que tu évites les combats." : state.avoidanceWeeks >= 3 ? `Tu n’as pas combattu depuis ${state.avoidanceWeeks} semaines : ta réputation commence à baisser.` : "";
   }
   document.querySelector("#amateur-fight-count").textContent = `${fightCount} combat${fightCount > 1 ? "s" : ""} disputé${fightCount > 1 ? "s" : ""}`;
-
-  if (isAwaitingAmateurTransition()) {
-    if (avoidanceWarning) avoidanceWarning.hidden = true;
-    renderAmateurTransition(recreationalPath, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition);
-    return;
-  }
 
   if (isRecreationalCareer()) {
     if (avoidanceWarning) avoidanceWarning.hidden = true;
@@ -1778,14 +1756,6 @@ function currentJob() {
 
 function isRecreationalCareer() {
   return state.careerStatus === "recreational";
-}
-
-function isAwaitingAmateurTransition() {
-  return state.careerStatus === "amateur_pending";
-}
-
-function canPassAmateurCareer() {
-  return isAwaitingAmateurTransition() || (isRecreationalCareer() && state.recreationalSparringStatus === "completed");
 }
 
 function renderJobBoardSheet(job, { active = false, selected = false, disabled = false, status = "", effects = "" } = {}) {
@@ -1944,6 +1914,7 @@ function render() {
   renderFights();
   renderV2WorldPreview(true);
   persistCareer();
+  if (state.amateurPromotionPending) setTimeout(openAmateurPromotionDialog, 0);
 }
 
 function renderV2WorldPreview(hasFighter = Boolean(state.profile)) {
@@ -2601,7 +2572,28 @@ function v2GymContext() {
   const plannerPreview = window.BoxeurWeekPlanner.previewPlan(plannerState);
   const coachPlannerId = state.careerStatus === "recreational" ? "group-class" : "boxing-coach";
   const coachPlanState = v2PlannerActionState(coachPlannerId);
-  const sparringPlanState = v2PlannerActionState("sparring");
+  const immediateAmateurSparring = state.careerStatus === "amateur";
+  const baseSparringPlanState = v2PlannerActionState("sparring", { immediate: immediateAmateurSparring });
+  const sparringEntry = plannerState.entries.find(entry => !entry.preReserved && entry.activityId === "sparring") || null;
+  const sparringCompleted = sparringEntry?.metadata?.completed === true;
+  const sparringFightWeek = immediateAmateurSparring && isV2OfficialFightWeek(capsule);
+  const sparringPlanState = immediateAmateurSparring
+    ? {
+      ...baseSparringPlanState,
+      available: !sparringCompleted && !sparringFightWeek && (Boolean(sparringEntry) || baseSparringPlanState.available),
+      reason: sparringFightWeek
+        ? "Le sparring n’est pas disponible pendant une semaine de combat officiel."
+        : sparringCompleted
+          ? "Ce sparring a déjà été fait cette semaine."
+          : baseSparringPlanState.reason,
+      planned: Boolean(sparringEntry && !sparringCompleted),
+      completed: sparringCompleted,
+      entryId: sparringEntry?.id || baseSparringPlanState.entryId,
+      immediate: true,
+      fightWeek: sparringFightWeek,
+      cost: 18,
+    }
+    : { ...baseSparringPlanState, immediate: false, completed: sparringCompleted, fightWeek: false };
   const membershipMissing = career.gymWeeks <= 0;
   const trainingBlocked = state.injuryWeeks > 0 || membershipMissing || plannerPreview.capacity.remaining <= 0;
   const trainingBlockedReason = state.injuryWeeks > 0
@@ -2644,7 +2636,7 @@ function v2GymContext() {
           : coachPreview.reason,
     },
     privateTrainer: {
-      available: career.gymWeeks > 0 && state.careerStatus !== "recreational" && state.careerStatus !== "amateur_pending",
+      available: career.gymWeeks > 0 && state.careerStatus !== "recreational",
       active: Boolean(boxingTrainerProgram),
       name: boxingTrainerProgram?.trainerLabel || "Entraîneur privé",
       detail: boxingTrainerProgram
@@ -2661,7 +2653,7 @@ function v2GymContext() {
     },
     recreational: {
       trainingWeeks: capsule.previewRuntime.trainingSessions,
-      targetWeeks: RECREATIONAL_MAX_WEEK,
+      targetWeeks: RECREATIONAL_SPARRING_WEEK,
       sparringWeek: 6,
       partner: sparringPartnerView(),
       remyStatus: career.v2Onboarding?.remyStatus === "completed" || state.recreationalSparringStatus === "completed"
@@ -2704,7 +2696,7 @@ function v2StrengthContext() {
   const quickState = v2PlannerActionState("strength-quick");
   return {
     profile: state.profile,
-    careerStatus: state.careerStatus === "amateur_pending" ? "recreational" : state.careerStatus,
+    careerStatus: state.careerStatus,
     condition: {
       energy: capsule.timeState.condition.energy,
       fatigue: capsule.timeState.condition.fatigue,
@@ -2864,7 +2856,7 @@ function v2HomeContext() {
   const homeEntries = v2PlannerLocationEntries(plannerState, "home");
   return {
     profile: state.profile,
-    careerStatus: state.careerStatus === "amateur_pending" ? "recreational" : state.careerStatus,
+    careerStatus: state.careerStatus,
     clock: {
       ...timeState.clock,
       dateLabel: v2CareerView().v2DateLabel,
@@ -2911,10 +2903,8 @@ function v2FighterContext() {
   const trainerState = runtime?.career?.v2TrainerState;
   return {
     profile: state.profile,
-    careerStatus: state.careerStatus === "amateur_pending" ? "recreational" : state.careerStatus,
-    statusLabel: isAwaitingAmateurTransition()
-      ? "Prêt à passer amateur"
-      : isRecreationalCareer() ? "Récréatif" : state.careerStatus === "professional" ? "Professionnel" : "Amateur",
+    careerStatus: state.careerStatus,
+    statusLabel: isRecreationalCareer() ? "Récréatif" : state.careerStatus === "professional" ? "Professionnel" : "Amateur",
     styleLabel: styles[state.profile?.style]?.label || "Équilibré",
     weightLabel: state.profile ? weightClassLabel(state.profile.weightClass, state.profile.sex) : "Catégorie à confirmer",
     money: career.money,
@@ -3427,7 +3417,7 @@ function v2PlannerBaseConfig(capsule = ensureV2PreviewCapsule()) {
   const job = jobs.find(item => item.id === runtime.career.jobId) || null;
   return {
     weekKey: v2PlannerWeekKey(capsule),
-    careerStatus: state.careerStatus === "amateur_pending" ? "recreational" : state.careerStatus,
+    careerStatus: state.careerStatus,
     capacity: v2PlannerCapacityTotal(capsule, career, job),
     condition: cloneData(capsule.timeState.condition),
     work: job ? {
@@ -3709,12 +3699,13 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: "sparring",
       location: "boxing-gym",
       physical: true,
-      capacityCost: v2PlannerLoadCost(18, 14, 12),
+      capacityCost: metadata.immediate === true ? 18 : v2PlannerLoadCost(18, 14, 12),
       energyCost: 18,
       fatigueDelta: 14,
       metadata: {
         plannerType: id,
         completed: metadata.completed === true,
+        immediate: metadata.immediate === true,
         familyId: "sparring",
         programSignature: "sparring:technical",
         capacityExtraBase: 0,
@@ -3725,6 +3716,24 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
     };
   }
   throw new Error("Cette activité n’est pas reconnue par le planificateur.");
+}
+
+function isV2OfficialFightWeek(capsule = ensureV2PreviewCapsule()) {
+  const currentWeek = Number(capsule?.timeState?.clock?.week || state.week);
+  const scheduled = state.scheduledFight;
+  const scheduledOfficial = Boolean(
+    scheduled
+      && !scheduled.isPracticeSparring
+      && !scheduled.isRecreationalSparring
+      && !scheduled.isDeveloperBout
+      && Number(scheduled.week) <= currentWeek,
+  );
+  const activeTournamentWeek = Boolean(
+    state.activeTournament
+      && state.activeTournament.status !== "completed"
+      && Number(state.activeTournament.startWeek) <= currentWeek,
+  );
+  return scheduledOfficial || activeTournamentWeek;
 }
 
 function v2PlannerActivityAccess(activityId) {
@@ -3753,8 +3762,13 @@ function v2PlannerActivityAccess(activityId) {
       return { available: false, reason: "Un abonnement actif au GYM de boxe est requis pour cet entraîneur." };
     }
   }
-  if (id === "sparring" && state.scheduledFight) {
-    return { available: false, reason: "Un autre rendez-vous de ring est déjà prévu." };
+  if (id === "sparring") {
+    if (state.careerStatus === "amateur" && isV2OfficialFightWeek(capsule)) {
+      return { available: false, reason: "Le sparring n’est pas disponible pendant une semaine de combat officiel." };
+    }
+    if (state.careerStatus !== "amateur" && state.scheduledFight) {
+      return { available: false, reason: "Un autre rendez-vous de ring est déjà prévu." };
+    }
   }
   if (id === "meal" && runtime.career.money < 15) {
     return { available: false, reason: "Il faut 15 $ pour préparer ce repas." };
@@ -3772,7 +3786,8 @@ function v2PlannerRebuild(capsule, previous) {
   oldEntries.forEach(entry => {
     try {
       const access = v2PlannerActivityAccess(entry.activityId);
-      if (!access.available) throw new Error(access.reason);
+      const alreadyConsumed = entry.activityId === "sparring" && entry.metadata?.immediate === true;
+      if (!access.available && !alreadyConsumed) throw new Error(access.reason);
       const definition = v2PlannerActivityDefinition(entry.activityId, entry.metadata || {});
       const added = window.BoxeurWeekPlanner.addActivity(rebuilt, definition, {
         day: entry.day,
@@ -3826,7 +3841,7 @@ function v2PlannerLocationEntries(plannerState, locationId) {
       label: entry.metadata?.gainMultiplier < 1 ? `${entry.label} · gains 85 %` : entry.label,
       cost: entry.capacityCost,
       gainMultiplier: safeNumber(entry.metadata?.gainMultiplier, 1, .5, 1, false),
-      removable: !entry.locked && !entry.metadata?.completed,
+      removable: !entry.locked && !entry.metadata?.completed && !entry.metadata?.immediate,
     }));
 }
 
@@ -3972,6 +3987,10 @@ function removeV2PlannerActivity(entryId, options = {}) {
   try {
     const plannerState = ensureV2WeekPlanner(capsule);
     const entry = plannerState.entries.find(item => item.id === entryId);
+    if (entry?.metadata?.immediate) {
+      showToast("Le sparring commencé ne peut pas être retiré : ses 18 points d’énergie ont été consommés.");
+      return null;
+    }
     const outcome = window.BoxeurWeekPlanner.removeActivity(plannerState, entryId);
     if (entry?.source === "work") outcome.state.workOptedOut = true;
     v2PlannerStore(capsule, outcome.state);
@@ -4105,7 +4124,7 @@ function v2WeekViewContext() {
       dayLabel: V2_PLANNER_DAY_LABELS[entry.day] || entry.day,
       cost: entry.capacityCost,
       tone: entry.preReserved ? "neutral" : entry.metadata?.completed ? "positive" : entry.energyCost >= 20 ? "warning" : "positive",
-      removable: !entry.locked && !entry.metadata?.completed,
+      removable: !entry.locked && !entry.metadata?.completed && !entry.metadata?.immediate,
       kindLabel: labels[entry.category] || "Activité",
     };
   });
@@ -4859,6 +4878,17 @@ function openV2JobMenu() {
   document.querySelector("#job-dialog")?.showModal();
 }
 
+function openV2OnboardingWelcome() {
+  const dialog = document.querySelector("#onboarding-guide-dialog");
+  if (!dialog || dialog.open) return;
+  dialog.showModal();
+}
+
+function startV2OnboardingFromWelcome() {
+  document.querySelector("#onboarding-guide-dialog")?.close();
+  openV2JobMenu();
+}
+
 function selectV2Job(jobId) {
   const capsule = ensureV2PreviewCapsule();
   const job = jobs.find(item => item.id === jobId);
@@ -5015,7 +5045,7 @@ function renderV2GymMenu(menuId) {
   sheet.classList.add("v2-location-sheet-full");
   sheet.innerHTML = markup;
   const preferredFocus = menuId === "coach"
-    ? "[data-v2-amateur-transition]:not([disabled]), [data-v2-coach-session]:not([disabled]), [data-v2-boxing-trainer]:not([disabled])"
+    ? "[data-v2-coach-session]:not([disabled]), [data-v2-boxing-trainer]:not([disabled])"
     : "[data-v2-sparring-activity]:not([disabled])";
   activateV2LocationSheet(sheet, preferredFocus);
 }
@@ -5170,7 +5200,7 @@ function selectV2StrengthPlan(planId) {
   const plan = strengthGymPlans.find(item => item.id === planId);
   if (!capsule || !plan || !window.BoxeurStrength) return;
   const runtime = normalizeV2PreviewRuntime(capsule);
-  if (state.careerStatus === "recreational" || state.careerStatus === "amateur_pending") {
+  if (state.careerStatus === "recreational") {
     return showToast("Le gym de musculation se débloque après le passage amateur.");
   }
   if (runtime.career.strengthGymWeeks > 0) return showToast("Ton abonnement de musculation est déjà actif.");
@@ -5325,7 +5355,8 @@ function runV2TrainerSession() {
 }
 
 async function runV2TechnicalSparring(options = {}) {
-  if (options.launch !== true) {
+  const immediateAmateurSparring = state.careerStatus === "amateur";
+  if (!immediateAmateurSparring && options.launch !== true) {
     addV2PlannerActivity("sparring", {}, { toggle: true, reopen: "boxing-gym" });
     return;
   }
@@ -5334,24 +5365,42 @@ async function runV2TechnicalSparring(options = {}) {
   if (!["amateur", "professional"].includes(state.careerStatus)) return showToast("Termine d’abord le sparring d’évaluation et confirme ton passage amateur.");
   const career = v2CareerView();
   if (career.gymWeeks <= 0) return showToast("Un abonnement actif au GYM est requis pour réserver un partenaire.");
-  if (state.scheduledFight) return showToast("Un combat est déjà à l’horaire : garde ton énergie pour ce rendez-vous.");
+  const access = v2PlannerActivityAccess("sparring");
+  if (!access.available) return showToast(access.reason);
   try {
-    normalizeV2PreviewRuntime(capsule).pendingPlannerSparringEntryId = options.entryId || null;
+    const runtime = normalizeV2PreviewRuntime(capsule);
+    let plannerState = ensureV2WeekPlanner(capsule);
+    let plannerEntry = options.entryId
+      ? plannerState.entries.find(entry => entry.id === options.entryId && entry.activityId === "sparring")
+      : plannerState.entries.find(entry => !entry.preReserved && entry.activityId === "sparring" && !entry.metadata?.completed);
+    if (plannerEntry?.metadata?.completed) return showToast("Ce sparring a déjà été fait cette semaine.");
+    if (!plannerEntry) {
+      const definition = v2PlannerActivityDefinition("sparring", { immediate: immediateAmateurSparring });
+      const outcome = window.BoxeurWeekPlanner.addActivity(plannerState, definition, { source: immediateAmateurSparring ? "immediate" : "gym" });
+      plannerState = v2PlannerStore(capsule, outcome.state);
+      plannerEntry = outcome.result.entry;
+    }
+    runtime.pendingPlannerSparringEntryId = plannerEntry.id;
     prepareV2TrainingWindow(capsule);
     const rating = clamp(Math.round(Object.values(career.combatStats).reduce((sum, value) => sum + Number(value || 0), 0) / 4), 30, 95);
-    const partnerName = state.profile.sex === "female" ? "Camille Beaulieu" : "Mathieu Beaulieu";
+    const partner = recreationalSparringPartner();
+    const deferredScheduledFight = state.scheduledFight?.isPracticeSparring
+      ? cloneData(state.scheduledFight.deferredScheduledFight || null)
+      : state.scheduledFight && !state.scheduledFight.isRecreationalSparring
+        ? cloneData(state.scheduledFight)
+        : null;
     state.scheduledFight = {
-      id: `partenaire-gym-${capsule.timeState.clock.week}`,
+      id: `${partner.id}-gym-${capsule.timeState.clock.week}`,
       opponent: {
-        id: `partenaire-gym-${capsule.timeState.clock.week}`,
-        name: partnerName,
-        nickname: "Partenaire du GYM",
-        style: "Équilibré",
+        id: `${partner.id}-gym-${capsule.timeState.clock.week}`,
+        name: partner.name,
+        nickname: partner.nickname,
+        style: partner.style,
         rating,
         difficulty: rating,
         record: "Sparring technique",
         weightClass: state.profile.weightClass,
-        stats: opponentStatsForRating(rating, "Équilibré", `${partnerName}-${capsule.timeState.clock.week}`),
+        stats: opponentStatsForRating(rating, partner.style, `${partner.id}-${capsule.timeState.clock.week}`),
       },
       tournamentId: null,
       tournamentRound: null,
@@ -5363,6 +5412,7 @@ async function runV2TechnicalSparring(options = {}) {
       isV2Sparring: true,
       travelEffects: { energy: 0, fatigue: 0 },
       travelApplied: true,
+      deferredScheduledFight,
       fightSeed: freshFightSeed(`sparring-technique-${state.profile.firstName}-${capsule.timeState.clock.week}`),
     };
     // Le combat fait partie de l’empreinte de sauvegarde : enregistrer après
@@ -5593,7 +5643,7 @@ async function startFight() {
   const isPracticeSparring = Boolean(state.scheduledFight.isPracticeSparring);
   const isNonRecordSparring = isRecreationalSparring || isPracticeSparring;
   const isLocalOfficialFight = !state.scheduledFight.tournamentId && !isNonRecordSparring;
-  const useImmersiveRing = isRecreationalSparring || isLocalOfficialFight;
+  const useImmersiveRing = isNonRecordSparring || isLocalOfficialFight;
   const v2FightCareer = !state.scheduledFight.tournamentId && !isDeveloperBout
     ? v2CareerView()
     : null;
@@ -5647,6 +5697,7 @@ async function startFight() {
     isLocalOfficialFight,
     isV2Sparring,
     isDeveloperBout,
+    deferredScheduledFight: scheduled.deferredScheduledFight ? cloneData(scheduled.deferredScheduledFight) : null,
     remyLesson: !isRecreationalSparring ? state.remyLesson : "",
   };
   sparringRingState = useImmersiveRing && window.BoxeurSparringRing
@@ -5664,7 +5715,7 @@ async function startFight() {
   stage.dataset.cue = "neutral";
   stage.classList.remove("show-impact");
   configureRingImages();
-  if (isRecreationalSparring) configureSparringPlayerImages();
+  if (isNonRecordSparring) configureSparringPlayerImages();
   const immersiveBackdropSelector = isLocalOfficialFight
     ? ".local-fight-ring-backdrop, .local-fight-before-backdrop, .local-fight-corner-backdrop, .local-fight-after-backdrop, .sparring-fighter-image"
     : ".sparring-ring-backdrop, .sparring-before-backdrop, .sparring-corner-backdrop, .sparring-after-backdrop, .sparring-fighter-image";
@@ -5868,19 +5919,14 @@ function turnProfessional() {
   showToast("Carrière professionnelle commencée");
 }
 
-function beginAmateurCareer() {
-  if (!canPassAmateurCareer()) return;
-  const capsule = ensureV2PreviewCapsule();
-  const onboarding = v2OnboardingView(capsule);
-  if (onboarding && !onboarding.gates.passAmateur.allowed) return showToast(onboarding.gates.passAmateur.reason);
+function completeAmateurCareerAfterSparring() {
+  if (!isRecreationalCareer() || state.recreationalSparringStatus !== "completed") return false;
+  const capsule = v2PreviewCapsule;
   if (capsule?.timeState?.stats) state.combatStats = cloneData(capsule.timeState.stats);
-  if (onboarding?.state.mode === "guided") {
-    applyV2OnboardingEvent({ type: window.BoxeurOnboarding.EVENT_TYPES.PASS_AMATEUR });
-  }
   const amateurEpoch = careerWeekDate(0);
   state.careerStatus = "amateur";
   state.week = 1;
-  state.careerStartDate = amateurEpoch;
+  state.careerStartDate = amateurEpoch || state.careerStartDate;
   state.calendar = null;
   state.bookings = [];
   state.scheduledFight = null;
@@ -5888,11 +5934,30 @@ function beginAmateurCareer() {
   state.avoidanceWeeks = 0;
   state.lastFightWeek = 0;
   state.amateurRecord = { wins: 0, losses: 0, draws: 0 };
-  state.journal.unshift({ week: 1, text: `${state.profile.firstName} passe officiellement amateur. Le calendrier des galas et tournois est ouvert.` });
+  state.amateurPromotionPending = true;
+  state.journal.unshift({ week: 1, text: `${state.profile.firstName} passe automatiquement amateur après le sparring d’évaluation. Le calendrier des galas et tournois est ouvert.` });
+  invalidateV2PreviewCapsule();
   ensureCareerCalendar();
   document.querySelector("#calendar-dialog")?.close();
-  render();
-  showToast("Statut amateur confirmé · semaine 1");
+  persistCareer();
+  return true;
+}
+
+function openAmateurPromotionDialog() {
+  const dialog = document.querySelector("#amateur-promotion-dialog");
+  if (!dialog || dialog.open || state.careerStatus !== "amateur" || !state.amateurPromotionPending) return;
+  const blockingDialog = Array.from(document.querySelectorAll("dialog[open]")).find(item => item !== dialog);
+  if (blockingDialog) return;
+  dialog.showModal();
+}
+
+function acknowledgeAmateurPromotion() {
+  const dialog = document.querySelector("#amateur-promotion-dialog");
+  state.amateurPromotionPending = false;
+  dialog?.close();
+  persistCareer();
+  renderV2WorldPreview(true);
+  showToast("Statut amateur obtenu · le circuit compétitif est ouvert");
 }
 
 function renderTournamentBoard() {
@@ -6117,12 +6182,16 @@ function isRemyRingPrototype() {
   return Boolean(fightState?.careerMeta?.isRecreationalSparring && sparringRingState && window.BoxeurSparringRing);
 }
 
+function isTechnicalSparringPrototype() {
+  return Boolean(fightState?.careerMeta?.isPracticeSparring && sparringRingState && window.BoxeurSparringRing);
+}
+
 function isLocalOfficialFight() {
   return Boolean(fightState?.careerMeta?.isLocalOfficialFight && sparringRingState && window.BoxeurSparringRing);
 }
 
 function isImmersiveRingFight() {
-  return isRemyRingPrototype() || isLocalOfficialFight();
+  return isRemyRingPrototype() || isTechnicalSparringPrototype() || isLocalOfficialFight();
 }
 
 function immersiveOpponentFirstName() {
@@ -6240,7 +6309,7 @@ function renderSparringRing(view) {
     }
     return;
   }
-  if (isRemyRingPrototype()) configureSparringPlayerImages();
+  if (isRemyRingPrototype() || isTechnicalSparringPrototype()) configureSparringPlayerImages();
 
   const scene = view.status.finished
     ? "after"
@@ -6803,7 +6872,9 @@ function settleV2Sparring(fight, fightFatigue, exposure) {
   }
   runtime.pendingPlannerSparringEntryId = null;
   runtime.weekPlannerSignature = null;
-  state.scheduledFight = null;
+  state.scheduledFight = !isRemy && fight.careerMeta?.deferredScheduledFight
+    ? cloneData(fight.careerMeta.deferredScheduledFight)
+    : null;
   persistV2PreviewCapsule();
   return true;
 }
@@ -6874,8 +6945,8 @@ function finishFight() {
   const journalPrefix = isRecreationalSparring ? "Sparring d’évaluation" : isPracticeSparring ? "Sparring technique" : "Combat amateur";
   const partner = sparringPartnerView();
   const sparringJournal = state.profile.sex === "female"
-    ? `${partner.firstName} termine l’opposition et Rémy confirme que le passage amateur est disponible.`
-    : "Rémy termine son évaluation et confirme que le passage amateur est disponible.";
+    ? `${partner.firstName} termine l’opposition et Rémy confirme ton passage automatique au statut amateur.`
+    : "Rémy termine son évaluation et confirme ton passage automatique au statut amateur.";
   const sparringDebrief = isRecreationalSparring ? buildRemySparringDebrief(fightState) : null;
   if (sparringDebrief) state.remyLesson = sparringDebrief.lesson;
   const sparringSummary = isRecreationalSparring
@@ -6891,7 +6962,10 @@ function finishFight() {
   if (isDeveloperBout) {
     state.scheduledFight = developerBoutScheduledBackup;
     developerBoutScheduledBackup = null;
-  } else if (isV2Sparring) settleV2Sparring(fightState, fightFatigue, exposure);
+  } else if (isV2Sparring) {
+    settleV2Sparring(fightState, fightFatigue, exposure);
+    if (isRecreationalSparring) completeAmateurCareerAfterSparring();
+  }
   else state.scheduledFight = null;
   if (meta.tournamentId && !isDeveloperBout) {
     restoreDeferredGalaAfterTournamentBout();
@@ -6899,20 +6973,21 @@ function finishFight() {
     const weekTransitionEvents = [];
     settleJobAttendance(false, weekTransitionEvents, state.week);
     endWeek(weekTransitionEvents);
+    if (isRecreationalSparring) completeAmateurCareerAfterSparring();
   }
   if (!isV2Sparring && !isDeveloperBout) persistCareer();
   renderFight(`${methodLabel}.`);
   const instruction = document.querySelector("#fight-instruction");
   const debriefTitle = state.profile.sex === "female" ? `Ce que Rémy et ${partner.firstName} veulent te montrer` : "Ce que Rémy veut te montrer";
   const evaluationComplete = state.profile.sex === "female"
-    ? `${partner.firstName} a terminé l’opposition et Rémy donne son feu vert. Tu peux passer amateur maintenant, ou continuer à t’entraîner jusqu’à la semaine 10.`
-    : "Rémy a terminé son évaluation. Tu peux passer amateur maintenant, ou continuer à t’entraîner jusqu’à la semaine 10.";
+    ? `${partner.firstName} a terminé l’opposition et Rémy donne son feu vert. Ton statut amateur est maintenant activé automatiquement.`
+    : "Rémy a terminé son évaluation. Ton statut amateur est maintenant activé automatiquement.";
   const sparringReport = sparringDebrief ? `<section class="sparring-debrief" aria-labelledby="sparring-debrief-title"><h3 id="sparring-debrief-title">${escapeHTML(debriefTitle)}</h3><div><strong>À garder</strong><ul>${sparringDebrief.strengths.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div><div><strong>À essayer au prochain combat</strong><ul>${sparringDebrief.adjustments.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></div></section>` : "";
   instruction.innerHTML = `<p><strong>${escapeHTML(methodLabel)}</strong><br>${isDeveloperBout ? "Test terminé : la carrière, le bilan, les jauges et le calendrier sont restés intacts." : isRecreationalSparring ? escapeHTML(evaluationComplete) : isPracticeSparring ? "Le sparring reste une séance d’apprentissage : aucune victoire ni défaite n’est ajoutée au bilan." : meta.tournamentId ? escapeHTML(tournamentNote || "Le tableau est mis à jour.") : "Expérience, réputation, fatigue et état physique ont été mis à jour."}${injuryEvent ? `<br>${escapeHTML(injuryEvent.trim())}` : ""}</p>${sparringReport}`;
   const closeButton = document.createElement("button");
   closeButton.className = "primary-button";
   closeButton.type = "button";
-  closeButton.textContent = isDeveloperBout ? "Retour au menu test" : meta.tournamentId ? "Retour au tournoi" : isRecreationalSparring ? "Voir le parcours récréatif" : isPracticeSparring ? "Retour au GYM" : "Retour au camp";
+  closeButton.textContent = isDeveloperBout ? "Retour au menu test" : meta.tournamentId ? "Retour au tournoi" : isRecreationalSparring ? "Voir mon passage amateur" : isPracticeSparring ? "Retour au GYM" : "Retour au camp";
   closeButton.addEventListener("click", () => {
     document.querySelector("#fight-dialog").close();
     clearSparringAutoResolve();
@@ -6927,8 +7002,9 @@ function finishFight() {
     } else {
       render();
       if (isNonRecordSparring) {
-        if (isV2Sparring) setTimeout(() => openV2Location("boxing-gym"), 0);
-        else setTimeout(() => document.querySelector("#calendar-dialog")?.showModal(), 0);
+        if (isV2Sparring) {
+          if (!isRecreationalSparring) setTimeout(() => openV2Location("boxing-gym"), 0);
+        } else if (!isRecreationalSparring) setTimeout(() => document.querySelector("#calendar-dialog")?.showModal(), 0);
       }
     }
     if (!isNonRecordSparring && !isDeveloperBout) showCareerAlertOrContinue();
@@ -7003,7 +7079,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   Object.keys(combatLabels).forEach(key => { state.combatStats[key] = BASE_COMBAT_STAT + styles[style].bonuses[key] + draftStats[key]; });
   state.journal = [{ week: 1, text: `${state.profile.firstName} commence au statut récréatif. Choisis un emploi et active le premier mois de GYM pour lancer le parcours.` }];
   render();
-  openV2JobMenu();
+  openV2OnboardingWelcome();
   showToast("Nouvelle carrière lancée · statut récréatif");
 });
 
@@ -7374,10 +7450,6 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     runV2TechnicalSparring();
     return;
   }
-  if (event.target.closest("[data-v2-amateur-transition]")) {
-    beginAmateurCareer();
-    return;
-  }
   if (event.target.closest("[data-v2-open-calendar]")) {
     openCalendarDialog();
     return;
@@ -7422,6 +7494,16 @@ document.querySelector("#job-options").addEventListener("click", event => {
 
 document.querySelector("#job-dialog-close").addEventListener("click", () => closeOptionalDialog("job-dialog"));
 document.querySelector("#job-dialog-cancel").addEventListener("click", () => closeOptionalDialog("job-dialog"));
+document.querySelector("#onboarding-guide-acknowledge")?.addEventListener("click", startV2OnboardingFromWelcome);
+document.querySelector("#onboarding-guide-dialog")?.addEventListener("cancel", event => {
+  event.preventDefault();
+  showToast("Appuie sur « Commencer le parcours » pour choisir ton premier emploi.");
+});
+document.querySelector("#amateur-promotion-acknowledge")?.addEventListener("click", acknowledgeAmateurPromotion);
+document.querySelector("#amateur-promotion-dialog")?.addEventListener("cancel", event => {
+  event.preventDefault();
+  showToast("Appuie sur « Entrer dans le circuit amateur » pour poursuivre.");
+});
 document.querySelector("#job-dialog")?.addEventListener("cancel", event => {
   if (event.currentTarget.dataset.mandatory === "true") {
     event.preventDefault();
@@ -7503,9 +7585,6 @@ document.querySelector("#tournament-recovery-choices").addEventListener("click",
 
 document.querySelector("#pro-transition").addEventListener("click", event => {
   if (event.target.closest("#turn-pro")) turnProfessional();
-});
-document.querySelector("#amateur-transition").addEventListener("click", event => {
-  if (event.target.closest("#turn-amateur")) beginAmateurCareer();
 });
 
 function openCalendarDialog() {

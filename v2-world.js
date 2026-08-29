@@ -88,10 +88,10 @@
       const partner = sparringPartner(career);
       if (!career.jobId && isFirstJobRequired(career)) return { title: "Choisir un emploi", detail: "Ton premier revenu finance le GYM et le début du parcours.", locationId: "work" };
       if (!career.gymWeeks) return { title: "Entrer au GYM de boxe", detail: "Active ton premier abonnement et rencontre le coach.", locationId: "boxing-gym" };
-      if (career.recreationalSparringStatus === "completed") return { title: "Passer amateur", detail: "Rémy « Le Tank » a donné son feu vert. Retourne voir le coach.", locationId: "boxing-gym" };
+      if (career.recreationalSparringStatus === "completed") return { title: "Statut amateur obtenu", detail: "Rémy « Le Tank » a donné son feu vert et le circuit amateur est maintenant ouvert.", locationId: "arena" };
       if (career.recreationalSparringStatus === "ready" || career.scheduledFight?.isRecreationalSparring) return { title: `Sparring avec ${partner.firstName}`, detail: `Le ring est prêt pour ton évaluation pédagogique contre ${partner.displayName}.`, locationId: "boxing-gym" };
-      const progress = Math.max(0, Math.min(10, Number(career.recreationalTrainingWeeks) || 0));
-      return { title: "Bâtir tes bases", detail: `${progress}/10 entraînements possibles. ${partner.firstName} t’évalue à la semaine 6; tu peux rester récréatif jusqu’à la semaine 10.`, locationId: "boxing-gym" };
+      const progress = Math.max(0, Number(career.recreationalTrainingWeeks) || 0);
+      return { title: "Bâtir tes bases", detail: `${progress} entraînement${progress > 1 ? "s" : ""} complété${progress > 1 ? "s" : ""}. ${partner.firstName} t’évalue à la semaine 6; le passage amateur suivra automatiquement.`, locationId: "boxing-gym" };
     }
     if (career.activeTournament) return { title: "Tournoi en cours", detail: "La pesée, le prochain combat et la récupération se gèrent à l’aréna.", locationId: "arena" };
     if (career.scheduledFight) return { title: "Préparer le prochain combat", detail: `Combat prévu à la semaine ${career.scheduledFight.week}.`, locationId: "arena" };
@@ -147,9 +147,6 @@
     if (currentObjective.type === "sparring" && currentLocationId === "boxing-gym") {
       return `Dans le GYM, va au ring et commence le sparring pédagogique avec ${currentObjective.sparringPartner?.firstName || "Rémy"}.`;
     }
-    if (currentObjective.type === "transition" && currentLocationId === "boxing-gym") {
-      return "Dans le GYM, retourne voir l’entraîneur pour confirmer ton passage amateur.";
-    }
     return `Suis les indications de ${destination} pour poursuivre cette étape.`;
   }
 
@@ -194,9 +191,6 @@
     }
     if (currentObjective.type === "sparring" && currentLocationId === "boxing-gym") {
       return `<button class="primary-button" type="button" data-v2-remy-sparring>Faire le sparring pédagogique</button>`;
-    }
-    if (currentObjective.type === "transition" && currentLocationId === "boxing-gym") {
-      return `<button class="primary-button" type="button" data-v2-amateur-transition>Voir l’entraîneur</button>`;
     }
     return "";
   }
@@ -358,23 +352,27 @@
       const status = escapeHTML(locationStatus(location, career));
       return `<button class="v2-map-hotspot" type="button" data-v2-location="${location.id}" aria-label="Entrer : ${escapeHTML(location.label)}. ${status}"><span aria-hidden="true">${location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${status}</small></button>`;
     }).join("");
-    return `<div class="v2-world-layout">
-      <section class="v2-map-panel" aria-labelledby="v2-map-title">
-        <div class="v2-map-heading"><div><p class="eyebrow">Quartier de carrière</p><h2 id="v2-map-title">Que veux-tu planifier cette semaine, ${escapeHTML(firstName)}?</h2></div></div>
-        ${developerTestBanner(career)}
-        <div class="v2-map-canvas">
-          <picture><source media="(max-width: 640px)" srcset="assets/carte-quartier-v2-mobile.jpg"><img src="assets/carte-quartier-v2-desktop.jpg" width="1440" height="810" alt="Carte illustrée du quartier avec la maison, les deux gyms, le lieu de travail et l’aréna" /></picture>
-          <div class="v2-map-hotspots">${hotspots}</div>
-        </div>
-      </section>
+    return `<header class="v2-world-bar">
+      <div class="v2-now-time"><span>Semaine</span><strong>${String(career.week || 1).padStart(2, "0")}</strong><small><span>${escapeHTML(dateLabel)}</span><b class="v2-now-money" aria-label="Argent disponible ${escapeHTML(moneyLabel)}">${escapeHTML(moneyLabel)}</b></small></div>
+    </header>
+    <div class="v2-world-layout">
+      <div class="v2-map-stack">
+        <section class="v2-map-panel" aria-label="Carte du quartier de carrière de ${escapeHTML(firstName)}">
+          <div class="v2-map-heading"><p class="eyebrow">Quartier de carrière</p></div>
+          ${developerTestBanner(career)}
+          <div class="v2-map-canvas">
+            <picture><source media="(max-width: 640px)" srcset="assets/carte-quartier-v2-mobile.jpg"><img src="assets/carte-quartier-v2-desktop.jpg" width="1440" height="810" alt="Carte illustrée du quartier avec la maison, les deux gyms, le lieu de travail et l’aréna" /></picture>
+            <div class="v2-map-hotspots">${hotspots}</div>
+          </div>
+        </section>
+        <nav class="v2-world-nav" aria-label="Navigation principale V2"><button class="active" type="button" data-v2-nav="map">Carte</button><button type="button" data-v2-open-calendar>Calendrier</button><button type="button" data-v2-nav="fighter">Boxeur</button><button type="button" data-v2-nav="inventory">Inventaire</button></nav>
+      </div>
       <aside class="v2-now-panel" aria-label="Situation actuelle">
-        <div class="v2-now-time"><span>Semaine</span><strong>${String(career.week || 1).padStart(2, "0")}</strong><small><span>${escapeHTML(dateLabel)}</span><b class="v2-now-money" aria-label="Argent disponible ${escapeHTML(moneyLabel)}">${escapeHTML(moneyLabel)}</b></small></div>
         ${renderObjectiveCard(currentObjective, "map")}
         <section class="v2-readiness-card ${prep.tone}"><span>État de préparation</span><strong>${escapeHTML(prep.label)}</strong><p>${escapeHTML(prep.detail)}</p><div class="v2-vitals"><span>Énergie <b>${Math.round(career.energy || 0)} %</b></span><span>Fatigue <b>${Math.round(career.fatigue || 0)} %</b></span></div></section>
         <section class="v2-appointment-card"><span>Prochain rendez-vous</span><strong>${escapeHTML(nextAppointment(career))}</strong><button type="button" data-v2-open-calendar>Voir les sept prochains jours</button></section>
       </aside>
     </div>
-    <nav class="v2-world-nav" aria-label="Navigation principale V2"><button class="active" type="button" data-v2-nav="map">Carte</button><button type="button" data-v2-open-calendar>Calendrier</button><button type="button" data-v2-nav="fighter">Boxeur</button><button type="button" data-v2-nav="inventory">Inventaire</button></nav>
     <section class="v2-location-sheet" role="dialog" aria-modal="true" aria-label="Lieu du quartier" tabindex="-1" hidden></section>`;
   }
 

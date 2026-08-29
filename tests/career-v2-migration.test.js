@@ -143,7 +143,7 @@ test("le stimulus actif et sa réserve représentent exactement chaque fraction 
 test("identifie les phases récréative, amateur, tournoi et professionnelle", () => {
   const cases = [
     [{ careerStatus: "recreational" }, "recreational"],
-    [{ careerStatus: "amateur_pending" }, "recreational"],
+    [{ careerStatus: "amateur_pending" }, "amateur"],
     [{ careerStatus: "amateur" }, "amateur"],
     [{ careerStatus: "amateur", activeTournament: { status: "in_progress" } }, "tournament"],
     [{ careerStatus: "professional" }, "professional"],

@@ -172,6 +172,54 @@
       </div>
     </dialog>
 
+    <dialog id="onboarding-guide-dialog" class="service-dialog career-alert-dialog onboarding-guide-dialog" aria-labelledby="onboarding-guide-title">
+      <div class="service-card">
+        <div class="onboarding-welcome-layout">
+          <picture class="onboarding-welcome-visual">
+            <source media="(max-width: 640px)" srcset="assets/accueil-parcours-recreatif-mobile.png">
+            <img src="assets/accueil-parcours-recreatif-desktop.png" width="1672" height="941" alt="Un boxeur entre dans un gym de quartier au coucher du soleil pour commencer son parcours" />
+          </picture>
+          <div class="onboarding-welcome-content">
+            <div class="service-heading"><div><p class="eyebrow">Bienvenue dans le tutoriel</p><h2 id="onboarding-guide-title">Ton parcours récréatif commence</h2></div></div>
+            <p class="service-lead">Ta carrière avance semaine par semaine. Planifie tes activités, vérifie ton programme, puis confirme la semaine pour progresser.</p>
+            <section class="onboarding-guide-callout" aria-labelledby="onboarding-guide-callout-title">
+              <p class="eyebrow">Ton repère principal</p>
+              <h3 id="onboarding-guide-callout-title">Le Guide récréatif</h3>
+              <p>Il t’indiquera toujours la prochaine étape : dans la colonne de droite sur ordinateur et sous la carte sur mobile.</p>
+            </section>
+            <p class="onboarding-guide-next"><strong>Prochaine étape :</strong> choisir ton premier emploi pour financer le début de ton parcours.</p>
+            <div class="service-actions"><button id="onboarding-guide-acknowledge" class="primary-button" type="button">Commencer le parcours</button></div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="amateur-promotion-dialog" class="service-dialog career-alert-dialog onboarding-guide-dialog amateur-promotion-dialog" aria-labelledby="amateur-promotion-title">
+      <div class="service-card">
+        <div class="onboarding-welcome-layout">
+          <picture class="onboarding-welcome-visual amateur-promotion-visual">
+            <source media="(max-width: 640px)" srcset="assets/passage-amateur-mobile.png">
+            <img src="assets/passage-amateur-desktop.png" width="1672" height="941" alt="Un boxeur et son entraîneur regardent le ring amateur qui s’ouvre devant eux après l’évaluation" />
+          </picture>
+          <div class="onboarding-welcome-content">
+            <div class="service-heading"><div><p class="eyebrow">Évaluation réussie</p><h2 id="amateur-promotion-title">Tu es maintenant amateur</h2></div></div>
+            <p class="service-lead">Ton sparring avec Rémy « Le Tank » termine le parcours récréatif. Ton nouveau statut est activé automatiquement.</p>
+            <section class="amateur-promotion-unlocks" aria-labelledby="amateur-promotion-unlocks-title">
+              <p class="eyebrow">Le circuit s’ouvre</p>
+              <h3 id="amateur-promotion-unlocks-title">Tes nouveaux accès</h3>
+              <ul>
+                <li><strong>Calendrier compétitif</strong><span>Galas et tournois amateurs</span></li>
+                <li><strong>Sparring régulier</strong><span>Oppositions au GYM</span></li>
+                <li><strong>Musculation</strong><span>Gym et préparation physique</span></li>
+              </ul>
+            </section>
+            <p class="onboarding-guide-next"><strong>Prochaine étape :</strong> consulter le calendrier et choisir ta première occasion de combattre.</p>
+            <div class="service-actions"><button id="amateur-promotion-acknowledge" class="primary-button" type="button">Entrer dans le circuit amateur</button></div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="membership-dialog" class="service-dialog" aria-labelledby="membership-dialog-title">
       <div class="service-card">
         <div class="service-heading"><div><p class="eyebrow">GYM de boxe</p><h2 id="membership-dialog-title">Choisir un abonnement</h2></div><button id="membership-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
@@ -274,9 +322,9 @@
           <div id="sparring-ring-destinations" class="sparring-ring-destinations" aria-label="Déplacements possibles sur le ring"></div>
           <aside id="sparring-coach-callout" class="sparring-coach-callout" hidden aria-live="polite"></aside>
           <div class="sparring-combat-hud">
-            <div class="sparring-player-energy" role="progressbar" aria-label="Énergie du boxeur" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-player-energy-bar"></span><b aria-hidden="true">ÉNERGIE</b></div>
+            <div class="sparring-player-energy" role="progressbar" aria-label="Énergie du boxeur" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-player-energy-bar"></span><b aria-hidden="true">⚡</b></div>
             <strong id="sparring-round-hud">ROUND 1 / 3</strong>
-            <div class="sparring-opponent-energy" role="progressbar" aria-label="Énergie de l’adversaire" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-opponent-energy-bar"></span></div>
+            <div class="sparring-opponent-energy" role="progressbar" aria-label="Énergie de l’adversaire" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-opponent-energy-bar"></span><b aria-hidden="true">⚡</b></div>
           </div>
           <div id="sparring-perception-hud" class="sparring-perception-hud" role="img" aria-label="Le round semble partagé, lecture très incertaine">
             <div class="sparring-perception-track"></div>

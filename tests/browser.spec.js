@@ -174,7 +174,7 @@ async function chooseExchangeAction(page) {
 }
 
 async function completeFight(page) {
-  const completionButton = page.locator("#fight-instruction button.primary-button").filter({ hasText: /Retour au camp|Retour au tournoi|Retour au GYM|Retour au menu test|Voir le parcours récréatif/ });
+  const completionButton = page.locator("#fight-instruction button.primary-button").filter({ hasText: /Retour au camp|Retour au tournoi|Retour au GYM|Retour au menu test|Voir mon passage amateur/ });
   for (let decision = 0; decision < 30; decision += 1) {
     if (await completionButton.isVisible()) return;
     if (await chooseCoachDirective(page)) continue;
@@ -418,6 +418,8 @@ for (const profile of [
     await openFreshCareer(page);
     const identity = await createCareer(page, { sex: profile.sex });
 
+    await expect(page.locator("#onboarding-guide-dialog")).toBeVisible();
+    await page.locator("#onboarding-guide-acknowledge").click();
     await expect(page.locator("#job-dialog")).toBeVisible();
     await page.locator('[data-select-job="courier"]').click();
     await page.locator('[data-v2-nav="fighter"]').click();
@@ -983,6 +985,7 @@ test("retire le travail, congédie après trois absences puis attend 1 à 3 sema
 test("protège le budget du premier GYM de boxe contre les dépenses de musculation", async ({ page }) => {
   await openFreshCareer(page);
   await createCareer(page, { firstName: "Mia", lastName: "Budget" });
+  await page.locator("#onboarding-guide-acknowledge").click();
   await page.locator('[data-select-job="convenience"]').click();
   let saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state);
   expect(saved.initialGymRequired).toBe(true);
@@ -1276,6 +1279,19 @@ test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.evaluate(() => localStorage.clear());
   await createCareer(page, { firstName: "Guide", lastName: "V2" });
+
+  const guideIntroDialog = page.locator("#onboarding-guide-dialog");
+  await expect(guideIntroDialog).toBeVisible();
+  await expect(guideIntroDialog).toContainText("Ton parcours récréatif commence");
+  await expect(guideIntroDialog).toContainText("Le Guide récréatif");
+  await expect(guideIntroDialog).toContainText("colonne de droite sur ordinateur");
+  await expect(guideIntroDialog).toContainText("choisir ton premier emploi");
+  await expect(guideIntroDialog.locator("picture source")).toHaveAttribute("srcset", "assets/accueil-parcours-recreatif-mobile.png");
+  await expect(guideIntroDialog.locator("picture img")).toHaveAttribute("src", "assets/accueil-parcours-recreatif-desktop.png");
+  await page.keyboard.press("Escape");
+  await expect(guideIntroDialog).toBeVisible();
+  await page.locator("#onboarding-guide-acknowledge").click();
+  await expect(guideIntroDialog).toBeHidden();
 
   const jobDialog = page.locator("#job-dialog");
   await expect(jobDialog).toBeVisible();
@@ -1606,7 +1622,7 @@ test("présente Nadia comme première partenaire de sparring du parcours fémini
   expect(stored.state.recreationalSparringStatus).toBe("completed");
 });
 
-test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis confirme le statut amateur", async ({ page }) => {
+test("joue le sparring interactif de Rémy puis passe automatiquement amateur avec une célébration", async ({ page }) => {
   test.setTimeout(60_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
@@ -1638,6 +1654,7 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
   await expect(page.locator("[data-sparring-move]")).toHaveCount(0);
   await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(5);
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("#sparring-coach-callout")).toBeHidden();
   const mobileMetrics = await page.evaluate(() => ({ body: document.body.scrollWidth, viewport: window.innerWidth }));
   expect(mobileMetrics.body).toBeLessThanOrEqual(mobileMetrics.viewport + 1);
   const mobileChoices = page.locator("#fight-choices [data-fight-action]");
@@ -1661,10 +1678,29 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
   const storedAfterSparring = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
   expect(storedAfterSparring.state.amateurRecord).toEqual({ wins: 0, losses: 0, draws: 0 });
   expect(storedAfterSparring.state.recreationalSparringStatus).toBe("completed");
-  await page.locator("#fight-instruction button.primary-button", { hasText: "Voir le parcours récréatif" }).click();
-  await page.locator('[data-v2-gym-zone="coach"]').click();
-  await expect(page.locator(".v2-gym-menu")).toContainText("Passer amateur");
-  await page.locator("[data-v2-amateur-transition]").click();
+  expect(storedAfterSparring.state.careerStatus).toBe("amateur");
+  expect(storedAfterSparring.state.week).toBe(1);
+  expect(storedAfterSparring.state.amateurPromotionPending).toBe(true);
+  await expect(page.locator("#fight-instruction")).toContainText("activé automatiquement");
+  await page.locator("#fight-instruction button.primary-button", { hasText: "Voir mon passage amateur" }).click();
+
+  const promotionDialog = page.locator("#amateur-promotion-dialog");
+  await expect(promotionDialog).toBeVisible();
+  await expect(promotionDialog).toContainText("Tu es maintenant amateur");
+  await expect(promotionDialog).toContainText("Rémy « Le Tank »");
+  await expect(promotionDialog).toContainText("Calendrier compétitif");
+  await expect(promotionDialog).toContainText("Sparring régulier");
+  await expect(promotionDialog).toContainText("Musculation");
+  await expect(promotionDialog.locator("picture source")).toHaveAttribute("srcset", "assets/passage-amateur-mobile.png");
+  await expect(promotionDialog.locator("picture img")).toHaveAttribute("src", "assets/passage-amateur-desktop.png");
+  await expect.poll(() => promotionDialog.locator("picture img").evaluate(image => image.currentSrc)).toContain("passage-amateur-mobile.png");
+  await page.keyboard.press("Escape");
+  await expect(promotionDialog).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect.poll(() => promotionDialog.locator("picture img").evaluate(image => image.currentSrc)).toContain("passage-amateur-desktop.png");
+  await page.locator("#amateur-promotion-acknowledge").click();
+  await expect(promotionDialog).toBeHidden();
+  await expect(page.locator("[data-v2-amateur-transition], #turn-amateur")).toHaveCount(0);
 
   await expect(page.locator("#v2-world")).toBeVisible();
   await expect(page.locator(".v2-now-panel > .v2-onboarding-card")).toHaveCount(0);
@@ -1673,22 +1709,39 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
   expect(storedAmateur.state.careerStatus).toBe("amateur");
   expect(storedAmateur.state.week).toBe(1);
   expect(storedAmateur.state.amateurRecord).toEqual({ wins: 0, losses: 0, draws: 0 });
+  expect(storedAmateur.state.amateurPromotionPending).toBe(false);
 
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
-  await page.locator('[data-v2-gym-zone="ring"]').click();
+  const amateurSparringHotspot = page.locator('[data-v2-gym-zone="ring"]');
+  await expect(amateurSparringHotspot).toContainText("Sparring");
+  await expect(amateurSparringHotspot).toContainText("−18 énergie");
+  const beforePractice = await page.evaluate(() => {
+    const capsule = JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview"));
+    return {
+      timeState: capsule.timeState,
+      capacity: BoxeurWeekPlanner.previewPlan(capsule.previewRuntime.weekPlanner).capacity,
+    };
+  });
+  await amateurSparringHotspot.click();
   await expect(page.locator('[data-v2-sparring-activity="cta"]')).toBeEnabled();
+  await expect(page.locator('[data-v2-sparring-activity="cta"]')).toContainText("Participer au sparring · −18 énergie");
   await page.locator('[data-v2-sparring-activity="cta"]').click();
-  await expect(page.locator("#fight-dialog")).not.toBeVisible();
-  await page.locator('[data-v2-gym-zone="ring"]').click();
-  await expect(page.locator('[data-v2-sparring-activity="cta"]')).toContainText("Retirer de ma semaine");
-  let plannedPractice = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")));
-  expect(plannedPractice.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "sparring" && !entry.metadata?.completed)).toBe(true);
-  const beforePracticeTime = plannedPractice.timeState;
-  await page.locator("[data-v2-gym-menu-close]").click();
-  await page.locator("[data-v2-leave-gym]").click();
-  await confirmWeekFromLauncher(page);
   await expect(page.locator("#fight-dialog")).toBeVisible();
+  await expect(page.locator("#fight-dialog")).toHaveClass(/sparring-ring-prototype/);
   await expect(page.locator("#fight-week-label")).toContainText("Sparring technique");
+  const chargedPractice = await page.evaluate(() => {
+    const capsule = JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview"));
+    return {
+      entry: capsule.previewRuntime.weekPlanner.entries.find(entry => entry.activityId === "sparring"),
+      capacity: BoxeurWeekPlanner.previewPlan(capsule.previewRuntime.weekPlanner).capacity,
+    };
+  });
+  expect(chargedPractice.entry.capacityCost).toBe(18);
+  expect(chargedPractice.entry.metadata.immediate).toBe(true);
+  expect(chargedPractice.entry.metadata.completed).toBe(false);
+  expect(chargedPractice.capacity.remaining).toBe(beforePractice.capacity.remaining - 18);
+  await chooseCoachDirective(page);
+  await expect(page.locator("#fight-choices [data-fight-action]")).toHaveCount(5);
   await completeFight(page);
   await expect(page.locator("#fight-score-label")).toHaveText("Sparring non comptabilisé");
   await expect(page.locator("#fight-instruction")).toContainText("aucune victoire ni défaite");
@@ -1700,17 +1753,107 @@ test("joue le sparring interactif de Rémy en V2 sans modifier le bilan puis con
   }));
   expect(afterPractice.career.state.amateurRecord).toEqual({ wins: 0, losses: 0, draws: 0 });
   expect(afterPractice.capsule.timeState.history.some(event => event.activityCategory === "sparring")).toBe(true);
-  expect(afterPractice.capsule.timeState.clock.absoluteSlot).toBeGreaterThan(beforePracticeTime.clock.absoluteSlot);
-  expect(afterPractice.capsule.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "sparring" && entry.metadata?.completed)).toBe(true);
+  expect(afterPractice.capsule.timeState.clock.absoluteSlot).toBeGreaterThan(beforePractice.timeState.clock.absoluteSlot);
+  const completedPractice = afterPractice.capsule.previewRuntime.weekPlanner.entries.find(entry => entry.activityId === "sparring");
+  expect(completedPractice.metadata.completed).toBe(true);
+  expect(completedPractice.metadata.immediate).toBe(true);
+  await expect(page.locator('.v2-place-week-plan li', { hasText: "Sparring technique interactif" })).toContainText("Déjà joué");
+  await expect(page.locator('.v2-place-week-plan li', { hasText: "Sparring technique interactif" }).locator("button")).toHaveCount(0);
+  await expect(page.locator('[data-v2-gym-zone="ring"]')).toBeDisabled();
 
   await page.locator("[data-v2-leave-gym]").click();
   await confirmWeekFromLauncher(page);
   await expect(page.locator(".v2-week-summary")).toBeVisible();
+  await expect(page.locator("#fight-dialog")).not.toBeVisible();
   afterPractice = await page.evaluate(() => ({
     career: JSON.parse(localStorage.getItem("boxeur-deux-career-v2")),
     capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-v2-v2-preview")),
   }));
   expect(afterPractice.career.state.week).toBe(2);
+});
+
+test("promeut aussi automatiquement après le sparring lancé depuis le calendrier", async ({ page }) => {
+  test.setTimeout(45_000);
+  await page.route("https://fonts.googleapis.com/**", route => route.abort());
+  await page.route("https://fonts.gstatic.com/**", route => route.abort());
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  await page.evaluate(value => {
+    localStorage.clear();
+    localStorage.setItem("boxeur-deux-career-v2", JSON.stringify(value));
+  }, recreationalReadySnapshot());
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+
+  await page.locator("[data-v2-open-calendar]").first().click();
+  await expect(page.locator("#start-fight")).toBeVisible();
+  await page.locator("#start-fight").click();
+  await expect(page.locator("#fight-dialog")).toBeVisible();
+  await expect(page.locator("#fight-coach-choices [data-coach-option]").first()).toBeVisible();
+  await completeFight(page);
+  await expect(page.locator("#fight-instruction")).toContainText("activé automatiquement");
+
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
+  expect(stored.state.careerStatus).toBe("amateur");
+  expect(stored.state.week).toBe(1);
+  expect(stored.state.amateurPromotionPending).toBe(true);
+  await page.locator("#fight-instruction button.primary-button", { hasText: "Voir mon passage amateur" }).click();
+  await expect(page.locator("#amateur-promotion-dialog")).toBeVisible();
+});
+
+test("bloque le sparring amateur pendant un combat, exige 18 énergie et préserve un combat futur", async ({ page }) => {
+  test.setTimeout(45_000);
+  const officialFight = week => ({
+    id: `combat-officiel-semaine-${week}`,
+    opponent: {
+      id: `adversaire-officiel-${week}`,
+      name: "Thomas Leclerc",
+      nickname: "Béton",
+      style: "Technicien",
+      record: "1 V · 1 D",
+      difficulty: 36,
+      rating: 36,
+      stats: { technique: 36, power: 34, cardio: 37, defense: 37 },
+    },
+    tournamentId: null,
+    week,
+    travelApplied: true,
+    travelEffects: { energy: 0, fatigue: 0 },
+    fightSeed: `combat-officiel-${week}`,
+  });
+
+  await openStoredCareer(page, amateurSnapshot({ gymWeeks: 4, scheduledFight: officialFight(1) }));
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  const currentFightRing = page.locator('[data-v2-gym-zone="ring"]');
+  await expect(currentFightRing).toBeDisabled();
+  await expect(currentFightRing).toContainText("Sparring");
+  await expect(currentFightRing).toHaveAccessibleName(/Semaine de combat/);
+
+  await openStoredCareer(page, amateurSnapshot({
+    gymWeeks: 4,
+    jobId: "office",
+    energy: 10,
+    fatigue: 90,
+  }));
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  const lowCapacityRing = page.locator('[data-v2-gym-zone="ring"]');
+  await expect(lowCapacityRing).toBeDisabled();
+  await expect(lowCapacityRing).toHaveAccessibleName(/Énergie insuffisante|capacité hebdomadaire restante est insuffisante/i);
+
+  const futureFight = officialFight(3);
+  await openStoredCareer(page, amateurSnapshot({ gymWeeks: 4, scheduledFight: futureFight }));
+  const storedFutureFightBeforeSparring = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")).state.scheduledFight);
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
+  const futureFightRing = page.locator('[data-v2-gym-zone="ring"]');
+  await expect(futureFightRing).toBeEnabled();
+  await futureFightRing.click();
+  await page.locator('[data-v2-sparring-activity="cta"]').click();
+  await expect(page.locator("#fight-dialog")).toBeVisible();
+  await completeFight(page);
+  await page.locator("#fight-instruction button.primary-button", { hasText: "Retour au GYM" }).click();
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-v2")));
+  expect(stored.state.scheduledFight.id).toBe(storedFutureFightBeforeSparring.id);
+  expect(stored.state.scheduledFight.opponent.name).toBe(storedFutureFightBeforeSparring.opponent.name);
+  expect(stored.state.scheduledFight.week).toBe(3);
 });
 
 test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegarde compatible", async ({ page }) => {
@@ -1734,16 +1877,19 @@ test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegar
   await expect(page.locator("#v2-world")).toBeVisible();
   await expect(page.locator("#v2-world .v2-map-hotspot")).toHaveCount(5);
   await expect(page.locator("#v2-world .v2-map-canvas > picture > img")).toHaveJSProperty("complete", true);
-  await expect(page.locator("#v2-world h2").first()).toContainText("Carte");
+  await expect(page.locator("#v2-world .v2-map-panel")).toHaveAttribute("aria-label", /Carte/);
   await expect(page.locator("#game > .topbar")).toBeHidden();
   const desktopMap = await page.locator(".v2-map-canvas").boundingBox();
   expect(desktopMap.width / desktopMap.height).toBeGreaterThan(1.6);
   const desktopMapHotspotAppearance = await page.locator(".v2-map-hotspot").first().evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     borderStyle: getComputedStyle(element).borderStyle,
+    markerContent: getComputedStyle(element, "::after").content,
   }));
-  expect(desktopMapHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.56)");
+  expect(desktopMapHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.28)");
   expect(desktopMapHotspotAppearance.borderStyle).toBe("dashed");
+  expect(desktopMapHotspotAppearance.markerContent).toBe("none");
+  await expect(page.locator(".v2-world-bar")).toHaveCSS("position", "relative");
   const gymOpener = page.getByRole("button", { name: /Entrer : GYM de boxe/ }).first();
   await gymOpener.click();
   const locationSheet = page.locator(".v2-location-sheet");

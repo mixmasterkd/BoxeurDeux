@@ -17,7 +17,6 @@
   const KIND = "boxeur-deux-v2-onboarding";
   const SCHEMA_VERSION = 1;
   const REMY_WEEK = 6;
-  const MAX_RECREATIONAL_WEEK = 10;
   const MAX_HISTORY = 100;
   const MODES = Object.freeze(["guided", "exempt", "complete"]);
   const EVENT_TYPES = Object.freeze({
@@ -31,7 +30,6 @@
     COMPLETE_TRAINING_WEEK: "complete-training-week",
     CLOSE_WEEK: "close-week",
     COMPLETE_REMY_SPARRING: "complete-remy-sparring",
-    PASS_AMATEUR: "pass-amateur",
   });
 
   const OBJECTIVES = deepFreeze([
@@ -142,7 +140,8 @@
   }
 
   function normalizeCareerStatus(value) {
-    if (["recreational", "amateur_pending", "amateur", "professional"].includes(value)) return value;
+    if (value === "amateur_pending") return "amateur";
+    if (["recreational", "amateur", "professional"].includes(value)) return value;
     return "amateur";
   }
 
@@ -165,7 +164,7 @@
   }
 
   function remyStatusFor(state) {
-    if (state.careerStatus === "amateur_pending" || state.remyStatus === "completed") return "completed";
+    if (["amateur", "professional"].includes(state.careerStatus) || state.remyStatus === "completed") return "completed";
     const prerequisitesMet = state.initialJob.selected && state.initialGym.purchased;
     return state.mode === "guided" && prerequisitesMet && state.week >= state.remyWeek ? "ready" : "training";
   }
@@ -178,7 +177,7 @@
   function normalizeState(source = {}, options = {}) {
     const canonical = isOnboardingState(source);
     const raw = canonical ? source : careerFrom(source);
-    const careerStatus = normalizeCareerStatus(raw.careerStatus);
+    let careerStatus = normalizeCareerStatus(raw.careerStatus);
     const week = boundedInteger(raw.week, 1, 1, 99999);
     const jobId = canonical
       ? cleanId(raw.initialJob && raw.initialJob.currentJobId)
@@ -229,7 +228,12 @@
       : membershipWeeks > 0 || raw.initialGymRequired === false;
     const firstWeekClosed = canonical ? raw.firstWeekClosed === true : week > 1;
     const suppliedRemyStatus = canonical ? raw.remyStatus : raw.recreationalSparringStatus;
-    const remyCompleted = careerStatus === "amateur_pending" || suppliedRemyStatus === "completed";
+    const remyCompleted = ["amateur", "professional"].includes(careerStatus) || suppliedRemyStatus === "completed";
+    if (careerStatus === "recreational" && remyCompleted) {
+      careerStatus = "amateur";
+      mode = "complete";
+      exemptionReason = null;
+    }
 
     const state = {
       kind: KIND,
@@ -238,13 +242,7 @@
       exemptionReason,
       careerStatus,
       week,
-      remyWeek: boundedInteger(canonical ? raw.remyWeek : options.remyWeek, REMY_WEEK, 1, MAX_RECREATIONAL_WEEK),
-      maxRecreationalWeek: boundedInteger(
-        canonical ? raw.maxRecreationalWeek : options.maxRecreationalWeek,
-        MAX_RECREATIONAL_WEEK,
-        REMY_WEEK,
-        52,
-      ),
+      remyWeek: boundedInteger(canonical ? raw.remyWeek : options.remyWeek, REMY_WEEK, 1, 52),
       initialJob: {
         required: canonical ? Boolean(raw.initialJob && raw.initialJob.required) : explicitInitialJobRequirement,
         selected,
@@ -261,7 +259,7 @@
         canonical ? raw.trainingWeeks : raw.recreationalTrainingWeeks,
         0,
         0,
-        MAX_RECREATIONAL_WEEK,
+        999,
       ),
       remyStatus: remyCompleted ? "completed" : suppliedRemyStatus === "ready" ? "ready" : "training",
       completedObjectiveIds: normalizeCompletedObjectives(raw.completedObjectiveIds),
@@ -292,7 +290,6 @@
         leaveJob: state.initialJob.currentJobId ? open : denied("NO_ACTIVE_JOB", "Aucun emploi actif."),
         closeWeek: open,
         remySparring: open,
-        passAmateur: open,
         fullCalendar: open,
         strengthGym: open,
         fullSparring: open,
@@ -307,14 +304,11 @@
     else if (missingMembership) closeWeek = denied("INITIAL_MEMBERSHIP_REQUIRED", "Active le premier abonnement au GYM de boxe avant de continuer.");
     else if (state.week >= state.remyWeek && state.remyStatus !== "completed") {
       closeWeek = denied("REMY_SPARRING_REQUIRED", "Le sparring pédagogique d’évaluation doit être terminé avant de poursuivre.");
-    } else if (state.week >= state.maxRecreationalWeek) {
-      closeWeek = denied("AMATEUR_TRANSITION_REQUIRED", "La semaine 10 termine le parcours récréatif : confirme maintenant le passage amateur.");
     }
 
     const remyReady = !missingJob && !missingMembership
       && state.week >= state.remyWeek
       && state.remyStatus !== "completed";
-    const amateurReady = state.remyStatus === "completed" && state.week >= state.remyWeek;
     return {
       tutorialActive: true,
       jobSelection: {
@@ -337,12 +331,9 @@
         : state.remyStatus === "completed"
           ? denied("REMY_ALREADY_COMPLETED", "Le sparring pédagogique est déjà terminé.")
           : denied("REMY_NOT_READY", `Le sparring d’évaluation est réservé pour la semaine ${state.remyWeek}.`),
-      passAmateur: amateurReady
-        ? allowed("Le passage amateur est disponible et doit rester une confirmation explicite.")
-        : denied("REMY_REQUIRED_FOR_AMATEUR", "Termine d’abord le sparring pédagogique d’évaluation."),
-      fullCalendar: denied("AMATEUR_STATUS_REQUIRED", "Le calendrier complet se débloque après la confirmation du passage amateur."),
-      strengthGym: denied("AMATEUR_STATUS_REQUIRED", "Le gym de musculation se débloque après la confirmation du passage amateur."),
-      fullSparring: denied("AMATEUR_STATUS_REQUIRED", "Le sparring régulier se débloque après le sparring d’évaluation et le passage amateur."),
+      fullCalendar: denied("AMATEUR_STATUS_REQUIRED", "Le calendrier complet se débloque automatiquement après le sparring d’évaluation."),
+      strengthGym: denied("AMATEUR_STATUS_REQUIRED", "Le gym de musculation se débloque automatiquement après le sparring d’évaluation."),
+      fullSparring: denied("AMATEUR_STATUS_REQUIRED", "Le sparring régulier se débloque automatiquement après le sparring d’évaluation."),
       groupClasses: allowed("Les cours de groupe sont disponibles seulement pendant le parcours récréatif."),
     };
   }
@@ -370,16 +361,6 @@
     }
     if (state.week >= state.remyWeek && state.remyStatus !== "completed") {
       return { id: "remy-sparring", type: "sparring", title: "Sparring d’évaluation", detail: "Une évaluation pédagogique interactive, sans gagnant ni défaite au bilan.", locationId: "boxing-gym", required: true };
-    }
-    if (state.remyStatus === "completed") {
-      const required = state.week >= state.maxRecreationalWeek;
-      return {
-        id: "pass-amateur", type: "transition", title: "Passer amateur",
-        detail: required
-          ? "La semaine 10 est terminée : confirme le passage amateur pour poursuivre."
-          : `Tu peux confirmer maintenant ou continuer le parcours récréatif jusqu’à la semaine ${state.maxRecreationalWeek}.`,
-        locationId: "boxing-gym", required,
-      };
     }
     const objective = objectiveForWeek(state);
     if (objective) return { ...clone(objective), type: "objective", required: false };
@@ -414,7 +395,6 @@
       case EVENT_TYPES.COMPLETE_TRAINING_WEEK: return allowed();
       case EVENT_TYPES.CLOSE_WEEK: return gates.closeWeek;
       case EVENT_TYPES.COMPLETE_REMY_SPARRING: return gates.remySparring;
-      case EVENT_TYPES.PASS_AMATEUR: return gates.passAmateur;
       default: return denied("UNKNOWN_ONBOARDING_EVENT", `Événement de tutoriel inconnu : ${event.type || "vide"}.`);
     }
   }
@@ -477,7 +457,7 @@
         break;
       }
       case EVENT_TYPES.COMPLETE_TRAINING_WEEK:
-        next.trainingWeeks = Math.min(next.maxRecreationalWeek, next.trainingWeeks + 1);
+        next.trainingWeeks = Math.min(999, next.trainingWeeks + 1);
         appendHistory(next, event.type);
         break;
       case EVENT_TYPES.CLOSE_WEEK:
@@ -487,9 +467,6 @@
         break;
       case EVENT_TYPES.COMPLETE_REMY_SPARRING:
         next.remyStatus = "completed";
-        appendHistory(next, event.type);
-        break;
-      case EVENT_TYPES.PASS_AMATEUR:
         next.careerStatus = "amateur";
         next.mode = "complete";
         next.exemptionReason = null;
@@ -507,7 +484,6 @@
     KIND,
     SCHEMA_VERSION,
     REMY_WEEK,
-    MAX_RECREATIONAL_WEEK,
     MODES,
     EVENT_TYPES,
     OBJECTIVES,

@@ -83,7 +83,7 @@
       && !["completed", "cancelled", "withdrawn"].includes(String(activeTournament.status || "").toLowerCase());
     if (tournamentActive) return "tournament";
     if (career.careerStatus === "professional") return "professional";
-    if (career.careerStatus === "recreational" || career.careerStatus === "amateur_pending") return "recreational";
+    if (career.careerStatus === "recreational") return "recreational";
     return "amateur";
   }
 

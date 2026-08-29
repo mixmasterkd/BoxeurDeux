@@ -142,6 +142,10 @@
         available: sparring.available !== false,
         reason: sparring.reason || "",
         planned: sparring.planned === true,
+        completed: sparring.completed === true,
+        immediate: sparring.immediate === true,
+        fightWeek: sparring.fightWeek === true,
+        cost: wholeNumber(sparring.cost, 18, 0, 100),
       },
       selectedExercises: Array.isArray(raw.selectedExercises)
         ? raw.selectedExercises.filter((id, index, list) => EXERCISES.some(exercise => exercise.id === id) && list.indexOf(id) === index).slice(0, EXERCISES.length)
@@ -158,10 +162,10 @@
       return {
         available: false,
         status: remyCompleted ? "transition" : "locked",
-        label: remyCompleted ? "Passage amateur requis" : "Verrouillé pendant le parcours récréatif",
+        label: remyCompleted ? "Passage amateur automatique" : "Verrouillé pendant le parcours récréatif",
         detail: remyCompleted
-          ? "Rémy a donné son feu vert. Confirme maintenant ton passage amateur auprès de l’entraîneur."
-          : `Complète d’abord le sparring pédagogique avec ${partner.displayName}, puis confirme ton passage amateur.`,
+          ? "Rémy a donné son feu vert. Le circuit amateur est en cours d’ouverture."
+          : `Complète d’abord le sparring pédagogique avec ${partner.displayName}; le statut amateur sera ensuite activé automatiquement.`,
       };
     }
     if (!context.membership.active) {
@@ -180,12 +184,38 @@
         detail: context.condition.trainingBlockedReason,
       };
     }
+    if (context.sparring.fightWeek) {
+      return {
+        available: false,
+        status: "fight-week",
+        label: "Semaine de combat",
+        detail: context.sparring.reason || "Le sparring est indisponible pendant une semaine de combat officiel.",
+      };
+    }
+    if (context.sparring.completed) {
+      return {
+        available: false,
+        status: "completed",
+        label: "Déjà fait cette semaine",
+        detail: `Les ${context.sparring.cost} points d’énergie hebdomadaire ont déjà été consommés.`,
+      };
+    }
     if (!context.sparring.available) {
       return {
         available: false,
         status: "capacity",
-        label: "Programme hebdomadaire complet",
-        detail: context.sparring.reason || "Libère de l’énergie dans ton programme avant d’ajouter un sparring.",
+        label: context.sparring.immediate ? "Énergie insuffisante" : "Programme hebdomadaire complet",
+        detail: context.sparring.reason || `Il faut ${context.sparring.cost} points d’énergie disponibles pour participer au sparring.`,
+      };
+    }
+    if (context.sparring.immediate) {
+      return {
+        available: true,
+        status: context.sparring.planned ? "planned" : "available",
+        label: context.sparring.planned ? "Énergie déjà consommée" : "Prêt à monter sur le ring",
+        detail: context.sparring.planned
+          ? "Reprends le sparring sans nouveau coût d’énergie."
+          : `${context.sparring.cost} points d’énergie hebdomadaire seront consommés immédiatement.`,
       };
     }
     return {
@@ -201,9 +231,13 @@
   function renderSparringCard(context) {
     const sparring = sparringState(context);
     const disabled = sparring.available ? "" : " disabled aria-disabled=\"true\" aria-describedby=\"v2-gym-sparring-reason\"";
-    const buttonLabel = sparring.available
-      ? context.sparring.planned ? "Retirer de ma semaine" : "Ajouter à ma semaine"
-      : "Sparring verrouillé";
+    const buttonLabel = context.sparring.immediate
+      ? sparring.available
+        ? context.sparring.planned ? "Reprendre le sparring" : `Participer au sparring · −${context.sparring.cost} énergie`
+        : context.sparring.completed ? "Sparring terminé" : "Sparring verrouillé"
+      : sparring.available
+        ? context.sparring.planned ? "Retirer de ma semaine" : "Ajouter à ma semaine"
+        : "Sparring verrouillé";
     return `<article class="v2-gym-sparring-card v2-gym-action-card ${sparring.available ? "available" : "locked"}" id="v2-gym-sparring-card" data-v2-sparring-state="${sparring.status}" aria-labelledby="v2-gym-sparring-title" tabindex="-1">
       <p class="eyebrow">Activité distincte</p>
       <h3 id="v2-gym-sparring-title">Sparring</h3>
@@ -259,20 +293,6 @@
     </article>`;
   }
 
-  function renderAmateurTransitionCard(context) {
-    if (context.careerStatus !== "recreational" || context.recreational.remyStatus !== "completed") return "";
-    const partner = context.recreational.partner;
-    const evaluation = partner.firstName === "Rémy"
-      ? "Ton évaluation avec Rémy est terminée."
-      : `Ton opposition avec ${partner.firstName} est terminée et Rémy a donné son feu vert.`;
-    return `<article class="v2-gym-action-card recommended" aria-labelledby="v2-gym-amateur-transition-title">
-      <div class="v2-gym-action-heading"><span>Parcours terminé</span><small>Rémy a donné son feu vert</small></div>
-      <h3 id="v2-gym-amateur-transition-title">Passer amateur</h3>
-      <p>${escapeHTML(evaluation)} Confirme ton passage amateur avec l’entraîneur.</p>
-      <button type="button" class="primary-button" data-v2-amateur-transition>Confirmer le passage amateur</button>
-    </article>`;
-  }
-
   function renderMenu(menuId, rawContext) {
     const context = normalizeContext(rawContext);
     const id = String(menuId || "");
@@ -283,12 +303,13 @@
       return `<section class="v2-gym-menu" aria-labelledby="v2-gym-menu-title">
         <header><div><p class="eyebrow">GYM de boxe</p><h2 id="v2-gym-menu-title">Voir l’entraîneur</h2></div><button type="button" class="secondary-button" data-v2-gym-menu-close>Retour au GYM</button></header>
         <p>${escapeHTML(description)}</p>
-        <div class="v2-gym-menu-actions">${renderAmateurTransitionCard(context)}${renderCoachCard(context)}${renderPrivateTrainerCard(context)}</div>
+        <div class="v2-gym-menu-actions">${renderCoachCard(context)}${renderPrivateTrainerCard(context)}</div>
       </section>`;
     }
     if (id === "ring") {
+      const title = context.sparring.immediate ? "Sparring" : "Ring";
       return `<section class="v2-gym-menu" aria-labelledby="v2-gym-menu-title">
-        <header><div><p class="eyebrow">GYM de boxe</p><h2 id="v2-gym-menu-title">Ring</h2></div><button type="button" class="secondary-button" data-v2-gym-menu-close>Retour au GYM</button></header>
+        <header><div><p class="eyebrow">GYM de boxe</p><h2 id="v2-gym-menu-title">${title}</h2></div><button type="button" class="secondary-button" data-v2-gym-menu-close>Retour au GYM</button></header>
         <p>Le sparring est une activité distincte : il ne fait jamais partie d’une séance personnalisée.</p>
         <div class="v2-gym-menu-actions">${renderSparringCard(context)}</div>
       </section>`;
@@ -319,8 +340,18 @@
         display.detail = remyReady
           ? `Sparring pédagogique avec ${context.recreational.partner.firstName}`
           : context.recreational.remyStatus === "completed"
-            ? "Passe amateur avec l’entraîneur"
+            ? "Passage amateur automatique"
             : `Débloqué avec ${context.recreational.partner.firstName}`;
+      }
+      if (isRing && context.sparring.immediate) {
+        display.label = "Sparring";
+        display.detail = context.sparring.completed
+          ? "Déjà fait cette semaine"
+          : context.sparring.planned
+            ? "Reprendre · énergie déjà consommée"
+            : sparring.available
+              ? `Participer maintenant · −${context.sparring.cost} énergie`
+              : sparring.label;
       }
       const disabled = sparringBlocked
         ? " disabled aria-disabled=\"true\""

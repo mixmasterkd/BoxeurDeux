@@ -48,12 +48,12 @@ test("guide le parcours récréatif sans masquer les étapes obligatoires", () =
     locationId: "work",
   });
   assert.equal(world.objective(baseCareer({ gymWeeks: 0 })).title, "Entrer au GYM de boxe");
-  assert.match(world.objective(baseCareer({ recreationalTrainingWeeks: 4 })).detail, /4\/10 entraînements/);
+  assert.match(world.objective(baseCareer({ recreationalTrainingWeeks: 4 })).detail, /4 entraînements complétés/);
   assert.equal(world.objective(baseCareer({ recreationalSparringStatus: "ready" })).title, "Sparring avec Rémy");
   assert.equal(world.objective(baseCareer({
     scheduledFight: { isRecreationalSparring: true },
   })).title, "Sparring avec Rémy");
-  assert.equal(world.objective(baseCareer({ recreationalSparringStatus: "completed" })).title, "Passer amateur");
+  assert.equal(world.objective(baseCareer({ recreationalSparringStatus: "completed" })).title, "Statut amateur obtenu");
 });
 
 test("donne priorité à l'étape déterministe du nouveau tutoriel", () => {

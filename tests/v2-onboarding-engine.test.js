@@ -38,7 +38,7 @@ test("expose le moteur pur en CommonJS et sur globalThis", () => {
   assert.equal(onboarding.KIND, "boxeur-deux-v2-onboarding");
   assert.equal(onboarding.SCHEMA_VERSION, 1);
   assert.equal(onboarding.REMY_WEEK, 6);
-  assert.equal(onboarding.MAX_RECREATIONAL_WEEK, 10);
+  assert.equal(onboarding.EVENT_TYPES.PASS_AMATEUR, undefined);
   assert.equal(Object.isFrozen(onboarding), true);
   assert.equal(Object.isFrozen(onboarding.OBJECTIVES), true);
 });
@@ -161,34 +161,26 @@ test("Rémy devient un rendez-vous obligatoire à la semaine 6 sans quota d'entr
 
   state = onboarding.applyEvent(state, E.COMPLETE_REMY_SPARRING);
   assert.equal(state.remyStatus, "completed");
-  assert.equal(onboarding.getCurrentStep(state).id, "pass-amateur");
-  assert.equal(onboarding.getCurrentStep(state).required, false);
-  assert.equal(onboarding.getGates(state).passAmateur.allowed, true);
+  assert.equal(state.careerStatus, "amateur");
+  assert.equal(state.mode, "complete");
+  assert.equal(onboarding.getCurrentStep(state).id, "onboarding-complete");
+  assert.equal(onboarding.getGates(state).fullCalendar.allowed, true);
 });
 
-test("le joueur peut rester récréatif après Rémy, mais pas dépasser la semaine 10", () => {
-  let state = advanceToWeek(completeInitialChoices(), 6);
-  state = onboarding.applyEvent(state, E.COMPLETE_REMY_SPARRING);
-  state = advanceToWeek(state, 10);
-
-  const step = onboarding.getCurrentStep(state);
-  assert.equal(step.id, "pass-amateur");
-  assert.equal(step.required, true);
-  assert.equal(onboarding.getGates(state).closeWeek.code, "AMATEUR_TRANSITION_REQUIRED");
-  assert.throws(
-    () => onboarding.applyEvent(state, E.CLOSE_WEEK),
-    error => error.code === "AMATEUR_TRANSITION_REQUIRED",
-  );
-});
-
-test("le passage amateur demeure explicite et ouvre les systèmes amateurs", () => {
-  let state = advanceToWeek(completeInitialChoices(), 6);
-  state = onboarding.applyEvent(state, E.COMPLETE_REMY_SPARRING);
-  const before = structuredClone(state);
-  state = onboarding.applyEvent(state, E.PASS_AMATEUR);
+test("une ancienne sauvegarde ayant terminé Rémy est promue automatiquement", () => {
+  const state = onboarding.normalizeState({
+    ...freshCareer({
+      week: 8,
+      jobId: "convenience",
+      jobsHeldCount: 1,
+      introJobRequired: false,
+      gymWeeks: 2,
+      initialGymRequired: false,
+      recreationalSparringStatus: "completed",
+    }),
+  });
   const gates = onboarding.getGates(state);
 
-  assert.equal(before.careerStatus, "recreational");
   assert.equal(state.careerStatus, "amateur");
   assert.equal(state.mode, "complete");
   assert.equal(onboarding.getCurrentStep(state).id, "onboarding-complete");

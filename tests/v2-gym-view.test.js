@@ -107,27 +107,31 @@ test("retire la tuile de parcours récréatif et route Rémy par le ring", () =>
   assert.match(amateurCoachMenu, /data-v2-boxing-trainer/);
 });
 
-test("sépare le sparring des séances et le verrouille jusqu’après Rémy et le passage amateur", () => {
+test("sépare le sparring des séances et retire toute confirmation manuelle après Rémy", () => {
   const beforeRemy = gymView.render(baseContext({
-    recreational: { trainingWeeks: 4, targetWeeks: 10, remyStatus: "locked" },
+    recreational: { trainingWeeks: 4, targetWeeks: 6, remyStatus: "locked" },
   }));
   const afterRemy = gymView.render(baseContext({
-    recreational: { trainingWeeks: 6, targetWeeks: 10, remyStatus: "completed" },
+    recreational: { trainingWeeks: 6, targetWeeks: 6, remyStatus: "completed" },
   }));
   const afterRemyCoach = gymView.renderMenu("coach", baseContext({
-    recreational: { trainingWeeks: 6, targetWeeks: 10, remyStatus: "completed" },
+    recreational: { trainingWeeks: 6, targetWeeks: 6, remyStatus: "completed" },
   }));
-  const amateur = gymView.renderMenu("ring", baseContext({ careerStatus: "amateur" }));
+  const amateurContext = baseContext({ careerStatus: "amateur", sparring: { immediate: true, cost: 18 } });
+  const amateur = gymView.renderMenu("ring", amateurContext);
+  const amateurGym = gymView.render(amateurContext);
 
   assert.match(beforeRemy, /data-v2-gym-zone="ring"[^>]+disabled/);
   assert.match(beforeRemy, /sparring pédagogique avec Rémy/);
   assert.doesNotMatch(beforeRemy, /data-v2-sparring-activity="cta"/);
-  assert.match(afterRemy, /Passe amateur avec l’entraîneur/);
+  assert.match(afterRemy, /Passage amateur automatique/);
   assert.doesNotMatch(afterRemy, /data-v2-sparring-activity="cta"/);
-  assert.match(afterRemyCoach, /data-v2-amateur-transition/);
+  assert.doesNotMatch(afterRemyCoach, /data-v2-amateur-transition|Passer amateur|Confirmer le passage amateur/);
   assert.match(amateur, /data-v2-sparring-state="available"/);
   assert.match(amateur, /activité distincte/);
   assert.match(amateur, /data-v2-sparring-activity="cta"(?![^>]+disabled)/);
+  assert.match(amateur, /Participer au sparring · −18 énergie/);
+  assert.match(amateurGym, /data-v2-gym-zone="ring"[^>]*><strong>Sparring<\/strong><small>Participer maintenant · −18 énergie<\/small>/);
   assert.doesNotMatch(amateur, /Cours de groupe/);
 });
 
@@ -151,6 +155,36 @@ test("rend le CTA de sparring dans son menu et explique chaque blocage", () => {
   assert.match(medicalBlocked, /data-v2-sparring-state="unavailable"/);
   assert.match(medicalBlocked, /Repos médical obligatoire/);
   assert.match(medicalBlocked, /data-v2-sparring-activity="cta"[^>]+aria-disabled="true"[^>]+aria-describedby="v2-gym-sparring-reason"/);
+});
+
+test("présente le sparring amateur immédiat comme non rejouable et le bloque en semaine de combat", () => {
+  const resumed = gymView.renderMenu("ring", baseContext({
+    careerStatus: "amateur",
+    sparring: { available: true, planned: true, immediate: true, cost: 18 },
+  }));
+  const completed = gymView.renderMenu("ring", baseContext({
+    careerStatus: "amateur",
+    sparring: { available: false, completed: true, immediate: true, cost: 18 },
+  }));
+  const fightWeek = gymView.renderMenu("ring", baseContext({
+    careerStatus: "amateur",
+    sparring: {
+      available: false,
+      immediate: true,
+      fightWeek: true,
+      cost: 18,
+      reason: "Le sparring n’est pas disponible pendant une semaine de combat officiel.",
+    },
+  }));
+
+  assert.match(resumed, /Énergie déjà consommée/);
+  assert.match(resumed, />Reprendre le sparring<\/button>/);
+  assert.match(completed, /data-v2-sparring-state="completed"/);
+  assert.match(completed, /18 points d’énergie hebdomadaire ont déjà été consommés/);
+  assert.match(completed, />Sparring terminé<\/button>/);
+  assert.match(fightWeek, /data-v2-sparring-state="fight-week"/);
+  assert.match(fightWeek, /Semaine de combat/);
+  assert.match(fightWeek, /semaine de combat officiel/);
 });
 
 test("rend l’inscription incontournable et explique les activités verrouillées", () => {
