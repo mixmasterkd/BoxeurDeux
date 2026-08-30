@@ -1,0 +1,856 @@
+/* Gym de musculation : décor interactif, menus secondaires et boutique. */
+
+.career-location-sheet.career-location-sheet-strength {
+  place-items: stretch end;
+  padding: 0;
+  overflow: hidden;
+}
+
+.career-strength-view,
+.career-strength-menu,
+.career-strength-shop,
+.career-strength-result {
+  --strength-surface: rgba(23, 27, 24, .97);
+  --strength-surface-soft: rgba(31, 37, 32, .94);
+  --strength-border: rgba(255, 255, 255, .15);
+  --strength-muted: #c5c1b8;
+  --strength-green: #85c99b;
+  --strength-gold: #ddb65e;
+  color: var(--ink, #f4f0e7);
+}
+
+.career-strength-view *,
+.career-strength-menu *,
+.career-strength-shop *,
+.career-strength-result * {
+  box-sizing: border-box;
+}
+
+.career-strength-view button,
+.career-strength-menu button,
+.career-strength-shop button,
+.career-strength-result button {
+  min-height: 44px;
+}
+
+.career-strength-view button:focus-visible,
+.career-strength-menu button:focus-visible,
+.career-strength-shop button:focus-visible,
+.career-strength-result button:focus-visible {
+  outline: 3px solid #ffe7a9;
+  outline-offset: 3px;
+}
+
+.career-strength-view.career-place-view,
+.career-strength-shop.career-place-view {
+  background:
+    radial-gradient(circle at 6% 0%, rgba(79, 139, 102, .16), transparent 29rem),
+    radial-gradient(circle at 100% 40%, rgba(221, 182, 94, .1), transparent 34rem),
+    #0c100d;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .54);
+}
+
+.career-strength-header h2 {
+  text-wrap: balance;
+}
+
+.career-strength-scene picture,
+.career-strength-shop-scene picture {
+  display: block;
+  width: 100%;
+}
+
+.career-strength-scene img,
+.career-strength-shop-scene img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1672 / 941;
+  object-fit: cover;
+}
+
+.career-strength-hotspots,
+.career-supplement-hotspots {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.career-strength-hotspot,
+.career-supplement-hotspot {
+  position: absolute;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  width: clamp(124px, 15vw, 184px);
+  min-height: 52px;
+  padding: 7px 9px;
+  border: 1px dashed rgba(255, 255, 255, .64);
+  border-radius: 12px;
+  color: #fff;
+  background: rgba(12, 15, 13, .28);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .32);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  opacity: .82;
+  pointer-events: auto;
+  cursor: pointer;
+  text-align: left;
+  transition: opacity .16s ease, border-color .16s ease, background-color .16s ease, transform .16s ease;
+}
+
+.career-strength-hotspot > span,
+.career-supplement-hotspot > span {
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, .52);
+  border-radius: 50%;
+  color: #fff1bd;
+  background: rgba(0, 0, 0, .22);
+  font: 800 .78rem/1 "Barlow Condensed", sans-serif;
+}
+
+.career-strength-hotspot > strong,
+.career-supplement-hotspot > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: 800 .76rem/1 "Barlow Condensed", sans-serif;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+.career-strength-hotspot > small,
+.career-supplement-hotspot > small,
+.career-supplement-hotspot > em {
+  min-width: 0;
+  color: rgba(255, 255, 255, .82);
+  font-size: .52rem;
+  font-style: normal;
+  line-height: 1.2;
+}
+
+.career-supplement-hotspot > em {
+  grid-column: 2;
+  color: #ffd2a3;
+}
+
+.career-strength-hotspot:not(:disabled):hover,
+.career-supplement-hotspot:not(:disabled):hover {
+  border-color: rgba(255, 231, 169, .94);
+  background: rgba(35, 43, 37, .46);
+  opacity: 1;
+  transform: translateY(-2px);
+}
+
+.career-strength-hotspot.locked,
+.career-supplement-hotspot.locked {
+  border-color: rgba(255, 255, 255, .42);
+  background: rgba(12, 15, 13, .28);
+  opacity: .68;
+  cursor: not-allowed;
+  filter: saturate(.65);
+}
+
+.career-strength-hotspot.zone-reception { left: 5%; top: 70%; }
+.career-strength-hotspot.zone-crossfit { left: 24%; top: 13%; }
+.career-strength-hotspot.zone-program { left: 43%; top: 46%; }
+.career-strength-hotspot.zone-trainer { left: 63%; top: 69%; }
+.career-strength-hotspot.zone-shop { right: 3%; top: 29%; }
+
+.career-strength-dashboard {
+  max-height: calc(100dvh - clamp(110px, 13vh, 150px));
+  padding-right: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: rgba(133, 201, 155, .5) transparent;
+}
+
+.career-strength-access {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-left: 4px solid var(--strength-gold);
+}
+
+.career-strength-access.active { border-left-color: var(--strength-green); }
+.career-strength-access.medical-blocked { border-left-color: var(--red, #e3513d); }
+
+.career-strength-access > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .06);
+}
+
+.career-strength-access strong,
+.career-strength-access p {
+  display: block;
+  margin: 0;
+}
+
+.career-strength-access > div:nth-child(2) > strong {
+  font: 800 1rem/1 "Barlow Condensed", sans-serif;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+.career-strength-access p {
+  margin-top: 4px;
+  color: var(--strength-muted);
+  font-size: .67rem;
+  line-height: 1.35;
+}
+
+.career-strength-condition-values {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.career-strength-condition-values > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  color: var(--strength-muted);
+  background: rgba(255, 255, 255, .05);
+  font-size: .65rem;
+}
+
+.career-strength-condition-values strong { color: #d9f3e2; }
+
+.career-strength-membership-summary h3,
+.career-strength-membership-summary p {
+  margin: 0;
+}
+
+.career-strength-membership-summary h3 {
+  margin-top: 3px;
+  font: 800 1.15rem/1 "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+}
+
+.career-strength-membership-summary > p:not(.eyebrow) {
+  margin-top: 7px;
+  color: var(--strength-muted);
+  font-size: .66rem;
+  line-height: 1.4;
+}
+
+.career-strength-membership-summary dl {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0 0;
+}
+
+.career-strength-membership-summary dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  font-size: .64rem;
+}
+
+.career-strength-membership-summary dt { color: var(--strength-muted); }
+.career-strength-membership-summary dd { margin: 0; text-align: right; }
+
+.career-strength-week-plan {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(92, 172, 255, .27);
+  border-radius: 13px;
+  background: rgba(18, 24, 21, .94);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .2);
+}
+
+.career-strength-week-plan h3,
+.career-strength-week-plan p { margin: 0; }
+
+.career-strength-week-plan h3 {
+  margin-top: 3px;
+  font: 800 1.12rem/1 "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+}
+
+.career-strength-week-plan ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.career-strength-week-plan li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+}
+
+.career-strength-week-plan li > span { display: grid; gap: 2px; min-width: 0; }
+.career-strength-week-plan li strong { overflow-wrap: anywhere; font-size: .69rem; }
+.career-strength-week-plan li small,
+.career-strength-week-plan li em {
+  color: #bbb7ae;
+  font-size: .59rem;
+  font-style: normal;
+}
+
+.career-strength-week-plan button { flex: 0 0 auto; padding: 7px 10px; }
+
+.career-strength-plan-empty {
+  padding: 9px 10px;
+  border: 1px dashed rgba(255, 255, 255, .17);
+  border-radius: 9px;
+  color: var(--strength-muted);
+  background: rgba(255, 255, 255, .025);
+  font-size: .64rem;
+  line-height: 1.4;
+}
+
+/* Menus secondaires */
+.career-strength-menu {
+  width: min(1540px, 100%);
+  min-width: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin-left: auto;
+  padding: clamp(14px, 2vw, 28px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-left: 1px solid var(--strength-border);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(91, 151, 118, .15), transparent 31rem),
+    radial-gradient(circle at 100% 35%, rgba(221, 182, 94, .1), transparent 34rem),
+    #0e110f;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .52);
+}
+
+.career-strength-menu-header {
+  position: sticky;
+  top: calc(0px - clamp(14px, 2vw, 28px));
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: calc(0px - clamp(14px, 2vw, 28px)) calc(0px - clamp(14px, 2vw, 28px)) 14px;
+  padding: clamp(14px, 2vw, 28px);
+  border-bottom: 1px solid var(--strength-border);
+  background: rgba(14, 17, 15, .93);
+  -webkit-backdrop-filter: blur(11px);
+  backdrop-filter: blur(11px);
+}
+
+.career-strength-menu-header h2,
+.career-strength-menu-header p { margin: 0; }
+
+.career-strength-menu-header h2 {
+  font-size: clamp(1.65rem, 3vw, 2.7rem);
+  line-height: .98;
+}
+
+.career-strength-menu-header > div > p:last-child {
+  margin-top: 6px;
+  color: var(--strength-muted);
+  font-size: .67rem;
+}
+
+.career-strength-reception-layout,
+.career-strength-crossfit-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, .65fr) minmax(0, 1.35fr);
+  align-items: start;
+  gap: clamp(12px, 2vw, 24px);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.career-strength-reception-intro,
+.career-strength-crossfit-card,
+.career-strength-membership,
+.career-strength-catalogue,
+.career-strength-selection {
+  min-width: 0;
+  padding: clamp(14px, 2vw, 20px);
+  border: 1px solid var(--strength-border);
+  border-radius: 15px;
+  background: var(--strength-surface);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .23);
+}
+
+.career-strength-reception-intro {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  border-color: rgba(221, 182, 94, .34);
+  background: linear-gradient(145deg, rgba(221, 182, 94, .14), rgba(24, 28, 25, .97));
+}
+
+.career-strength-reception-intro > span,
+.career-strength-crossfit-mark {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(255, 231, 169, .6);
+  border-radius: 14px;
+  color: #ffe7a9;
+  background: rgba(221, 182, 94, .12);
+  font: 900 1.1rem/1 "Barlow Condensed", sans-serif;
+}
+
+.career-strength-reception-intro h3,
+.career-strength-reception-intro p,
+.career-strength-crossfit-card h3,
+.career-strength-crossfit-card p { margin: 0; }
+
+.career-strength-reception-intro h3,
+.career-strength-crossfit-card h3 {
+  margin-top: 3px;
+  font: 800 1.35rem/1 "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+}
+
+.career-strength-reception-intro p:not(.eyebrow),
+.career-strength-crossfit-card p:not(.eyebrow) {
+  margin-top: 8px;
+  color: var(--strength-muted);
+  font-size: .72rem;
+  line-height: 1.5;
+}
+
+.career-strength-membership > header,
+.career-strength-catalogue > header,
+.career-strength-selection > header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.career-strength-membership h3,
+.career-strength-membership p,
+.career-strength-catalogue h3,
+.career-strength-catalogue p,
+.career-strength-selection h3 { margin: 0; }
+
+.career-strength-membership-current {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .055);
+}
+
+.career-strength-membership-current.active { box-shadow: inset 3px 0 0 var(--strength-green); }
+.career-strength-membership-current strong,
+.career-strength-membership-current p { display: block; margin: 0; }
+.career-strength-membership-current p { margin-top: 3px; color: var(--strength-muted); font-size: .65rem; }
+
+.career-strength-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.career-strength-plan {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, .11);
+  border-radius: 11px;
+  background: rgba(0, 0, 0, .17);
+}
+
+.career-strength-plan > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.career-strength-plan > div span { font-size: .72rem; }
+.career-strength-plan > div strong { color: #c7f1d5; font-size: 1.08rem; }
+.career-strength-plan p { flex: 1 1 auto; margin: 8px 0; color: var(--strength-muted); font-size: .66rem; line-height: 1.4; }
+.career-strength-plan > span { color: #ead18f; font-size: .6rem; }
+.career-strength-plan > button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(255, 255, 255, .07);
+}
+.career-strength-plan.available > button { color: #07160d; background: var(--strength-green); cursor: pointer; }
+.career-strength-plan-reason { display: block; margin-top: 6px; color: #ffcf9b; font-size: .58rem; line-height: 1.35; }
+
+.career-strength-crossfit-layout { grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); }
+.career-strength-crossfit-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; border-color: rgba(133, 201, 155, .36); }
+.career-strength-crossfit-card ul { margin: 13px 0; padding-left: 18px; color: #d8d4cc; font-size: .69rem; line-height: 1.6; }
+.career-strength-crossfit-card button { width: min(100%, 360px); }
+.career-strength-menu-reason { display: block; margin-top: 8px; color: #ffcf9b; font-size: .64rem; }
+
+/* Compositeur libre */
+.career-strength-mobile-summary { display: none; }
+
+.career-strength-program-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(315px, 380px);
+  align-items: start;
+  gap: clamp(12px, 1.8vw, 24px);
+}
+
+.career-strength-program-sidebar {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.career-strength-catalogue > header > p {
+  max-width: 420px;
+  color: var(--strength-muted);
+  font-size: .7rem;
+  text-align: right;
+}
+
+.career-strength-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.career-strength-activity {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 12px;
+  background: rgba(10, 13, 11, .63);
+  transition: border-color .16s ease, background-color .16s ease, transform .16s ease;
+}
+
+.career-strength-activity.selected {
+  border-color: rgba(133, 201, 155, .72);
+  background: rgba(55, 100, 73, .22);
+  box-shadow: inset 4px 0 0 var(--strength-green);
+}
+
+.career-strength-activity.unavailable:not(.selected) { opacity: .66; }
+.career-strength-activity:not(.unavailable):hover { border-color: rgba(255, 231, 169, .56); transform: translateY(-1px); }
+
+.career-strength-activity-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 9px;
+  color: #ffe7a9;
+  background: rgba(255, 255, 255, .06);
+  font: 800 1rem/1 "Barlow Condensed", sans-serif;
+}
+
+.career-strength-activity-copy { min-width: 0; }
+.career-strength-activity h4,
+.career-strength-activity p,
+.career-strength-activity small { margin: 0; }
+.career-strength-activity h4 { overflow-wrap: anywhere; font: 800 1rem/1 "Barlow Condensed", sans-serif; }
+.career-strength-activity p { margin-top: 4px; color: var(--strength-muted); font-size: .66rem; line-height: 1.35; }
+
+.career-strength-activity > button {
+  min-width: 70px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(255, 255, 255, .07);
+  cursor: pointer;
+}
+
+.career-strength-activity.selected > button { color: #06160c; background: var(--strength-green); }
+.career-strength-activity > button:disabled { cursor: not-allowed; }
+
+.career-strength-activity-costs,
+.career-strength-stimuli {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.career-strength-activity-costs span,
+.career-strength-activity-costs strong,
+.career-strength-stimuli span {
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-size: .57rem;
+  line-height: 1.2;
+}
+
+.career-strength-activity-costs span,
+.career-strength-stimuli span { color: #d9d6cf; background: rgba(255, 255, 255, .07); }
+.career-strength-activity-costs strong { color: #c7f1d5; background: rgba(83, 157, 107, .18); }
+.career-strength-stimuli b { font-weight: 700; }
+
+.career-strength-tradeoff,
+.career-strength-activity-reason { display: block; margin-top: 7px !important; font-size: .58rem; line-height: 1.35; }
+.career-strength-tradeoff { color: #bdbab3; }
+.career-strength-activity-reason { color: #ffcf9b; }
+
+.career-strength-selection {
+  position: sticky;
+  top: 92px;
+  z-index: 2;
+  border-color: rgba(133, 201, 155, .28);
+}
+
+.career-strength-selection > header > strong { flex: 0 0 auto; color: #c7f1d5; }
+.career-strength-selection ol { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.career-strength-selection li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, .055); font-size: .69rem; }
+.career-strength-selection li > button { min-height: 36px; border: 0; color: #ffd1c8; background: transparent; cursor: pointer; }
+.career-strength-selection-empty { margin: 0; padding: 12px; border: 1px dashed rgba(255, 255, 255, .2); border-radius: 9px; color: var(--strength-muted); font-size: .7rem; line-height: 1.4; }
+
+.career-strength-projection { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.career-strength-projection > div { display: grid; gap: 3px; padding: 8px; border-radius: 8px; background: rgba(255, 255, 255, .06); }
+.career-strength-projection span,
+.career-strength-total-stimuli > span { color: var(--strength-muted); font-size: .56rem; text-transform: uppercase; }
+.career-strength-projection strong { font-size: .82rem; }
+.career-strength-total-stimuli { display: grid; gap: 6px; margin-top: 10px; padding: 9px; border-radius: 9px; background: rgba(0, 0, 0, .18); }
+.career-strength-total-stimuli > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.career-strength-total-stimuli span:not(.empty) { padding: 3px 6px; border-radius: 999px; background: rgba(133, 201, 155, .12); font-size: .58rem; }
+.career-strength-warnings { display: grid; gap: 4px; margin: 10px 0 0; padding: 8px 8px 8px 24px; border-left: 3px solid var(--strength-gold); border-radius: 7px; color: #ffe1ab; background: rgba(221, 182, 94, .09); font-size: .65rem; }
+.career-strength-confirm-reason { min-height: 1.1em; margin: 9px 0 7px; color: var(--strength-muted); font-size: .63rem; }
+.career-strength-selection > .primary-button { width: 100%; }
+.career-strength-selection > .primary-button:disabled,
+.career-strength-mobile-summary > .primary-button:disabled { opacity: .46; cursor: not-allowed; filter: saturate(.35); }
+
+/* Boutique */
+.career-supplement-hotspot.product-protein-bar { left: 4%; bottom: 7%; }
+.career-supplement-hotspot.product-sports-drink { left: 5%; top: 28%; }
+.career-supplement-hotspot.product-protein-shake { left: 41%; top: 28%; }
+.career-supplement-hotspot.product-preworkout { right: 5%; top: 33%; }
+
+.career-strength-shop-dashboard h3,
+.career-strength-shop-dashboard p { margin: 0; }
+.career-strength-shop-dashboard h3 { margin-top: 3px; font: 800 1.2rem/1 "Barlow Condensed", sans-serif; text-transform: uppercase; }
+.career-strength-shop-dashboard p:not(.eyebrow) { margin-top: 8px; color: var(--strength-muted); font-size: .68rem; line-height: 1.45; }
+.career-strength-shop-inventory { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.career-strength-shop-inventory li { display: flex; justify-content: space-between; gap: 8px; padding: 7px 8px; border-radius: 8px; background: rgba(255, 255, 255, .05); font-size: .67rem; }
+.career-strength-shop-inventory strong { color: #c7f1d5; }
+
+/* Bilan conservé pour les flux existants. */
+.career-strength-result {
+  width: min(660px, calc(100% - 24px));
+  max-height: min(760px, calc(100dvh - 24px));
+  padding: clamp(18px, 4vw, 30px);
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 16px;
+  background: #151916;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .55);
+}
+
+.career-strength-result h2,
+.career-strength-result p { margin-top: 0; }
+.career-strength-result-activities,
+.career-strength-result-changes { display: grid; gap: 6px; margin: 12px 0; padding: 0; list-style: none; }
+.career-strength-result-activities li,
+.career-strength-result-changes li { padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, .06); }
+.career-strength-result-changes li { display: flex; justify-content: space-between; gap: 10px; }
+.career-strength-result-changes li.positive { box-shadow: inset 3px 0 0 var(--strength-green); }
+.career-strength-result-changes li.warning,
+.career-strength-result-changes li.critical { box-shadow: inset 3px 0 0 var(--red, #e3513d); }
+.career-strength-result > div:last-child { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+@media (max-width: 1120px) {
+  .career-strength-program-layout { grid-template-columns: minmax(0, 1fr) minmax(290px, 330px); }
+  .career-strength-activity-grid { grid-template-columns: minmax(0, 1fr); }
+  .career-strength-hotspot > small { display: none; }
+  .career-strength-hotspot { grid-template-rows: auto; }
+  .career-strength-hotspot > span { grid-row: 1; }
+}
+
+@media (max-width: 980px) {
+  .career-strength-dashboard,
+  .career-strength-shop-dashboard {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .career-strength-reception-layout,
+  .career-strength-crossfit-layout,
+  .career-strength-program-layout { grid-template-columns: minmax(0, 1fr); }
+
+  .career-strength-selection { position: static; }
+  .career-strength-program-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .career-location-sheet.career-location-sheet-strength { place-items: stretch; }
+
+  .career-strength-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .career-strength-shop-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .career-strength-view.career-place-view,
+  .career-strength-shop.career-place-view {
+    padding-bottom: max(82px, env(safe-area-inset-bottom));
+  }
+
+  .career-strength-scene img,
+  .career-strength-shop-scene img {
+    aspect-ratio: 941 / 1672;
+  }
+
+  .career-strength-hotspot,
+  .career-supplement-hotspot {
+    grid-template-columns: 31px minmax(0, 1fr);
+    width: min(138px, 41%);
+    min-height: 48px;
+    padding: 6px 7px;
+    opacity: .86;
+  }
+
+  .career-strength-hotspot > span,
+  .career-supplement-hotspot > span { width: 31px; height: 31px; }
+  .career-strength-hotspot > strong,
+  .career-supplement-hotspot > strong { font-size: .67rem; }
+  .career-strength-hotspot > small,
+  .career-supplement-hotspot > small,
+  .career-supplement-hotspot > em { display: none; }
+
+  .career-strength-hotspot.zone-crossfit { left: 4%; top: 12%; }
+  .career-strength-hotspot.zone-program { right: 4%; left: auto; top: 33%; }
+  .career-strength-hotspot.zone-trainer { left: 4%; top: 57%; }
+  .career-strength-hotspot.zone-shop { right: 4%; top: 68%; }
+  .career-strength-hotspot.zone-reception { left: 28%; top: 82%; }
+
+  .career-supplement-hotspot.product-sports-drink { left: 3%; top: 27%; }
+  .career-supplement-hotspot.product-protein-shake { right: 3%; left: auto; top: 39%; }
+  .career-supplement-hotspot.product-preworkout { right: 3%; top: 57%; }
+  .career-supplement-hotspot.product-protein-bar { left: 5%; bottom: 11%; }
+
+  .career-strength-menu {
+    width: 100%;
+    padding: max(9px, env(safe-area-inset-top)) 8px max(82px, env(safe-area-inset-bottom));
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .career-strength-menu-header {
+    top: calc(0px - max(9px, env(safe-area-inset-top)));
+    align-items: flex-start;
+    gap: 8px;
+    margin: calc(0px - max(9px, env(safe-area-inset-top))) -8px 8px;
+    padding: max(9px, env(safe-area-inset-top)) 8px 8px;
+  }
+
+  .career-strength-menu-header h2 { max-width: 62vw; font-size: clamp(1.25rem, 6vw, 1.65rem); }
+  .career-strength-menu-header > div > p:last-child { max-width: 58vw; font-size: .56rem; }
+  .career-strength-menu-header > button { max-width: 108px; padding: 7px 9px; font-size: .62rem; line-height: 1.2; }
+
+  .career-strength-reception-layout,
+  .career-strength-crossfit-layout { gap: 8px; }
+  .career-strength-reception-intro,
+  .career-strength-crossfit-card,
+  .career-strength-membership,
+  .career-strength-catalogue,
+  .career-strength-selection { padding: 13px; border-radius: 11px; }
+  .career-strength-reception-intro,
+  .career-strength-crossfit-card { grid-template-columns: minmax(0, 1fr); }
+  .career-strength-reception-intro > span,
+  .career-strength-crossfit-mark { width: 44px; height: 44px; }
+
+  .career-strength-plan-grid {
+    display: flex;
+    gap: 8px;
+    padding-bottom: 4px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  .career-strength-plan { flex: 0 0 min(76vw, 270px); scroll-snap-align: start; }
+
+  .career-strength-mobile-summary {
+    position: sticky;
+    top: 78px;
+    z-index: 7;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 9px 10px;
+    border: 1px solid rgba(133, 201, 155, .46);
+    border-radius: 11px;
+    background: rgba(18, 24, 20, .96);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .32);
+  }
+
+  .career-strength-mobile-summary > span { display: grid; min-width: 0; }
+  .career-strength-mobile-summary small { color: var(--strength-muted); font-size: .65rem; }
+  .career-strength-mobile-summary > button { flex: 0 0 auto; min-width: 104px; }
+
+  .career-strength-program-sidebar { grid-template-columns: minmax(0, 1fr); }
+  .career-strength-catalogue > header,
+  .career-strength-membership > header { display: grid; align-items: start; }
+  .career-strength-catalogue > header > p { max-width: none; text-align: left; }
+  .career-strength-activity-grid { grid-template-columns: minmax(0, 1fr); }
+  .career-strength-activity { grid-template-columns: 34px minmax(0, 1fr); }
+  .career-strength-activity-icon { width: 34px; height: 34px; }
+  .career-strength-activity > button { grid-column: 1 / -1; width: 100%; }
+  .career-strength-projection { grid-template-columns: minmax(0, 1fr); }
+  .career-strength-week-plan li { align-items: stretch; flex-wrap: wrap; }
+  .career-strength-week-plan button { width: 100%; }
+  .career-strength-result > div:last-child { position: sticky; bottom: 0; display: grid; padding-top: 10px; background: #151916; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .career-strength-view *,
+  .career-strength-view *::before,
+  .career-strength-view *::after,
+  .career-strength-menu *,
+  .career-strength-menu *::before,
+  .career-strength-menu *::after,
+  .career-strength-shop *,
+  .career-strength-shop *::before,
+  .career-strength-shop *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .001ms !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

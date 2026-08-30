@@ -9,15 +9,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="v2-world.css" />
-    <link rel="stylesheet" href="v2-gym.css" />
-    <link rel="stylesheet" href="v2-strength.css" />
-    <link rel="stylesheet" href="v2-home.css" />
-    <link rel="stylesheet" href="v2-work.css" />
-    <link rel="stylesheet" href="v2-place.css" />
-    <link rel="stylesheet" href="v2-week.css" />
-    <link rel="stylesheet" href="v2-fighter.css" />
-    <link rel="stylesheet" href="v2-inventory.css" />
+    <link rel="stylesheet" href="world.css" />
+    <link rel="stylesheet" href="gym.css" />
+    <link rel="stylesheet" href="strength.css" />
+    <link rel="stylesheet" href="home.css" />
+    <link rel="stylesheet" href="work.css" />
+    <link rel="stylesheet" href="place.css" />
+    <link rel="stylesheet" href="week.css" />
+    <link rel="stylesheet" href="fighter.css" />
+    <link rel="stylesheet" href="inventory.css" />
   </head>
   <body>
     <section id="creation-screen" class="creation-screen" aria-labelledby="creation-title">
@@ -95,7 +95,7 @@
     </dialog>
 
     <main id="game" class="game-shell hidden">
-      <section id="v2-world" class="v2-world" hidden aria-label="Carte de carrière"></section>
+      <section id="career-world" class="career-world" hidden aria-label="Carte de carrière"></section>
     </main>
 
     <dialog id="division-migration-dialog" class="service-dialog migration-dialog" aria-labelledby="division-migration-title">
@@ -235,7 +235,7 @@
         <div class="service-heading">
           <div><p id="calendar-dialog-eyebrow" class="eyebrow">Saison amateur</p><h2 id="calendar-title">Calendrier des galas et tournois</h2></div>
         </div>
-        <div id="v2-calendar-navigation" class="v2-calendar-navigation"></div>
+        <div id="career-calendar-navigation" class="career-calendar-navigation"></div>
         <div class="calendar-heading-meta"><span id="calendar-date-label">Septembre · semaine 1</span><span id="amateur-fight-count">0 combat disputé</span></div>
         <p id="calendar-dialog-lead" class="calendar-lead">Les événements sont annoncés quelques semaines à l’avance. Lorsqu’ils ont lieu le même soir, il faut choisir.</p>
         <section id="recreational-path" class="recreational-path" hidden aria-live="polite"></section>
@@ -407,30 +407,30 @@
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="v2-balance-engine.js"></script>
+    <script src="balance-engine.js"></script>
     <script src="career-calendar.js"></script>
     <script src="tournament-engine.js"></script>
     <script src="combat-engine.js"></script>
     <script src="sparring-ring-engine.js"></script>
     <script src="career-time-engine.js"></script>
-    <script src="career-v2-migration.js"></script>
-    <script src="v2-onboarding-engine.js"></script>
-    <script src="v2-progression-engine.js"></script>
-    <script src="v2-trainer-engine.js"></script>
-    <script src="v2-supplement-engine.js"></script>
-    <script src="v2-training-engine.js"></script>
-    <script src="v2-strength-engine.js"></script>
-    <script src="v2-recovery-engine.js"></script>
-    <script src="v2-week-planner-engine.js"></script>
-    <script src="v2-week-engine.js"></script>
-    <script src="v2-gym-view.js"></script>
-    <script src="v2-strength-view.js"></script>
-    <script src="v2-home-view.js"></script>
-    <script src="v2-work-view.js"></script>
-    <script src="v2-week-view.js"></script>
-    <script src="v2-fighter-view.js"></script>
-    <script src="v2-inventory-view.js"></script>
-    <script src="v2-world.js"></script>
+    <script src="career-migration.js"></script>
+    <script src="onboarding-engine.js"></script>
+    <script src="progression-engine.js"></script>
+    <script src="trainer-engine.js"></script>
+    <script src="supplement-engine.js"></script>
+    <script src="training-engine.js"></script>
+    <script src="strength-engine.js"></script>
+    <script src="recovery-engine.js"></script>
+    <script src="week-planner-engine.js"></script>
+    <script src="week-engine.js"></script>
+    <script src="gym-view.js"></script>
+    <script src="strength-view.js"></script>
+    <script src="home-view.js"></script>
+    <script src="work-view.js"></script>
+    <script src="week-view.js"></script>
+    <script src="fighter-view.js"></script>
+    <script src="inventory-view.js"></script>
+    <script src="world.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

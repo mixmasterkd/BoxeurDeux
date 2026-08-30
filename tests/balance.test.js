@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const combat = require("../combat-engine.js");
-const balance = require("../v2-balance-engine.js");
+const balance = require("../balance-engine.js");
 
 // Banc de non-régression statistique. Sa graine et sa taille sont fixes par
 // défaut, mais BALANCE_SAMPLES permet une campagne plus longue en CI sans

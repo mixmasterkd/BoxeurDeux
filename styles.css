@@ -690,8 +690,8 @@ h2 { font-size: 1.65rem; }
 .calendar-dialog::backdrop { background: rgba(0,0,0,.78); backdrop-filter: blur(5px); }
 .calendar-dialog-card { max-height: calc(100dvh - 24px); padding: 26px 26px max(106px, calc(90px + env(safe-area-inset-bottom))); overflow-y: auto; border: 1px solid var(--line); border-top: 4px solid var(--red); background: #171917; }
 .calendar-dialog-card > .calendar-heading-meta { margin: 12px 0 4px; text-align: left; }
-.v2-calendar-navigation { margin: 0; padding: 0; }
-.v2-calendar-navigation > .v2-world-nav { position: fixed; right: 50%; bottom: max(12px, env(safe-area-inset-bottom)); left: auto; z-index: 70; width: min(720px, calc(100% - 28px)); transform: translateX(50%); }
+.career-calendar-navigation { margin: 0; padding: 0; }
+.career-calendar-navigation > .career-world-nav { position: fixed; right: 50%; bottom: max(12px, env(safe-area-inset-bottom)); left: auto; z-index: 70; width: min(720px, calc(100% - 28px)); transform: translateX(50%); }
 .recreational-path { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .75fr); gap: 16px; margin-bottom: 16px; padding: 18px; border: 1px solid var(--gold); background: linear-gradient(145deg, rgba(221,182,94,.1), #111311 65%); }
 .recreational-path[hidden] { display: none; }
 .recreational-path strong { display: block; color: var(--gold); font: 800 1.45rem "Barlow Condensed"; text-transform: uppercase; }
@@ -704,12 +704,12 @@ h2 { font-size: 1.65rem; }
 @media (max-width: 760px) {
   .calendar-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
   .calendar-dialog-card { max-height: calc(100dvh - 12px); padding: 16px 12px max(92px, calc(78px + env(safe-area-inset-bottom))); }
-  .v2-calendar-navigation { margin: 0; }
+  .career-calendar-navigation { margin: 0; }
   .recreational-path { grid-template-columns: 1fr; gap: 10px; padding: 13px; }
 }
 
 @media (max-width: 640px) {
-  .v2-calendar-navigation > .v2-world-nav { right: max(7px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); left: max(7px, env(safe-area-inset-left)); width: auto; transform: none; }
+  .career-calendar-navigation > .career-world-nav { right: max(7px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); left: max(7px, env(safe-area-inset-left)); width: auto; transform: none; }
 }
 
 @media (max-width: 560px) {

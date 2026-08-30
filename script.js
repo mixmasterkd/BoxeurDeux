@@ -1,26 +1,30 @@
 const CREATION_POINTS = 5;
 const BASE_COMBAT_STAT = 40;
-const V2_BALANCE = window.BoxeurBalance;
-if (!V2_BALANCE) throw new Error("Boxeur Deux requiert son moteur d’équilibrage (BoxeurBalance).");
-const GYM_PRICE = V2_BALANCE.ECONOMY.memberships.boxing.monthly.price;
-const GYM_THREE_MONTH_PRICE = V2_BALANCE.ECONOMY.memberships.boxing.threeMonths.price;
-const GYM_MONTH_WEEKS = V2_BALANCE.ECONOMY.memberships.boxing.monthly.weeks;
-const GYM_THREE_MONTH_WEEKS = V2_BALANCE.ECONOMY.memberships.boxing.threeMonths.weeks;
-const STRENGTH_GYM_PRICE = V2_BALANCE.ECONOMY.memberships.strength.monthly.price;
-const STRENGTH_GYM_THREE_MONTH_PRICE = V2_BALANCE.ECONOMY.memberships.strength.threeMonths.price;
-const STRENGTH_GYM_MONTH_WEEKS = V2_BALANCE.ECONOMY.memberships.strength.monthly.weeks;
-const STRENGTH_GYM_THREE_MONTH_WEEKS = V2_BALANCE.ECONOMY.memberships.strength.threeMonths.weeks;
+const CAREER_BALANCE = window.BoxeurBalance;
+if (!CAREER_BALANCE) throw new Error("Boxeur Deux requiert son moteur d’équilibrage (BoxeurBalance).");
+const GYM_PRICE = CAREER_BALANCE.ECONOMY.memberships.boxing.monthly.price;
+const GYM_THREE_MONTH_PRICE = CAREER_BALANCE.ECONOMY.memberships.boxing.threeMonths.price;
+const GYM_MONTH_WEEKS = CAREER_BALANCE.ECONOMY.memberships.boxing.monthly.weeks;
+const GYM_THREE_MONTH_WEEKS = CAREER_BALANCE.ECONOMY.memberships.boxing.threeMonths.weeks;
+const STRENGTH_GYM_PRICE = CAREER_BALANCE.ECONOMY.memberships.strength.monthly.price;
+const STRENGTH_GYM_THREE_MONTH_PRICE = CAREER_BALANCE.ECONOMY.memberships.strength.threeMonths.price;
+const STRENGTH_GYM_MONTH_WEEKS = CAREER_BALANCE.ECONOMY.memberships.strength.monthly.weeks;
+const STRENGTH_GYM_THREE_MONTH_WEEKS = CAREER_BALANCE.ECONOMY.memberships.strength.threeMonths.weeks;
 const TOURNAMENT_PREP_WEEKS = 4;
 const RECREATIONAL_START_DATE = "2026-09-07";
 const RECREATIONAL_SPARRING_WEEK = 6;
-const SAVE_KEY = "boxeur-deux-career-v2";
+const SAVE_KEY = "boxeur-deux-career";
+const LEGACY_SAVE_KEYS = Object.freeze(["boxeur-deux-career-v2"]);
 const DEV_RETURN_SAVE_KEY = `${SAVE_KEY}-dev-return`;
 const DEV_TEST_ACTIVE_KEY = `${SAVE_KEY}-dev-active`;
+const LEGACY_DEV_RETURN_SAVE_KEYS = Object.freeze(LEGACY_SAVE_KEYS.map(key => `${key}-dev-return`));
+const LEGACY_DEV_TEST_ACTIVE_KEYS = Object.freeze(LEGACY_SAVE_KEYS.map(key => `${key}-dev-active`));
 const DEV_UNLOCK_CODE = "128";
-const SAVE_VERSION = 5;
-const V2_PREVIEW_SAVE_KEY = `${SAVE_KEY}-v2-preview`;
+const SAVE_VERSION = 6;
+const CAREER_RUNTIME_SAVE_KEY = `${SAVE_KEY}-runtime`;
+const LEGACY_CAREER_RUNTIME_SAVE_KEYS = Object.freeze(["boxeur-deux-career-v2-v2-preview"]);
 const JSON_EXPORT_KIND = "boxeur-deux-complete-career";
-const JSON_EXPORT_VERSION = 1;
+const JSON_EXPORT_VERSION = 2;
 const MAX_SUPPLEMENTS_PER_WEEK = 2;
 const MAX_LEGACY_PLAN_ITEMS = 32;
 const FIRST_PAID_VACATION_WEEKS = 8;
@@ -182,7 +186,7 @@ const LEGACY_PRIVATE_COACHES = Object.freeze([
   { id: "dubois", name: "Victor Dubois", targets: ["power", "cardio"], price: 325, sessions: 6, reward: 3 },
 ]);
 
-const jobs = V2_BALANCE.JOBS;
+const jobs = CAREER_BALANCE.JOBS;
 
 const REMY_TANK = Object.freeze({
   id: "remy-le-tank",
@@ -230,7 +234,7 @@ const INITIAL_STATE = {
   profile: null,
   combatStats: { technique: BASE_COMBAT_STAT, power: BASE_COMBAT_STAT, cardio: BASE_COMBAT_STAT, defense: BASE_COMBAT_STAT },
   week: 1,
-  money: V2_BALANCE.ECONOMY.startingMoney,
+  money: CAREER_BALANCE.ECONOMY.startingMoney,
   careerStartDate: RECREATIONAL_START_DATE,
   energy: 72,
   fitness: 25,
@@ -293,9 +297,9 @@ const INITIAL_STATE = {
   sponsorAvailableWeek: 1,
   supplementWeek: 1,
   supplementsUsed: [],
-  v2SupplementState: null,
-  v2TrainerState: null,
-  v2WeekPlannerState: null,
+  supplementState: null,
+  trainerState: null,
+  weekPlannerState: null,
   progressionState: null,
   levelNotice: null,
   levelAnnouncementPending: false,
@@ -307,8 +311,8 @@ const INITIAL_STATE = {
 
 // Anciens champs conservés tels quels dans les sauvegardes pour garantir leur
 // compatibilité. Le jeu actuel ne les utilise plus dans ses règles persistantes.
-const V2_LEGACY_CONDITION_KEYS = new Set(["fitness", "morale", "injury", "injuryWeeks", "injuryStartedWeek"]);
-const V2_NEUTRAL_COMBAT_CONDITION = Object.freeze({ fitness: 50, morale: 50, injury: 0 });
+const CAREER_LEGACY_CONDITION_KEYS = new Set(["fitness", "morale", "injury", "injuryWeeks", "injuryStartedWeek"]);
+const CAREER_NEUTRAL_COMBAT_CONDITION = Object.freeze({ fitness: 50, morale: 50, injury: 0 });
 
 const strengthGymProducts = [
   { id: "protein-bar", label: "Barre protéinée", price: 10, effect: "+3 E · −1 Fa · +1 M", changes: { energy: 3, fatigue: -1, morale: 1 } },
@@ -322,6 +326,33 @@ const strengthGymProducts = [
 // Copie profonde compatible avec les navigateurs mobiles plus anciens.
 // Les sauvegardes restent au même format et aucune donnée locale n'est supprimée.
 const cloneData = value => typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));
+
+function readStoredValue(primaryKey, legacyKeys = []) {
+  const primary = localStorage.getItem(primaryKey);
+  if (primary != null) return { key: primaryKey, raw: primary, legacy: false };
+  for (const key of legacyKeys) {
+    const raw = localStorage.getItem(key);
+    if (raw != null) return { key, raw, legacy: true };
+  }
+  return null;
+}
+
+function readStoredJson(primaryKey, legacyKeys = []) {
+  for (const key of [primaryKey, ...legacyKeys]) {
+    const raw = localStorage.getItem(key);
+    if (raw == null) continue;
+    try {
+      return { key, raw, value: JSON.parse(raw), legacy: key !== primaryKey };
+    } catch (error) {
+      console.warn(`[Boxeur Deux] Données locales illisibles pour ${key} :`, error);
+    }
+  }
+  return null;
+}
+
+function removeStoredValues(keys) {
+  keys.forEach(key => localStorage.removeItem(key));
+}
 
 // Diagnostic temporaire : ne change ni l'interface ni les sauvegardes.
 window.addEventListener("error", event => {
@@ -343,11 +374,11 @@ let sparringPendingActionId = null;
 let draftPortraitId = 0;
 let drugSalesTapCount = 0;
 let resumeCareerAlertsAfterLevelDialog = false;
-let v2PreviewCapsule = null;
-let v2ComposerSelection = [];
-let v2StrengthSelection = [];
-let v2HomeSelection = [];
-let v2TrainerTarget = "technique";
+let careerCapsule = null;
+let careerComposerSelection = [];
+let careerStrengthSelection = [];
+let careerHomeSelection = [];
+let careerTrainerTarget = "technique";
 let developerBoutScheduledBackup = null;
 
 const clamp = (value, min = 0, max = 100) => Math.min(max, Math.max(min, value));
@@ -566,16 +597,16 @@ function normalizeCareerState(source) {
     firstSessionPaid: Boolean(source.privateProgram.firstSessionPaid),
   } : null;
   normalized.privateProgram = null;
-  normalized.v2SupplementState = window.BoxeurSupplements
-    ? window.BoxeurSupplements.createState(source.v2SupplementState || source, { weekKey: normalized.week })
-    : source.v2SupplementState && typeof source.v2SupplementState === "object" ? cloneData(source.v2SupplementState) : null;
-  normalized.v2TrainerState = window.BoxeurTrainer
-    ? window.BoxeurTrainer.createState(source.v2TrainerState || {})
-    : source.v2TrainerState && typeof source.v2TrainerState === "object" ? cloneData(source.v2TrainerState) : null;
-  if (window.BoxeurTrainer && legacyPrivateProgram && !normalized.v2TrainerState.activeProgram) {
+  normalized.supplementState = window.BoxeurSupplements
+    ? window.BoxeurSupplements.createState(source.supplementState || source, { weekKey: normalized.week })
+    : source.supplementState && typeof source.supplementState === "object" ? cloneData(source.supplementState) : null;
+  normalized.trainerState = window.BoxeurTrainer
+    ? window.BoxeurTrainer.createState(source.trainerState || {})
+    : source.trainerState && typeof source.trainerState === "object" ? cloneData(source.trainerState) : null;
+  if (window.BoxeurTrainer && legacyPrivateProgram && !normalized.trainerState.activeProgram) {
     const trainerId = coach.reward >= 3 ? "elite" : coach.reward >= 2 ? "specialist" : "club";
-    normalized.v2TrainerState = window.BoxeurTrainer.createState({
-      ...normalized.v2TrainerState,
+    normalized.trainerState = window.BoxeurTrainer.createState({
+      ...normalized.trainerState,
       activeProgram: {
         id: `legacy:${coach.id}:${target}`,
         trainerId,
@@ -592,11 +623,11 @@ function normalizeCareerState(source) {
     });
   }
   try {
-    normalized.v2WeekPlannerState = window.BoxeurWeekPlanner && source.v2WeekPlannerState?.kind === window.BoxeurWeekPlanner.STATE_KIND
-      ? window.BoxeurWeekPlanner.restorePlanner(source.v2WeekPlannerState)
+    normalized.weekPlannerState = window.BoxeurWeekPlanner && source.weekPlannerState?.kind === window.BoxeurWeekPlanner.STATE_KIND
+      ? window.BoxeurWeekPlanner.restorePlanner(source.weekPlannerState)
       : null;
   } catch (error) {
-    normalized.v2WeekPlannerState = null;
+    normalized.weekPlannerState = null;
   }
   normalized.progressionState = window.BoxeurProgression && source.progressionState?.kind === window.BoxeurProgression.STATE_KIND
     ? window.BoxeurProgression.createState(source.progressionState)
@@ -617,14 +648,14 @@ const LEVEL_GIFT_SUPPLEMENTS = Object.freeze(["protein-bar", "sports-drink", "pr
 
 function addLevelGiftSupplement(level) {
   if (!window.BoxeurSupplements) return null;
-  const supplementState = window.BoxeurSupplements.createState(state.v2SupplementState || state, { weekKey: state.week });
+  const supplementState = window.BoxeurSupplements.createState(state.supplementState || state, { weekKey: state.week });
   const preferredIndex = Math.max(0, level - 2) % LEVEL_GIFT_SUPPLEMENTS.length;
   const productId = LEVEL_GIFT_SUPPLEMENTS
     .map((_, offset) => LEVEL_GIFT_SUPPLEMENTS[(preferredIndex + offset) % LEVEL_GIFT_SUPPLEMENTS.length])
     .find(id => Number(supplementState.inventory[id] || 0) < 9);
   if (!productId) return null;
   supplementState.inventory[productId] += 1;
-  state.v2SupplementState = window.BoxeurSupplements.createState(supplementState, { weekKey: state.week });
+  state.supplementState = window.BoxeurSupplements.createState(supplementState, { weekKey: state.week });
   return window.BoxeurSupplements.CATALOG[productId];
 }
 
@@ -701,8 +732,8 @@ function careerSnapshot() {
 }
 
 function completeCareerExportSnapshot() {
-  const capsule = ensureV2PreviewCapsule();
-  if (capsule) persistV2PreviewCapsule();
+  const capsule = ensureCareerPreviewCapsule();
+  if (capsule) persistCareerPreviewCapsule();
   return {
     ...careerSnapshot(),
     export: {
@@ -710,7 +741,7 @@ function completeCareerExportSnapshot() {
       version: JSON_EXPORT_VERSION,
       exportedAt: new Date().toISOString(),
     },
-    v2PreviewCapsule: capsule ? cloneData(capsule) : null,
+    careerCapsule: capsule ? cloneData(capsule) : null,
   };
 }
 
@@ -914,8 +945,8 @@ function normalizeCompetitionState() {
           condition: {
             energy: state.energy,
             fatigue: state.fatigue,
-            injury: V2_NEUTRAL_COMBAT_CONDITION.injury,
-            fitness: V2_NEUTRAL_COMBAT_CONDITION.fitness,
+            injury: CAREER_NEUTRAL_COMBAT_CONDITION.injury,
+            fitness: CAREER_NEUTRAL_COMBAT_CONDITION.fitness,
             cardio: state.combatStats.cardio,
             headDamage: 0,
             bodyDamage: 0,
@@ -977,7 +1008,8 @@ function normalizeCompetitionState() {
 }
 
 function hydrateCareer(snapshot) {
-  const source = snapshot?.state || snapshot;
+  const migratedSnapshot = window.BoxeurCareerMigration?.migrateCareerSnapshot(snapshot, { targetVersion: SAVE_VERSION }) || snapshot;
+  const source = migratedSnapshot?.state || migratedSnapshot;
   const previousState = state;
   const previousLegacyPlan = legacyPendingPlanForMigration;
   try {
@@ -985,7 +1017,7 @@ function hydrateCareer(snapshot) {
     normalizeCompetitionState();
     ensureCareerCalendar();
     syncLevelProgress();
-    legacyPendingPlanForMigration = (Array.isArray(snapshot?.weeklyPlan) ? snapshot.weeklyPlan : [])
+    legacyPendingPlanForMigration = (Array.isArray(migratedSnapshot?.weeklyPlan) ? migratedSnapshot.weeklyPlan : [])
       .filter(item => typeof item?.actionId === "string")
       .slice(0, MAX_LEGACY_PLAN_ITEMS)
       .map(item => ({ actionId: item.actionId }));
@@ -1013,13 +1045,17 @@ function maybeShowDivisionMigration() {
 
 function loadSavedSnapshot() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
+    const stored = readStoredJson(SAVE_KEY, LEGACY_SAVE_KEYS);
+    if (!stored) return null;
+    const parsed = stored.value;
+    const migrated = window.BoxeurCareerMigration?.migrateCareerSnapshot(parsed, { targetVersion: SAVE_VERSION }) || parsed;
     // Accepte aussi les toutes premières sauvegardes qui stockaient l'état
     // directement à la racine du JSON.
-    if (!(parsed?.state?.profile || parsed?.profile)) return null;
-    return parsed;
+    if (!(migrated?.state?.profile || migrated?.profile)) return null;
+    if (stored.legacy || Number(parsed?.version) !== SAVE_VERSION) {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(migrated));
+    }
+    return migrated;
   } catch (error) {
     console.warn("[Boxeur Deux] Sauvegarde locale illisible :", error);
     return null;
@@ -1028,21 +1064,22 @@ function loadSavedSnapshot() {
 
 function restoreCareer(snapshot, options = {}) {
   try {
-    const suppliedCapsule = snapshot?.v2PreviewCapsule;
-    if (suppliedCapsule != null && !window.BoxeurCareerV2Migration?.isV2Capsule(suppliedCapsule)) {
+    const migratedSnapshot = window.BoxeurCareerMigration?.migrateCareerSnapshot(snapshot, { targetVersion: SAVE_VERSION }) || snapshot;
+    const suppliedCapsule = migratedSnapshot?.careerCapsule;
+    if (suppliedCapsule != null && !window.BoxeurCareerMigration?.isCareerCapsule(suppliedCapsule)) {
       throw new TypeError("La capsule complète de la sauvegarde JSON est invalide.");
     }
-    hydrateCareer(snapshot);
+    hydrateCareer(migratedSnapshot);
     // Une importation doit reconstruire sa capsule depuis les données qui
     // viennent d'être validées, avant que le premier rendu de carrière puisse la lire.
-    if (options.invalidateV2 === true) {
-      invalidateV2PreviewCapsule();
+    if (options.invalidateCareer === true) {
+      invalidateCareerPreviewCapsule();
       if (suppliedCapsule) {
-        v2PreviewCapsule = window.BoxeurCareerV2Migration.migrateV5ToV2(suppliedCapsule);
-        normalizeV2PreviewRuntime(v2PreviewCapsule);
-        syncV2CapsuleToCareer(v2PreviewCapsule);
-        v2PreviewCapsule.previewFingerprint = v2PreviewFingerprint(state);
-        localStorage.setItem(V2_PREVIEW_SAVE_KEY, JSON.stringify(v2PreviewCapsule));
+        careerCapsule = window.BoxeurCareerMigration.migrateToCareerCapsule(suppliedCapsule);
+        normalizeCareerPreviewRuntime(careerCapsule);
+        syncCareerCapsuleToCareer(careerCapsule);
+        careerCapsule.previewFingerprint = careerPreviewFingerprint(state);
+        localStorage.setItem(CAREER_RUNTIME_SAVE_KEY, JSON.stringify(careerCapsule));
       }
     }
     render();
@@ -1074,7 +1111,7 @@ const developerToolDefinitions = Object.freeze([
   { id: "test-fight", label: "Combat immédiat", detail: "Lance un combat complet comparable, sans modifier la carrière ni le bilan." },
   { id: "test-sparring", label: "Sparring immédiat", detail: "Lance quatre échanges par round, sans gagnant officiel ni effet sur la carrière." },
   { id: "next-week", label: "Semaine suivante", detail: "Avance sans action ni dépense ; indisponible lorsqu’un combat est dû." },
-  { id: "v2-reset", label: "Réinitialiser la carte", detail: "Recrée seulement l’état de la carte depuis la carrière actuelle." },
+  { id: "career-reset", label: "Réinitialiser la carte", detail: "Recrée seulement l’état de la carte depuis la carrière actuelle." },
 ]);
 
 function developerPresetSnapshot(id) {
@@ -1148,7 +1185,7 @@ function developerPresetSnapshot(id) {
 
 function hasDeveloperReturnCareer() {
   try {
-    return Boolean(localStorage.getItem(DEV_RETURN_SAVE_KEY));
+    return Boolean(readStoredValue(DEV_RETURN_SAVE_KEY, LEGACY_DEV_RETURN_SAVE_KEYS));
   } catch {
     return false;
   }
@@ -1156,7 +1193,7 @@ function hasDeveloperReturnCareer() {
 
 function isDeveloperTestActive() {
   try {
-    return localStorage.getItem(DEV_TEST_ACTIVE_KEY) === "1";
+    return readStoredValue(DEV_TEST_ACTIVE_KEY, LEGACY_DEV_TEST_ACTIVE_KEYS)?.raw === "1";
   } catch {
     return false;
   }
@@ -1178,7 +1215,7 @@ function openDeveloperTestMenu() {
 function applyDeveloperCorner(corner) {
   if (!state.profile || !isCornerTheme(corner)) return;
   state.profile.corner = corner;
-  invalidateV2PreviewCapsule();
+  invalidateCareerPreviewCapsule();
   applyCareerTheme();
   render();
   const options = document.querySelector("#developer-corner-options");
@@ -1192,15 +1229,15 @@ function applyDeveloperCorner(corner) {
 
 function runDeveloperTool(id) {
   if (!state.profile || !developerToolDefinitions.some(tool => tool.id === id)) return;
-  if (id === "v2-reset") {
-    invalidateV2PreviewCapsule();
-    renderV2WorldPreview(Boolean(state.profile));
+  if (id === "career-reset") {
+    invalidateCareerPreviewCapsule();
+    renderCareerWorldPreview(Boolean(state.profile));
     showToast("Données de test réinitialisées · carrière actuelle intacte");
     return;
   }
   if (id === "funds") {
     state.money = 9999;
-    invalidateV2PreviewCapsule();
+    invalidateCareerPreviewCapsule();
     render();
     showToast("Fonds de test appliqués · solde : 9 999 $");
     return;
@@ -1211,7 +1248,7 @@ function runDeveloperTool(id) {
     state.injury = 0;
     state.injuryWeeks = 0;
     state.injuryStartedWeek = 0;
-    invalidateV2PreviewCapsule();
+    invalidateCareerPreviewCapsule();
     render();
     showToast("Récupération complète appliquée");
     return;
@@ -1232,7 +1269,7 @@ function runDeveloperTool(id) {
   state.pendingWeekEvent = null;
   scheduleRecreationalSparring(events);
   state.journal.unshift({ week: skippedWeek, text: "Outil de test : semaine avancée sans action ni dépense." });
-  invalidateV2PreviewCapsule();
+  invalidateCareerPreviewCapsule();
   render();
   showToast(`Semaine ${skippedWeek + 1} · aucune action ni dépense appliquée`);
 }
@@ -1251,10 +1288,10 @@ function registerDeveloperSecretTap() {
 function loadDeveloperPreset(id) {
   if (!developerPresetDefinitions.some(preset => preset.id === id)) return;
   try {
-    if (!localStorage.getItem(DEV_TEST_ACTIVE_KEY)) localStorage.setItem(DEV_RETURN_SAVE_KEY, JSON.stringify(careerSnapshot()));
+    if (!readStoredValue(DEV_TEST_ACTIVE_KEY, LEGACY_DEV_TEST_ACTIVE_KEYS)) localStorage.setItem(DEV_RETURN_SAVE_KEY, JSON.stringify(careerSnapshot()));
     localStorage.setItem(DEV_TEST_ACTIVE_KEY, "1");
     hydrateCareer(developerPresetSnapshot(id));
-    invalidateV2PreviewCapsule();
+    invalidateCareerPreviewCapsule();
     render();
     document.querySelector("#developer-test-dialog")?.close();
     showToast("Profil de test chargé · ta carrière est conservée");
@@ -1266,12 +1303,11 @@ function loadDeveloperPreset(id) {
 
 function restoreDeveloperReturnCareer() {
   try {
-    const raw = localStorage.getItem(DEV_RETURN_SAVE_KEY);
-    if (!raw) return showToast("Aucune carrière de retour n’est disponible.");
-    hydrateCareer(JSON.parse(raw));
-    localStorage.removeItem(DEV_RETURN_SAVE_KEY);
-    localStorage.removeItem(DEV_TEST_ACTIVE_KEY);
-    invalidateV2PreviewCapsule();
+    const stored = readStoredJson(DEV_RETURN_SAVE_KEY, LEGACY_DEV_RETURN_SAVE_KEYS);
+    if (!stored) return showToast("Aucune carrière de retour n’est disponible.");
+    hydrateCareer(stored.value);
+    removeStoredValues([DEV_RETURN_SAVE_KEY, DEV_TEST_ACTIVE_KEY, ...LEGACY_DEV_RETURN_SAVE_KEYS, ...LEGACY_DEV_TEST_ACTIVE_KEYS]);
+    invalidateCareerPreviewCapsule();
     render();
     document.querySelector("#developer-test-dialog")?.close();
     showToast("Carrière principale restaurée");
@@ -1445,7 +1481,7 @@ function opponentDifficulty(opponent) {
 }
 
 function opponentReputationReward(difficulty) {
-  return V2_BALANCE.opponentReputationReward({
+  return CAREER_BALANCE.opponentReputationReward({
     difficulty,
     playerStrength: playerCombatStrength(),
     avoidanceWeeks: state.avoidanceWeeks,
@@ -1453,7 +1489,7 @@ function opponentReputationReward(difficulty) {
 }
 
 function opponentExperienceReward(difficulty) {
-  return V2_BALANCE.opponentExperienceReward({ difficulty, playerStrength: playerCombatStrength() });
+  return CAREER_BALANCE.opponentExperienceReward({ difficulty, playerStrength: playerCombatStrength() });
 }
 
 function isCompetitiveCareer() {
@@ -1543,12 +1579,12 @@ function generateTournamentOpponents(tournament) {
   const names = state.profile.sex === "female" ? tournamentNamesFemale : tournamentNames;
   // Les parcours avancés sont surtout plus exigeants par leur longueur et leur progression
   // ronde après ronde; un décalage initial trop élevé les rendait presque impossibles.
-  const curve = V2_BALANCE.TOURNAMENT_CURVES[tournament.id] || V2_BALANCE.TOURNAMENT_CURVES["regional-cup"];
+  const curve = CAREER_BALANCE.TOURNAMENT_CURVES[tournament.id] || CAREER_BALANCE.TOURNAMENT_CURVES["regional-cup"];
   const stageBonus = curve.openingOffset;
   const playerRating = playerCombatStrength();
   return Array.from({ length: tournament.rounds }, (_, round) => {
     const identity = names[(seed + round * 3) % names.length];
-    const rating = V2_BALANCE.tournamentOpponentRating({
+    const rating = CAREER_BALANCE.tournamentOpponentRating({
       tournamentId: tournament.id,
       playerRating,
       roundIndex: round,
@@ -1655,8 +1691,8 @@ function resolveTournamentRound(fight, result, method = "decision", score = "") 
   const condition = {
     energy: fight.fighters.player.energy,
     fatigue: state.fatigue,
-    injury: V2_NEUTRAL_COMBAT_CONDITION.injury,
-    fitness: V2_NEUTRAL_COMBAT_CONDITION.fitness,
+    injury: CAREER_NEUTRAL_COMBAT_CONDITION.injury,
+    fitness: CAREER_NEUTRAL_COMBAT_CONDITION.fitness,
     cardio: state.combatStats.cardio,
     // Ces séquelles restent limitées au tournoi. Elles donnent un sens aux
     // choix Repos/Protection sans réactiver les anciennes blessures persistantes.
@@ -2060,35 +2096,35 @@ function render() {
   document.querySelector("#creation-screen").classList.toggle("hidden", hasFighter);
   document.querySelector("#game").classList.toggle("hidden", !hasFighter);
   if (!hasFighter) {
-    renderV2WorldPreview(false);
+    renderCareerWorldPreview(false);
     return;
   }
   renderLevel();
   renderFights();
-  renderV2WorldPreview(true);
+  renderCareerWorldPreview(true);
   persistCareer();
   if (state.amateurPromotionPending) setTimeout(openAmateurPromotionDialog, 0);
 }
 
-function renderV2WorldPreview(hasFighter = Boolean(state.profile)) {
-  const root = document.querySelector("#v2-world");
-  const active = Boolean(hasFighter && window.BoxeurWorld && window.BoxeurCareerV2Migration);
-  document.body.classList.toggle("v2-preview", active);
+function renderCareerWorldPreview(hasFighter = Boolean(state.profile)) {
+  const root = document.querySelector("#career-world");
+  const active = Boolean(hasFighter && window.BoxeurWorld && window.BoxeurCareerMigration);
+  document.body.classList.toggle("career-preview", active);
   if (!root) return;
   root.hidden = !active;
   if (active) {
-    root.innerHTML = window.BoxeurWorld.render(v2CareerView());
-    const panel = root.querySelector(".v2-now-panel");
+    root.innerHTML = window.BoxeurWorld.render(careerCareerView());
+    const panel = root.querySelector(".career-now-panel");
     if (panel && window.BoxeurWeekView && window.BoxeurWeek) {
-      const anchorCard = panel.querySelector(".v2-objective-card") || panel.querySelector(".v2-now-time");
-      const launcher = window.BoxeurWeekView.renderLauncher(v2WeekViewContext());
+      const anchorCard = panel.querySelector(".career-objective-card") || panel.querySelector(".career-now-time");
+      const launcher = window.BoxeurWeekView.renderLauncher(careerWeekViewContext());
       if (anchorCard) anchorCard.insertAdjacentHTML("afterend", launcher);
       else panel.insertAdjacentHTML("afterbegin", launcher);
     }
   }
 }
 
-function v2PreviewFingerprint(career = state) {
+function careerPreviewFingerprint(career = state) {
   if (!career?.profile) return "no-career";
   return JSON.stringify([
     career.profile.firstName,
@@ -2127,35 +2163,35 @@ function v2PreviewFingerprint(career = state) {
     career.scheduledFight?.week || null,
     career.activeTournament?.id || null,
     career.activeTournament?.status || null,
-    career.v2SupplementState || null,
-    career.v2TrainerState || null,
+    career.supplementState || null,
+    career.trainerState || null,
     career.progressionState || null,
   ]);
 }
 
-function createV2PreviewCapsule() {
+function createCareerPreviewCapsule() {
   const snapshot = careerSnapshot();
   if (legacyPendingPlanForMigration.length) snapshot.weeklyPlan = cloneData(legacyPendingPlanForMigration);
-  const capsule = window.BoxeurCareerV2Migration.migrateV5ToV2(snapshot, {
-    seed: `preview:${v2PreviewFingerprint(state)}`,
+  const capsule = window.BoxeurCareerMigration.migrateToCareerCapsule(snapshot, {
+    seed: `preview:${careerPreviewFingerprint(state)}`,
   });
   legacyPendingPlanForMigration = [];
-  capsule.previewFingerprint = v2PreviewFingerprint(state);
+  capsule.previewFingerprint = careerPreviewFingerprint(state);
   capsule.previewRuntime = {
     trainingSessions: safeNumber(state.recreationalTrainingWeeks, 0, 0, 999),
     sessions: [],
     weekMode: "quick",
-    weekPlanner: state.v2WeekPlannerState ? cloneData(state.v2WeekPlannerState) : null,
+    weekPlanner: state.weekPlannerState ? cloneData(state.weekPlannerState) : null,
     weekPlannerSignature: null,
     weeklySummaries: [],
     weekLedgers: {},
     settledWeeks: [],
-    career: createV2RuntimeCareer(),
+    career: createCareerRuntimeCareer(),
   };
   return capsule;
 }
 
-function createV2RuntimeCareer(source = state) {
+function createCareerRuntimeCareer(source = state) {
   const sourceWeek = safeNumber(source.week, state.week || 1, 1, 99999);
   return {
     money: safeNumber(source.money, 0, 0, 9999999),
@@ -2179,14 +2215,14 @@ function createV2RuntimeCareer(source = state) {
       : null,
     experience: safeNumber(source.experience, 0, 0, 99999999),
     privateLessonCredits: safeNumber(source.privateLessonCredits, 0, 0, 99),
-    v2SupplementState: window.BoxeurSupplements
-      ? window.BoxeurSupplements.createState(source.v2SupplementState || source, { weekKey: sourceWeek })
-      : source.v2SupplementState && typeof source.v2SupplementState === "object" ? cloneData(source.v2SupplementState) : null,
-    v2TrainerState: window.BoxeurTrainer
-      ? window.BoxeurTrainer.createState(source.v2TrainerState || {})
-      : source.v2TrainerState && typeof source.v2TrainerState === "object" ? cloneData(source.v2TrainerState) : null,
-    v2WeekPlannerState: source.v2WeekPlannerState && typeof source.v2WeekPlannerState === "object"
-      ? cloneData(source.v2WeekPlannerState)
+    supplementState: window.BoxeurSupplements
+      ? window.BoxeurSupplements.createState(source.supplementState || source, { weekKey: sourceWeek })
+      : source.supplementState && typeof source.supplementState === "object" ? cloneData(source.supplementState) : null,
+    trainerState: window.BoxeurTrainer
+      ? window.BoxeurTrainer.createState(source.trainerState || {})
+      : source.trainerState && typeof source.trainerState === "object" ? cloneData(source.trainerState) : null,
+    weekPlannerState: source.weekPlannerState && typeof source.weekPlannerState === "object"
+      ? cloneData(source.weekPlannerState)
       : null,
     progressionState: window.BoxeurProgression && source.progressionState?.kind === window.BoxeurProgression.STATE_KIND
       ? window.BoxeurProgression.createState(source.progressionState)
@@ -2194,7 +2230,7 @@ function createV2RuntimeCareer(source = state) {
   };
 }
 
-function normalizeV2PreviewRuntime(capsule) {
+function normalizeCareerPreviewRuntime(capsule) {
   if (!capsule.previewRuntime || typeof capsule.previewRuntime !== "object") capsule.previewRuntime = {};
   const runtime = capsule.previewRuntime;
   runtime.trainingSessions = safeNumber(runtime.trainingSessions, state.recreationalTrainingWeeks, 0, 999);
@@ -2202,7 +2238,7 @@ function normalizeV2PreviewRuntime(capsule) {
   runtime.weekMode = runtime.weekMode === "detailed" ? "detailed" : "quick";
   const suppliedPlanner = Object.prototype.hasOwnProperty.call(runtime, "weekPlanner")
     ? runtime.weekPlanner
-    : state.v2WeekPlannerState;
+    : state.weekPlannerState;
   try {
     runtime.weekPlanner = window.BoxeurWeekPlanner && suppliedPlanner?.kind === window.BoxeurWeekPlanner.STATE_KIND
       ? window.BoxeurWeekPlanner.restorePlanner(suppliedPlanner)
@@ -2215,11 +2251,11 @@ function normalizeV2PreviewRuntime(capsule) {
   if (!runtime.weekLedgers || typeof runtime.weekLedgers !== "object" || Array.isArray(runtime.weekLedgers)) runtime.weekLedgers = {};
   if (!Array.isArray(runtime.settledWeeks)) runtime.settledWeeks = [];
   runtime.settledWeeks = [...new Set(runtime.settledWeeks.map(value => safeNumber(value, 0, 1, 99999)).filter(Boolean))].slice(-104);
-  const defaults = createV2RuntimeCareer();
+  const defaults = createCareerRuntimeCareer();
   const suppliedCareer = runtime.career && typeof runtime.career === "object" ? runtime.career : {};
   let normalizedSupplementState = window.BoxeurSupplements
-    ? window.BoxeurSupplements.createState(suppliedCareer.v2SupplementState || defaults.v2SupplementState || {}, { weekKey: capsule.timeState?.clock?.week || state.week })
-    : suppliedCareer.v2SupplementState || defaults.v2SupplementState || null;
+    ? window.BoxeurSupplements.createState(suppliedCareer.supplementState || defaults.supplementState || {}, { weekKey: capsule.timeState?.clock?.week || state.week })
+    : suppliedCareer.supplementState || defaults.supplementState || null;
   // Une réservation de produit n'est jamais un état durable de l'interface :
   // préparation et séance forment une seule transaction synchrone. Si une
   // ancienne sauvegarde en contient une, elle est interrompue et remboursée.
@@ -2260,10 +2296,10 @@ function normalizeV2PreviewRuntime(capsule) {
     introJobRequired: suppliedCareer.introJobRequired == null ? defaults.introJobRequired : suppliedCareer.introJobRequired === true,
     initialJobLockedUntilWeek: safeNumber(suppliedCareer.initialJobLockedUntilWeek, defaults.initialJobLockedUntilWeek, 0, 99999),
     jobId: typeof suppliedCareer.jobId === "string" ? suppliedCareer.jobId : null,
-    v2SupplementState: normalizedSupplementState,
-    v2TrainerState: window.BoxeurTrainer
-      ? window.BoxeurTrainer.createState(suppliedCareer.v2TrainerState || defaults.v2TrainerState || {})
-      : suppliedCareer.v2TrainerState || defaults.v2TrainerState || null,
+    supplementState: normalizedSupplementState,
+    trainerState: window.BoxeurTrainer
+      ? window.BoxeurTrainer.createState(suppliedCareer.trainerState || defaults.trainerState || {})
+      : suppliedCareer.trainerState || defaults.trainerState || null,
     progressionState: window.BoxeurProgression && suppliedCareer.progressionState?.kind === window.BoxeurProgression.STATE_KIND
       ? window.BoxeurProgression.createState(suppliedCareer.progressionState)
       : defaults.progressionState,
@@ -2271,41 +2307,42 @@ function normalizeV2PreviewRuntime(capsule) {
   return runtime;
 }
 
-function invalidateV2PreviewCapsule() {
-  v2PreviewCapsule = null;
+function invalidateCareerPreviewCapsule() {
+  careerCapsule = null;
   try {
-    localStorage.removeItem(V2_PREVIEW_SAVE_KEY);
+    removeStoredValues([CAREER_RUNTIME_SAVE_KEY, ...LEGACY_CAREER_RUNTIME_SAVE_KEYS]);
   } catch (error) {
     console.warn("[Boxeur Deux] Données d’exécution impossibles à invalider :", error);
   }
 }
 
-function ensureV2PreviewCapsule() {
-  if (!state.profile || !window.BoxeurCareerV2Migration) return null;
-  if (v2PreviewCapsule?.previewFingerprint === v2PreviewFingerprint(state)) {
+function ensureCareerPreviewCapsule() {
+  if (!state.profile || !window.BoxeurCareerMigration) return null;
+  if (careerCapsule?.previewFingerprint === careerPreviewFingerprint(state)) {
     legacyPendingPlanForMigration = [];
-    return v2PreviewCapsule;
+    return careerCapsule;
   }
   try {
-    const stored = JSON.parse(localStorage.getItem(V2_PREVIEW_SAVE_KEY) || "null");
-    if (window.BoxeurCareerV2Migration.isV2Capsule(stored) && stored.previewFingerprint === v2PreviewFingerprint(state)) {
-      v2PreviewCapsule = window.BoxeurCareerV2Migration.migrateV5ToV2(stored);
+    const storedValue = readStoredJson(CAREER_RUNTIME_SAVE_KEY, LEGACY_CAREER_RUNTIME_SAVE_KEYS);
+    const stored = storedValue?.value || null;
+    if (window.BoxeurCareerMigration.isCareerCapsule(stored) && stored.previewFingerprint === careerPreviewFingerprint(state)) {
+      careerCapsule = window.BoxeurCareerMigration.migrateToCareerCapsule(stored);
     } else {
-      v2PreviewCapsule = createV2PreviewCapsule();
+      careerCapsule = createCareerPreviewCapsule();
     }
   } catch (error) {
     console.warn("[Boxeur Deux] Données d’exécution recréées :", error);
-    v2PreviewCapsule = createV2PreviewCapsule();
+    careerCapsule = createCareerPreviewCapsule();
   }
-  normalizeV2PreviewRuntime(v2PreviewCapsule);
+  normalizeCareerPreviewRuntime(careerCapsule);
   legacyPendingPlanForMigration = [];
-  persistV2PreviewCapsule();
-  return v2PreviewCapsule;
+  persistCareerPreviewCapsule();
+  return careerCapsule;
 }
 
-function syncV2CapsuleToCareer(capsule) {
+function syncCareerCapsuleToCareer(capsule) {
   if (!capsule?.timeState?.clock || !state.profile) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const career = runtime.career;
   state.week = safeNumber(capsule.timeState.clock.week, state.week, 1, 99999);
   state.money = safeNumber(career.money, state.money, 0, 9999999);
@@ -2332,33 +2369,33 @@ function syncV2CapsuleToCareer(capsule) {
   Object.keys(combatLabels).forEach(key => {
     state.combatStats[key] = safeNumber(capsule.timeState.stats?.[key], state.combatStats[key], 0, 99, false);
   });
-  state.v2SupplementState = career.v2SupplementState ? cloneData(career.v2SupplementState) : null;
-  state.v2TrainerState = career.v2TrainerState ? cloneData(career.v2TrainerState) : null;
-  state.v2WeekPlannerState = runtime.weekPlanner ? cloneData(runtime.weekPlanner) : null;
+  state.supplementState = career.supplementState ? cloneData(career.supplementState) : null;
+  state.trainerState = career.trainerState ? cloneData(career.trainerState) : null;
+  state.weekPlannerState = runtime.weekPlanner ? cloneData(runtime.weekPlanner) : null;
   state.progressionState = career.progressionState ? cloneData(career.progressionState) : null;
   state.recreationalTrainingWeeks = safeNumber(runtime.trainingSessions, state.recreationalTrainingWeeks, 0, 999);
   syncLevelProgress();
   career.money = state.money;
   career.privateLessonCredits = state.privateLessonCredits;
-  career.v2SupplementState = state.v2SupplementState ? cloneData(state.v2SupplementState) : null;
+  career.supplementState = state.supplementState ? cloneData(state.supplementState) : null;
   if (state.careerStatus === "recreational") scheduleRecreationalSparring([]);
-  capsule.previewFingerprint = v2PreviewFingerprint(state);
+  capsule.previewFingerprint = careerPreviewFingerprint(state);
 }
 
-function persistV2PreviewCapsule() {
-  if (!v2PreviewCapsule) return;
-  syncV2CapsuleToCareer(v2PreviewCapsule);
+function persistCareerPreviewCapsule() {
+  if (!careerCapsule) return;
+  syncCareerCapsuleToCareer(careerCapsule);
   try {
-    localStorage.setItem(V2_PREVIEW_SAVE_KEY, JSON.stringify(v2PreviewCapsule));
+    localStorage.setItem(CAREER_RUNTIME_SAVE_KEY, JSON.stringify(careerCapsule));
     persistCareer();
   } catch (error) {
     console.warn("[Boxeur Deux] Données d’exécution non enregistrées :", error);
   }
 }
 
-function v2OnboardingSnapshot(capsule = ensureV2PreviewCapsule()) {
+function careerOnboardingSnapshot(capsule = ensureCareerPreviewCapsule()) {
   if (!capsule?.timeState?.clock || !window.BoxeurOnboarding) return null;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const career = runtime.career;
   const previous = window.BoxeurOnboarding.isOnboardingState(runtime.onboardingState)
     ? runtime.onboardingState
@@ -2393,7 +2430,7 @@ function v2OnboardingSnapshot(capsule = ensureV2PreviewCapsule()) {
         onboardingRequired: career.introJobRequired || career.initialGymRequired,
         recreationalTrainingWeeks: runtime.trainingSessions,
         recreationalSparringStatus: state.recreationalSparringStatus,
-        v2DeveloperTest: { active: isDeveloperTestActive() },
+        careerDeveloperTest: { active: isDeveloperTestActive() },
       };
   runtime.onboardingState = window.BoxeurOnboarding.normalizeState(source, {
     developerMode: isDeveloperTestActive(),
@@ -2401,8 +2438,8 @@ function v2OnboardingSnapshot(capsule = ensureV2PreviewCapsule()) {
   return runtime.onboardingState;
 }
 
-function v2OnboardingView(capsule = ensureV2PreviewCapsule()) {
-  const onboarding = v2OnboardingSnapshot(capsule);
+function careerOnboardingView(capsule = ensureCareerPreviewCapsule()) {
+  const onboarding = careerOnboardingSnapshot(capsule);
   if (!onboarding || !window.BoxeurOnboarding) return null;
   const partner = sparringPartnerView();
   const baseStep = window.BoxeurOnboarding.getCurrentStep(onboarding);
@@ -2578,7 +2615,7 @@ function v2OnboardingView(capsule = ensureV2PreviewCapsule()) {
   };
 }
 
-function v2CompletedOnboardingObjectiveId(onboarding, plannerEntries, executedEntryIds) {
+function careerCompletedOnboardingObjectiveId(onboarding, plannerEntries, executedEntryIds) {
   if (!onboarding?.state || onboarding.state.mode !== "guided" || !window.BoxeurOnboarding) return null;
   const objective = window.BoxeurOnboarding.getCurrentStep(onboarding.state);
   if (objective?.type !== "objective" || onboarding.state.completedObjectiveIds.includes(objective.id)) return null;
@@ -2610,18 +2647,18 @@ function v2CompletedOnboardingObjectiveId(onboarding, plannerEntries, executedEn
   return completed?.() ? objective.id : null;
 }
 
-function applyV2OnboardingEvent(event) {
-  const capsule = ensureV2PreviewCapsule();
-  const onboarding = v2OnboardingSnapshot(capsule);
+function applyCareerOnboardingEvent(event) {
+  const capsule = ensureCareerPreviewCapsule();
+  const onboarding = careerOnboardingSnapshot(capsule);
   if (!capsule || !onboarding || !window.BoxeurOnboarding) return null;
   const next = window.BoxeurOnboarding.applyEvent(onboarding, event);
-  normalizeV2PreviewRuntime(capsule).onboardingState = next;
+  normalizeCareerPreviewRuntime(capsule).onboardingState = next;
   return next;
 }
 
-function v2ProgressionSnapshot(capsule = ensureV2PreviewCapsule()) {
+function careerProgressionSnapshot(capsule = ensureCareerPreviewCapsule()) {
   if (!capsule?.timeState?.stats || !window.BoxeurProgression) return null;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const previous = runtime.career.progressionState?.kind === window.BoxeurProgression.STATE_KIND
     ? runtime.career.progressionState
     : null;
@@ -2650,7 +2687,7 @@ function v2ProgressionSnapshot(capsule = ensureV2PreviewCapsule()) {
   return window.BoxeurProgression.getPublicState(runtime.career.progressionState);
 }
 
-function v2PreparationView(timeState) {
+function careerPreparationView(timeState) {
   if (!timeState || !window.BoxeurTime) return null;
   const base = window.BoxeurTime.getPreparation(timeState);
   const tone = base.status === "excellent" || base.status === "good"
@@ -2659,14 +2696,14 @@ function v2PreparationView(timeState) {
   return { ...base, tone, detail: base.reasons.join(" · ") };
 }
 
-function v2CareerView() {
-  const capsule = ensureV2PreviewCapsule();
+function careerCareerView() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule?.timeState) return state;
   const timeState = capsule.timeState;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const runtimeCareer = runtime.career;
-  const workStatus = v2WorkStatus(timeState, runtimeCareer);
-  const onboarding = v2OnboardingView(capsule);
+  const workStatus = careerWorkStatus(timeState, runtimeCareer);
+  const onboarding = careerOnboardingView(capsule);
   const currentDate = window.BoxeurCalendar && state.calendar?.epoch
     ? window.BoxeurCalendar.dateForCareerWeek(state.calendar.epoch, timeState.clock.week, timeState.clock.dayIndex)
     : null;
@@ -2678,16 +2715,16 @@ function v2CareerView() {
     fatigue: Math.round(timeState.condition.fatigue),
     combatStats: { ...state.combatStats, ...timeState.stats },
     recreationalTrainingWeeks: safeNumber(runtime.trainingSessions, state.recreationalTrainingWeeks, 0, 999),
-    v2Clock: cloneData(timeState.clock),
-    v2Appointments: window.BoxeurTime ? window.BoxeurTime.getAgenda(timeState) : [],
-    v2DateLabel: currentDate ? formatCareerDate(currentDate) : "Date inconnue",
-    v2Preparation: v2PreparationView(timeState),
-    v2Onboarding: onboarding?.state || null,
-    v2OnboardingStep: onboarding?.step || null,
-    v2SparringPartner: sparringPartnerView(),
-    v2Job: jobs.find(job => job.id === runtimeCareer.jobId) || null,
+    careerClock: cloneData(timeState.clock),
+    careerAppointments: window.BoxeurTime ? window.BoxeurTime.getAgenda(timeState) : [],
+    careerDateLabel: currentDate ? formatCareerDate(currentDate) : "Date inconnue",
+    careerPreparation: careerPreparationView(timeState),
+    careerOnboarding: onboarding?.state || null,
+    careerOnboardingStep: onboarding?.step || null,
+    careerSparringPartner: sparringPartnerView(),
+    careerJob: jobs.find(job => job.id === runtimeCareer.jobId) || null,
     ...workStatus,
-    v2DeveloperTest: {
+    careerDeveloperTest: {
       active: isDeveloperTestActive(),
       canReturn: hasDeveloperReturnCareer(),
       profileLabel: [state.profile?.firstName, state.profile?.lastName].filter(Boolean).join(" "),
@@ -2695,16 +2732,16 @@ function v2CareerView() {
   };
 }
 
-function v2WorkLocationContext() {
-  const career = v2CareerView();
-  const capsule = ensureV2PreviewCapsule();
-  const plannerState = capsule ? ensureV2WeekPlanner(capsule) : null;
+function careerWorkLocationContext() {
+  const career = careerCareerView();
+  const capsule = ensureCareerPreviewCapsule();
+  const plannerState = capsule ? ensureCareerWeekPlanner(capsule) : null;
   const workEntry = plannerState?.entries?.find(entry => entry.source === "work") || null;
   const job = jobs.find(item => item.id === career.jobId) || null;
-  const workAccess = capsule && job ? v2PlannerWorkAccess(capsule, job) : { available: false, reason: "" };
+  const workAccess = capsule && job ? careerPlannerWorkAccess(capsule, job) : { available: false, reason: "" };
   return {
     ...career,
-    v2JobOffers: jobs.map(job => ({
+    careerJobOffers: jobs.map(job => ({
       id: job.id,
       title: job.title,
       wage: job.wage,
@@ -2712,44 +2749,44 @@ function v2WorkLocationContext() {
       interviewWeeks: job.interviewWeeks,
       energy: job.energy,
       fatigue: job.fatigue,
-      weekCapacityCost: v2PlannerWorkCost(job),
+      weekCapacityCost: careerPlannerWorkCost(job),
       detail: job.detail,
     })),
-    v2JobApplicationLabel: jobs.find(job => job.id === career.jobApplication?.jobId)?.title || "",
-    v2WorkPlan: {
+    careerJobApplicationLabel: jobs.find(job => job.id === career.jobApplication?.jobId)?.title || "",
+    careerWorkPlan: {
       planned: Boolean(workEntry),
       available: Boolean(workEntry || workAccess.available),
       reason: workEntry ? "" : (plannerState?.workBlockedReason || workAccess.reason || ""),
       entryId: workEntry?.id || null,
-      cost: safeNumber(workEntry?.capacityCost, v2PlannerWorkCost(career.v2Job), 0, 100),
+      cost: safeNumber(workEntry?.capacityCost, careerPlannerWorkCost(career.careerJob), 0, 100),
     },
   };
 }
 
-function v2GymContext() {
-  const capsule = ensureV2PreviewCapsule();
+function careerGymContext() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule?.timeState || !window.BoxeurTraining || !window.BoxeurTime) return null;
-  const career = v2CareerView();
-  const prep = v2PreparationView(capsule.timeState);
-  const trainingContext = v2TrainingContext();
+  const career = careerCareerView();
+  const prep = careerPreparationView(capsule.timeState);
+  const trainingContext = careerTrainingContext();
   const coachSession = window.BoxeurTraining.buildCoachSession(capsule.timeState, trainingContext);
   const coachPreview = window.BoxeurTraining.previewSession(capsule.timeState, coachSession, trainingContext);
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const activeTrainerProgram = window.BoxeurTrainer && runtime.career.v2TrainerState
-    ? window.BoxeurTrainer.getPublicState(runtime.career.v2TrainerState).activeProgram
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const activeTrainerProgram = window.BoxeurTrainer && runtime.career.trainerState
+    ? window.BoxeurTrainer.getPublicState(runtime.career.trainerState).activeProgram
     : null;
   const boxingTrainerProgram = activeTrainerProgram && ["technique", "defense"].includes(activeTrainerProgram.target)
     ? activeTrainerProgram
     : null;
-  const plannerState = ensureV2WeekPlanner(capsule);
+  const plannerState = ensureCareerWeekPlanner(capsule);
   const plannerPreview = window.BoxeurWeekPlanner.previewPlan(plannerState);
   const coachPlannerId = state.careerStatus === "recreational" ? "group-class" : "boxing-coach";
-  const coachPlanState = v2PlannerActionState(coachPlannerId);
+  const coachPlanState = careerPlannerActionState(coachPlannerId);
   const immediateAmateurSparring = state.careerStatus === "amateur";
-  const baseSparringPlanState = v2PlannerActionState("sparring", { immediate: immediateAmateurSparring });
+  const baseSparringPlanState = careerPlannerActionState("sparring", { immediate: immediateAmateurSparring });
   const sparringEntry = plannerState.entries.find(entry => !entry.preReserved && entry.activityId === "sparring") || null;
   const sparringCompleted = sparringEntry?.metadata?.completed === true;
-  const sparringFightWeek = immediateAmateurSparring && isV2OfficialFightWeek(capsule);
+  const sparringFightWeek = immediateAmateurSparring && isCareerOfficialFightWeek(capsule);
   const sparringPlanState = immediateAmateurSparring
     ? {
       ...baseSparringPlanState,
@@ -2768,7 +2805,7 @@ function v2GymContext() {
     }
     : { ...baseSparringPlanState, immediate: false, completed: sparringCompleted, fightWeek: false };
   const membershipMissing = career.gymWeeks <= 0;
-  const conditionAccess = v2ConditionActivityAccess(coachPlannerId, capsule);
+  const conditionAccess = careerConditionActivityAccess(coachPlannerId, capsule);
   const trainingBlocked = membershipMissing || !conditionAccess.available || plannerPreview.capacity.remaining <= 0;
   const trainingBlockedReason = membershipMissing
       ? "Inscription requise : passe à l’accueil. Le sac au sous-sol demeure accessible comme dépannage."
@@ -2781,7 +2818,7 @@ function v2GymContext() {
     careerStatusLabel: state.careerStatus === "professional" ? "Professionnel" : state.careerStatus === "amateur" ? "Amateur" : "Récréatif",
     clock: {
       ...capsule.timeState.clock,
-      dateLabel: career.v2DateLabel,
+      dateLabel: career.careerDateLabel,
     },
     condition: {
       preparationLabel: prep.label,
@@ -2830,12 +2867,12 @@ function v2GymContext() {
       targetWeeks: RECREATIONAL_SPARRING_WEEK,
       sparringWeek: 6,
       partner: sparringPartnerView(),
-      remyStatus: career.v2Onboarding?.remyStatus === "completed" || state.recreationalSparringStatus === "completed"
+      remyStatus: career.careerOnboarding?.remyStatus === "completed" || state.recreationalSparringStatus === "completed"
         ? "completed"
-        : career.v2Onboarding?.remyStatus === "ready" || state.recreationalSparringStatus === "ready"
+        : career.careerOnboarding?.remyStatus === "ready" || state.recreationalSparringStatus === "ready"
           ? "ready"
           : state.scheduledFight?.isRecreationalSparring ? "scheduled" : "locked",
-      remyDetail: career.v2OnboardingStep?.type === "sparring" ? career.v2OnboardingStep.detail : "",
+      remyDetail: career.careerOnboardingStep?.type === "sparring" ? career.careerOnboardingStep.detail : "",
     },
     weekCapacity: {
       total: plannerPreview.capacity.total,
@@ -2843,40 +2880,40 @@ function v2GymContext() {
       remaining: plannerPreview.capacity.remaining,
     },
     weekPlan: {
-      entries: v2PlannerLocationEntries(plannerState, "boxing-gym"),
+      entries: careerPlannerLocationEntries(plannerState, "boxing-gym"),
     },
     sparring: sparringPlanState,
   };
 }
 
-function v2ReservedBoxingGymBudget(career = v2CareerView()) {
+function careerReservedBoxingGymBudget(career = careerCareerView()) {
   return career.initialGymRequired && career.gymWeeks <= 0 ? GYM_PRICE : 0;
 }
 
-function v2StrengthContext() {
-  const capsule = ensureV2PreviewCapsule();
+function careerStrengthContext() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule?.timeState || !window.BoxeurStrength || !window.BoxeurStrengthView) return null;
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const career = v2CareerView();
-  const trainerProgram = window.BoxeurTrainer && runtime.career.v2TrainerState
-    ? window.BoxeurTrainer.getPublicState(runtime.career.v2TrainerState).activeProgram
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const career = careerCareerView();
+  const trainerProgram = window.BoxeurTrainer && runtime.career.trainerState
+    ? window.BoxeurTrainer.getPublicState(runtime.career.trainerState).activeProgram
     : null;
   const strengthProgram = trainerProgram && ["power", "cardio"].includes(trainerProgram.target) ? trainerProgram : null;
-  const supplementInventory = window.BoxeurSupplements && runtime.career.v2SupplementState
-    ? window.BoxeurSupplements.inventoryList(runtime.career.v2SupplementState)
+  const supplementInventory = window.BoxeurSupplements && runtime.career.supplementState
+    ? window.BoxeurSupplements.inventoryList(runtime.career.supplementState)
     : [];
-  const reserve = v2ReservedBoxingGymBudget(career);
-  const plannerPreview = window.BoxeurWeekPlanner.previewPlan(ensureV2WeekPlanner(capsule));
-  const quickState = v2PlannerActionState("strength-quick");
-  const conditionAccess = v2ConditionActivityAccess("strength-quick", capsule);
-  const trainerAccess = v2TrainerAccess("strength-gym", strengthProgram);
+  const reserve = careerReservedBoxingGymBudget(career);
+  const plannerPreview = window.BoxeurWeekPlanner.previewPlan(ensureCareerWeekPlanner(capsule));
+  const quickState = careerPlannerActionState("strength-quick");
+  const conditionAccess = careerConditionActivityAccess("strength-quick", capsule);
+  const trainerAccess = careerTrainerAccess("strength-gym", strengthProgram);
   const shopAvailable = state.careerStatus !== "recreational" && runtime.career.strengthGymWeeks > 0;
   return {
     profile: state.profile,
     careerStatus: state.careerStatus,
     clock: {
       ...capsule.timeState.clock,
-      dateLabel: career.v2DateLabel,
+      dateLabel: career.careerDateLabel,
     },
     condition: {
       energy: capsule.timeState.condition.energy,
@@ -2899,7 +2936,7 @@ function v2StrengthContext() {
       spendableBalance: Math.max(0, runtime.career.money - reserve),
       plans: strengthGymPlans,
     },
-    selectedActivities: v2StrengthSelection,
+    selectedActivities: careerStrengthSelection,
     physicalSessionCompletedToday: false,
     trainer: {
       available: trainerAccess.available,
@@ -2926,22 +2963,22 @@ function v2StrengthContext() {
       remaining: plannerPreview.capacity.remaining,
     },
     weekPlan: {
-      entries: v2PlannerLocationEntries(ensureV2WeekPlanner(capsule), "strength-gym"),
+      entries: careerPlannerLocationEntries(ensureCareerWeekPlanner(capsule), "strength-gym"),
     },
     quick: quickState,
   };
 }
 
-const V2_HOME_ACTIVITIES = Object.freeze({
+const CAREER_HOME_ACTIVITIES = Object.freeze({
   meal: Object.freeze({
     id: "home-meal",
     label: "Repas maison de récupération",
     category: "home-recovery",
     duration: 1,
     energyCost: 0,
-    energyGain: V2_BALANCE.WEEK.recovery.mealEnergyGain,
+    energyGain: CAREER_BALANCE.WEEK.recovery.mealEnergyGain,
     fatigueGain: 0,
-    fatigueRelief: V2_BALANCE.WEEK.recovery.mealFatigueRelief,
+    fatigueRelief: CAREER_BALANCE.WEEK.recovery.mealFatigueRelief,
     stimulus: { technique: 0, power: 0, cardio: 0, defense: 0 },
     xp: 0,
   }),
@@ -3019,12 +3056,12 @@ const V2_HOME_ACTIVITIES = Object.freeze({
   }),
 });
 
-function v2HomeContext() {
-  const capsule = ensureV2PreviewCapsule();
+function careerHomeContext() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule?.timeState || !window.BoxeurRecovery || !window.BoxeurTime || !window.BoxeurWeekPlanner) return null;
   const timeState = capsule.timeState;
-  const preparation = v2PreparationView(timeState);
-  const plannerState = ensureV2WeekPlanner(capsule);
+  const preparation = careerPreparationView(timeState);
+  const plannerState = ensureCareerWeekPlanner(capsule);
   const preview = window.BoxeurWeekPlanner.previewPlan(plannerState);
   const pendingLoad = Object.values(timeState.stimulus).reduce((sum, value) => sum + Number(value || 0), 0);
   const recommendation = timeState.condition.fatigue >= 65
@@ -3034,14 +3071,14 @@ function v2HomeContext() {
       : preparation.score >= 80
         ? { title: "Tu peux ajouter une séance", detail: "Compare le coût hebdomadaire du GYM et de la maison avant de confirmer.", tone: "positive" }
         : { title: "Prévois une récupération", detail: "Une journée plus calme préservera une partie de ta réserve pour la semaine suivante.", tone: "steady" };
-  const actionState = id => v2PlannerActionState(id);
-  const homeEntries = v2PlannerLocationEntries(plannerState, "home");
+  const actionState = id => careerPlannerActionState(id);
+  const homeEntries = careerPlannerLocationEntries(plannerState, "home");
   return {
     profile: state.profile,
     careerStatus: state.careerStatus,
     clock: {
       ...timeState.clock,
-      dateLabel: v2CareerView().v2DateLabel,
+      dateLabel: careerCareerView().careerDateLabel,
     },
     condition: {
       energy: timeState.condition.energy,
@@ -3074,16 +3111,16 @@ function v2HomeContext() {
   };
 }
 
-function v2FighterContext() {
-  const capsule = ensureV2PreviewCapsule();
-  const runtime = capsule ? normalizeV2PreviewRuntime(capsule) : null;
-  const career = v2CareerView();
-  const progression = v2ProgressionSnapshot(capsule);
+function careerFighterContext() {
+  const capsule = ensureCareerPreviewCapsule();
+  const runtime = capsule ? normalizeCareerPreviewRuntime(capsule) : null;
+  const career = careerCareerView();
+  const progression = careerProgressionSnapshot(capsule);
   const timeStats = capsule?.timeState?.stats || progression?.stats || state.combatStats;
   const statXpProgress = capsule?.timeState && window.BoxeurTime
     ? window.BoxeurTime.getPublicState(capsule.timeState).statXpProgress
     : null;
-  const trainerState = runtime?.career?.v2TrainerState;
+  const trainerState = runtime?.career?.trainerState;
   return {
     profile: state.profile,
     careerStatus: state.careerStatus,
@@ -3111,91 +3148,91 @@ function v2FighterContext() {
   };
 }
 
-let v2LocationReturnFocus = null;
+let careerLocationReturnFocus = null;
 
-function setV2PrimaryNavigationView(navigation, viewId) {
+function setCareerPrimaryNavigationView(navigation, viewId) {
   if (!navigation) return;
   const activeView = ["map", "calendar", "fighter", "inventory"].includes(viewId) ? viewId : "map";
-  navigation.dataset.v2NavigationView = activeView;
-  navigation.querySelectorAll("[data-v2-nav]").forEach(button => {
-    const active = button.dataset.v2Nav === activeView;
+  navigation.dataset.careerNavigationView = activeView;
+  navigation.querySelectorAll("[data-career-nav]").forEach(button => {
+    const active = button.dataset.careerNav === activeView;
     button.classList.toggle("active", active);
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   });
 }
 
-function v2PrimaryNavigation() {
-  return document.querySelector("#v2-world [data-v2-primary-navigation]");
+function careerPrimaryNavigation() {
+  return document.querySelector("#career-world [data-career-primary-navigation]");
 }
 
-function renderV2PrimarySheet(sheet, html, activeView) {
-  const navigation = v2PrimaryNavigation();
+function renderCareerPrimarySheet(sheet, html, activeView) {
+  const navigation = careerPrimaryNavigation();
   if (navigation && sheet.contains(navigation)) navigation.remove();
   sheet.innerHTML = html;
   if (!navigation) return;
-  setV2PrimaryNavigationView(navigation, activeView);
+  setCareerPrimaryNavigationView(navigation, activeView);
   sheet.append(navigation);
 }
 
-function restoreV2PrimaryNavigation() {
-  const navigation = v2PrimaryNavigation();
-  const host = document.querySelector("#v2-world .v2-map-stack");
+function restoreCareerPrimaryNavigation() {
+  const navigation = careerPrimaryNavigation();
+  const host = document.querySelector("#career-world .career-map-stack");
   if (!navigation || !host) return;
-  setV2PrimaryNavigationView(navigation, "map");
+  setCareerPrimaryNavigationView(navigation, "map");
   host.append(navigation);
 }
 
-function v2LocationFocusableElements(sheet) {
+function careerLocationFocusableElements(sheet) {
   if (!sheet) return [];
   return Array.from(sheet.querySelectorAll("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"))
     .filter(element => element.getClientRects().length > 0 && !element.closest("[hidden]") && element.getAttribute("aria-hidden") !== "true");
 }
 
-function setV2LocationBackgroundInert(sheet, inactive) {
+function setCareerLocationBackgroundInert(sheet, inactive) {
   if (!sheet?.parentElement) return;
   Array.from(sheet.parentElement.children).forEach(element => {
     if (element === sheet) return;
     if (inactive) {
       if (!element.inert) {
         element.inert = true;
-        element.dataset.v2LocationInert = "true";
+        element.dataset.careerLocationInert = "true";
       }
-    } else if (element.dataset.v2LocationInert === "true") {
+    } else if (element.dataset.careerLocationInert === "true") {
       element.inert = false;
-      delete element.dataset.v2LocationInert;
+      delete element.dataset.careerLocationInert;
     }
   });
 }
 
-function activateV2LocationSheet(sheet, preferredFocusSelector) {
+function activateCareerLocationSheet(sheet, preferredFocusSelector) {
   if (!sheet) return;
-  const isWeekSurface = Boolean(sheet.querySelector(":scope > .v2-week-plan, :scope > .v2-week-summary"));
-  sheet.classList.toggle("v2-location-sheet-week", isWeekSurface);
+  const isWeekSurface = Boolean(sheet.querySelector(":scope > .career-week-plan, :scope > .career-week-summary"));
+  sheet.classList.toggle("career-location-sheet-week", isWeekSurface);
   sheet.hidden = false;
   sheet.setAttribute("role", "dialog");
   sheet.setAttribute("aria-modal", "true");
   sheet.setAttribute("tabindex", "-1");
   const title = sheet.querySelector("h2");
   if (title) {
-    if (!title.id) title.id = "v2-location-dialog-title";
+    if (!title.id) title.id = "career-location-dialog-title";
     sheet.setAttribute("aria-labelledby", title.id);
     sheet.removeAttribute("aria-label");
   } else {
     sheet.removeAttribute("aria-labelledby");
     sheet.setAttribute("aria-label", "Lieu du quartier");
   }
-  setV2LocationBackgroundInert(sheet, true);
+  setCareerLocationBackgroundInert(sheet, true);
   const preferred = preferredFocusSelector ? sheet.querySelector(preferredFocusSelector) : null;
-  const target = preferred || v2LocationFocusableElements(sheet)[0] || sheet;
+  const target = preferred || careerLocationFocusableElements(sheet)[0] || sheet;
   target.focus({ preventScroll: true });
 }
 
-function openV2Location(locationId) {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function openCareerLocation(locationId) {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet) return;
-  restoreV2PrimaryNavigation();
-  const career = v2CareerView();
+  restoreCareerPrimaryNavigation();
+  const career = careerCareerView();
   const access = window.BoxeurWorld?.locationAccess?.(locationId, career);
   if (access?.locked) {
     showToast(access.reason || "Ce lieu se débloque après le passage amateur.");
@@ -3203,64 +3240,64 @@ function openV2Location(locationId) {
   }
   if (sheet.hidden) {
     const currentFocus = document.activeElement;
-    v2LocationReturnFocus = currentFocus instanceof HTMLElement && currentFocus !== document.body
+    careerLocationReturnFocus = currentFocus instanceof HTMLElement && currentFocus !== document.body
       ? currentFocus
-      : document.querySelector(`#v2-world [data-v2-location="${safeIdentifier(locationId, "home")}"]`);
+      : document.querySelector(`#career-world [data-career-location="${safeIdentifier(locationId, "home")}"]`);
   }
   sheet.dataset.originLocation = locationId;
   const isBoxingGym = locationId === "boxing-gym" && window.BoxeurGymView;
   const isStrengthGym = locationId === "strength-gym" && window.BoxeurStrengthView;
   const isHome = locationId === "home" && window.BoxeurHomeView;
   const isWork = locationId === "work" && window.BoxeurWorkView;
-  sheet.classList.toggle("v2-location-sheet-full", Boolean(isBoxingGym || isStrengthGym || isHome || isWork));
-  sheet.classList.toggle("v2-location-sheet-strength", Boolean(isStrengthGym));
+  sheet.classList.toggle("career-location-sheet-full", Boolean(isBoxingGym || isStrengthGym || isHome || isWork));
+  sheet.classList.toggle("career-location-sheet-strength", Boolean(isStrengthGym));
   sheet.innerHTML = isBoxingGym
-    ? window.BoxeurGymView.render(v2GymContext())
+    ? window.BoxeurGymView.render(careerGymContext())
     : isStrengthGym
-      ? window.BoxeurStrengthView.render(v2StrengthContext())
+      ? window.BoxeurStrengthView.render(careerStrengthContext())
       : isHome
-        ? window.BoxeurHomeView.render(v2HomeContext())
+        ? window.BoxeurHomeView.render(careerHomeContext())
         : isWork
-          ? window.BoxeurWorkView.render(v2WorkLocationContext())
-        : window.BoxeurWorld.renderLocation(locationId, locationId === "work" ? v2WorkLocationContext() : career);
+          ? window.BoxeurWorkView.render(careerWorkLocationContext())
+        : window.BoxeurWorld.renderLocation(locationId, locationId === "work" ? careerWorkLocationContext() : career);
   if (["boxing-gym", "home", "work"].includes(locationId) && window.BoxeurWorld?.renderLocationGuide) {
     const guide = window.BoxeurWorld.renderLocationGuide(career, locationId);
     const guideTarget = isBoxingGym
-      ? sheet.querySelector(".v2-gym-dashboard")
+      ? sheet.querySelector(".career-gym-dashboard")
       : isHome
-        ? sheet.querySelector(".v2-home-dashboard")
+        ? sheet.querySelector(".career-home-dashboard")
         : isWork
-          ? sheet.querySelector(".v2-work-dashboard")
-          : sheet.querySelector(".v2-location-card");
+          ? sheet.querySelector(".career-work-dashboard")
+          : sheet.querySelector(".career-location-card");
     if (guide && guideTarget) guideTarget.insertAdjacentHTML("afterbegin", guide);
   }
-  activateV2LocationSheet(sheet, "[data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-leave-work], [data-v2-close-location], button");
+  activateCareerLocationSheet(sheet, "[data-career-leave-gym], [data-career-leave-strength-gym], [data-career-leave-home], [data-career-leave-work], [data-career-close-location], button");
 }
 
-function openV2Fighter() {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function openCareerFighter() {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet || !window.BoxeurFighterView) return;
   if (sheet.hidden) {
     const currentFocus = document.activeElement;
-    v2LocationReturnFocus = currentFocus instanceof HTMLElement && currentFocus !== document.body
+    careerLocationReturnFocus = currentFocus instanceof HTMLElement && currentFocus !== document.body
       ? currentFocus
-      : document.querySelector('#v2-world [data-v2-nav="fighter"]');
+      : document.querySelector('#career-world [data-career-nav="fighter"]');
   }
   sheet.dataset.originLocation = "fighter";
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.classList.remove("v2-location-sheet-strength", "v2-location-sheet-week");
-  renderV2PrimarySheet(sheet, window.BoxeurFighterView.render(v2FighterContext()), "fighter");
-  activateV2LocationSheet(sheet, '[data-v2-nav="fighter"]');
+  sheet.classList.add("career-location-sheet-full");
+  sheet.classList.remove("career-location-sheet-strength", "career-location-sheet-week");
+  renderCareerPrimarySheet(sheet, window.BoxeurFighterView.render(careerFighterContext()), "fighter");
+  activateCareerLocationSheet(sheet, '[data-career-nav="fighter"]');
 }
 
-function v2InventoryContext() {
-  const capsule = ensureV2PreviewCapsule();
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const plannerState = ensureV2WeekPlanner(capsule);
+function careerInventoryContext() {
+  const capsule = ensureCareerPreviewCapsule();
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const plannerState = ensureCareerWeekPlanner(capsule);
   const preview = window.BoxeurWeekPlanner.previewPlan(plannerState);
   const physicalEntries = preview.entries.filter(entry => entry.physical && entry.activityId !== "sparring" && !entry.metadata?.completed);
   const reservedByProduct = Object.fromEntries(preview.supplements.reservations.map(reservation => [reservation.productId, reservation.entryId]));
-  const inventory = window.BoxeurSupplements.inventoryList(v2SupplementState(capsule));
+  const inventory = window.BoxeurSupplements.inventoryList(careerSupplementState(capsule));
   return {
     profile: state.profile,
     eyebrow: "Inventaire de carrière",
@@ -3300,56 +3337,56 @@ function v2InventoryContext() {
   };
 }
 
-function openV2Inventory() {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function openCareerInventory() {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet || !window.BoxeurInventoryView) return;
   if (sheet.hidden) {
     const currentFocus = document.activeElement;
-    v2LocationReturnFocus = currentFocus instanceof HTMLElement && currentFocus !== document.body
+    careerLocationReturnFocus = currentFocus instanceof HTMLElement && currentFocus !== document.body
       ? currentFocus
-      : document.querySelector('#v2-world [data-v2-nav="inventory"]');
+      : document.querySelector('#career-world [data-career-nav="inventory"]');
   }
   sheet.dataset.originLocation = "inventory";
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.classList.remove("v2-location-sheet-strength", "v2-location-sheet-week");
-  renderV2PrimarySheet(sheet, window.BoxeurInventoryView.render(v2InventoryContext()), "inventory");
-  activateV2LocationSheet(sheet, '[data-v2-nav="inventory"], [data-v2-inventory-action]');
+  sheet.classList.add("career-location-sheet-full");
+  sheet.classList.remove("career-location-sheet-strength", "career-location-sheet-week");
+  renderCareerPrimarySheet(sheet, window.BoxeurInventoryView.render(careerInventoryContext()), "inventory");
+  activateCareerLocationSheet(sheet, '[data-career-nav="inventory"], [data-career-inventory-action]');
 }
 
-function openV2SupplementReservation(productId) {
-  const capsule = ensureV2PreviewCapsule();
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function openCareerSupplementReservation(productId) {
+  const capsule = ensureCareerPreviewCapsule();
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   const product = window.BoxeurSupplements.CATALOG[productId];
   if (!capsule || !sheet || !product) return;
-  const plannerState = ensureV2WeekPlanner(capsule);
+  const plannerState = ensureCareerWeekPlanner(capsule);
   const entries = plannerState.entries.filter(entry => entry.physical && entry.activityId !== "sparring" && !entry.metadata?.completed);
   const choices = entries.map(entry => {
     const selected = entry.supplementId === productId;
-    return `<article class="v2-supplement-card${selected ? " selected" : ""}"><div><p class="eyebrow">${escapeHTML(V2_PLANNER_DAY_LABELS[entry.day] || entry.day)}</p><h3>${escapeHTML(entry.label)}</h3></div><p>Coût actuel : ${entry.capacityCost} de capacité hebdomadaire.</p><button type="button" data-v2-plan-supplement-entry="${escapeHTML(entry.id)}" data-v2-plan-supplement-product="${escapeHTML(productId)}">${selected ? "Garder cette séance" : "Associer ici"}</button>${entry.supplementId && !selected ? `<small>Remplacera ${escapeHTML(window.BoxeurSupplements.CATALOG[entry.supplementId]?.label || "le produit actuel")}.</small>` : ""}${entry.supplementId ? `<button type="button" class="text-button" data-v2-plan-supplement-remove="${escapeHTML(entry.id)}">Retirer le produit actuel</button>` : ""}</article>`;
+    return `<article class="career-supplement-card${selected ? " selected" : ""}"><div><p class="eyebrow">${escapeHTML(CAREER_PLANNER_DAY_LABELS[entry.day] || entry.day)}</p><h3>${escapeHTML(entry.label)}</h3></div><p>Coût actuel : ${entry.capacityCost} de capacité hebdomadaire.</p><button type="button" data-career-plan-supplement-entry="${escapeHTML(entry.id)}" data-career-plan-supplement-product="${escapeHTML(productId)}">${selected ? "Garder cette séance" : "Associer ici"}</button>${entry.supplementId && !selected ? `<small>Remplacera ${escapeHTML(window.BoxeurSupplements.CATALOG[entry.supplementId]?.label || "le produit actuel")}.</small>` : ""}${entry.supplementId ? `<button type="button" class="text-button" data-career-plan-supplement-remove="${escapeHTML(entry.id)}">Retirer le produit actuel</button>` : ""}</article>`;
   }).join("");
   sheet.dataset.originLocation = "inventory";
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.classList.remove("v2-location-sheet-strength", "v2-location-sheet-week");
-  renderV2PrimarySheet(sheet, `<section class="v2-service-panel v2-supplement-picker" aria-labelledby="v2-inventory-reserve-title"><header><div><p class="eyebrow">${escapeHTML(product.label)} · ×${v2SupplementState(capsule).inventory[productId] || 0}</p><h2 id="v2-inventory-reserve-title">Choisis une séance</h2></div><button type="button" class="secondary-button" data-v2-inventory-reserve-close>Retour à l’inventaire</button></header><p>${escapeHTML(product.benefit)} Le coût hebdomadaire sera recalculé à partir du même effet appliqué pendant la séance; le produit sera consommé seulement à la confirmation.</p><div class="v2-supplement-grid">${choices}</div></section>`, "inventory");
-  activateV2LocationSheet(sheet, "[data-v2-plan-supplement-entry], [data-v2-inventory-reserve-close]");
+  sheet.classList.add("career-location-sheet-full");
+  sheet.classList.remove("career-location-sheet-strength", "career-location-sheet-week");
+  renderCareerPrimarySheet(sheet, `<section class="career-service-panel career-supplement-picker" aria-labelledby="career-inventory-reserve-title"><header><div><p class="eyebrow">${escapeHTML(product.label)} · ×${careerSupplementState(capsule).inventory[productId] || 0}</p><h2 id="career-inventory-reserve-title">Choisis une séance</h2></div><button type="button" class="secondary-button" data-career-inventory-reserve-close>Retour à l’inventaire</button></header><p>${escapeHTML(product.benefit)} Le coût hebdomadaire sera recalculé à partir du même effet appliqué pendant la séance; le produit sera consommé seulement à la confirmation.</p><div class="career-supplement-grid">${choices}</div></section>`, "inventory");
+  activateCareerLocationSheet(sheet, "[data-career-plan-supplement-entry], [data-career-inventory-reserve-close]");
 }
 
-function reserveV2PlannerSupplement(entryId, productId) {
-  const capsule = ensureV2PreviewCapsule();
+function reserveCareerPlannerSupplement(entryId, productId) {
+  const capsule = ensureCareerPreviewCapsule();
   try {
-    const outcome = v2PlannerReserveSupplementOnState(ensureV2WeekPlanner(capsule), entryId, productId);
-    v2PlannerStore(capsule, outcome.state);
-    openV2Inventory();
+    const outcome = careerPlannerReserveSupplementOnState(ensureCareerWeekPlanner(capsule), entryId, productId);
+    careerPlannerStore(capsule, outcome.state);
+    openCareerInventory();
     showToast(`${window.BoxeurSupplements.CATALOG[productId]?.label || "Supplément"} réservé · la barre hebdomadaire remonte légèrement`);
   } catch (error) {
     showToast(error.message || "Ce supplément ne peut pas être réservé.");
   }
 }
 
-function unreserveV2PlannerSupplement(entryId) {
-  const capsule = ensureV2PreviewCapsule();
+function unreserveCareerPlannerSupplement(entryId) {
+  const capsule = ensureCareerPreviewCapsule();
   try {
-    let plannerState = ensureV2WeekPlanner(capsule);
+    let plannerState = ensureCareerWeekPlanner(capsule);
     const entry = plannerState.entries.find(item => item.id === entryId);
     if (!entry?.supplementId) return;
     const unreserved = window.BoxeurWeekPlanner.unreserveSupplement(plannerState, entryId);
@@ -3371,36 +3408,36 @@ function unreserveV2PlannerSupplement(entryId) {
       fatigueDelta: restoredFatigue,
       metadata,
     }).state;
-    v2PlannerStore(capsule, plannerState);
-    openV2Inventory();
+    careerPlannerStore(capsule, plannerState);
+    openCareerInventory();
     showToast("Réservation retirée · le produit reste dans l’inventaire.");
   } catch (error) {
     showToast(error.message || "La réservation ne peut pas être retirée.");
   }
 }
 
-function closeV2Location() {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function closeCareerLocation() {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet) return;
   const origin = sheet.dataset.originLocation;
-  const rememberedFocus = v2LocationReturnFocus;
-  restoreV2PrimaryNavigation();
+  const rememberedFocus = careerLocationReturnFocus;
+  restoreCareerPrimaryNavigation();
   sheet.hidden = true;
-  sheet.classList.remove("v2-location-sheet-full");
-  sheet.classList.remove("v2-location-sheet-strength");
-  sheet.classList.remove("v2-location-sheet-week");
-  setV2LocationBackgroundInert(sheet, false);
-  v2LocationReturnFocus = null;
-  const fallback = document.querySelector(`#v2-world [data-v2-location="${safeIdentifier(origin, "home")}"]`);
+  sheet.classList.remove("career-location-sheet-full");
+  sheet.classList.remove("career-location-sheet-strength");
+  sheet.classList.remove("career-location-sheet-week");
+  setCareerLocationBackgroundInert(sheet, false);
+  careerLocationReturnFocus = null;
+  const fallback = document.querySelector(`#career-world [data-career-location="${safeIdentifier(origin, "home")}"]`);
   const target = rememberedFocus?.isConnected ? rememberedFocus : fallback;
   target?.focus({ preventScroll: true });
 }
 
-function revealPendingV2LevelAlert() {
+function revealPendingCareerLevelAlert() {
   if (state.levelAnnouncementPending) setTimeout(showCareerAlertOrContinue, 0);
 }
 
-const V2_EXERCISE_TO_ENGINE = Object.freeze({
+const CAREER_EXERCISE_TO_ENGINE = Object.freeze({
   "jump-rope": "jump_rope",
   "shadow-boxing": "shadow_boxing",
   "heavy-bag": "heavy_bag",
@@ -3409,31 +3446,31 @@ const V2_EXERCISE_TO_ENGINE = Object.freeze({
   cooldown: "cooldown",
 });
 
-function v2TrainingContext() {
-  const capsule = ensureV2PreviewCapsule();
-  const runtimeCareer = capsule ? normalizeV2PreviewRuntime(capsule).career : createV2RuntimeCareer();
+function careerTrainingContext() {
+  const capsule = ensureCareerPreviewCapsule();
+  const runtimeCareer = capsule ? normalizeCareerPreviewRuntime(capsule).career : createCareerRuntimeCareer();
   return {
     membershipActive: runtimeCareer.gymWeeks > 0,
     careerStatus: state.careerStatus,
   };
 }
 
-function v2Signed(value, suffix = " %") {
+function careerSigned(value, suffix = " %") {
   const rounded = Math.round(Number(value) * 10) / 10;
   return `${rounded > 0 ? "+" : ""}${rounded}${suffix}`;
 }
 
-function v2WeekStartSlot(timeState) {
+function careerWeekStartSlot(timeState) {
   return (timeState.clock.week - 1) * window.BoxeurTime.PERIODS_PER_WEEK;
 }
 
-function v2DayStartSlot(timeState, absoluteSlot = timeState?.clock?.absoluteSlot) {
+function careerDayStartSlot(timeState, absoluteSlot = timeState?.clock?.absoluteSlot) {
   if (!timeState?.clock || !window.BoxeurTime || !Number.isFinite(Number(absoluteSlot))) return 0;
   const moment = window.BoxeurTime.fromAbsoluteSlot(Math.max(0, Math.trunc(Number(absoluteSlot))));
   return Math.trunc(Number(absoluteSlot)) - moment.periodIndex;
 }
 
-function v2IsPrimaryPhysicalEvent(event) {
+function careerIsPrimaryPhysicalEvent(event) {
   if (event?.type !== "activity-completed") return false;
   const category = String(event.activityCategory || "");
   const activityId = String(event.activityId || "");
@@ -3445,27 +3482,27 @@ function v2IsPrimaryPhysicalEvent(event) {
     || activityId.startsWith("private-trainer:");
 }
 
-function v2PrimaryTrainingOnDay(timeState, dayStartSlot = v2DayStartSlot(timeState)) {
+function careerPrimaryTrainingOnDay(timeState, dayStartSlot = careerDayStartSlot(timeState)) {
   if (!Array.isArray(timeState?.history) || !window.BoxeurTime) return false;
   const dayEndSlot = dayStartSlot + window.BoxeurTime.PERIODS_PER_DAY;
   return timeState.history.some(event => {
     if (event?.type !== "activity-completed") return false;
     const fromSlot = Number(event.fromSlot);
     if (!Number.isFinite(fromSlot) || fromSlot < dayStartSlot || fromSlot >= dayEndSlot) return false;
-    return v2IsPrimaryPhysicalEvent(event);
+    return careerIsPrimaryPhysicalEvent(event);
   });
 }
 
-function v2NextTrainingWindow(timeState) {
+function careerNextTrainingWindow(timeState) {
   if (!timeState?.clock || !window.BoxeurTime) return { available: false, reason: "Horaire de carrière indisponible." };
   const now = timeState.clock.absoluteSlot;
-  const currentDayStart = v2DayStartSlot(timeState, now);
-  const trainedToday = v2PrimaryTrainingOnDay(timeState, currentDayStart);
+  const currentDayStart = careerDayStartSlot(timeState, now);
+  const trainedToday = careerPrimaryTrainingOnDay(timeState, currentDayStart);
   let startSlot = trainedToday
     ? currentDayStart + window.BoxeurTime.PERIODS_PER_DAY + 2
     : currentDayStart + 2;
   if (startSlot < now) startSlot += window.BoxeurTime.PERIODS_PER_DAY;
-  const weekEnd = v2WeekStartSlot(timeState) + window.BoxeurTime.PERIODS_PER_WEEK;
+  const weekEnd = careerWeekStartSlot(timeState) + window.BoxeurTime.PERIODS_PER_WEEK;
   if (startSlot + 1 >= weekEnd) {
     return {
       available: false,
@@ -3483,8 +3520,8 @@ function v2NextTrainingWindow(timeState) {
   };
 }
 
-function prepareV2TrainingWindow(capsule) {
-  const windowState = v2NextTrainingWindow(capsule?.timeState);
+function prepareCareerTrainingWindow(capsule) {
+  const windowState = careerNextTrainingWindow(capsule?.timeState);
   if (!windowState.available) {
     const error = new Error(windowState.reason);
     error.code = "NO_TRAINING_WINDOW";
@@ -3496,51 +3533,51 @@ function prepareV2TrainingWindow(capsule) {
   return windowState;
 }
 
-function v2WouldCrossWeek(timeState, duration = 1) {
+function careerWouldCrossWeek(timeState, duration = 1) {
   if (!timeState?.clock || !window.BoxeurTime) return false;
-  const weekEnd = v2WeekStartSlot(timeState) + window.BoxeurTime.PERIODS_PER_WEEK;
+  const weekEnd = careerWeekStartSlot(timeState) + window.BoxeurTime.PERIODS_PER_WEEK;
   return timeState.clock.absoluteSlot + Math.max(1, Number(duration) || 1) >= weekEnd;
 }
 
-function v2WeekTrainingActivityCount(timeState, weekNumber = timeState?.clock?.week) {
+function careerWeekTrainingActivityCount(timeState, weekNumber = timeState?.clock?.week) {
   if (!timeState?.clock || !Array.isArray(timeState.history) || !window.BoxeurTime) return 0;
   const week = safeNumber(weekNumber, timeState.clock.week, 1, 99999);
   const start = (week - 1) * window.BoxeurTime.PERIODS_PER_WEEK;
   const end = start + window.BoxeurTime.PERIODS_PER_WEEK;
   return timeState.history.filter(event => (
-    v2IsPrimaryPhysicalEvent(event)
+    careerIsPrimaryPhysicalEvent(event)
     && Number(event.fromSlot) >= start
     && Number(event.fromSlot) < end
   )).length;
 }
 
-function v2WeekWorkActivityCount(timeState, jobId = null) {
+function careerWeekWorkActivityCount(timeState, jobId = null) {
   if (!timeState?.clock || !Array.isArray(timeState.history) || !window.BoxeurTime) return 0;
-  const start = v2WeekStartSlot(timeState);
+  const start = careerWeekStartSlot(timeState);
   const end = start + window.BoxeurTime.PERIODS_PER_WEEK;
-  const expectedId = jobId ? `v2-work:${jobId}` : null;
+  const expectedId = jobId ? `work:${jobId}` : null;
   return timeState.history.filter(event => (
     event.type === "activity-completed"
     && Number(event.fromSlot) >= start
     && Number(event.fromSlot) < end
-    && (String(event.activityId || "").startsWith("v2-work:") || (expectedId && event.activityId === expectedId))
+    && (String(event.activityId || "").startsWith("work:") || (expectedId && event.activityId === expectedId))
   )).length;
 }
 
-function v2WorkStatus(timeState, career = {}) {
+function careerWorkStatus(timeState, career = {}) {
   const job = jobs.find(item => item.id === career.jobId) || null;
-  const completed = Boolean(job && v2WeekWorkActivityCount(timeState, job.id) > 0);
-  const tooLate = Boolean(job && !completed && v2WouldCrossWeek(timeState, 2));
+  const completed = Boolean(job && careerWeekWorkActivityCount(timeState, job.id) > 0);
+  const tooLate = Boolean(job && !completed && careerWouldCrossWeek(timeState, 2));
   return {
-    v2WorkCompleted: completed,
-    v2WorkAvailable: Boolean(job && !completed && !tooLate),
-    v2WorkBlockReason: completed
+    careerWorkCompleted: completed,
+    careerWorkAvailable: Boolean(job && !completed && !tooLate),
+    careerWorkBlockReason: completed
       ? "Travail fait cette semaine · paie hebdomadaire versée."
       : tooLate ? "Il ne reste pas assez de temps pour assurer cette semaine de travail avant lundi." : "",
   };
 }
 
-function v2WeekLedger(runtime, weekNumber) {
+function careerWeekLedger(runtime, weekNumber) {
   const key = String(safeNumber(weekNumber, 1, 1, 99999));
   const supplied = runtime.weekLedgers[key] && typeof runtime.weekLedgers[key] === "object" ? runtime.weekLedgers[key] : {};
   runtime.weekLedgers[key] = {
@@ -3550,8 +3587,8 @@ function v2WeekLedger(runtime, weekNumber) {
   return runtime.weekLedgers[key];
 }
 
-function recordV2Work(runtime, weekNumber, grossWages, workShifts = 1) {
-  const ledger = v2WeekLedger(runtime, weekNumber);
+function recordCareerWork(runtime, weekNumber, grossWages, workShifts = 1) {
+  const ledger = careerWeekLedger(runtime, weekNumber);
   const pay = safeNumber(grossWages, 0, 0, 99999999);
   const shifts = safeNumber(workShifts, 0, 0, 99);
   ledger.grossWages += pay;
@@ -3559,13 +3596,13 @@ function recordV2Work(runtime, weekNumber, grossWages, workShifts = 1) {
   return ledger;
 }
 
-const V2_WEEK_CAPACITY_MILESTONE_GAIN = V2_BALANCE.WEEK.milestoneGain;
-const V2_WEEK_RULESET_VERSION = 10;
-const V2_CONDITION_CRITICAL_ENERGY = V2_BALANCE.WEEK.condition.criticalEnergy;
-const V2_CONDITION_CRITICAL_FATIGUE = V2_BALANCE.WEEK.condition.criticalFatigue;
-const V2_CONDITION_FRAGILE_ENERGY = V2_BALANCE.WEEK.condition.fragileEnergy;
-const V2_CONDITION_FRAGILE_FATIGUE = V2_BALANCE.WEEK.condition.fragileFatigue;
-const V2_DEMANDING_ACTIVITY_IDS = new Set([
+const CAREER_WEEK_CAPACITY_MILESTONE_GAIN = CAREER_BALANCE.WEEK.milestoneGain;
+const CAREER_WEEK_RULESET_VERSION = 10;
+const CAREER_CONDITION_CRITICAL_ENERGY = CAREER_BALANCE.WEEK.condition.criticalEnergy;
+const CAREER_CONDITION_CRITICAL_FATIGUE = CAREER_BALANCE.WEEK.condition.criticalFatigue;
+const CAREER_CONDITION_FRAGILE_ENERGY = CAREER_BALANCE.WEEK.condition.fragileEnergy;
+const CAREER_CONDITION_FRAGILE_FATIGUE = CAREER_BALANCE.WEEK.condition.fragileFatigue;
+const CAREER_DEMANDING_ACTIVITY_IDS = new Set([
   "boxing-coach",
   "boxing-custom",
   "strength-quick",
@@ -3576,23 +3613,23 @@ const V2_DEMANDING_ACTIVITY_IDS = new Set([
   "roadwork-long",
   "roadwork-intervals",
 ]);
-const V2_DEMANDING_JOB_IDS = new Set(["courier", "warehouse"]);
-const V2_WEEK_ACTIVITY_LIMITS = Object.freeze({
+const CAREER_DEMANDING_JOB_IDS = new Set(["courier", "warehouse"]);
+const CAREER_WEEK_ACTIVITY_LIMITS = Object.freeze({
   "group-class": 1,
   rest: 2,
   meal: 1,
   sparring: 1,
 });
-const V2_WEEK_FAMILY_LIMITS = Object.freeze({
+const CAREER_WEEK_FAMILY_LIMITS = Object.freeze({
   group: 1,
   boxing: 2,
   strength: 2,
   home: 2,
   sparring: 1,
 });
-const V2_WEEK_TOGGLE_ACTIVITY_IDS = new Set(["group-class", "rest", "meal", "sparring"]);
-const V2_CUSTOM_SESSION_BASE_COST = 2;
-const V2_PLANNER_DAY_LABELS = Object.freeze({
+const CAREER_WEEK_TOGGLE_ACTIVITY_IDS = new Set(["group-class", "rest", "meal", "sparring"]);
+const CAREER_CUSTOM_SESSION_BASE_COST = 2;
+const CAREER_PLANNER_DAY_LABELS = Object.freeze({
   monday: "Lundi",
   tuesday: "Mardi",
   wednesday: "Mercredi",
@@ -3602,29 +3639,29 @@ const V2_PLANNER_DAY_LABELS = Object.freeze({
   sunday: "Dimanche",
 });
 
-function v2PlannerWeekKey(capsule = ensureV2PreviewCapsule()) {
+function careerPlannerWeekKey(capsule = ensureCareerPreviewCapsule()) {
   return `week-${capsule?.timeState?.clock?.week || state.week}`;
 }
 
-function v2PlannerLoadCost(energyCost, fatigueDelta, minimum = 4, extraBaseCost = 0) {
-  return V2_BALANCE.activityCapacityCost(energyCost, fatigueDelta, { minimum, extraBaseCost });
+function careerPlannerLoadCost(energyCost, fatigueDelta, minimum = 4, extraBaseCost = 0) {
+  return CAREER_BALANCE.activityCapacityCost(energyCost, fatigueDelta, { minimum, extraBaseCost });
 }
 
-function v2PlannerWorkCost(job) {
-  return V2_BALANCE.workCapacityCost(job);
+function careerPlannerWorkCost(job) {
+  return CAREER_BALANCE.workCapacityCost(job);
 }
 
-function v2PlannerCapacityTotal() {
-  return V2_BALANCE.weeklyCapacity(state.level);
+function careerPlannerCapacityTotal() {
+  return CAREER_BALANCE.weeklyCapacity(state.level);
 }
 
-function v2ActiveRecoveryConsequence(capsule, career = normalizeV2PreviewRuntime(capsule).career) {
+function careerActiveRecoveryConsequence(capsule, career = normalizeCareerPreviewRuntime(capsule).career) {
   const consequence = normalizeRecoveryConsequence(career?.recoveryConsequence);
   const week = safeNumber(capsule?.timeState?.clock?.week, state.week, 1, 99999);
   return consequence?.week === week ? consequence : null;
 }
 
-function v2PlannerUnavailableCapacity(capsule, career, _job, total = v2PlannerCapacityTotal()) {
+function careerPlannerUnavailableCapacity(capsule, career, _job, total = careerPlannerCapacityTotal()) {
   const condition = capsule.timeState.condition || {};
   const conditionPenalty = Math.round(
     Math.max(0, Number(condition.fatigue || 0) - 58) / 8
@@ -3633,18 +3670,18 @@ function v2PlannerUnavailableCapacity(capsule, career, _job, total = v2PlannerCa
   const rhythmPenalty = isCompetitiveCareer()
     ? safeNumber(runtimeCareerTrainingRhythm(career), 0, 0, 4) * 5
     : 0;
-  const forcedRecoveryCost = v2ActiveRecoveryConsequence(capsule, career)?.capacityCost || 0;
+  const forcedRecoveryCost = careerActiveRecoveryConsequence(capsule, career)?.capacityCost || 0;
   return Math.min(total, Math.max(conditionPenalty, forcedRecoveryCost) + rhythmPenalty);
 }
 
-function runtimeCareerTrainingRhythm(career = v2CareerView()) {
+function runtimeCareerTrainingRhythm(career = careerCareerView()) {
   return safeNumber(career?.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 4);
 }
 
-function v2ConditionActivityAccess(activityId, capsule = ensureV2PreviewCapsule()) {
+function careerConditionActivityAccess(activityId, capsule = ensureCareerPreviewCapsule()) {
   if (!capsule?.timeState) return { available: false, reason: "État physique indisponible." };
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const activeRecovery = v2ActiveRecoveryConsequence(capsule, runtime.career);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const activeRecovery = careerActiveRecoveryConsequence(capsule, runtime.career);
   const id = String(activityId || "");
   if (activeRecovery) {
     if (id === "rest") {
@@ -3658,14 +3695,14 @@ function v2ConditionActivityAccess(activityId, capsule = ensureV2PreviewCapsule(
   if (["rest", "meal"].includes(id)) return { available: true, reason: "" };
   const energy = Number(capsule.timeState.condition.energy || 0);
   const fatigue = Number(capsule.timeState.condition.fatigue || 0);
-  if (energy <= V2_CONDITION_CRITICAL_ENERGY || fatigue >= V2_CONDITION_CRITICAL_FATIGUE) {
+  if (energy <= CAREER_CONDITION_CRITICAL_ENERGY || fatigue >= CAREER_CONDITION_CRITICAL_FATIGUE) {
     return {
       available: false,
       reason: "L’état physique est critique : repose-toi avant de travailler ou de t’entraîner.",
     };
   }
-  if (V2_DEMANDING_ACTIVITY_IDS.has(id)
-    && (energy <= V2_CONDITION_FRAGILE_ENERGY || fatigue >= V2_CONDITION_FRAGILE_FATIGUE)) {
+  if (CAREER_DEMANDING_ACTIVITY_IDS.has(id)
+    && (energy <= CAREER_CONDITION_FRAGILE_ENERGY || fatigue >= CAREER_CONDITION_FRAGILE_FATIGUE)) {
     return {
       available: false,
       reason: "L’état physique est trop fragile pour une activité exigeante. Choisis un effort léger ou du repos.",
@@ -3674,10 +3711,10 @@ function v2ConditionActivityAccess(activityId, capsule = ensureV2PreviewCapsule(
   return { available: true, reason: "" };
 }
 
-function v2PlannerWorkAccess(capsule, job, total = v2PlannerCapacityTotal()) {
+function careerPlannerWorkAccess(capsule, job, total = careerPlannerCapacityTotal()) {
   if (!job) return { available: false, reason: "Choisis d’abord un emploi." };
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const activeRecovery = v2ActiveRecoveryConsequence(capsule, runtime.career);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const activeRecovery = careerActiveRecoveryConsequence(capsule, runtime.career);
   if (activeRecovery) {
     const label = activeRecovery.kind === "hospital" ? "La nuit à l’hôpital" : "Le repos forcé";
     return { available: false, reason: `${label} empêche de travailler cette semaine.` };
@@ -3685,15 +3722,15 @@ function v2PlannerWorkAccess(capsule, job, total = v2PlannerCapacityTotal()) {
   const condition = capsule.timeState.condition || {};
   const energy = Number(condition.energy || 0);
   const fatigue = Number(condition.fatigue || 0);
-  if (energy <= V2_CONDITION_CRITICAL_ENERGY || fatigue >= V2_CONDITION_CRITICAL_FATIGUE) {
+  if (energy <= CAREER_CONDITION_CRITICAL_ENERGY || fatigue >= CAREER_CONDITION_CRITICAL_FATIGUE) {
     return { available: false, reason: "L’état physique est critique : cette semaine doit servir à récupérer." };
   }
-  if (V2_DEMANDING_JOB_IDS.has(job.id)
-    && (energy <= V2_CONDITION_FRAGILE_ENERGY || fatigue >= V2_CONDITION_FRAGILE_FATIGUE)) {
+  if (CAREER_DEMANDING_JOB_IDS.has(job.id)
+    && (energy <= CAREER_CONDITION_FRAGILE_ENERGY || fatigue >= CAREER_CONDITION_FRAGILE_FATIGUE)) {
     return { available: false, reason: "Ton état physique est trop fragile pour assurer cet emploi exigeant." };
   }
-  const unavailable = v2PlannerUnavailableCapacity(capsule, runtime.career, null, total);
-  const workCost = v2PlannerWorkCost(job);
+  const unavailable = careerPlannerUnavailableCapacity(capsule, runtime.career, null, total);
+  const workCost = careerPlannerWorkCost(job);
   if (unavailable + workCost > total) {
     return {
       available: false,
@@ -3703,10 +3740,10 @@ function v2PlannerWorkAccess(capsule, job, total = v2PlannerCapacityTotal()) {
   return { available: true, reason: "" };
 }
 
-function v2PlannerSupplementConfig(capsule) {
-  const supplementState = v2SupplementState(capsule);
+function careerPlannerSupplementConfig(capsule) {
+  const supplementState = careerSupplementState(capsule);
   if (!supplementState) return { inventory: {}, weeklyLimit: 0, alreadyUsed: 0, usedProductIds: [] };
-  const currentKeys = new Set([v2PlannerWeekKey(capsule), String(capsule.timeState.clock.week)]);
+  const currentKeys = new Set([careerPlannerWeekKey(capsule), String(capsule.timeState.clock.week)]);
   const currentUsage = currentKeys.has(String(supplementState.weeklyUsage?.weekKey));
   return {
     inventory: cloneData(supplementState.inventory || {}),
@@ -3717,18 +3754,18 @@ function v2PlannerSupplementConfig(capsule) {
   };
 }
 
-function v2PlannerBaseConfig(capsule = ensureV2PreviewCapsule()) {
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const career = v2CareerView();
+function careerPlannerBaseConfig(capsule = ensureCareerPreviewCapsule()) {
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const career = careerCareerView();
   const job = jobs.find(item => item.id === runtime.career.jobId) || null;
-  const capacityTotal = v2PlannerCapacityTotal();
-  const workAccess = job ? v2PlannerWorkAccess(capsule, job, capacityTotal) : { available: false, reason: "" };
+  const capacityTotal = careerPlannerCapacityTotal();
+  const workAccess = job ? careerPlannerWorkAccess(capsule, job, capacityTotal) : { available: false, reason: "" };
   return {
-    weekKey: v2PlannerWeekKey(capsule),
+    weekKey: careerPlannerWeekKey(capsule),
     careerStatus: state.careerStatus,
     capacity: {
       total: capacityTotal,
-      unavailable: v2PlannerUnavailableCapacity(capsule, career, job, capacityTotal),
+      unavailable: careerPlannerUnavailableCapacity(capsule, career, job, capacityTotal),
     },
     condition: cloneData(capsule.timeState.condition),
     work: job && workAccess.available ? {
@@ -3736,7 +3773,7 @@ function v2PlannerBaseConfig(capsule = ensureV2PreviewCapsule()) {
       title: job.title,
       active: true,
       weeklyPay: job.wage,
-      capacityCost: v2PlannerWorkCost(job),
+      capacityCost: careerPlannerWorkCost(job),
       energyCost: Math.max(0, -Number(job.energy || 0)),
       fatigueGain: Math.max(0, Number(job.fatigue || 0)),
       // Une entrée représente toute la semaine de travail; elle est réglée le
@@ -3745,22 +3782,22 @@ function v2PlannerBaseConfig(capsule = ensureV2PreviewCapsule()) {
       locked: false,
     } : null,
     workBlockedReason: job && !workAccess.available ? workAccess.reason : "",
-    supplements: v2PlannerSupplementConfig(capsule),
+    supplements: careerPlannerSupplementConfig(capsule),
     limits: {
       recreationalPhysicalActivities: 2,
       family: {
-        ...V2_WEEK_FAMILY_LIMITS,
-        home: state.careerStatus === "recreational" ? 1 : V2_WEEK_FAMILY_LIMITS.home,
+        ...CAREER_WEEK_FAMILY_LIMITS,
+        home: state.careerStatus === "recreational" ? 1 : CAREER_WEEK_FAMILY_LIMITS.home,
       },
     },
   };
 }
 
-function v2PlannerSignature(capsule = ensureV2PreviewCapsule()) {
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const supplementState = runtime.career.v2SupplementState;
+function careerPlannerSignature(capsule = ensureCareerPreviewCapsule()) {
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const supplementState = runtime.career.supplementState;
   return JSON.stringify([
-    V2_WEEK_RULESET_VERSION,
+    CAREER_WEEK_RULESET_VERSION,
     capsule.timeState.clock.week,
     state.careerStatus,
     runtime.career.jobId,
@@ -3773,12 +3810,12 @@ function v2PlannerSignature(capsule = ensureV2PreviewCapsule()) {
     runtime.career.recoveryConsequence || null,
     supplementState?.inventory || {},
     supplementState?.weeklyUsage || {},
-    runtime.career.v2TrainerState?.activeProgram || null,
+    runtime.career.trainerState?.activeProgram || null,
   ]);
 }
 
-function v2PlannerBoxingAggregate(metadata = {}, options = {}) {
-  const capsule = ensureV2PreviewCapsule();
+function careerPlannerBoxingAggregate(metadata = {}, options = {}) {
+  const capsule = ensureCareerPreviewCapsule();
   const blockIds = Array.isArray(metadata.blocks)
     ? metadata.blocks.filter(id => window.BoxeurTraining.EXERCISES[id])
     : [];
@@ -3790,20 +3827,20 @@ function v2PlannerBoxingAggregate(metadata = {}, options = {}) {
       source: options.source || metadata.source || "custom",
     });
   } else {
-    session = window.BoxeurTraining.buildCoachSession(capsule.timeState, v2TrainingContext());
+    session = window.BoxeurTraining.buildCoachSession(capsule.timeState, careerTrainingContext());
   }
   const aggregate = window.BoxeurTraining.aggregateSession(session);
   return { session: aggregate.session, totals: aggregate.totals };
 }
 
-function v2PlannerHomeAggregate(selectionInput) {
+function careerPlannerHomeAggregate(selectionInput) {
   const hasExplicitSelection = Array.isArray(selectionInput);
   const selection = hasExplicitSelection
-    ? [...new Set(selectionInput.filter(id => V2_HOME_ACTIVITIES[id]?.category === "home-training"))].slice(0, 3)
+    ? [...new Set(selectionInput.filter(id => CAREER_HOME_ACTIVITIES[id]?.category === "home-training"))].slice(0, 3)
     : [];
   const chosen = selection.length ? selection : hasExplicitSelection ? [] : ["shadow-boxing", "basement-bag"];
   const totals = chosen.reduce((sum, id) => {
-    const activity = V2_HOME_ACTIVITIES[id];
+    const activity = CAREER_HOME_ACTIVITIES[id];
     sum.energyCost += activity.energyCost;
     sum.fatigueGain += activity.fatigueGain;
     sum.xp += activity.xp;
@@ -3814,17 +3851,17 @@ function v2PlannerHomeAggregate(selectionInput) {
   return { selection: chosen, totals };
 }
 
-function v2PlannerActivityDefinition(activityId, metadata = {}) {
+function careerPlannerActivityDefinition(activityId, metadata = {}) {
   const id = String(activityId || "");
   if (["group-class", "boxing-coach", "boxing-custom"].includes(id)) {
     const groupClass = id === "group-class";
     const custom = id === "boxing-custom";
-    const aggregate = v2PlannerBoxingAggregate(metadata, {
+    const aggregate = careerPlannerBoxingAggregate(metadata, {
       label: groupClass ? "Cours de groupe · fondamentaux" : custom ? "Séance de boxe personnalisée" : "Séance de l’entraîneur",
       source: custom ? "custom" : "coach",
     });
     const familyId = groupClass ? "group" : "boxing";
-    const capacityExtraBase = custom ? V2_CUSTOM_SESSION_BASE_COST : 0;
+    const capacityExtraBase = custom ? CAREER_CUSTOM_SESSION_BASE_COST : 0;
     const programSignature = `${familyId}:${aggregate.session.blocks.map(block => block.id).sort().join("+")}`;
     return {
       id,
@@ -3832,7 +3869,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: groupClass ? "group-class" : "boxing",
       location: "boxing-gym",
       physical: true,
-      capacityCost: v2PlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 4, capacityExtraBase),
+      capacityCost: careerPlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 4, capacityExtraBase),
       energyCost: aggregate.totals.energyCost,
       fatigueDelta: aggregate.totals.fatigueDelta,
       recreationalAllowed: groupClass,
@@ -3866,14 +3903,14 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
         throw new Error("Une séance personnalisée doit contenir un échauffement, un exercice principal et un retour au calme.");
       }
     }
-    const capacityExtraBase = id === "strength-custom" ? V2_CUSTOM_SESSION_BASE_COST : 0;
+    const capacityExtraBase = id === "strength-custom" ? CAREER_CUSTOM_SESSION_BASE_COST : 0;
     return {
       id,
       label: id === "strength-quick" ? "Cours de CrossFit" : "Séance de musculation personnalisée",
       category: "strength",
       location: "strength-gym",
       physical: true,
-      capacityCost: v2PlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 4, capacityExtraBase),
+      capacityCost: careerPlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 4, capacityExtraBase),
       energyCost: aggregate.totals.energyCost,
       fatigueDelta: aggregate.totals.fatigueDelta,
       metadata: {
@@ -3892,7 +3929,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
     };
   }
   if (["roadwork-short", "roadwork-long", "roadwork-intervals"].includes(id)) {
-    const activity = V2_HOME_ACTIVITIES[id];
+    const activity = CAREER_HOME_ACTIVITIES[id];
     const capacityMinimum = id === "roadwork-short" ? 5 : 7;
     return {
       id,
@@ -3900,7 +3937,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: "home",
       location: "home",
       physical: true,
-      capacityCost: v2PlannerLoadCost(activity.energyCost, activity.fatigueGain, capacityMinimum),
+      capacityCost: careerPlannerLoadCost(activity.energyCost, activity.fatigueGain, capacityMinimum),
       energyCost: activity.energyCost,
       fatigueDelta: activity.fatigueGain,
       recreationalAllowed: id === "roadwork-short",
@@ -3917,18 +3954,18 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
     };
   }
   if (["home-quick", "home-custom"].includes(id)) {
-    const aggregate = v2PlannerHomeAggregate(id === "home-custom" ? metadata.selection : ["shadow-boxing", "basement-bag"]);
+    const aggregate = careerPlannerHomeAggregate(id === "home-custom" ? metadata.selection : ["shadow-boxing", "basement-bag"]);
     if (id === "home-custom" && aggregate.selection.length === 0) {
       throw new Error("Choisis au moins une activité pour bâtir l’entraînement maison.");
     }
-    const capacityExtraBase = id === "home-custom" ? V2_CUSTOM_SESSION_BASE_COST : 0;
+    const capacityExtraBase = id === "home-custom" ? CAREER_CUSTOM_SESSION_BASE_COST : 0;
     return {
       id,
       label: id === "home-quick" ? "Entraînement maison rapide" : "Entraînement maison personnalisé",
       category: "home",
       location: "home",
       physical: true,
-      capacityCost: v2PlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 5, capacityExtraBase),
+      capacityCost: careerPlannerLoadCost(aggregate.totals.energyCost, aggregate.totals.fatigueDelta, 5, capacityExtraBase),
       energyCost: aggregate.totals.energyCost,
       fatigueDelta: aggregate.totals.fatigueDelta,
       recreationalAllowed: id === "home-quick",
@@ -3952,9 +3989,9 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: "recovery",
       location: "home",
       physical: false,
-      capacityCost: V2_BALANCE.WEEK.recovery.restCapacityCost,
-      energyGain: V2_BALANCE.WEEK.recovery.restEnergyGain,
-      fatigueDelta: -V2_BALANCE.WEEK.recovery.restFatigueRelief,
+      capacityCost: CAREER_BALANCE.WEEK.recovery.restCapacityCost,
+      energyGain: CAREER_BALANCE.WEEK.recovery.restEnergyGain,
+      fatigueDelta: -CAREER_BALANCE.WEEK.recovery.restFatigueRelief,
       recreationalAllowed: true,
       metadata: { plannerType: id },
     };
@@ -3967,19 +4004,19 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       location: "home",
       physical: false,
       capacityCost: 0,
-      energyGain: V2_BALANCE.WEEK.recovery.mealEnergyGain,
-      fatigueDelta: -V2_BALANCE.WEEK.recovery.mealFatigueRelief,
+      energyGain: CAREER_BALANCE.WEEK.recovery.mealEnergyGain,
+      fatigueDelta: -CAREER_BALANCE.WEEK.recovery.mealFatigueRelief,
       recreationalAllowed: true,
-      metadata: { plannerType: id, moneyCost: V2_BALANCE.WEEK.recovery.mealCost },
+      metadata: { plannerType: id, moneyCost: CAREER_BALANCE.WEEK.recovery.mealCost },
     };
   }
   if (id === "private-training") {
-    const capsule = ensureV2PreviewCapsule();
-    const runtime = normalizeV2PreviewRuntime(capsule);
-    const program = window.BoxeurTrainer.getPublicState(runtime.career.v2TrainerState).activeProgram;
+    const capsule = ensureCareerPreviewCapsule();
+    const runtime = normalizeCareerPreviewRuntime(capsule);
+    const program = window.BoxeurTrainer.getPublicState(runtime.career.trainerState).activeProgram;
     const trainer = program ? window.BoxeurTrainer.getTrainer(program.trainerId) : null;
     if (!program || !trainer) throw new Error("Aucun programme privé n’est actif.");
-    const location = v2TrainerLocationForTarget(program.target);
+    const location = careerTrainerLocationForTarget(program.target);
     const familyId = location === "strength-gym" ? "strength" : "boxing";
     return {
       id,
@@ -3987,7 +4024,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: "private-training",
       location,
       physical: true,
-      capacityCost: v2PlannerLoadCost(trainer.energyCost, trainer.fatigue),
+      capacityCost: careerPlannerLoadCost(trainer.energyCost, trainer.fatigue),
       energyCost: trainer.energyCost,
       fatigueDelta: trainer.fatigue,
       metadata: {
@@ -4011,7 +4048,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
       category: "sparring",
       location: "boxing-gym",
       physical: true,
-      capacityCost: metadata.immediate === true ? 18 : v2PlannerLoadCost(18, 14, 12),
+      capacityCost: metadata.immediate === true ? 18 : careerPlannerLoadCost(18, 14, 12),
       energyCost: 18,
       fatigueDelta: 14,
       metadata: {
@@ -4030,7 +4067,7 @@ function v2PlannerActivityDefinition(activityId, metadata = {}) {
   throw new Error("Cette activité n’est pas reconnue par le planificateur.");
 }
 
-function isV2OfficialFightWeek(capsule = ensureV2PreviewCapsule()) {
+function isCareerOfficialFightWeek(capsule = ensureCareerPreviewCapsule()) {
   const currentWeek = Number(capsule?.timeState?.clock?.week || state.week);
   const scheduled = state.scheduledFight;
   const scheduledOfficial = Boolean(
@@ -4048,11 +4085,11 @@ function isV2OfficialFightWeek(capsule = ensureV2PreviewCapsule()) {
   return scheduledOfficial || activeTournamentWeek;
 }
 
-function v2PlannerActivityAccess(activityId) {
-  const capsule = ensureV2PreviewCapsule();
-  const runtime = normalizeV2PreviewRuntime(capsule);
+function careerPlannerActivityAccess(activityId) {
+  const capsule = ensureCareerPreviewCapsule();
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const id = String(activityId || "");
-  const conditionAccess = v2ConditionActivityAccess(id, capsule);
+  const conditionAccess = careerConditionActivityAccess(id, capsule);
   if (!conditionAccess.available) return conditionAccess;
   if (["group-class", "boxing-coach", "boxing-custom", "sparring"].includes(id) && runtime.career.gymWeeks <= 0) {
     return { available: false, reason: "Un abonnement actif au GYM de boxe est requis." };
@@ -4064,7 +4101,7 @@ function v2PlannerActivityAccess(activityId) {
     return { available: false, reason: "Cette activité se débloque après le passage amateur." };
   }
   if (id === "private-training") {
-    const program = runtime.career.v2TrainerState?.activeProgram;
+    const program = runtime.career.trainerState?.activeProgram;
     if (!program) return { available: false, reason: "Choisis d’abord un programme avec un entraîneur privé." };
     const physicalProgram = ["power", "cardio"].includes(program.target);
     if (physicalProgram && runtime.career.strengthGymWeeks <= 0) {
@@ -4075,7 +4112,7 @@ function v2PlannerActivityAccess(activityId) {
     }
   }
   if (id === "sparring") {
-    if (state.careerStatus === "amateur" && isV2OfficialFightWeek(capsule)) {
+    if (state.careerStatus === "amateur" && isCareerOfficialFightWeek(capsule)) {
       return { available: false, reason: "Le sparring n’est pas disponible pendant une semaine de combat officiel." };
     }
     if (state.careerStatus !== "amateur" && state.scheduledFight) {
@@ -4088,8 +4125,8 @@ function v2PlannerActivityAccess(activityId) {
   return { available: true, reason: "" };
 }
 
-function v2PlannerRebuild(capsule, previous) {
-  const baseConfig = v2PlannerBaseConfig(capsule);
+function careerPlannerRebuild(capsule, previous) {
+  const baseConfig = careerPlannerBaseConfig(capsule);
   const workOptedOut = previous?.workOptedOut === true;
   if (workOptedOut) baseConfig.work = null;
   let rebuilt = window.BoxeurWeekPlanner.createPlanner(baseConfig);
@@ -4098,17 +4135,17 @@ function v2PlannerRebuild(capsule, previous) {
   const oldEntries = Array.isArray(previous?.entries) ? previous.entries.filter(entry => !entry.preReserved) : [];
   oldEntries.forEach(entry => {
     try {
-      const access = v2PlannerActivityAccess(entry.activityId);
+      const access = careerPlannerActivityAccess(entry.activityId);
       const alreadyConsumed = entry.activityId === "sparring" && entry.metadata?.immediate === true;
       if (!access.available && !alreadyConsumed) throw new Error(access.reason);
-      const definition = v2PlannerActivityDefinition(entry.activityId, entry.metadata || {});
+      const definition = careerPlannerActivityDefinition(entry.activityId, entry.metadata || {});
       const added = window.BoxeurWeekPlanner.addActivity(rebuilt, definition, {
         day: entry.day,
         source: entry.source,
       });
       rebuilt = added.state;
       if (entry.supplementId) {
-        const reserved = v2PlannerReserveSupplementOnState(rebuilt, added.result.entry.id, entry.supplementId);
+        const reserved = careerPlannerReserveSupplementOnState(rebuilt, added.result.entry.id, entry.supplementId);
         rebuilt = reserved.state;
       }
     } catch (error) {
@@ -4119,33 +4156,33 @@ function v2PlannerRebuild(capsule, previous) {
   return rebuilt;
 }
 
-function ensureV2WeekPlanner(capsule = ensureV2PreviewCapsule()) {
+function ensureCareerWeekPlanner(capsule = ensureCareerPreviewCapsule()) {
   if (!capsule || !window.BoxeurWeekPlanner) return null;
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const signature = v2PlannerSignature(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const signature = careerPlannerSignature(capsule);
   const current = runtime.weekPlanner;
-  const currentWeek = v2PlannerWeekKey(capsule);
+  const currentWeek = careerPlannerWeekKey(capsule);
   if (!current || current.weekKey !== currentWeek || current.status !== "draft" || runtime.weekPlannerSignature !== signature) {
-    runtime.weekPlanner = v2PlannerRebuild(capsule, current?.weekKey === currentWeek && current?.status === "draft" ? current : null);
+    runtime.weekPlanner = careerPlannerRebuild(capsule, current?.weekKey === currentWeek && current?.status === "draft" ? current : null);
     runtime.weekPlannerSignature = signature;
   }
   return runtime.weekPlanner;
 }
 
-function v2PlannerStore(capsule, plannerState) {
-  const runtime = normalizeV2PreviewRuntime(capsule);
+function careerPlannerStore(capsule, plannerState) {
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   runtime.weekPlanner = plannerState;
-  runtime.weekPlannerSignature = v2PlannerSignature(capsule);
-  persistV2PreviewCapsule();
-  renderV2WorldPreview(true);
+  runtime.weekPlannerSignature = careerPlannerSignature(capsule);
+  persistCareerPreviewCapsule();
+  renderCareerWorldPreview(true);
   return plannerState;
 }
 
-function v2PlannerEntryCount(plannerState, activityId) {
+function careerPlannerEntryCount(plannerState, activityId) {
   return plannerState.entries.filter(entry => !entry.preReserved && entry.activityId === activityId).length;
 }
 
-function v2PlannerLocationEntries(plannerState, locationId) {
+function careerPlannerLocationEntries(plannerState, locationId) {
   return plannerState.entries
     .filter(entry => !entry.preReserved && entry.location === locationId)
     .map(entry => ({
@@ -4158,23 +4195,23 @@ function v2PlannerLocationEntries(plannerState, locationId) {
     }));
 }
 
-function v2PlannerActionState(activityId, metadata = {}) {
-  const capsule = ensureV2PreviewCapsule();
-  const plannerState = ensureV2WeekPlanner(capsule);
-  const access = v2PlannerActivityAccess(activityId);
+function careerPlannerActionState(activityId, metadata = {}) {
+  const capsule = ensureCareerPreviewCapsule();
+  const plannerState = ensureCareerWeekPlanner(capsule);
+  const access = careerPlannerActivityAccess(activityId);
   if (!access.available) return { ...access, planned: false, entryId: null };
   const existingEntries = plannerState.entries.filter(entry => !entry.preReserved && entry.activityId === activityId);
   const existing = existingEntries[0] || null;
-  const toggleActivity = V2_WEEK_TOGGLE_ACTIVITY_IDS.has(activityId);
+  const toggleActivity = CAREER_WEEK_TOGGLE_ACTIVITY_IDS.has(activityId);
   if (toggleActivity && existing) {
     return { available: true, reason: "", planned: true, plannedCount: existingEntries.length, entryId: existing.id };
   }
-  const max = V2_WEEK_ACTIVITY_LIMITS[activityId];
+  const max = CAREER_WEEK_ACTIVITY_LIMITS[activityId];
   if (max != null && existingEntries.length >= max) {
     return { available: false, reason: "Le maximum hebdomadaire de cette activité est atteint.", planned: existingEntries.length > 0, plannedCount: existingEntries.length, entryId: existing?.id || null };
   }
   try {
-    const definition = v2PlannerActivityDefinition(activityId, metadata);
+    const definition = careerPlannerActivityDefinition(activityId, metadata);
     const quote = window.BoxeurWeekPlanner.quoteActivity(plannerState, definition);
     return {
       available: quote.ok,
@@ -4189,7 +4226,7 @@ function v2PlannerActionState(activityId, metadata = {}) {
   }
 }
 
-function v2PlannerReserveSupplementOnState(plannerState, entryId, productId) {
+function careerPlannerReserveSupplementOnState(plannerState, entryId, productId) {
   const entry = plannerState.entries.find(item => item.id === entryId);
   if (!entry) throw new Error("La séance choisie n’existe plus.");
   if (entry.activityId === "sparring") throw new Error("Les suppléments ne s’appliquent pas au sparring interactif.");
@@ -4239,7 +4276,7 @@ function v2PlannerReserveSupplementOnState(plannerState, entryId, productId) {
   const adjustedFatigueGain = Math.round(baseFatigueGain * safeNumber(product.effects?.fatigueGainMultiplier, 1, .5, 1.5, false) * 100) / 100;
   const adjustedFatigueRelief = Math.round((baseFatigueRelief + safeNumber(product.effects?.fatigueRelief, 0, 0, 20, false)) * 100) / 100;
   const adjustedFatigueDelta = adjustedFatigueGain - adjustedFatigueRelief;
-  const adjustedCost = v2PlannerLoadCost(
+  const adjustedCost = careerPlannerLoadCost(
     adjustedEnergy,
     adjustedFatigueDelta,
     safeNumber(currentEntry.metadata?.capacityMinimum, 4, 1, 20),
@@ -4264,29 +4301,29 @@ function v2PlannerReserveSupplementOnState(plannerState, entryId, productId) {
   return window.BoxeurWeekPlanner.reserveSupplement(working, entryId, productId);
 }
 
-function addV2PlannerActivity(activityId, metadata = {}, options = {}) {
-  const capsule = ensureV2PreviewCapsule();
+function addCareerPlannerActivity(activityId, metadata = {}, options = {}) {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule) return null;
-  const access = v2PlannerActivityAccess(activityId);
+  const access = careerPlannerActivityAccess(activityId);
   if (!access.available) return showToast(access.reason);
-  let plannerState = ensureV2WeekPlanner(capsule);
-  const max = V2_WEEK_ACTIVITY_LIMITS[activityId];
+  let plannerState = ensureCareerWeekPlanner(capsule);
+  const max = CAREER_WEEK_ACTIVITY_LIMITS[activityId];
   const existing = plannerState.entries.find(entry => !entry.preReserved && entry.activityId === activityId);
-  if (options.toggle === true && existing) return removeV2PlannerActivity(existing.id, { reopen: options.reopen });
-  if (max != null && v2PlannerEntryCount(plannerState, activityId) >= max) return showToast(`Cette activité est déjà planifiée au maximum ${max} fois cette semaine.`);
+  if (options.toggle === true && existing) return removeCareerPlannerActivity(existing.id, { reopen: options.reopen });
+  if (max != null && careerPlannerEntryCount(plannerState, activityId) >= max) return showToast(`Cette activité est déjà planifiée au maximum ${max} fois cette semaine.`);
   try {
-    const definition = v2PlannerActivityDefinition(activityId, metadata);
+    const definition = careerPlannerActivityDefinition(activityId, metadata);
     const defaultDay = activityId === "rest" ? "sunday" : activityId === "meal" ? "wednesday" : undefined;
     const outcome = window.BoxeurWeekPlanner.addActivity(plannerState, definition, {
       preferredDay: options.preferredDay || defaultDay,
       source: options.source,
     });
-    v2PlannerStore(capsule, outcome.state);
+    careerPlannerStore(capsule, outcome.state);
     const reservationLabel = outcome.result.capacityReserved > 0
       ? `−${outcome.result.capacityReserved} de capacité hebdomadaire`
       : "aucun coût de capacité hebdomadaire";
     showToast(`${outcome.result.entry.label} ajouté à la semaine · ${reservationLabel}`);
-    if (options.reopen) openV2Location(options.reopen);
+    if (options.reopen) openCareerLocation(options.reopen);
     return outcome;
   } catch (error) {
     showToast(error.message || "Cette activité ne peut pas être ajoutée à la semaine.");
@@ -4294,11 +4331,11 @@ function addV2PlannerActivity(activityId, metadata = {}, options = {}) {
   }
 }
 
-function removeV2PlannerActivity(entryId, options = {}) {
-  const capsule = ensureV2PreviewCapsule();
+function removeCareerPlannerActivity(entryId, options = {}) {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule) return null;
   try {
-    const plannerState = ensureV2WeekPlanner(capsule);
+    const plannerState = ensureCareerWeekPlanner(capsule);
     const entry = plannerState.entries.find(item => item.id === entryId);
     if (entry?.metadata?.immediate) {
       showToast("Le sparring commencé ne peut pas être retiré : ses 18 points de capacité ont été consommés.");
@@ -4306,9 +4343,9 @@ function removeV2PlannerActivity(entryId, options = {}) {
     }
     const outcome = window.BoxeurWeekPlanner.removeActivity(plannerState, entryId);
     if (entry?.source === "work") outcome.state.workOptedOut = true;
-    v2PlannerStore(capsule, outcome.state);
+    careerPlannerStore(capsule, outcome.state);
     showToast(`${entry?.label || "Activité"} retiré du programme · énergie remboursée`);
-    if (options.reopen) openV2Location(options.reopen);
+    if (options.reopen) openCareerLocation(options.reopen);
     return outcome;
   } catch (error) {
     showToast(error.message || "Cette activité ne peut pas être retirée.");
@@ -4316,28 +4353,28 @@ function removeV2PlannerActivity(entryId, options = {}) {
   }
 }
 
-function setV2PlannerWorkAttendance(planned) {
-  const capsule = ensureV2PreviewCapsule();
+function setCareerPlannerWorkAttendance(planned) {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule || !window.BoxeurWeekPlanner) return null;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const job = jobs.find(item => item.id === runtime.career.jobId) || null;
   if (!job) return showToast("Choisis d’abord un emploi.");
-  const plannerState = ensureV2WeekPlanner(capsule);
+  const plannerState = ensureCareerWeekPlanner(capsule);
   const workEntry = plannerState.entries.find(entry => entry.source === "work");
   if (!planned) {
     if (!workEntry) return null;
-    return removeV2PlannerActivity(workEntry.id, { reopen: "work" });
+    return removeCareerPlannerActivity(workEntry.id, { reopen: "work" });
   }
   if (workEntry) return null;
   try {
-    const access = v2PlannerWorkAccess(capsule, job);
+    const access = careerPlannerWorkAccess(capsule, job);
     if (!access.available) throw new Error(access.reason);
     const previous = cloneData(plannerState);
     previous.workOptedOut = false;
-    const rebuilt = v2PlannerRebuild(capsule, previous);
+    const rebuilt = careerPlannerRebuild(capsule, previous);
     rebuilt.revision = plannerState.revision + 1;
-    v2PlannerStore(capsule, rebuilt);
-    openV2Location("work");
+    careerPlannerStore(capsule, rebuilt);
+    openCareerLocation("work");
     showToast(`${job.title} ajouté à la semaine · paie de ${job.wage} $ prévue`);
     return rebuilt;
   } catch (error) {
@@ -4346,12 +4383,12 @@ function setV2PlannerWorkAttendance(planned) {
   }
 }
 
-function applyV2QuickWeekPlan() {
-  const capsule = ensureV2PreviewCapsule();
+function applyCareerQuickWeekPlan() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule) return;
-  const blocker = v2WeekQuickBlockReason(v2CareerView());
+  const blocker = careerWeekQuickBlockReason(careerCareerView());
   if (blocker) return showToast(blocker);
-  let plannerState = ensureV2WeekPlanner(capsule);
+  let plannerState = ensureCareerWeekPlanner(capsule);
   const candidates = [];
   if (state.careerStatus === "recreational") {
     candidates.push({ id: "group-class", day: "tuesday" }, { id: "rest", day: "sunday" });
@@ -4361,13 +4398,13 @@ function applyV2QuickWeekPlan() {
     // repos sans avertissement lorsque la capacité devient serrée.
     candidates.push({ id: "boxing-coach", day: "tuesday" });
     candidates.push({ id: "rest", day: "sunday" });
-    if (v2CareerView().strengthGymWeeks > 0) candidates.push({ id: "strength-quick", day: "thursday" });
+    if (careerCareerView().strengthGymWeeks > 0) candidates.push({ id: "strength-quick", day: "thursday" });
     else candidates.push({ id: "home-quick", day: "thursday" });
   }
   const accepted = [];
   for (const candidate of candidates) {
     try {
-      const definition = v2PlannerActivityDefinition(candidate.id);
+      const definition = careerPlannerActivityDefinition(candidate.id);
       window.BoxeurWeekPlanner.applyQuickPlan(plannerState, [
         ...accepted,
         { activity: definition, day: candidate.day },
@@ -4379,23 +4416,23 @@ function applyV2QuickWeekPlan() {
   }
   try {
     const outcome = window.BoxeurWeekPlanner.applyQuickPlan(plannerState, accepted);
-    v2PlannerStore(capsule, outcome.state);
-    openV2WeekPlan();
+    careerPlannerStore(capsule, outcome.state);
+    openCareerWeekPlan();
     showToast("Plan rapide créé · tu peux encore le modifier avant de confirmer.");
   } catch (error) {
     showToast(error.message || "Le plan rapide ne peut pas être préparé.");
   }
 }
 
-function v2WeekQuickBlockReason(career = v2CareerView()) {
-  const onboarding = v2OnboardingView();
+function careerWeekQuickBlockReason(career = careerCareerView()) {
+  const onboarding = careerOnboardingView();
   if (onboarding && !onboarding.gates.closeWeek.allowed) return onboarding.gates.closeWeek.reason;
   if (career.introJobRequired && !career.jobId) return "Choisis d’abord ton emploi de départ dans le lieu Emploi.";
   if (career.initialGymRequired && career.gymWeeks <= 0) return "Inscris-toi d’abord au GYM de boxe. Ton budget de départ couvre le premier mois.";
   if (state.scheduledFight && state.scheduledFight.week <= career.week) return "Un combat est arrivé : règle ce rendez-vous avant de terminer la semaine.";
   if (state.activeTournament && state.activeTournament.status !== "completed" && state.activeTournament.startWeek <= career.week) return "Le tournoi est en cours : les décisions se prennent maintenant à l’aréna.";
-  const capsule = ensureV2PreviewCapsule();
-  const weekEnd = capsule?.timeState ? v2WeekStartSlot(capsule.timeState) + window.BoxeurTime.PERIODS_PER_WEEK : 0;
+  const capsule = ensureCareerPreviewCapsule();
+  const weekEnd = capsule?.timeState ? careerWeekStartSlot(capsule.timeState) + window.BoxeurTime.PERIODS_PER_WEEK : 0;
   const importantAppointment = capsule?.timeState?.appointments?.find(appointment => (
     Number(appointment.startSlot) >= Number(capsule.timeState.clock.absoluteSlot)
       && Number(appointment.startSlot) < weekEnd
@@ -4405,12 +4442,12 @@ function v2WeekQuickBlockReason(career = v2CareerView()) {
   return "";
 }
 
-function v2WeekViewContext() {
-  const capsule = ensureV2PreviewCapsule();
-  const career = v2CareerView();
-  const plannerState = ensureV2WeekPlanner(capsule);
+function careerWeekViewContext() {
+  const capsule = ensureCareerPreviewCapsule();
+  const career = careerCareerView();
+  const plannerState = ensureCareerWeekPlanner(capsule);
   const preview = window.BoxeurWeekPlanner.previewPlan(plannerState);
-  const blocker = v2WeekQuickBlockReason(career);
+  const blocker = careerWeekQuickBlockReason(career);
   const remainingRatio = preview.capacity.total > 0 ? preview.capacity.remaining / preview.capacity.total : 0;
   const zone = preview.capacity.remaining <= 0
     ? "blocked"
@@ -4427,7 +4464,7 @@ function v2WeekViewContext() {
   };
   const rhythmPenalty = runtimeCareerTrainingRhythm(career);
   const rhythmCapacity = isCompetitiveCareer() ? rhythmPenalty * 5 : 0;
-  const activeRecovery = v2ActiveRecoveryConsequence(capsule, normalizeV2PreviewRuntime(capsule).career);
+  const activeRecovery = careerActiveRecoveryConsequence(capsule, normalizeCareerPreviewRuntime(capsule).career);
   const plannedItems = preview.entries.map(entry => {
     const effects = [];
     if (entry.pay > 0) effects.push(`+${Math.round(entry.pay)} $ à la fin de la semaine`);
@@ -4442,7 +4479,7 @@ function v2WeekViewContext() {
       id: entry.id,
       label: entry.label,
       detail: effects.join(" · ") || "Inclus dans le programme.",
-      dayLabel: V2_PLANNER_DAY_LABELS[entry.day] || entry.day,
+      dayLabel: CAREER_PLANNER_DAY_LABELS[entry.day] || entry.day,
       cost: entry.capacityCost,
       tone: entry.preReserved ? "neutral" : entry.metadata?.completed ? "positive" : entry.energyCost >= 20 ? "warning" : "positive",
       removable: !entry.locked && !entry.metadata?.completed && !entry.metadata?.immediate,
@@ -4465,7 +4502,7 @@ function v2WeekViewContext() {
     ? `${preview.capacity.unavailable} point${preview.capacity.unavailable > 1 ? "s" : ""} occupé${preview.capacity.unavailable > 1 ? "s" : ""} au départ, dont ${activeRecovery.capacityCost} par ${activeRecovery.kind === "hospital" ? "la nuit à l’hôpital" : "le repos forcé"}. Ton maximum permanent reste intact.`
     : preview.capacity.unavailable > 0
       ? `${preview.capacity.unavailable} point${preview.capacity.unavailable > 1 ? "s" : ""} occupé${preview.capacity.unavailable > 1 ? "s" : ""} au départ${rhythmCapacity > 0 ? `, dont ${rhythmCapacity} par le manque d’entraînement` : ""}${preview.capacity.unavailable > rhythmCapacity ? `${rhythmCapacity > 0 ? " et" : ", dont"} ${preview.capacity.unavailable - rhythmCapacity} par l’état physique` : ""}. Ton maximum permanent reste intact.`
-      : `Ton maximum permanent augmente de ${V2_WEEK_CAPACITY_MILESTONE_GAIN} aux niveaux 5, 10 et 15.`;
+      : `Ton maximum permanent augmente de ${CAREER_WEEK_CAPACITY_MILESTONE_GAIN} aux niveaux 5, 10 et 15.`;
   return {
     week: capsule.timeState.clock.week,
     capacity: {
@@ -4498,29 +4535,29 @@ function v2WeekViewContext() {
   };
 }
 
-function openV2WeekPlan() {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function openCareerWeekPlan() {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet || !window.BoxeurWeekView) return;
   if (sheet.hidden) {
     const currentFocus = document.activeElement;
-    v2LocationReturnFocus = currentFocus instanceof HTMLElement && currentFocus !== document.body ? currentFocus : null;
+    careerLocationReturnFocus = currentFocus instanceof HTMLElement && currentFocus !== document.body ? currentFocus : null;
   }
   sheet.dataset.originLocation = "week";
-  sheet.classList.remove("v2-location-sheet-full");
-  sheet.innerHTML = window.BoxeurWeekView.renderPlan(v2WeekViewContext());
-  activateV2LocationSheet(sheet, "[data-v2-week-confirm]");
+  sheet.classList.remove("career-location-sheet-full");
+  sheet.innerHTML = window.BoxeurWeekView.renderPlan(careerWeekViewContext());
+  activateCareerLocationSheet(sheet, "[data-career-week-confirm]");
 }
 
-function selectV2DetailedWeek() {
-  openV2WeekPlan();
+function selectCareerDetailedWeek() {
+  openCareerWeekPlan();
 }
 
-function addV2EmploymentEvent(events, week, label, detail, tone = "neutral") {
+function addCareerEmploymentEvent(events, week, label, detail, tone = "neutral") {
   events.push({ label, detail, tone });
   state.journal.unshift({ week, text: detail });
 }
 
-function accrueV2PaidVacation(runtime, job, events, week) {
+function accrueCareerPaidVacation(runtime, job, events, week) {
   const career = runtime.career;
   const requiredTenure = career.jobVacationEarnedAtTenure
     ? career.jobVacationEarnedAtTenure + PAID_VACATION_INTERVAL_WEEKS
@@ -4528,7 +4565,7 @@ function accrueV2PaidVacation(runtime, job, events, week) {
   if (career.jobTenureWeeks < requiredTenure) return;
   career.jobVacationEarnedAtTenure = requiredTenure;
   if (career.vacationBankWeeks >= MAX_PAID_VACATION_WEEKS) {
-    addV2EmploymentEvent(
+    addCareerEmploymentEvent(
       events,
       week,
       "Vacances",
@@ -4537,7 +4574,7 @@ function accrueV2PaidVacation(runtime, job, events, week) {
     return;
   }
   career.vacationBankWeeks += 1;
-  addV2EmploymentEvent(
+  addCareerEmploymentEvent(
     events,
     week,
     "Vacances acquises",
@@ -4546,17 +4583,17 @@ function accrueV2PaidVacation(runtime, job, events, week) {
   );
 }
 
-function settleV2JobAttendance(runtime, worked, events, week, excused = false) {
+function settleCareerJobAttendance(runtime, worked, events, week, excused = false) {
   const career = runtime.career;
   const job = jobs.find(item => item.id === career.jobId) || null;
   if (!job) {
     career.missedWorkWeeks = 0;
     return;
   }
-  const ledger = v2WeekLedger(runtime, week);
+  const ledger = careerWeekLedger(runtime, week);
   if (worked) {
     if (career.missedWorkWeeks > 0) {
-      addV2EmploymentEvent(
+      addCareerEmploymentEvent(
         events,
         week,
         "Présence enregistrée",
@@ -4566,19 +4603,19 @@ function settleV2JobAttendance(runtime, worked, events, week, excused = false) {
     }
     career.jobTenureWeeks += 1;
     career.jobWagesEarned += ledger.grossWages;
-    accrueV2PaidVacation(runtime, job, events, week);
+    accrueCareerPaidVacation(runtime, job, events, week);
     return;
   }
   if (excused) {
-    addV2EmploymentEvent(events, week, "Absence protégée", `${job.title} : l’absence est justifiée; ton emploi demeure protégé.`, "neutral");
+    addCareerEmploymentEvent(events, week, "Absence protégée", `${job.title} : l’absence est justifiée; ton emploi demeure protégé.`, "neutral");
     career.jobTenureWeeks += 1;
-    accrueV2PaidVacation(runtime, job, events, week);
+    accrueCareerPaidVacation(runtime, job, events, week);
     return;
   }
   career.missedWorkWeeks += 1;
   if (career.missedWorkWeeks < 3) {
     const remaining = 3 - career.missedWorkWeeks;
-    addV2EmploymentEvent(
+    addCareerEmploymentEvent(
       events,
       week,
       career.missedWorkWeeks === 1 ? "Première absence" : "Dernier avertissement",
@@ -4590,7 +4627,7 @@ function settleV2JobAttendance(runtime, worked, events, week, excused = false) {
   const vacationPayout = career.vacationBankWeeks > 0 ? Math.round(career.jobWagesEarned * .04) : 0;
   if (vacationPayout) career.money += vacationPayout;
   const detail = `${job.title} : congédiement après trois absences injustifiées cumulées chez le même employeur.${vacationPayout ? ` Indemnité de vacances : +${vacationPayout} $ (4 % des salaires reçus).` : ""}`;
-  addV2EmploymentEvent(events, week, "Emploi perdu", detail, "critical");
+  addCareerEmploymentEvent(events, week, "Emploi perdu", detail, "critical");
   career.jobId = null;
   career.missedWorkWeeks = 0;
   career.jobTenureWeeks = 0;
@@ -4603,7 +4640,7 @@ function settleV2JobAttendance(runtime, worked, events, week, excused = false) {
   state.jobLossNotice = `Tu as perdu ton emploi de ${job.title} après trois absences injustifiées cumulées.${vacationPayout ? ` Une indemnité de vacances de ${vacationPayout} $ a été versée.` : ""}`;
 }
 
-function advanceV2JobApplication(runtime, events, week) {
+function advanceCareerJobApplication(runtime, events, week) {
   const career = runtime.career;
   const application = career.jobApplication;
   if (!application || application.appliedWeek > week) return;
@@ -4615,7 +4652,7 @@ function advanceV2JobApplication(runtime, events, week) {
   application.progress = Math.min(application.requiredWeeks, application.progress + 1);
   if (application.progress < application.requiredWeeks) {
     const remaining = application.requiredWeeks - application.progress;
-    addV2EmploymentEvent(
+    addCareerEmploymentEvent(
       events,
       week,
       "Candidature en cours",
@@ -4636,7 +4673,7 @@ function advanceV2JobApplication(runtime, events, week) {
   career.jobReferenceBonus = false;
   career.jobApplication = null;
   state.workStreak = 0;
-  addV2EmploymentEvent(
+  addCareerEmploymentEvent(
     events,
     week,
     "Embauche confirmée",
@@ -4647,7 +4684,7 @@ function advanceV2JobApplication(runtime, events, week) {
   );
 }
 
-function v2WeeklyCompletionEvents(result, runtime, previousWeek) {
+function careerWeeklyCompletionEvents(result, runtime, previousWeek) {
   const events = [];
   const completedWeek = result.timeState.clock.week > previousWeek;
   if (!completedWeek) return events;
@@ -4659,11 +4696,11 @@ function v2WeeklyCompletionEvents(result, runtime, previousWeek) {
     if (runtime.career.gymWeeks === 0) events.push({ label: "Abonnement expiré", detail: "Renouvelle le GYM pour reprendre les séances encadrées.", tone: "warning" });
   }
   if (runtime.career.strengthGymWeeks > 0) runtime.career.strengthGymWeeks -= 1;
-  const ledger = v2WeekLedger(runtime, previousWeek);
-  settleV2JobAttendance(runtime, ledger.workShifts > 0, events, previousWeek);
-  advanceV2JobApplication(runtime, events, previousWeek);
+  const ledger = careerWeekLedger(runtime, previousWeek);
+  settleCareerJobAttendance(runtime, ledger.workShifts > 0, events, previousWeek);
+  advanceCareerJobApplication(runtime, events, previousWeek);
   if (isCompetitiveCareer()) {
-    const trained = v2WeekTrainingActivityCount(result.timeState, previousWeek) > 0;
+    const trained = careerWeekTrainingActivityCount(result.timeState, previousWeek) > 0;
     const beforeRhythm = safeNumber(runtime.career.trainingRhythmPenalty, state.trainingRhythmPenalty, 0, 4);
     const afterRhythm = trained ? Math.max(0, beforeRhythm - 1) : Math.min(4, beforeRhythm + 1);
     runtime.career.trainingRhythmPenalty = afterRhythm;
@@ -4690,7 +4727,7 @@ function v2WeeklyCompletionEvents(result, runtime, previousWeek) {
   return events;
 }
 
-function applyV2UnrecoveredWorkload(result, plannerEntries, startingCondition, previousWeek) {
+function applyCareerUnrecoveredWorkload(result, plannerEntries, startingCondition, previousWeek) {
   const entries = Array.isArray(plannerEntries) ? plannerEntries : [];
   if (entries.some(entry => entry.activityId === "rest")) return null;
   const demandingEntries = entries.filter(entry => entry.preReserved || entry.physical === true);
@@ -4718,7 +4755,7 @@ function applyV2UnrecoveredWorkload(result, plannerEntries, startingCondition, p
   return event;
 }
 
-function applyV2RecoveryConsequence(result, runtime, plannerEntries, previousWeek) {
+function applyCareerRecoveryConsequence(result, runtime, plannerEntries, previousWeek) {
   if (!window.BoxeurWeekPlanner?.assessRecoveryRisk) return null;
   const plannedRest = plannerEntries.some(entry => entry.activityId === "rest");
   const risk = window.BoxeurWeekPlanner.assessRecoveryRisk({
@@ -4772,7 +4809,7 @@ function applyV2RecoveryConsequence(result, runtime, plannerEntries, previousWee
   return event;
 }
 
-function v2WeekSummaryView(result, completionEvents = [], options = {}) {
+function careerWeekSummaryView(result, completionEvents = [], options = {}) {
   const grossWages = result.summary.actions
     .filter(record => record.kind === "work")
     .reduce((sum, record) => sum + Math.max(0, Number(record.moneyDelta || 0)), 0);
@@ -4790,16 +4827,16 @@ function v2WeekSummaryView(result, completionEvents = [], options = {}) {
     const after = Math.round(Number(result.timeState.condition[key] || 0));
     const delta = Math.round(Number(result.summary.conditionDelta[key] || 0));
     const before = after - delta;
-    const change = delta === 0 ? "stable" : v2Signed(delta, " pts");
+    const change = delta === 0 ? "stable" : careerSigned(delta, " pts");
     return `${before}${suffix} → ${after}${suffix} · ${change}`;
   };
-  const dateLabel = options.dateLabel || v2CareerView()?.v2DateLabel || "";
+  const dateLabel = options.dateLabel || careerCareerView()?.careerDateLabel || "";
   const changes = [
     { label: "Énergie", detail: conditionTransition("energy", " %"), tone: result.summary.conditionDelta.energy < 0 ? "warning" : result.summary.conditionDelta.energy > 0 ? "positive" : "neutral" },
     { label: "Fatigue", detail: conditionTransition("fatigue", " %"), tone: result.summary.conditionDelta.fatigue > 0 ? "warning" : result.summary.conditionDelta.fatigue < 0 ? "positive" : "neutral" },
-    { label: "Paie brute", detail: v2Signed(grossWages, " $"), tone: grossWages > 0 ? "positive" : "neutral" },
+    { label: "Paie brute", detail: careerSigned(grossWages, " $"), tone: grossWages > 0 ? "positive" : "neutral" },
     { label: "Dépenses planifiées", detail: plannedExpenses ? `−${plannedExpenses} $` : "0 $", tone: plannedExpenses ? "warning" : "neutral" },
-    { label: "Variation du solde", detail: v2Signed(result.summary.money.earned, " $"), tone: result.summary.money.earned > 0 ? "positive" : result.summary.money.earned < 0 ? "warning" : "neutral" },
+    { label: "Variation du solde", detail: careerSigned(result.summary.money.earned, " $"), tone: result.summary.money.earned > 0 ? "positive" : result.summary.money.earned < 0 ? "warning" : "neutral" },
     { label: "Entraînement", detail: `${result.summary.counts.training} séance${result.summary.counts.training > 1 ? "s" : ""}`, tone: result.summary.counts.training > 0 ? "positive" : "neutral" },
     { label: "XP générale", detail: `${result.summary.xpAward > 0 ? "+" : ""}${Math.round(result.summary.xpAward)} XP`, tone: result.summary.xpAward > 0 ? "positive" : "neutral" },
     ...statXpChanges,
@@ -4830,51 +4867,51 @@ function v2WeekSummaryView(result, completionEvents = [], options = {}) {
   };
 }
 
-function v2PlannerSupplementAdjustment(supplementState, entry, totals, capsule) {
+function careerPlannerSupplementAdjustment(supplementState, entry, totals, capsule) {
   if (!entry.supplementId || !window.BoxeurSupplements) {
     return { state: supplementState, totals: cloneData(totals), result: null };
   }
   const sessionId = `planner:${entry.id}`;
   const prepared = window.BoxeurSupplements.prepareForSession(supplementState, entry.supplementId, {
     sessionId,
-    useId: `use:${v2PlannerWeekKey(capsule)}:${entry.id}`,
-    weekKey: v2PlannerWeekKey(capsule),
+    useId: `use:${careerPlannerWeekKey(capsule)}:${entry.id}`,
+    weekKey: careerPlannerWeekKey(capsule),
     careerStatus: state.careerStatus,
   });
   const applied = window.BoxeurSupplements.applyToSession(prepared.state, totals, { sessionId });
   return { state: applied.state, totals: applied.session, result: applied.result };
 }
 
-function v2PlannerGainMultiplier(entry) {
+function careerPlannerGainMultiplier(entry) {
   return safeNumber(entry?.metadata?.gainMultiplier, 1, .5, 1, false);
 }
 
-function v2PlannerScaledStimulus(stimulus, multiplier) {
+function careerPlannerScaledStimulus(stimulus, multiplier) {
   return Object.fromEntries(Object.keys(combatLabels).map(key => [
     key,
     Math.round(Number(stimulus?.[key] || 0) * multiplier * 10000) / 10000,
   ]));
 }
 
-function v2PlannerScaledBoxingSession(session, multiplier) {
+function careerPlannerScaledBoxingSession(session, multiplier) {
   if (multiplier >= 1) return session;
   return {
     ...cloneData(session),
     blocks: session.blocks.map(block => ({
       ...cloneData(block),
-      stimulus: v2PlannerScaledStimulus(block.stimulus, multiplier),
+      stimulus: careerPlannerScaledStimulus(block.stimulus, multiplier),
       xp: Math.round(Number(block.xp || 0) * multiplier * 100) / 100,
     })),
   };
 }
 
-function v2PlannerGenericActivity(entry, label, totals, options = {}) {
+function careerPlannerGenericActivity(entry, label, totals, options = {}) {
   return {
     kind: "activity",
     plannerActivityId: entry.activityId,
     plannerEntryId: entry.id,
     activity: {
-      id: options.engineId || `v2-planner:${entry.activityId}:${entry.id}`,
+      id: options.engineId || `planner:${entry.activityId}:${entry.id}`,
       label,
       category: options.category || entry.category,
       duration: safeNumber(options.duration, 1, 1, window.BoxeurTime.PERIODS_PER_DAY),
@@ -4897,8 +4934,8 @@ function v2PlannerGenericActivity(entry, label, totals, options = {}) {
   };
 }
 
-function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
-  const runtime = normalizeV2PreviewRuntime(capsule);
+function careerPlannerExecutionPrimitive(entry, capsule, sideEffects) {
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   if (entry.preReserved) {
     const job = jobs.find(item => item.id === runtime.career.jobId);
     if (!job) throw new Error("L’emploi réservé n’existe plus.");
@@ -4908,7 +4945,7 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
       plannerEntryId: entry.id,
       pay: job.wage,
       activity: {
-        id: `v2-work:${job.id}`,
+        id: `work:${job.id}`,
         label: `Travail · ${job.title}`,
         category: "work",
         duration: 2,
@@ -4921,20 +4958,20 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     };
   }
   if (["group-class", "boxing-coach", "boxing-custom"].includes(entry.activityId)) {
-    const aggregate = v2PlannerBoxingAggregate(entry.metadata, {
+    const aggregate = careerPlannerBoxingAggregate(entry.metadata, {
       label: entry.label,
       source: entry.activityId === "boxing-custom" ? "custom" : "coach",
     });
-    const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, aggregate.totals, capsule);
+    const adjusted = careerPlannerSupplementAdjustment(sideEffects.supplementState, entry, aggregate.totals, capsule);
     sideEffects.supplementState = adjusted.state;
     if (adjusted.result) sideEffects.supplements.push(adjusted.result);
-    const gainMultiplier = v2PlannerGainMultiplier(entry);
+    const gainMultiplier = careerPlannerGainMultiplier(entry);
     return {
       kind: "training",
       plannerActivityId: entry.activityId,
       plannerEntryId: entry.id,
-      session: v2PlannerScaledBoxingSession(aggregate.session, gainMultiplier),
-      context: { ...v2TrainingContext(), sessionAdjustment: adjusted.result ? adjusted.totals : null },
+      session: careerPlannerScaledBoxingSession(aggregate.session, gainMultiplier),
+      context: { ...careerTrainingContext(), sessionAdjustment: adjusted.result ? adjusted.totals : null },
       budgetKind: "trainingSessions",
     };
   }
@@ -4943,13 +4980,13 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
       ? ["dynamic_warmup", "machine_conditioning", "mobility_cooldown"]
       : entry.metadata?.selection || [];
     const aggregate = window.BoxeurStrength.aggregateSelection(selection);
-    const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, aggregate.totals, capsule);
+    const adjusted = careerPlannerSupplementAdjustment(sideEffects.supplementState, entry, aggregate.totals, capsule);
     sideEffects.supplementState = adjusted.state;
     if (adjusted.result) sideEffects.supplements.push(adjusted.result);
-    const gainMultiplier = v2PlannerGainMultiplier(entry);
-    return v2PlannerGenericActivity(entry, entry.label, {
+    const gainMultiplier = careerPlannerGainMultiplier(entry);
+    return careerPlannerGenericActivity(entry, entry.label, {
       ...adjusted.totals,
-      stimulus: v2PlannerScaledStimulus(aggregate.totals.stimulus, gainMultiplier),
+      stimulus: careerPlannerScaledStimulus(aggregate.totals.stimulus, gainMultiplier),
     }, {
       engineId: `strength-gym-session:${aggregate.activityIds.join("-")}`,
       category: "strength-gym-training",
@@ -4959,14 +4996,14 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     });
   }
   if (["home-quick", "home-custom"].includes(entry.activityId)) {
-    const aggregate = v2PlannerHomeAggregate(entry.metadata?.selection);
-    const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, aggregate.totals, capsule);
+    const aggregate = careerPlannerHomeAggregate(entry.metadata?.selection);
+    const adjusted = careerPlannerSupplementAdjustment(sideEffects.supplementState, entry, aggregate.totals, capsule);
     sideEffects.supplementState = adjusted.state;
     if (adjusted.result) sideEffects.supplements.push(adjusted.result);
-    const gainMultiplier = v2PlannerGainMultiplier(entry);
-    return v2PlannerGenericActivity(entry, entry.label, {
+    const gainMultiplier = careerPlannerGainMultiplier(entry);
+    return careerPlannerGenericActivity(entry, entry.label, {
       ...adjusted.totals,
-      stimulus: v2PlannerScaledStimulus(aggregate.totals.stimulus, gainMultiplier),
+      stimulus: careerPlannerScaledStimulus(aggregate.totals.stimulus, gainMultiplier),
     }, {
       engineId: `home-session:${aggregate.selection.join("-")}`,
       category: "home-training",
@@ -4974,7 +5011,7 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     });
   }
   if (["roadwork-short", "roadwork-long", "roadwork-intervals"].includes(entry.activityId)) {
-    const activity = V2_HOME_ACTIVITIES[entry.activityId];
+    const activity = CAREER_HOME_ACTIVITIES[entry.activityId];
     const totals = {
       energyCost: activity.energyCost,
       energyGain: activity.energyGain,
@@ -4982,13 +5019,13 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
       fatigueRelief: activity.fatigueRelief,
       stimulus: activity.stimulus,
     };
-    const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, totals, capsule);
+    const adjusted = careerPlannerSupplementAdjustment(sideEffects.supplementState, entry, totals, capsule);
     sideEffects.supplementState = adjusted.state;
     if (adjusted.result) sideEffects.supplements.push(adjusted.result);
-    const gainMultiplier = v2PlannerGainMultiplier(entry);
-    return v2PlannerGenericActivity(entry, entry.label, {
+    const gainMultiplier = careerPlannerGainMultiplier(entry);
+    return careerPlannerGenericActivity(entry, entry.label, {
       ...adjusted.totals,
-      stimulus: v2PlannerScaledStimulus(adjusted.totals.stimulus, gainMultiplier),
+      stimulus: careerPlannerScaledStimulus(adjusted.totals.stimulus, gainMultiplier),
     }, {
       engineId: activity.id,
       category: "roadwork",
@@ -4997,7 +5034,7 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     });
   }
   if (entry.activityId === "rest") {
-    return v2PlannerGenericActivity(entry, entry.label, {
+    return careerPlannerGenericActivity(entry, entry.label, {
       energyCost: entry.energyCost,
       energyGain: entry.energyGain,
       fatigueGain: Math.max(0, entry.fatigueDelta),
@@ -5006,44 +5043,44 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
     }, { engineId: "home_planned_rest", category: "recovery", duration: window.BoxeurTime.PERIODS_PER_DAY });
   }
   if (entry.activityId === "meal") {
-    const activity = V2_HOME_ACTIVITIES.meal;
-    return v2PlannerGenericActivity(entry, entry.label, {
+    const activity = CAREER_HOME_ACTIVITIES.meal;
+    return careerPlannerGenericActivity(entry, entry.label, {
       energyCost: activity.energyCost,
       energyGain: activity.energyGain,
       fatigueGain: activity.fatigueGain,
       fatigueRelief: activity.fatigueRelief,
       stimulus: activity.stimulus,
-    }, { engineId: activity.id, category: "home-recovery", moneyDelta: -V2_BALANCE.WEEK.recovery.mealCost });
+    }, { engineId: activity.id, category: "home-recovery", moneyDelta: -CAREER_BALANCE.WEEK.recovery.mealCost });
   }
   if (entry.activityId === "private-training") {
     const publicProgram = window.BoxeurTrainer.getPublicState(sideEffects.trainerState).activeProgram;
     if (!publicProgram) throw new Error("Le programme privé planifié n’est plus actif.");
-    const sourceId = `${v2PlannerWeekKey(capsule)}:${entry.id}`;
+    const sourceId = `${careerPlannerWeekKey(capsule)}:${entry.id}`;
     const outcome = window.BoxeurTrainer.completeSession(sideEffects.trainerState, sideEffects.progressionState, {
       sourceId,
-      weekKey: v2PlannerWeekKey(capsule),
+      weekKey: careerPlannerWeekKey(capsule),
       condition: { energy: 100, fatigue: capsule.timeState.condition.fatigue },
     });
     sideEffects.trainerState = outcome.state;
     sideEffects.progressionState = outcome.progressionState;
     sideEffects.privateSessions.push(outcome.result);
-    const gainMultiplier = v2PlannerGainMultiplier(entry);
+    const gainMultiplier = careerPlannerGainMultiplier(entry);
     const totals = {
       energyCost: Math.max(0, -outcome.result.energyDelta),
       energyGain: 0,
       fatigueGain: Math.max(0, outcome.result.fatigueDelta),
       fatigueRelief: 0,
-      stimulus: v2PlannerScaledStimulus(outcome.result.progression.effectiveAccepted, gainMultiplier),
+      stimulus: careerPlannerScaledStimulus(outcome.result.progression.effectiveAccepted, gainMultiplier),
     };
-    const adjusted = v2PlannerSupplementAdjustment(sideEffects.supplementState, entry, totals, capsule);
+    const adjusted = careerPlannerSupplementAdjustment(sideEffects.supplementState, entry, totals, capsule);
     sideEffects.supplementState = adjusted.state;
     if (adjusted.result) sideEffects.supplements.push(adjusted.result);
-    const primitive = v2PlannerGenericActivity(entry, entry.label, {
+    const primitive = careerPlannerGenericActivity(entry, entry.label, {
       ...adjusted.totals,
       stimulus: totals.stimulus,
     }, {
       engineId: `private-trainer:${sourceId}`,
-      category: v2TrainerLocationForTarget(publicProgram.target) === "strength-gym" ? "strength-gym-training" : "boxing-gym-training",
+      category: careerTrainerLocationForTarget(publicProgram.target) === "strength-gym" ? "strength-gym-training" : "boxing-gym-training",
       xpAward: 4 * gainMultiplier,
     });
     primitive.privateTarget = publicProgram.target;
@@ -5052,12 +5089,12 @@ function v2PlannerExecutionPrimitive(entry, capsule, sideEffects) {
   throw new Error(`Activité hebdomadaire non exécutable : ${entry.activityId}.`);
 }
 
-function v2PlannerExecutionSlots(entries, capsule) {
-  const weekStart = v2WeekStartSlot(capsule.timeState);
+function careerPlannerExecutionSlots(entries, capsule) {
+  const weekStart = careerWeekStartSlot(capsule.timeState);
   const weekEnd = weekStart + window.BoxeurTime.PERIODS_PER_WEEK;
   const now = capsule.timeState.clock.absoluteSlot;
   const occupied = [];
-  const historicalPhysicalDays = new Set((capsule.timeState.history || []).filter(v2IsPrimaryPhysicalEvent).filter(event => (
+  const historicalPhysicalDays = new Set((capsule.timeState.history || []).filter(careerIsPrimaryPhysicalEvent).filter(event => (
     Number(event.fromSlot) >= weekStart && Number(event.fromSlot) < weekEnd
   )).map(event => Math.floor((Number(event.fromSlot) - weekStart) / window.BoxeurTime.PERIODS_PER_DAY)));
   const reserve = (start, duration) => occupied.push({ start, end: start + duration });
@@ -5083,38 +5120,38 @@ function v2PlannerExecutionSlots(entries, capsule) {
   });
 }
 
-function createV2PlannerSideEffects(capsule) {
-  const runtime = normalizeV2PreviewRuntime(capsule);
+function createCareerPlannerSideEffects(capsule) {
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   return {
-    supplementState: window.BoxeurSupplements.createState(runtime.career.v2SupplementState, { weekKey: capsule.timeState.clock.week }),
-    trainerState: window.BoxeurTrainer.createState(runtime.career.v2TrainerState),
+    supplementState: window.BoxeurSupplements.createState(runtime.career.supplementState, { weekKey: capsule.timeState.clock.week }),
+    trainerState: window.BoxeurTrainer.createState(runtime.career.trainerState),
     progressionState: window.BoxeurProgression.createState(runtime.career.progressionState),
     supplements: [],
     privateSessions: [],
   };
 }
 
-function replayV2PlannerSideEffects(capsule, plannerEntries, executedEntryIds) {
-  const committed = createV2PlannerSideEffects(capsule);
+function replayCareerPlannerSideEffects(capsule, plannerEntries, executedEntryIds) {
+  const committed = createCareerPlannerSideEffects(capsule);
   plannerEntries
     .filter(entry => executedEntryIds.has(entry.id))
-    .forEach(entry => { v2PlannerExecutionPrimitive(entry, capsule, committed); });
+    .forEach(entry => { careerPlannerExecutionPrimitive(entry, capsule, committed); });
   return committed;
 }
 
-function buildV2PlannerExecution(capsule, plannerState) {
-  v2ProgressionSnapshot(capsule);
-  const sideEffects = createV2PlannerSideEffects(capsule);
+function buildCareerPlannerExecution(capsule, plannerState) {
+  careerProgressionSnapshot(capsule);
+  const sideEffects = createCareerPlannerSideEffects(capsule);
   const candidates = window.BoxeurWeekPlanner.previewPlan(plannerState).entries
     .filter(entry => !(entry.activityId === "sparring" && entry.metadata?.completed));
   const withPrimitives = candidates.map(plannerEntry => ({
     plannerEntry,
-    primitive: v2PlannerExecutionPrimitive(plannerEntry, capsule, sideEffects),
+    primitive: careerPlannerExecutionPrimitive(plannerEntry, capsule, sideEffects),
   }));
-  const entries = v2PlannerExecutionSlots(withPrimitives, capsule);
-  const weekStartSlot = v2WeekStartSlot(capsule.timeState);
+  const entries = careerPlannerExecutionSlots(withPrimitives, capsule);
+  const weekStartSlot = careerWeekStartSlot(capsule.timeState);
   const physicalCount = entries.filter(entry => entry.kind === "training" || entry.physical === true).length;
-  const physicalAlreadyDone = v2WeekTrainingActivityCount(capsule.timeState);
+  const physicalAlreadyDone = careerWeekTrainingActivityCount(capsule.timeState);
   return {
     plan: {
       schemaVersion: window.BoxeurWeek.SCHEMA_VERSION,
@@ -5133,28 +5170,28 @@ function buildV2PlannerExecution(capsule, plannerState) {
   };
 }
 
-function runV2AutomaticWeek() {
-  const capsule = ensureV2PreviewCapsule();
+function runCareerAutomaticWeek() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule || !window.BoxeurWeek || !window.BoxeurWeekView || !window.BoxeurWeekPlanner) return;
-  const blocker = v2WeekQuickBlockReason(v2CareerView());
+  const blocker = careerWeekQuickBlockReason(careerCareerView());
   if (blocker) return showToast(blocker);
-  const plannerState = ensureV2WeekPlanner(capsule);
+  const plannerState = ensureCareerWeekPlanner(capsule);
   const pendingSparring = plannerState.entries.find(entry => entry.activityId === "sparring" && !entry.metadata?.completed);
   if (pendingSparring) {
     showToast("Le sparring est interactif : joue-le maintenant, puis confirme de nouveau la semaine.");
-    runV2TechnicalSparring({ launch: true, entryId: pendingSparring.id });
+    runCareerTechnicalSparring({ launch: true, entryId: pendingSparring.id });
     return;
   }
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const previousWeek = capsule.timeState.clock.week;
   const beforeCapsule = cloneData(capsule);
   const beforeCareerState = cloneData(state);
   try {
     const confirmed = window.BoxeurWeekPlanner.confirmPlan(plannerState, {
-      transactionId: `${v2PlannerWeekKey(capsule)}:revision-${plannerState.revision}`,
+      transactionId: `${careerPlannerWeekKey(capsule)}:revision-${plannerState.revision}`,
       expectedRevision: plannerState.revision,
     });
-    const execution = buildV2PlannerExecution(capsule, confirmed.state);
+    const execution = buildCareerPlannerExecution(capsule, confirmed.state);
     const result = window.BoxeurWeek.runWeek({
       timeState: capsule.timeState,
       finances: { money: runtime.career.money },
@@ -5172,37 +5209,37 @@ function runV2AutomaticWeek() {
     if (missingEntries.length) {
       throw new Error(`${missingEntries[0].activity?.label || missingEntries[0].session?.label || "Une activité"} n’a pas pu être accomplie. Allège ou réorganise le programme.`);
     }
-    const committedSideEffects = replayV2PlannerSideEffects(capsule, execution.plannerEntries, executedEntryIds);
-    const onboardingBeforeAdvance = v2OnboardingView(capsule);
+    const committedSideEffects = replayCareerPlannerSideEffects(capsule, execution.plannerEntries, executedEntryIds);
+    const onboardingBeforeAdvance = careerOnboardingView(capsule);
     const firstGuidedWeek = onboardingBeforeAdvance?.state.mode === "guided" && previousWeek === 1;
     if (onboardingBeforeAdvance?.state.mode === "guided") {
-      const completedObjectiveId = v2CompletedOnboardingObjectiveId(
+      const completedObjectiveId = careerCompletedOnboardingObjectiveId(
         onboardingBeforeAdvance,
         execution.plannerEntries,
         executedEntryIds,
       );
       if (completedObjectiveId) {
-        applyV2OnboardingEvent({
+        applyCareerOnboardingEvent({
           type: window.BoxeurOnboarding.EVENT_TYPES.COMPLETE_OBJECTIVE,
           objectiveId: completedObjectiveId,
         });
       }
-      applyV2OnboardingEvent({ type: window.BoxeurOnboarding.EVENT_TYPES.CLOSE_WEEK });
+      applyCareerOnboardingEvent({ type: window.BoxeurOnboarding.EVENT_TYPES.CLOSE_WEEK });
     }
     capsule.timeState = result.timeState;
     runtime.career.money = result.finances.money;
     runtime.career.experience += result.summary.xpAward;
-    runtime.career.v2SupplementState = committedSideEffects.supplementState;
-    runtime.career.v2TrainerState = committedSideEffects.trainerState;
+    runtime.career.supplementState = committedSideEffects.supplementState;
+    runtime.career.trainerState = committedSideEffects.trainerState;
     // BoxeurTime demeure l’unique source de progression exécutée. Le moteur
     // d’entraîneur sert à calculer son stimulus ciblé, sans le créditer une
     // seconde fois dans une jauge parallèle.
-    v2ProgressionSnapshot(capsule);
+    careerProgressionSnapshot(capsule);
     if (result.summary.counts.work > 0 || result.summary.money.earned > 0) {
       const grossWages = result.summary.actions
         .filter(record => record.kind === "work")
         .reduce((sum, record) => sum + Math.max(0, Number(record.moneyDelta || 0)), 0);
-      recordV2Work(runtime, previousWeek, grossWages, result.summary.counts.work);
+      recordCareerWork(runtime, previousWeek, grossWages, result.summary.counts.work);
     }
     if (state.careerStatus === "recreational" && result.summary.counts.training > 0) runtime.trainingSessions += 1;
     const boxingDone = result.summary.actions.some(record => {
@@ -5212,41 +5249,41 @@ function runV2AutomaticWeek() {
       return ["technique", "defense"].includes(record.primitive?.privateTarget);
     });
     if (boxingDone && isCompetitiveCareer()) state.boxingTrainingWeek = previousWeek;
-    const workloadEvent = applyV2UnrecoveredWorkload(
+    const workloadEvent = applyCareerUnrecoveredWorkload(
       result,
       execution.plannerEntries,
       beforeCapsule.timeState.condition,
       previousWeek,
     );
-    const completionEvents = v2WeeklyCompletionEvents(result, runtime, previousWeek);
+    const completionEvents = careerWeeklyCompletionEvents(result, runtime, previousWeek);
     if (workloadEvent) completionEvents.unshift(workloadEvent);
-    const recoveryEvent = applyV2RecoveryConsequence(result, runtime, execution.plannerEntries, previousWeek);
+    const recoveryEvent = applyCareerRecoveryConsequence(result, runtime, execution.plannerEntries, previousWeek);
     if (recoveryEvent) completionEvents.unshift(recoveryEvent);
     runtime.weekMode = confirmed.commit.mode === "quick" ? "quick" : "detailed";
     runtime.weeklySummaries.unshift(cloneData(result.summary));
     runtime.weeklySummaries = runtime.weeklySummaries.slice(0, 30);
     runtime.weekPlanner = null;
     runtime.weekPlannerSignature = null;
-    persistV2PreviewCapsule();
-    renderV2WorldPreview(true);
-    const sheet = document.querySelector("#v2-world .v2-location-sheet");
+    persistCareerPreviewCapsule();
+    renderCareerWorldPreview(true);
+    const sheet = document.querySelector("#career-world .career-location-sheet");
     if (!sheet) return;
     sheet.dataset.originLocation = "week";
-    sheet.classList.remove("v2-location-sheet-full");
-    sheet.innerHTML = window.BoxeurWeekView.renderSummary(v2WeekSummaryView(result, completionEvents, { firstGuidedWeek }));
-    activateV2LocationSheet(sheet, "[data-v2-week-summary-close]");
+    sheet.classList.remove("career-location-sheet-full");
+    sheet.innerHTML = window.BoxeurWeekView.renderSummary(careerWeekSummaryView(result, completionEvents, { firstGuidedWeek }));
+    activateCareerLocationSheet(sheet, "[data-career-week-summary-close]");
   } catch (error) {
-    v2PreviewCapsule = beforeCapsule;
+    careerCapsule = beforeCapsule;
     state = beforeCareerState;
-    renderV2WorldPreview(true);
+    renderCareerWorldPreview(true);
     showToast(error.message || "La semaine n’a pas été confirmée; aucun coût ni produit n’a été appliqué.");
   }
 }
 
-function openV2MembershipMenu() {
-  const capsule = ensureV2PreviewCapsule();
+function openCareerMembershipMenu() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule) return;
-  const career = normalizeV2PreviewRuntime(capsule).career;
+  const career = normalizeCareerPreviewRuntime(capsule).career;
   if (career.gymWeeks > 0) return showToast(`Abonnement actif · ${career.gymWeeks} semaine${career.gymWeeks > 1 ? "s" : ""} restante${career.gymWeeks > 1 ? "s" : ""}.`);
   const choices = career.initialGymRequired ? gymPlans.filter(plan => plan.id === "monthly") : gymPlans;
   document.querySelector("#membership-dialog-title").textContent = career.initialGymRequired ? "Premier abonnement obligatoire" : "Renouveler le GYM de boxe";
@@ -5261,34 +5298,34 @@ function openV2MembershipMenu() {
   document.querySelector("#membership-dialog")?.showModal();
 }
 
-function selectV2GymPlan(planId) {
-  const capsule = ensureV2PreviewCapsule();
+function selectCareerGymPlan(planId) {
+  const capsule = ensureCareerPreviewCapsule();
   const plan = gymPlans.find(item => item.id === planId);
   if (!capsule || !plan) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const career = runtime.career;
   if (career.gymWeeks > 0 || career.money < plan.price) return;
   career.money -= plan.price;
   career.gymWeeks = plan.weeks;
   career.initialGymRequired = false;
-  const onboarding = v2OnboardingView(capsule);
+  const onboarding = careerOnboardingView(capsule);
   if (onboarding?.state.mode === "guided" && !onboarding.state.initialGym.purchased) {
-    applyV2OnboardingEvent({
+    applyCareerOnboardingEvent({
       type: window.BoxeurOnboarding.EVENT_TYPES.PURCHASE_INITIAL_MEMBERSHIP,
       weeks: plan.weeks,
     });
   }
-  persistV2PreviewCapsule();
+  persistCareerPreviewCapsule();
   document.querySelector("#membership-dialog")?.close();
-  renderV2WorldPreview(true);
-  openV2Location("boxing-gym");
+  renderCareerWorldPreview(true);
+  openCareerLocation("boxing-gym");
   showToast(`Inscription confirmée · GYM actif pour ${plan.weeks} semaines`);
 }
 
-function openV2JobMenu() {
-  const capsule = ensureV2PreviewCapsule();
+function openCareerJobMenu() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule) return;
-  const career = normalizeV2PreviewRuntime(capsule).career;
+  const career = normalizeCareerPreviewRuntime(capsule).career;
   const current = jobs.find(job => job.id === career.jobId);
   const immediate = career.introJobRequired && career.jobsHeldCount === 0 && !current;
   const application = career.jobApplication;
@@ -5315,29 +5352,29 @@ function openV2JobMenu() {
     });
   }).join("");
   const cancel = application && !immediate
-    ? `<button class="text-button" type="button" data-v2-cancel-job-application>Annuler la candidature en cours</button>`
+    ? `<button class="text-button" type="button" data-career-cancel-job-application>Annuler la candidature en cours</button>`
     : "";
   document.querySelector("#job-options").innerHTML = `${options}${cancel}`;
   setMandatoryDialogState("job-dialog", immediate, "Choisis ton emploi de départ pour commencer la semaine 1.");
   document.querySelector("#job-dialog")?.showModal();
 }
 
-function openV2OnboardingWelcome() {
+function openCareerOnboardingWelcome() {
   const dialog = document.querySelector("#onboarding-guide-dialog");
   if (!dialog || dialog.open) return;
   dialog.showModal();
 }
 
-function startV2OnboardingFromWelcome() {
+function startCareerOnboardingFromWelcome() {
   document.querySelector("#onboarding-guide-dialog")?.close();
-  openV2JobMenu();
+  openCareerJobMenu();
 }
 
-function selectV2Job(jobId) {
-  const capsule = ensureV2PreviewCapsule();
+function selectCareerJob(jobId) {
+  const capsule = ensureCareerPreviewCapsule();
   const job = jobs.find(item => item.id === jobId);
   if (!capsule || !job) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const career = runtime.career;
   const initial = career.introJobRequired && career.jobsHeldCount === 0 && !career.jobId;
   if (!initial) {
@@ -5348,9 +5385,9 @@ function selectV2Job(jobId) {
       requiredWeeks: job.interviewWeeks,
       appliedWeek: capsule.timeState.clock.week,
     };
-    persistV2PreviewCapsule();
+    persistCareerPreviewCapsule();
     document.querySelector("#job-dialog")?.close();
-    renderV2WorldPreview(true);
+    renderCareerWorldPreview(true);
     showToast(`${job.title} · candidature envoyée, réponse dans ${job.interviewWeeks} semaine${job.interviewWeeks > 1 ? "s" : ""}`);
     return;
   }
@@ -5362,30 +5399,30 @@ function selectV2Job(jobId) {
   career.jobWagesEarned = 0;
   career.missedWorkWeeks = 0;
   career.jobApplication = null;
-  const onboarding = v2OnboardingView(capsule);
+  const onboarding = careerOnboardingView(capsule);
   if (onboarding?.state.mode === "guided" && !onboarding.state.initialJob.selected) {
-    applyV2OnboardingEvent({
+    applyCareerOnboardingEvent({
       type: window.BoxeurOnboarding.EVENT_TYPES.SELECT_INITIAL_JOB,
       jobId: job.id,
     });
   }
-  persistV2PreviewCapsule();
+  persistCareerPreviewCapsule();
   document.querySelector("#job-dialog")?.close();
-  renderV2WorldPreview(true);
+  renderCareerWorldPreview(true);
   showToast(`${job.title} obtenu · la paie sera maintenant simulée chaque semaine`);
 }
 
-function cancelV2JobApplication() {
-  const capsule = ensureV2PreviewCapsule();
+function cancelCareerJobApplication() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const job = jobs.find(item => item.id === runtime.career.jobApplication?.jobId);
   if (!runtime.career.jobApplication) return;
   runtime.career.jobApplication = null;
-  persistV2PreviewCapsule();
+  persistCareerPreviewCapsule();
   document.querySelector("#job-dialog")?.close();
-  renderV2WorldPreview(true);
-  openV2Location("work");
+  renderCareerWorldPreview(true);
+  openCareerLocation("work");
   showToast(`Candidature${job ? ` chez ${job.title}` : ""} annulée`);
 }
 
@@ -5413,24 +5450,24 @@ function closeOptionalDialog(dialogId) {
   dialog.close();
 }
 
-function v2SupplementState(capsule = ensureV2PreviewCapsule()) {
+function careerSupplementState(capsule = ensureCareerPreviewCapsule()) {
   if (!capsule || !window.BoxeurSupplements) return null;
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  runtime.career.v2SupplementState = window.BoxeurSupplements.createState(
-    runtime.career.v2SupplementState || {},
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  runtime.career.supplementState = window.BoxeurSupplements.createState(
+    runtime.career.supplementState || {},
     { weekKey: capsule.timeState?.clock?.week || state.week },
   );
-  return runtime.career.v2SupplementState;
+  return runtime.career.supplementState;
 }
 
-function openV2SupplementShop() {
-  const capsule = ensureV2PreviewCapsule();
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function openCareerSupplementShop() {
+  const capsule = ensureCareerPreviewCapsule();
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!capsule || !sheet || !window.BoxeurSupplements || !window.BoxeurStrengthView?.renderShop) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   if (!["amateur", "professional"].includes(state.careerStatus)) return showToast("La boutique se débloque après le passage amateur.");
   if (runtime.career.strengthGymWeeks <= 0) return showToast("Un abonnement actif au gym de musculation est requis.");
-  const supplementState = v2SupplementState(capsule);
+  const supplementState = careerSupplementState(capsule);
   const products = Object.values(window.BoxeurSupplements.CATALOG).map(product => {
     const quantity = supplementState.inventory[product.id] || 0;
     const quote = window.BoxeurSupplements.quotePurchase(supplementState, product.id, 1, { money: runtime.career.money });
@@ -5447,123 +5484,123 @@ function openV2SupplementShop() {
     };
   });
   sheet.dataset.originLocation = "strength-gym";
-  sheet.classList.add("v2-location-sheet-full", "v2-location-sheet-strength");
+  sheet.classList.add("career-location-sheet-full", "career-location-sheet-strength");
   sheet.innerHTML = window.BoxeurStrengthView.renderShop({ balance: runtime.career.money, products });
-  activateV2LocationSheet(sheet, "[data-v2-supplement-buy], [data-v2-supplement-shop-close]");
+  activateCareerLocationSheet(sheet, "[data-career-supplement-buy], [data-career-supplement-shop-close]");
 }
 
-function purchaseV2Supplement(productId) {
-  const capsule = ensureV2PreviewCapsule();
+function purchaseCareerSupplement(productId) {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule || !window.BoxeurSupplements) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   try {
-    const supplementState = v2SupplementState(capsule);
+    const supplementState = careerSupplementState(capsule);
     const transactionId = `shop:${capsule.timeState.clock.week}:${capsule.timeState.clock.absoluteSlot}:${productId}:${supplementState.purchaseIds.length + 1}`;
     const outcome = window.BoxeurSupplements.purchase(supplementState, productId, 1, {
       money: runtime.career.money,
       transactionId,
     });
-    runtime.career.v2SupplementState = outcome.state;
+    runtime.career.supplementState = outcome.state;
     runtime.career.money = outcome.balance;
-    persistV2PreviewCapsule();
-    renderV2WorldPreview(true);
-    openV2SupplementShop();
+    persistCareerPreviewCapsule();
+    renderCareerWorldPreview(true);
+    openCareerSupplementShop();
     showToast(`${window.BoxeurSupplements.CATALOG[productId].label} ajouté à ton inventaire · −${outcome.result.cost} $`);
   } catch (error) {
     showToast(error.message || "Cet achat n’est pas disponible.");
   }
 }
 
-function runV2CoachSession() {
+function runCareerCoachSession() {
   const plannerId = state.careerStatus === "recreational" ? "group-class" : "boxing-coach";
-  addV2PlannerActivity(plannerId, {}, { toggle: plannerId === "group-class", reopen: "boxing-gym" });
+  addCareerPlannerActivity(plannerId, {}, { toggle: plannerId === "group-class", reopen: "boxing-gym" });
 }
 
-function renderV2GymMenu(menuId) {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function renderCareerGymMenu(menuId) {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet || !window.BoxeurGymView?.renderMenu) return;
-  const markup = window.BoxeurGymView.renderMenu(menuId, v2GymContext());
+  const markup = window.BoxeurGymView.renderMenu(menuId, careerGymContext());
   if (!markup) return;
   sheet.dataset.originLocation = "boxing-gym";
-  sheet.classList.add("v2-location-sheet-full");
+  sheet.classList.add("career-location-sheet-full");
   sheet.innerHTML = markup;
   const preferredFocus = menuId === "coach"
-    ? "[data-v2-coach-session]:not([disabled]), [data-v2-boxing-trainer]:not([disabled])"
-    : "[data-v2-sparring-activity]:not([disabled])";
-  activateV2LocationSheet(sheet, preferredFocus);
+    ? "[data-career-coach-session]:not([disabled]), [data-career-boxing-trainer]:not([disabled])"
+    : "[data-career-sparring-activity]:not([disabled])";
+  activateCareerLocationSheet(sheet, preferredFocus);
 }
 
-function renderV2WorkMenu(menuId) {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function renderCareerWorkMenu(menuId) {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet || !window.BoxeurWorkView?.renderMenu) return;
-  const markup = window.BoxeurWorkView.renderMenu(menuId, v2WorkLocationContext());
+  const markup = window.BoxeurWorkView.renderMenu(menuId, careerWorkLocationContext());
   if (!markup) return;
   sheet.dataset.originLocation = "work";
-  sheet.classList.add("v2-location-sheet-full");
+  sheet.classList.add("career-location-sheet-full");
   sheet.innerHTML = markup;
   const preferredFocus = menuId === "schedule"
-    ? "[data-v2-toggle-work]:not([disabled])"
-    : "[data-v2-open-job-menu]:not([disabled])";
-  activateV2LocationSheet(sheet, preferredFocus);
+    ? "[data-career-toggle-work]:not([disabled])"
+    : "[data-career-open-job-menu]:not([disabled])";
+  activateCareerLocationSheet(sheet, preferredFocus);
 }
 
-function renderV2HomeMenu(menuId) {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function renderCareerHomeMenu(menuId) {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet || !window.BoxeurHomeView?.renderMenu) return;
-  const markup = window.BoxeurHomeView.renderMenu(menuId, v2HomeContext());
+  const markup = window.BoxeurHomeView.renderMenu(menuId, careerHomeContext());
   if (!markup) return;
   sheet.dataset.originLocation = "home";
-  sheet.classList.add("v2-location-sheet-full");
+  sheet.classList.add("career-location-sheet-full");
   sheet.innerHTML = markup;
-  activateV2LocationSheet(sheet, "[data-v2-home-action], [data-v2-home-menu-close]");
+  activateCareerLocationSheet(sheet, "[data-career-home-action], [data-career-home-menu-close]");
 }
 
-function runV2HomeAction(viewActionId) {
+function runCareerHomeAction(viewActionId) {
   if (viewActionId === "home-custom") {
     if (state.careerStatus === "recreational") return showToast("La séance maison personnalisée se débloque après le passage amateur.");
-    v2HomeSelection = [];
-    renderV2HomeComposer();
+    careerHomeSelection = [];
+    renderCareerHomeComposer();
     return;
   }
   if (!["rest", "home-quick", "meal", "roadwork-short", "roadwork-long", "roadwork-intervals"].includes(viewActionId)) return;
-  addV2PlannerActivity(viewActionId, {}, { toggle: ["rest", "meal", "roadwork-short", "roadwork-long", "roadwork-intervals"].includes(viewActionId), reopen: "home" });
+  addCareerPlannerActivity(viewActionId, {}, { toggle: ["rest", "meal", "roadwork-short", "roadwork-long", "roadwork-intervals"].includes(viewActionId), reopen: "home" });
 }
 
-function renderV2HomeComposer() {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function renderCareerHomeComposer() {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet) return;
   const choices = ["shadow-boxing", "basement-bag"].map(id => {
-    const activity = V2_HOME_ACTIVITIES[id];
-    const selected = v2HomeSelection.includes(id);
-    return `<button type="button" class="v2-exercise-choice${selected ? " selected" : ""}" data-v2-home-exercise="${id}" aria-pressed="${selected}"><strong>${escapeHTML(activity.label)}</strong><small>−${activity.energyCost} énergie · +${activity.fatigueGain} fatigue</small></button>`;
+    const activity = CAREER_HOME_ACTIVITIES[id];
+    const selected = careerHomeSelection.includes(id);
+    return `<button type="button" class="career-exercise-choice${selected ? " selected" : ""}" data-career-home-exercise="${id}" aria-pressed="${selected}"><strong>${escapeHTML(activity.label)}</strong><small>−${activity.energyCost} énergie · +${activity.fatigueGain} fatigue</small></button>`;
   }).join("");
-  const aggregate = v2PlannerHomeAggregate(v2HomeSelection);
-  const empty = v2HomeSelection.length === 0;
+  const aggregate = careerPlannerHomeAggregate(careerHomeSelection);
+  const empty = careerHomeSelection.length === 0;
   sheet.dataset.originLocation = "home";
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.innerHTML = `<section class="v2-session-composer" aria-labelledby="v2-home-composer-title">
-    <header><div><p class="eyebrow">Maison · semaine ${ensureV2PreviewCapsule().timeState.clock.week}</p><h2 id="v2-home-composer-title">Bâtis un entraînement maison</h2></div><button type="button" data-v2-home-composer-close>Fermer</button></header>
+  sheet.classList.add("career-location-sheet-full");
+  sheet.innerHTML = `<section class="career-session-composer" aria-labelledby="career-home-composer-title">
+    <header><div><p class="eyebrow">Maison · semaine ${ensureCareerPreviewCapsule().timeState.clock.week}</p><h2 id="career-home-composer-title">Bâtis un entraînement maison</h2></div><button type="button" data-career-home-composer-close>Fermer</button></header>
     <p>Choisis une ou deux activités du sous-sol. Cette combinaison comptera comme une seule séance physique dans la semaine. La course se planifie séparément par la porte.</p>
-    <div class="v2-composer-state" aria-live="polite"><strong>${v2HomeSelection.length} activité${v2HomeSelection.length > 1 ? "s" : ""}</strong><span>−${aggregate.totals.energyCost} énergie</span><span>+${aggregate.totals.fatigueGain} fatigue</span></div>
-    <div class="v2-exercise-grid">${choices}</div>
-    <footer><button type="button" class="secondary-button" data-v2-home-composer-close>Annuler</button><button type="button" class="primary-button" data-v2-home-custom-confirm${empty ? " disabled aria-disabled=\"true\"" : ""}>Ajouter à ma semaine</button></footer>
+    <div class="career-composer-state" aria-live="polite"><strong>${careerHomeSelection.length} activité${careerHomeSelection.length > 1 ? "s" : ""}</strong><span>−${aggregate.totals.energyCost} énergie</span><span>+${aggregate.totals.fatigueGain} fatigue</span></div>
+    <div class="career-exercise-grid">${choices}</div>
+    <footer><button type="button" class="secondary-button" data-career-home-composer-close>Annuler</button><button type="button" class="primary-button" data-career-home-custom-confirm${empty ? " disabled aria-disabled=\"true\"" : ""}>Ajouter à ma semaine</button></footer>
   </section>`;
-  activateV2LocationSheet(sheet, "[data-v2-home-exercise], [data-v2-home-composer-close]");
+  activateCareerLocationSheet(sheet, "[data-career-home-exercise], [data-career-home-composer-close]");
 }
 
-function toggleV2HomeExercise(exerciseId) {
-  if (!V2_HOME_ACTIVITIES[exerciseId] || V2_HOME_ACTIVITIES[exerciseId].category !== "home-training") return;
-  const index = v2HomeSelection.indexOf(exerciseId);
-  if (index >= 0) v2HomeSelection.splice(index, 1);
-  else if (v2HomeSelection.length < 2) v2HomeSelection.push(exerciseId);
+function toggleCareerHomeExercise(exerciseId) {
+  if (!CAREER_HOME_ACTIVITIES[exerciseId] || CAREER_HOME_ACTIVITIES[exerciseId].category !== "home-training") return;
+  const index = careerHomeSelection.indexOf(exerciseId);
+  if (index >= 0) careerHomeSelection.splice(index, 1);
+  else if (careerHomeSelection.length < 2) careerHomeSelection.push(exerciseId);
   else return showToast("Une séance maison reste courte : choisis au maximum deux activités.");
-  renderV2HomeComposer();
+  renderCareerHomeComposer();
 }
 
-function renderV2Composer() {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function renderCareerComposer() {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet || !window.BoxeurGymView || !window.BoxeurTraining) return;
-  const engineIds = v2ComposerSelection.map(id => V2_EXERCISE_TO_ENGINE[id]).filter(Boolean);
+  const engineIds = careerComposerSelection.map(id => CAREER_EXERCISE_TO_ENGINE[id]).filter(Boolean);
   const durationMinutes = engineIds.reduce((sum, id) => sum + (window.BoxeurTraining.EXERCISES[id]?.durationMinutes || 0), 0);
   let draftWeekCost = 0;
   if (engineIds.length) {
@@ -5573,88 +5610,88 @@ function renderV2Composer() {
       sum.fatigueDelta += Number(exercise?.fatigueGain || 0) - Number(exercise?.fatigueRelief || 0);
       return sum;
     }, { energyCost: 0, fatigueDelta: 0 });
-    draftWeekCost = v2PlannerLoadCost(totals.energyCost, totals.fatigueDelta, 4, V2_CUSTOM_SESSION_BASE_COST);
+    draftWeekCost = careerPlannerLoadCost(totals.energyCost, totals.fatigueDelta, 4, CAREER_CUSTOM_SESSION_BASE_COST);
   }
   sheet.dataset.originLocation = "boxing-gym";
-  sheet.classList.add("v2-location-sheet-full");
+  sheet.classList.add("career-location-sheet-full");
   sheet.innerHTML = window.BoxeurGymView.renderComposer({
-    ...v2GymContext(),
-    selectedExercises: v2ComposerSelection,
+    ...careerGymContext(),
+    selectedExercises: careerComposerSelection,
     draftDurationMinutes: durationMinutes,
     draftWeekCost,
   });
-  activateV2LocationSheet(sheet, "[data-v2-close-composer]");
+  activateCareerLocationSheet(sheet, "[data-career-close-composer]");
 }
 
-function selectV2ComposerPreset(presetId) {
+function selectCareerComposerPreset(presetId) {
   const preset = window.BoxeurGymView?.PRESETS?.find(item => item.id === presetId);
   if (!preset) return;
-  v2ComposerSelection = [...preset.exerciseIds];
-  renderV2Composer();
+  careerComposerSelection = [...preset.exerciseIds];
+  renderCareerComposer();
 }
 
-function toggleV2ComposerExercise(exerciseId) {
-  if (!Object.hasOwn(V2_EXERCISE_TO_ENGINE, exerciseId)) return;
-  const existing = v2ComposerSelection.indexOf(exerciseId);
-  if (existing >= 0) v2ComposerSelection.splice(existing, 1);
-  else if (v2ComposerSelection.length < window.BoxeurGymView.EXERCISES.length) v2ComposerSelection.push(exerciseId);
-  renderV2Composer();
+function toggleCareerComposerExercise(exerciseId) {
+  if (!Object.hasOwn(CAREER_EXERCISE_TO_ENGINE, exerciseId)) return;
+  const existing = careerComposerSelection.indexOf(exerciseId);
+  if (existing >= 0) careerComposerSelection.splice(existing, 1);
+  else if (careerComposerSelection.length < window.BoxeurGymView.EXERCISES.length) careerComposerSelection.push(exerciseId);
+  renderCareerComposer();
 }
 
-function runV2CustomSession() {
+function runCareerCustomSession() {
   if (!window.BoxeurTraining) return;
-  const selected = new Set(v2ComposerSelection);
+  const selected = new Set(careerComposerSelection);
   const hasPreparation = selected.has("jump-rope");
   const hasWork = ["shadow-boxing", "heavy-bag", "mitt-work", "defense"].some(id => selected.has(id));
   const hasCooldown = selected.has("cooldown");
   if (!hasPreparation || !hasWork || !hasCooldown) {
     return showToast("Complète la préparation, le travail principal et le retour au calme avant d’ajouter la séance.");
   }
-  const blocks = v2ComposerSelection.map(id => V2_EXERCISE_TO_ENGINE[id]).filter(Boolean);
-  const outcome = addV2PlannerActivity("boxing-custom", { blocks }, { reopen: "boxing-gym" });
-  if (outcome) v2ComposerSelection = [];
+  const blocks = careerComposerSelection.map(id => CAREER_EXERCISE_TO_ENGINE[id]).filter(Boolean);
+  const outcome = addCareerPlannerActivity("boxing-custom", { blocks }, { reopen: "boxing-gym" });
+  if (outcome) careerComposerSelection = [];
 }
 
-function renderV2StrengthMenu(menuId, preferredFocusSelector = "") {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function renderCareerStrengthMenu(menuId, preferredFocusSelector = "") {
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!sheet || !window.BoxeurStrengthView?.renderMenu) return;
-  const markup = window.BoxeurStrengthView.renderMenu(menuId, v2StrengthContext());
+  const markup = window.BoxeurStrengthView.renderMenu(menuId, careerStrengthContext());
   if (!markup) return;
   sheet.dataset.originLocation = "strength-gym";
-  sheet.classList.add("v2-location-sheet-full", "v2-location-sheet-strength");
+  sheet.classList.add("career-location-sheet-full", "career-location-sheet-strength");
   sheet.innerHTML = markup;
   const defaultFocus = menuId === "reception"
-    ? "[data-v2-strength-plan]:not([disabled]), [data-v2-strength-menu-close]"
+    ? "[data-career-strength-plan]:not([disabled]), [data-career-strength-menu-close]"
     : menuId === "crossfit"
-      ? "[data-v2-strength-quick]:not([disabled]), [data-v2-strength-menu-close]"
-      : "[data-v2-strength-activity]:not([disabled]), [data-v2-strength-menu-close]";
-  activateV2LocationSheet(sheet, preferredFocusSelector || defaultFocus);
+      ? "[data-career-strength-quick]:not([disabled]), [data-career-strength-menu-close]"
+      : "[data-career-strength-activity]:not([disabled]), [data-career-strength-menu-close]";
+  activateCareerLocationSheet(sheet, preferredFocusSelector || defaultFocus);
 }
 
-function toggleV2StrengthActivity(activityId) {
-  const capsule = ensureV2PreviewCapsule();
+function toggleCareerStrengthActivity(activityId) {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule?.timeState || !window.BoxeurStrength) return;
   const outcome = window.BoxeurStrength.toggleActivity(
     capsule.timeState,
-    v2StrengthSelection,
+    careerStrengthSelection,
     activityId,
-    v2StrengthContext(),
+    careerStrengthContext(),
   );
   if (!outcome.ok) return showToast(outcome.reason || "Cette activité ne peut pas être ajoutée.");
-  v2StrengthSelection = outcome.selection;
-  renderV2StrengthMenu("program", `[data-v2-strength-activity="${safeIdentifier(activityId)}"]`);
+  careerStrengthSelection = outcome.selection;
+  renderCareerStrengthMenu("program", `[data-career-strength-activity="${safeIdentifier(activityId)}"]`);
 }
 
-function selectV2StrengthPlan(planId) {
-  const capsule = ensureV2PreviewCapsule();
+function selectCareerStrengthPlan(planId) {
+  const capsule = ensureCareerPreviewCapsule();
   const plan = strengthGymPlans.find(item => item.id === planId);
   if (!capsule || !plan || !window.BoxeurStrength) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   if (state.careerStatus === "recreational") {
     return showToast("Le gym de musculation se débloque après le passage amateur.");
   }
   if (runtime.career.strengthGymWeeks > 0) return showToast("Ton abonnement de musculation est déjà actif.");
-  const reserve = v2ReservedBoxingGymBudget(v2CareerView());
+  const reserve = careerReservedBoxingGymBudget(careerCareerView());
   const spendable = Math.max(0, runtime.career.money - reserve);
   if (spendable < plan.price) {
     const reserveDetail = reserve > 0 ? ` Le premier mois du GYM de boxe garde ${reserve} $ en réserve.` : "";
@@ -5662,82 +5699,82 @@ function selectV2StrengthPlan(planId) {
   }
   runtime.career.money -= plan.price;
   runtime.career.strengthGymWeeks = plan.weeks;
-  v2StrengthSelection = [];
-  persistV2PreviewCapsule();
-  renderV2WorldPreview(true);
-  openV2Location("strength-gym");
+  careerStrengthSelection = [];
+  persistCareerPreviewCapsule();
+  renderCareerWorldPreview(true);
+  openCareerLocation("strength-gym");
   showToast(`Gym de musculation actif · ${plan.label.toLowerCase()} · ${plan.weeks} semaines`);
 }
 
-function runV2StrengthSession() {
-  if (!window.BoxeurStrength || !v2StrengthSelection.length) {
+function runCareerStrengthSession() {
+  if (!window.BoxeurStrength || !careerStrengthSelection.length) {
     return showToast("Ajoute au moins un exercice de travail physique.");
   }
-  const selection = [...v2StrengthSelection];
-  const outcome = addV2PlannerActivity("strength-custom", { selection }, { reopen: "strength-gym" });
-  if (outcome) v2StrengthSelection = [];
+  const selection = [...careerStrengthSelection];
+  const outcome = addCareerPlannerActivity("strength-custom", { selection }, { reopen: "strength-gym" });
+  if (outcome) careerStrengthSelection = [];
 }
 
-function v2TrainerLocationForTarget(target) {
+function careerTrainerLocationForTarget(target) {
   return ["power", "cardio"].includes(target) ? "strength-gym" : "boxing-gym";
 }
 
-function v2TrainerTargetLabel(target) {
+function careerTrainerTargetLabel(target) {
   return combatLabels[target] || "Qualité ciblée";
 }
 
-function v2TrainerAccess(locationId, program = null) {
-  const capsule = ensureV2PreviewCapsule();
-  const career = capsule ? normalizeV2PreviewRuntime(capsule).career : null;
+function careerTrainerAccess(locationId, program = null) {
+  const capsule = ensureCareerPreviewCapsule();
+  const career = capsule ? normalizeCareerPreviewRuntime(capsule).career : null;
   if (!capsule?.timeState || !career) return { available: false, reason: "Carrière indisponible." };
   if (!["amateur", "professional"].includes(state.careerStatus)) {
     return { available: false, reason: "Les programmes privés se débloquent après le passage amateur." };
   }
   const membershipActive = locationId === "strength-gym" ? career.strengthGymWeeks > 0 : career.gymWeeks > 0;
   if (!membershipActive) return { available: false, reason: "Un abonnement actif dans ce gym est requis." };
-  const conditionAccess = v2ConditionActivityAccess("private-training", capsule);
+  const conditionAccess = careerConditionActivityAccess("private-training", capsule);
   if (!conditionAccess.available) return conditionAccess;
-  if (program && v2TrainerLocationForTarget(program.target) !== locationId) {
-    const destination = v2TrainerLocationForTarget(program.target) === "strength-gym" ? "gym de musculation" : "GYM de boxe";
+  if (program && careerTrainerLocationForTarget(program.target) !== locationId) {
+    const destination = careerTrainerLocationForTarget(program.target) === "strength-gym" ? "gym de musculation" : "GYM de boxe";
     return { available: false, reason: `Ce programme se poursuit au ${destination}.` };
   }
-  const trainingWindow = v2NextTrainingWindow(capsule.timeState);
+  const trainingWindow = careerNextTrainingWindow(capsule.timeState);
   return trainingWindow.available
     ? { available: true, reason: "", label: trainingWindow.label }
     : { available: false, reason: trainingWindow.reason };
 }
 
-function renderV2TrainerMenu(locationId = "boxing-gym") {
-  const capsule = ensureV2PreviewCapsule();
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+function renderCareerTrainerMenu(locationId = "boxing-gym") {
+  const capsule = ensureCareerPreviewCapsule();
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   if (!capsule || !sheet || !window.BoxeurTrainer) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const trainerState = runtime.career.v2TrainerState;
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const trainerState = runtime.career.trainerState;
   const publicState = window.BoxeurTrainer.getPublicState(trainerState);
   const active = publicState.activeProgram;
   const allowedTargets = locationId === "strength-gym" ? ["power", "cardio"] : ["technique", "defense"];
-  if (active) v2TrainerTarget = active.target;
-  else if (!allowedTargets.includes(v2TrainerTarget)) v2TrainerTarget = allowedTargets[0];
-  const access = v2TrainerAccess(locationId, active);
+  if (active) careerTrainerTarget = active.target;
+  else if (!allowedTargets.includes(careerTrainerTarget)) careerTrainerTarget = allowedTargets[0];
+  const access = careerTrainerAccess(locationId, active);
   const locationLabel = locationId === "strength-gym" ? "gym de musculation" : "GYM de boxe";
   let body = "";
   if (active) {
     const trainer = window.BoxeurTrainer.getTrainer(active.trainerId);
-    const correctLocation = v2TrainerLocationForTarget(active.target);
+    const correctLocation = careerTrainerLocationForTarget(active.target);
     const otherLocation = correctLocation !== locationId;
-    body = `<section class="v2-trainer-active" aria-labelledby="v2-trainer-active-title">
-      <p class="eyebrow">Programme actif</p><h3 id="v2-trainer-active-title">${escapeHTML(active.trainerLabel)}</h3>
-      <p><strong>${escapeHTML(v2TrainerTargetLabel(active.target))}</strong> · ${active.sessionsCompleted}/${active.sessionsTotal} séances complétées</p>
+    body = `<section class="career-trainer-active" aria-labelledby="career-trainer-active-title">
+      <p class="eyebrow">Programme actif</p><h3 id="career-trainer-active-title">${escapeHTML(active.trainerLabel)}</h3>
+      <p><strong>${escapeHTML(careerTrainerTargetLabel(active.target))}</strong> · ${active.sessionsCompleted}/${active.sessionsTotal} séances complétées</p>
       <progress max="${active.sessionsTotal}" value="${active.sessionsCompleted}">${active.sessionsCompleted}/${active.sessionsTotal}</progress>
       <p>${escapeHTML(otherLocation ? access.reason : `Prochaine séance : ${access.label || "créneau à confirmer"}. Chaque cours produit de l’XP ciblée qui doit ensuite être assimilée.`)}</p>
       ${otherLocation
-        ? `<button type="button" class="primary-button" data-v2-trainer-go-location="${correctLocation}">Aller au ${correctLocation === "strength-gym" ? "gym de musculation" : "GYM de boxe"}</button>`
-        : `<button type="button" class="primary-button" data-v2-trainer-session${access.available ? "" : " disabled aria-disabled=\"true\""}>Ajouter la prochaine séance · −${trainer.energyCost} énergie</button>`}
-      ${!access.available && !otherLocation ? `<small class="v2-trainer-reason">${escapeHTML(access.reason)}</small>` : ""}
+        ? `<button type="button" class="primary-button" data-career-trainer-go-location="${correctLocation}">Aller au ${correctLocation === "strength-gym" ? "gym de musculation" : "GYM de boxe"}</button>`
+        : `<button type="button" class="primary-button" data-career-trainer-session${access.available ? "" : " disabled aria-disabled=\"true\""}>Ajouter la prochaine séance · −${trainer.energyCost} énergie</button>`}
+      ${!access.available && !otherLocation ? `<small class="career-trainer-reason">${escapeHTML(access.reason)}</small>` : ""}
     </section>`;
   } else {
-    const targetButtons = allowedTargets.map(target => `<button type="button" data-v2-trainer-target="${target}" aria-pressed="${v2TrainerTarget === target}">${escapeHTML(v2TrainerTargetLabel(target))}</button>`).join("");
-    const statValue = Number(v2ProgressionSnapshot(capsule)?.stats?.[v2TrainerTarget] || state.combatStats[v2TrainerTarget] || 40);
+    const targetButtons = allowedTargets.map(target => `<button type="button" data-career-trainer-target="${target}" aria-pressed="${careerTrainerTarget === target}">${escapeHTML(careerTrainerTargetLabel(target))}</button>`).join("");
+    const statValue = Number(careerProgressionSnapshot(capsule)?.stats?.[careerTrainerTarget] || state.combatStats[careerTrainerTarget] || 40);
     const lessonCredits = safeNumber(runtime.career.privateLessonCredits, 0, 0, 99);
     const offers = window.BoxeurTrainer.listOffers({ statValue }).map(offer => {
       const lessonDiscount = lessonCredits > 0 ? Math.round(offer.cost / offer.sessions) : 0;
@@ -5745,104 +5782,104 @@ function renderV2TrainerMenu(locationId = "boxing-gym") {
       const insufficient = runtime.career.money < currentCost;
       const locked = !access.available || insufficient;
       const reason = !access.available ? access.reason : insufficient ? `Il manque ${currentCost - runtime.career.money} $.` : "";
-      return `<article class="v2-trainer-offer">
+      return `<article class="career-trainer-offer">
         <div><p class="eyebrow">${escapeHTML(offer.tierLabel)}</p><h3>${escapeHTML(offer.label)}</h3></div>
         <strong>${lessonDiscount > 0 ? `<s>${offer.cost} $</s> ${currentCost} $` : `${offer.cost} $`} · ${offer.sessions} séances</strong>
-        ${lessonDiscount > 0 ? `<small class="v2-trainer-gift">Bon cadeau appliqué · une séance offerte (−${lessonDiscount} $)</small>` : ""}
+        ${lessonDiscount > 0 ? `<small class="career-trainer-gift">Bon cadeau appliqué · une séance offerte (−${lessonDiscount} $)</small>` : ""}
         <p>Environ ${Math.round(offer.estimatedTargetedXpPerSession ?? offer.estimatedGaugePointsPerSession)} XP ciblée par séance, avant assimilation.</p>
         <small>−${offer.energyCost} énergie · +${offer.fatigue} fatigue par séance</small>
-        <button type="button" data-v2-trainer-start="${offer.id}"${locked ? " disabled aria-disabled=\"true\"" : ""}>Choisir ${escapeHTML(offer.label)}</button>
-        ${reason ? `<small class="v2-trainer-reason">${escapeHTML(reason)}</small>` : ""}
+        <button type="button" data-career-trainer-start="${offer.id}"${locked ? " disabled aria-disabled=\"true\"" : ""}>Choisir ${escapeHTML(offer.label)}</button>
+        ${reason ? `<small class="career-trainer-reason">${escapeHTML(reason)}</small>` : ""}
       </article>`;
     }).join("");
-    body = `<section class="v2-trainer-picker" aria-labelledby="v2-trainer-picker-title">
-      <div><p class="eyebrow">Qualité travaillée</p><h3 id="v2-trainer-picker-title">Choisis une cible</h3><div class="v2-trainer-targets">${targetButtons}</div></div>
+    body = `<section class="career-trainer-picker" aria-labelledby="career-trainer-picker-title">
+      <div><p class="eyebrow">Qualité travaillée</p><h3 id="career-trainer-picker-title">Choisis une cible</h3><div class="career-trainer-targets">${targetButtons}</div></div>
       <p>Le prix couvre le programme complet. Un entraîneur plus cher crée davantage d’XP ciblée; la récupération reste nécessaire avant tout gain de caractéristique.${lessonCredits > 0 ? ` Tu as ${lessonCredits} bon${lessonCredits > 1 ? "s" : ""} pour un cours offert.` : ""}</p>
-      <div class="v2-trainer-offers">${offers}</div>
+      <div class="career-trainer-offers">${offers}</div>
     </section>`;
   }
   sheet.dataset.originLocation = locationId;
   sheet.dataset.trainerLocation = locationId;
-  sheet.classList.add("v2-location-sheet-full");
-  sheet.classList.toggle("v2-location-sheet-strength", locationId === "strength-gym");
-  sheet.innerHTML = `<section class="v2-service-panel v2-trainer-panel" aria-labelledby="v2-trainer-title">
-    <header><div><p class="eyebrow">Service du ${escapeHTML(locationLabel)}</p><h2 id="v2-trainer-title">${locationId === "strength-gym" ? "Entraîneurs privés" : "Entraîneur privé"}</h2></div><button type="button" class="secondary-button" data-v2-trainer-close>Fermer</button></header>
-    <div class="v2-service-balance">Solde disponible <strong>${runtime.career.money} $</strong></div>${body}
+  sheet.classList.add("career-location-sheet-full");
+  sheet.classList.toggle("career-location-sheet-strength", locationId === "strength-gym");
+  sheet.innerHTML = `<section class="career-service-panel career-trainer-panel" aria-labelledby="career-trainer-title">
+    <header><div><p class="eyebrow">Service du ${escapeHTML(locationLabel)}</p><h2 id="career-trainer-title">${locationId === "strength-gym" ? "Entraîneurs privés" : "Entraîneur privé"}</h2></div><button type="button" class="secondary-button" data-career-trainer-close>Fermer</button></header>
+    <div class="career-service-balance">Solde disponible <strong>${runtime.career.money} $</strong></div>${body}
   </section>`;
-  activateV2LocationSheet(sheet, active ? "[data-v2-trainer-session], [data-v2-trainer-go-location], [data-v2-trainer-close]" : `[data-v2-trainer-target="${v2TrainerTarget}"]`);
+  activateCareerLocationSheet(sheet, active ? "[data-career-trainer-session], [data-career-trainer-go-location], [data-career-trainer-close]" : `[data-career-trainer-target="${careerTrainerTarget}"]`);
 }
 
-function startV2TrainerProgram(trainerId) {
-  const capsule = ensureV2PreviewCapsule();
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  const locationId = sheet?.dataset.trainerLocation || v2TrainerLocationForTarget(v2TrainerTarget);
+function startCareerTrainerProgram(trainerId) {
+  const capsule = ensureCareerPreviewCapsule();
+  const sheet = document.querySelector("#career-world .career-location-sheet");
+  const locationId = sheet?.dataset.trainerLocation || careerTrainerLocationForTarget(careerTrainerTarget);
   if (!capsule || !window.BoxeurTrainer) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const access = v2TrainerAccess(locationId);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const access = careerTrainerAccess(locationId);
   if (!access.available) return showToast(access.reason);
   try {
-    const outcome = window.BoxeurTrainer.startProgram(runtime.career.v2TrainerState, {
+    const outcome = window.BoxeurTrainer.startProgram(runtime.career.trainerState, {
       trainerId,
-      target: v2TrainerTarget,
+      target: careerTrainerTarget,
       startedWeek: capsule.timeState.clock.week,
     }, {
       balance: runtime.career.money,
       freeSessions: runtime.career.privateLessonCredits > 0 ? 1 : 0,
     });
-    runtime.career.v2TrainerState = outcome.state;
+    runtime.career.trainerState = outcome.state;
     runtime.career.money = outcome.result.remainingBalance;
     if (outcome.result.freeSessionsUsed > 0) {
       runtime.career.privateLessonCredits = Math.max(0, runtime.career.privateLessonCredits - outcome.result.freeSessionsUsed);
     }
-    persistV2PreviewCapsule();
-    renderV2WorldPreview(true);
-    renderV2TrainerMenu(locationId);
+    persistCareerPreviewCapsule();
+    renderCareerWorldPreview(true);
+    renderCareerTrainerMenu(locationId);
     showToast(`${outcome.result.trainer.label} · programme de ${outcome.result.program.sessionsTotal} séances confirmé`);
   } catch (error) {
     showToast(error.message || "Ce programme privé ne peut pas être commencé.");
   }
 }
 
-function runV2TrainerSession() {
-  const capsule = ensureV2PreviewCapsule();
+function runCareerTrainerSession() {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule?.timeState || !window.BoxeurTrainer) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const publicProgram = window.BoxeurTrainer.getPublicState(runtime.career.v2TrainerState).activeProgram;
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const publicProgram = window.BoxeurTrainer.getPublicState(runtime.career.trainerState).activeProgram;
   if (!publicProgram) return showToast("Aucun programme privé n’est actif.");
-  const locationId = v2TrainerLocationForTarget(publicProgram.target);
-  const access = v2TrainerAccess(locationId, publicProgram);
+  const locationId = careerTrainerLocationForTarget(publicProgram.target);
+  const access = careerTrainerAccess(locationId, publicProgram);
   if (!access.available) return showToast(access.reason);
-  addV2PlannerActivity("private-training", {}, { reopen: locationId });
+  addCareerPlannerActivity("private-training", {}, { reopen: locationId });
 }
 
-async function runV2TechnicalSparring(options = {}) {
+async function runCareerTechnicalSparring(options = {}) {
   const immediateAmateurSparring = state.careerStatus === "amateur";
   if (!immediateAmateurSparring && options.launch !== true) {
-    addV2PlannerActivity("sparring", {}, { toggle: true, reopen: "boxing-gym" });
+    addCareerPlannerActivity("sparring", {}, { toggle: true, reopen: "boxing-gym" });
     return;
   }
-  const capsule = ensureV2PreviewCapsule();
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule || !window.BoxeurTraining) return;
   if (!["amateur", "professional"].includes(state.careerStatus)) return showToast("Termine d’abord le sparring d’évaluation; le passage amateur se fera automatiquement.");
-  const career = v2CareerView();
+  const career = careerCareerView();
   if (career.gymWeeks <= 0) return showToast("Un abonnement actif au GYM est requis pour réserver un partenaire.");
-  const access = v2PlannerActivityAccess("sparring");
+  const access = careerPlannerActivityAccess("sparring");
   if (!access.available) return showToast(access.reason);
   try {
-    const runtime = normalizeV2PreviewRuntime(capsule);
-    let plannerState = ensureV2WeekPlanner(capsule);
+    const runtime = normalizeCareerPreviewRuntime(capsule);
+    let plannerState = ensureCareerWeekPlanner(capsule);
     let plannerEntry = options.entryId
       ? plannerState.entries.find(entry => entry.id === options.entryId && entry.activityId === "sparring")
       : plannerState.entries.find(entry => !entry.preReserved && entry.activityId === "sparring" && !entry.metadata?.completed);
     if (plannerEntry?.metadata?.completed) return showToast("Ce sparring a déjà été fait cette semaine.");
     if (!plannerEntry) {
-      const definition = v2PlannerActivityDefinition("sparring", { immediate: immediateAmateurSparring });
+      const definition = careerPlannerActivityDefinition("sparring", { immediate: immediateAmateurSparring });
       const outcome = window.BoxeurWeekPlanner.addActivity(plannerState, definition, { source: immediateAmateurSparring ? "immediate" : "gym" });
-      plannerState = v2PlannerStore(capsule, outcome.state);
+      plannerState = careerPlannerStore(capsule, outcome.state);
       plannerEntry = outcome.result.entry;
     }
     runtime.pendingPlannerSparringEntryId = plannerEntry.id;
-    prepareV2TrainingWindow(capsule);
+    prepareCareerTrainingWindow(capsule);
     const rating = clamp(Math.round(Object.values(career.combatStats).reduce((sum, value) => sum + Number(value || 0), 0) / 4), 30, 95);
     const partner = recreationalSparringPartner();
     const deferredScheduledFight = state.scheduledFight?.isPracticeSparring
@@ -5866,11 +5903,11 @@ async function runV2TechnicalSparring(options = {}) {
       tournamentId: null,
       tournamentRound: null,
       bookingId: null,
-      eventId: "v2-sparring-technique",
-      event: { id: "v2-sparring-technique", name: "Sparring technique · GYM de boxe", careerWeek: state.week },
+      eventId: "sparring-technique",
+      event: { id: "sparring-technique", name: "Sparring technique · GYM de boxe", careerWeek: state.week },
       week: state.week,
       isPracticeSparring: true,
-      isV2Sparring: true,
+      isCareerSparring: true,
       travelEffects: { energy: 0, fatigue: 0 },
       travelApplied: true,
       deferredScheduledFight,
@@ -5878,26 +5915,26 @@ async function runV2TechnicalSparring(options = {}) {
     };
     // Le combat fait partie de l’empreinte de sauvegarde : enregistrer après
     // sa création conserve le lien avec l’entrée du brouillon hebdomadaire.
-    persistV2PreviewCapsule();
+    persistCareerPreviewCapsule();
     await startFight();
   } catch (error) {
     showToast(error.message || "Le sparring n’est pas disponible maintenant.");
   }
 }
 
-async function startV2RemySparring() {
-  const capsule = ensureV2PreviewCapsule();
-  const onboarding = v2OnboardingView(capsule);
+async function startCareerRemySparring() {
+  const capsule = ensureCareerPreviewCapsule();
+  const onboarding = careerOnboardingView(capsule);
   if (!capsule || !onboarding) return;
   if (!onboarding.gates.remySparring.allowed) return showToast(onboarding.gates.remySparring.reason);
   const partner = sparringPartnerView();
-  if (v2CareerView().gymWeeks <= 0) return showToast(`Réactive ton abonnement au GYM avant le sparring de ${partner.firstName}.`);
+  if (careerCareerView().gymWeeks <= 0) return showToast(`Réactive ton abonnement au GYM avant le sparring de ${partner.firstName}.`);
   try {
-    prepareV2TrainingWindow(capsule);
+    prepareCareerTrainingWindow(capsule);
     if (!state.scheduledFight?.isRecreationalSparring) scheduleRecreationalSparring([]);
     if (!state.scheduledFight?.isRecreationalSparring) return showToast(`${partner.firstName} n’a pas pu être ${state.profile.sex === "female" ? "ajoutée" : "ajouté"} à l’horaire.`);
-    state.scheduledFight.isV2Sparring = true;
-    persistV2PreviewCapsule();
+    state.scheduledFight.isCareerSparring = true;
+    persistCareerPreviewCapsule();
     await startFight();
   } catch (error) {
     showToast(error.message || `Le sparring de ${partner.firstName} ne peut pas commencer maintenant.`);
@@ -5906,7 +5943,7 @@ async function startV2RemySparring() {
 
 function applyChanges(changes = {}) {
   Object.entries(changes).forEach(([key, change]) => {
-    if (V2_LEGACY_CONDITION_KEYS.has(key)) return;
+    if (CAREER_LEGACY_CONDITION_KEYS.has(key)) return;
     if (key === "money" || key === "experience") state[key] = Math.max(0, state[key] + change);
     else state[key] = clamp(state[key] + change);
   });
@@ -6035,7 +6072,7 @@ async function startFight() {
   if (!opponent) return;
   if (state.week < state.scheduledFight.week) return showToast(`Combat prévu à la semaine ${state.scheduledFight.week}.`);
   const isDeveloperBout = Boolean(state.scheduledFight.isDeveloperBout);
-  const isV2Sparring = Boolean(state.scheduledFight.isV2Sparring);
+  const isCareerSparring = Boolean(state.scheduledFight.isCareerSparring);
   if (!state.scheduledFight.travelApplied) {
     applyChanges({ energy: state.scheduledFight.travelEffects?.energy || 0, fatigue: state.scheduledFight.travelEffects?.fatigue || 0 });
     state.scheduledFight.travelApplied = true;
@@ -6046,8 +6083,8 @@ async function startFight() {
   const isTournamentBout = Boolean(state.scheduledFight.tournamentId) && !isNonRecordSparring;
   const isLocalOfficialFight = !isTournamentBout && !isNonRecordSparring;
   const useImmersiveRing = isNonRecordSparring || isLocalOfficialFight || isTournamentBout;
-  const v2FightCareer = !state.scheduledFight.tournamentId && !isDeveloperBout
-    ? v2CareerView()
+  const careerFightCareer = !state.scheduledFight.tournamentId && !isDeveloperBout
+    ? careerCareerView()
     : null;
   const difficulty = opponentDifficulty(opponent);
   const opponentStats = opponent.stats || opponentStatsForRating(difficulty, opponent.style, opponent.id);
@@ -6072,12 +6109,12 @@ async function startFight() {
       id: "player",
       name: state.profile.firstName,
       style: styles[state.profile.style].label,
-      stats: v2FightCareer?.combatStats || state.combatStats,
-      energy: isDeveloperBout ? 100 : v2FightCareer?.energy ?? state.activeTournament?.competition?.condition?.energy ?? state.energy,
-      fitness: V2_NEUTRAL_COMBAT_CONDITION.fitness,
-      fatigue: isDeveloperBout ? 0 : v2FightCareer?.fatigue ?? state.fatigue,
-      injury: V2_NEUTRAL_COMBAT_CONDITION.injury,
-      morale: V2_NEUTRAL_COMBAT_CONDITION.morale,
+      stats: careerFightCareer?.combatStats || state.combatStats,
+      energy: isDeveloperBout ? 100 : careerFightCareer?.energy ?? state.activeTournament?.competition?.condition?.energy ?? state.energy,
+      fitness: CAREER_NEUTRAL_COMBAT_CONDITION.fitness,
+      fatigue: isDeveloperBout ? 0 : careerFightCareer?.fatigue ?? state.fatigue,
+      injury: CAREER_NEUTRAL_COMBAT_CONDITION.injury,
+      morale: CAREER_NEUTRAL_COMBAT_CONDITION.morale,
       experience: state.experience,
       level: state.level,
       head: state.activeTournament?.competition?.condition?.headDamage || 0,
@@ -6098,13 +6135,13 @@ async function startFight() {
     isPracticeSparring,
     isLocalOfficialFight,
     isTournamentOfficialFight: isTournamentBout,
-    isV2Sparring,
+    isCareerSparring,
     isDeveloperBout,
     deferredScheduledFight: scheduled.deferredScheduledFight ? cloneData(scheduled.deferredScheduledFight) : null,
     remyLesson: !isRecreationalSparring ? state.remyLesson : "",
     careerBefore: {
-      energy: Math.round(v2FightCareer?.energy ?? state.energy),
-      fatigue: Math.round(v2FightCareer?.fatigue ?? state.fatigue),
+      energy: Math.round(careerFightCareer?.energy ?? state.energy),
+      fatigue: Math.round(careerFightCareer?.fatigue ?? state.fatigue),
       experience: state.experience,
       reputation: state.reputation,
       money: state.money,
@@ -6253,7 +6290,7 @@ function activateTournamentBooking(booking) {
     id: event.id,
     totalBouts: event.rounds,
     started: true,
-    condition: { energy: state.energy, fatigue: state.fatigue, injury: V2_NEUTRAL_COMBAT_CONDITION.injury, fitness: V2_NEUTRAL_COMBAT_CONDITION.fitness, cardio: state.combatStats.cardio, headDamage: 0, bodyDamage: 0, lucidity: 100 },
+    condition: { energy: state.energy, fatigue: state.fatigue, injury: CAREER_NEUTRAL_COMBAT_CONDITION.injury, fitness: CAREER_NEUTRAL_COMBAT_CONDITION.fitness, cardio: state.combatStats.cardio, headDamage: 0, bodyDamage: 0, lucidity: 100 },
     weight: { className: category.label, minKg: category.minKg, maxKg: category.maxKg },
   });
   state.activeTournament = {
@@ -6326,7 +6363,7 @@ function registerTournament(id) {
 
 function completeAmateurCareerAfterSparring() {
   if (!isRecreationalCareer() || state.recreationalSparringStatus !== "completed") return false;
-  const capsule = v2PreviewCapsule;
+  const capsule = careerCapsule;
   if (capsule?.timeState?.stats) state.combatStats = cloneData(capsule.timeState.stats);
   const amateurEpoch = careerWeekDate(0);
   state.careerStatus = "amateur";
@@ -6341,7 +6378,7 @@ function completeAmateurCareerAfterSparring() {
   state.amateurRecord = { wins: 0, losses: 0, draws: 0 };
   state.amateurPromotionPending = true;
   state.journal.unshift({ week: 1, text: `${state.profile.firstName} passe automatiquement amateur après le sparring d’évaluation. Le calendrier des galas et tournois est ouvert.` });
-  invalidateV2PreviewCapsule();
+  invalidateCareerPreviewCapsule();
   ensureCareerCalendar();
   closeCalendarDialog();
   persistCareer();
@@ -6361,7 +6398,7 @@ function acknowledgeAmateurPromotion() {
   state.amateurPromotionPending = false;
   dialog?.close();
   persistCareer();
-  renderV2WorldPreview(true);
+  renderCareerWorldPreview(true);
   showToast("Statut amateur obtenu · le circuit compétitif est ouvert");
 }
 
@@ -7261,18 +7298,18 @@ function useCornerBoost() {
   if (fightState?.phase === "corner") chooseFightCoachDirective("recover");
 }
 
-function settleV2Sparring(fight, fightFatigue, exposure) {
-  const capsule = ensureV2PreviewCapsule();
+function settleCareerSparring(fight, fightFatigue, exposure) {
+  const capsule = ensureCareerPreviewCapsule();
   if (!capsule?.timeState || !window.BoxeurTime) return false;
-  const runtime = normalizeV2PreviewRuntime(capsule);
+  const runtime = normalizeCareerPreviewRuntime(capsule);
   const isRemy = fight.careerMeta?.isRecreationalSparring === true;
   const label = isRemy ? `Sparring pédagogique avec ${sparringPartnerView().displayName}` : "Sparring technique au GYM";
-  const trainedEarlierThisWeek = v2WeekTrainingActivityCount(capsule.timeState) > 0;
+  const trainedEarlierThisWeek = careerWeekTrainingActivityCount(capsule.timeState) > 0;
   const finalEnergy = clamp(Math.round(fight.fighters.player.energy), 0, 100);
   const energyCost = Math.max(0, Math.round(capsule.timeState.condition.energy - finalEnergy));
   try {
     capsule.timeState = window.BoxeurTime.performActivity(capsule.timeState, {
-      id: `${isRemy ? "v2-remy-sparring" : "v2-practice-sparring"}:${capsule.timeState.clock.week}`,
+      id: `${isRemy ? "remy-sparring" : "practice-sparring"}:${capsule.timeState.clock.week}`,
       label,
       category: "sparring",
       duration: 1,
@@ -7291,9 +7328,9 @@ function settleV2Sparring(fight, fightFatigue, exposure) {
     capsule.timeState = window.BoxeurTime.advanceTime(capsule.timeState, 1);
   }
   if (isRemy) {
-    const onboarding = v2OnboardingView(capsule);
+    const onboarding = careerOnboardingView(capsule);
     if (onboarding?.gates.remySparring.allowed) {
-      applyV2OnboardingEvent({ type: window.BoxeurOnboarding.EVENT_TYPES.COMPLETE_REMY_SPARRING });
+      applyCareerOnboardingEvent({ type: window.BoxeurOnboarding.EVENT_TYPES.COMPLETE_REMY_SPARRING });
     }
     state.recreationalSparringStatus = "completed";
   }
@@ -7301,7 +7338,7 @@ function settleV2Sparring(fight, fightFatigue, exposure) {
   if (!isRemy && isCompetitiveCareer()) state.boxingTrainingWeek = capsule.timeState.clock.week;
   if (!trainedEarlierThisWeek) runtime.trainingSessions = safeNumber(runtime.trainingSessions + 1, 0, 0, 999);
   runtime.sessions.unshift({
-    type: isRemy ? "v2-remy-sparring" : "v2-practice-sparring",
+    type: isRemy ? "remy-sparring" : "practice-sparring",
     label,
     week: capsule.timeState.clock.week,
     exposure: Math.round(exposure * 10) / 10,
@@ -7324,7 +7361,7 @@ function settleV2Sparring(fight, fightFatigue, exposure) {
   state.scheduledFight = !isRemy && fight.careerMeta?.deferredScheduledFight
     ? cloneData(fight.careerMeta.deferredScheduledFight)
     : null;
-  persistV2PreviewCapsule();
+  persistCareerPreviewCapsule();
   return true;
 }
 
@@ -7392,7 +7429,7 @@ function finishFight() {
   const isRecreationalSparring = Boolean(meta.isRecreationalSparring);
   const isPracticeSparring = Boolean(meta.isPracticeSparring);
   const isNonRecordSparring = isRecreationalSparring || isPracticeSparring;
-  const isV2Sparring = Boolean(meta.isV2Sparring);
+  const isCareerSparring = Boolean(meta.isCareerSparring);
   const isDeveloperBout = Boolean(meta.isDeveloperBout);
   const exposure = fightResult.exposure?.player || fightState.fighters.player.legacyExposure || 0;
   const fightFatigue = clamp(Math.round(8 + (100 - fightState.fighters.player.energy) * .14 + exposure * .25 - state.combatStats.cardio * .035), 8, 32);
@@ -7400,7 +7437,7 @@ function finishFight() {
     // Un affrontement lancé par le menu caché exerce le vrai moteur, mais ne
     // touche jamais au bilan, aux jauges ni à la semaine de la carrière testée.
   } else if (isNonRecordSparring) {
-    if (!isV2Sparring) {
+    if (!isCareerSparring) {
       applyChanges({ experience: 14, fatigue: Math.round(fightFatigue * .72) });
       if (isRecreationalSparring) state.recreationalSparringStatus = "completed";
     }
@@ -7411,7 +7448,7 @@ function finishFight() {
     state.amateurRecord.losses += 1;
     applyChanges({ reputation: 2, experience: Math.max(10, (meta.experienceReward || 16) - 6), fatigue: fightFatigue + 3 });
   }
-  if (!isV2Sparring && !isDeveloperBout) state.energy = clamp(Math.round(fightState.fighters.player.energy));
+  if (!isCareerSparring && !isDeveloperBout) state.energy = clamp(Math.round(fightState.fighters.player.energy));
   if (!isNonRecordSparring && !isDeveloperBout) {
     state.lastFightWeek = state.week;
     state.avoidanceWeeks = 0;
@@ -7441,21 +7478,21 @@ function finishFight() {
   if (isDeveloperBout) {
     state.scheduledFight = developerBoutScheduledBackup;
     developerBoutScheduledBackup = null;
-  } else if (isV2Sparring) {
-    settleV2Sparring(fightState, fightFatigue, exposure);
-    careerAfterFight = fightCareerSnapshot(v2CareerView());
+  } else if (isCareerSparring) {
+    settleCareerSparring(fightState, fightFatigue, exposure);
+    careerAfterFight = fightCareerSnapshot(careerCareerView());
     if (isRecreationalSparring) completeAmateurCareerAfterSparring();
   }
   else state.scheduledFight = null;
   if (meta.tournamentId && !isDeveloperBout) {
     restoreDeferredGalaAfterTournamentBout();
-  } else if (!isV2Sparring && !isDeveloperBout) {
+  } else if (!isCareerSparring && !isDeveloperBout) {
     const weekTransitionEvents = [];
     settleJobAttendance(false, weekTransitionEvents, state.week);
     endWeek(weekTransitionEvents);
     if (isRecreationalSparring) completeAmateurCareerAfterSparring();
   }
-  if (!isV2Sparring && !isDeveloperBout) persistCareer();
+  if (!isCareerSparring && !isDeveloperBout) persistCareer();
   renderFight(`${methodLabel}.`);
   const instruction = document.querySelector("#fight-instruction");
   const debriefTitle = state.profile.sex === "female" ? `Ce que Rémy et ${partner.firstName} veulent te montrer` : "Ce que Rémy veut te montrer";
@@ -7488,8 +7525,8 @@ function finishFight() {
     } else {
       render();
       if (isNonRecordSparring) {
-        if (isV2Sparring) {
-          if (!isRecreationalSparring) setTimeout(() => openV2Location("boxing-gym"), 0);
+        if (isCareerSparring) {
+          if (!isRecreationalSparring) setTimeout(() => openCareerLocation("boxing-gym"), 0);
         } else if (!isRecreationalSparring) setTimeout(() => document.querySelector("#calendar-dialog")?.showModal(), 0);
       }
     }
@@ -7543,7 +7580,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   const style = document.querySelector("#fighter-style").value;
   const corner = document.querySelector("#fighter-corner").value;
   const sex = document.querySelector("#fighter-sex").value === "female" ? "female" : "male";
-  invalidateV2PreviewCapsule();
+  invalidateCareerPreviewCapsule();
   state = cloneData(INITIAL_STATE);
   fightState = null;
   sparringRingState = null;
@@ -7565,7 +7602,7 @@ document.querySelector("#creation-form").addEventListener("submit", event => {
   Object.keys(combatLabels).forEach(key => { state.combatStats[key] = BASE_COMBAT_STAT + styles[style].bonuses[key] + draftStats[key]; });
   state.journal = [{ week: 1, text: `${state.profile.firstName} commence au statut récréatif. Choisis un emploi et active le premier mois de GYM pour lancer le parcours.` }];
   render();
-  openV2OnboardingWelcome();
+  openCareerOnboardingWelcome();
   showToast("Nouvelle carrière lancée · statut récréatif");
 });
 
@@ -7576,7 +7613,7 @@ document.querySelector("#import-career-file")?.addEventListener("change", async 
   if (!file) return;
   try {
     const snapshot = JSON.parse(await file.text());
-    restoreCareer(snapshot, { invalidateV2: true });
+    restoreCareer(snapshot, { invalidateCareer: true });
   } catch (error) {
     console.error("[Boxeur Deux] Import JSON impossible :", error);
     showToast("Impossible de lire ce fichier de carrière.");
@@ -7589,7 +7626,7 @@ document.querySelector("#resume-load")?.addEventListener("click", () => {
 });
 document.querySelector("#resume-new")?.addEventListener("click", () => {
   document.querySelector("#resume-dialog")?.close();
-  invalidateV2PreviewCapsule();
+  invalidateCareerPreviewCapsule();
   state = cloneData(INITIAL_STATE);
   fightState = null;
   sparringRingState = null;
@@ -7650,16 +7687,16 @@ document.querySelector("#developer-tool-options")?.addEventListener("click", eve
 });
 document.querySelector("#developer-return-career")?.addEventListener("click", restoreDeveloperReturnCareer);
 
-document.querySelector("#v2-world")?.addEventListener("keydown", event => {
-  const sheet = event.target.closest(".v2-location-sheet");
+document.querySelector("#career-world")?.addEventListener("keydown", event => {
+  const sheet = event.target.closest(".career-location-sheet");
   if (!sheet || sheet.hidden) return;
   if (event.key === "Escape") {
     event.preventDefault();
-    closeV2Location();
+    closeCareerLocation();
     return;
   }
   if (event.key !== "Tab") return;
-  const focusable = v2LocationFocusableElements(sheet);
+  const focusable = careerLocationFocusableElements(sheet);
   if (!focusable.length) {
     event.preventDefault();
     sheet.focus();
@@ -7676,8 +7713,8 @@ document.querySelector("#v2-world")?.addEventListener("keydown", event => {
   }
 });
 
-document.querySelector("#v2-world")?.addEventListener("click", event => {
-  const disabledControl = event.target.closest('.v2-location-sheet [aria-disabled="true"]:not(:disabled)');
+document.querySelector("#career-world")?.addEventListener("click", event => {
+  const disabledControl = event.target.closest('.career-location-sheet [aria-disabled="true"]:not(:disabled)');
   if (disabledControl) {
     event.preventDefault();
     const reasonId = disabledControl.getAttribute("aria-describedby");
@@ -7685,306 +7722,306 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     showToast(reason || "Cette option n’est pas disponible maintenant.");
     return;
   }
-  const destination = event.target.closest("[data-v2-location]");
+  const destination = event.target.closest("[data-career-location]");
   if (destination) {
-    openV2Location(destination.dataset.v2Location);
+    openCareerLocation(destination.dataset.careerLocation);
     return;
   }
-  if (event.target.closest("[data-v2-week-quick]")) {
-    applyV2QuickWeekPlan();
+  if (event.target.closest("[data-career-week-quick]")) {
+    applyCareerQuickWeekPlan();
     return;
   }
-  if (event.target.closest("[data-v2-week-handoff]")) {
-    openV2WeekPlan();
+  if (event.target.closest("[data-career-week-handoff]")) {
+    openCareerWeekPlan();
     return;
   }
-  if (event.target.closest("[data-v2-week-detailed]")) {
-    selectV2DetailedWeek();
+  if (event.target.closest("[data-career-week-detailed]")) {
+    selectCareerDetailedWeek();
     return;
   }
-  if (event.target.closest("[data-v2-week-confirm]")) {
-    runV2AutomaticWeek();
+  if (event.target.closest("[data-career-week-confirm]")) {
+    runCareerAutomaticWeek();
     return;
   }
-  const weekEntryRemove = event.target.closest("[data-v2-week-remove]");
+  const weekEntryRemove = event.target.closest("[data-career-week-remove]");
   if (weekEntryRemove) {
-    const removed = removeV2PlannerActivity(weekEntryRemove.dataset.v2WeekRemove);
-    if (removed) openV2WeekPlan();
+    const removed = removeCareerPlannerActivity(weekEntryRemove.dataset.careerWeekRemove);
+    if (removed) openCareerWeekPlan();
     return;
   }
-  if (event.target.closest("[data-v2-week-summary-close]")) {
-    closeV2Location();
+  if (event.target.closest("[data-career-week-summary-close]")) {
+    closeCareerLocation();
     setTimeout(showCareerAlertOrContinue, 0);
     return;
   }
-  if (event.target.closest("[data-v2-export-career]")) {
+  if (event.target.closest("[data-career-export-career]")) {
     exportCareerJson();
     return;
   }
-  if (event.target.closest("[data-v2-week-plan-close]")) {
-    closeV2Location();
+  if (event.target.closest("[data-career-week-plan-close]")) {
+    closeCareerLocation();
     return;
   }
-  if (event.target.closest("[data-v2-close-location], [data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-leave-work]")) {
-    closeV2Location();
-    revealPendingV2LevelAlert();
+  if (event.target.closest("[data-career-close-location], [data-career-leave-gym], [data-career-leave-strength-gym], [data-career-leave-home], [data-career-leave-work]")) {
+    closeCareerLocation();
+    revealPendingCareerLevelAlert();
     return;
   }
-  if (event.target.closest("[data-v2-developer-secret]")) {
+  if (event.target.closest("[data-career-developer-secret]")) {
     registerDeveloperSecretTap();
     return;
   }
-  if (event.target.closest("[data-v2-restore-career]")) {
+  if (event.target.closest("[data-career-restore-career]")) {
     restoreDeveloperReturnCareer();
     return;
   }
-  const inventoryAction = event.target.closest("[data-v2-inventory-action]");
+  const inventoryAction = event.target.closest("[data-career-inventory-action]");
   if (inventoryAction) {
-    if (inventoryAction.dataset.v2InventoryAction === "reserve-week") {
-      openV2SupplementReservation(inventoryAction.dataset.v2InventoryItem);
+    if (inventoryAction.dataset.careerInventoryAction === "reserve-week") {
+      openCareerSupplementReservation(inventoryAction.dataset.careerInventoryItem);
     }
     return;
   }
-  const supplementEntry = event.target.closest("[data-v2-plan-supplement-entry]");
+  const supplementEntry = event.target.closest("[data-career-plan-supplement-entry]");
   if (supplementEntry) {
-    reserveV2PlannerSupplement(supplementEntry.dataset.v2PlanSupplementEntry, supplementEntry.dataset.v2PlanSupplementProduct);
+    reserveCareerPlannerSupplement(supplementEntry.dataset.careerPlanSupplementEntry, supplementEntry.dataset.careerPlanSupplementProduct);
     return;
   }
-  const supplementRemove = event.target.closest("[data-v2-plan-supplement-remove]");
+  const supplementRemove = event.target.closest("[data-career-plan-supplement-remove]");
   if (supplementRemove) {
-    unreserveV2PlannerSupplement(supplementRemove.dataset.v2PlanSupplementRemove);
+    unreserveCareerPlannerSupplement(supplementRemove.dataset.careerPlanSupplementRemove);
     return;
   }
-  const locationEntryRemove = event.target.closest("[data-v2-location-remove]");
+  const locationEntryRemove = event.target.closest("[data-career-location-remove]");
   if (locationEntryRemove) {
-    const origin = event.currentTarget.querySelector(".v2-location-sheet")?.dataset.originLocation;
-    removeV2PlannerActivity(locationEntryRemove.dataset.v2LocationRemove, { reopen: origin });
+    const origin = event.currentTarget.querySelector(".career-location-sheet")?.dataset.originLocation;
+    removeCareerPlannerActivity(locationEntryRemove.dataset.careerLocationRemove, { reopen: origin });
     return;
   }
-  if (event.target.closest("[data-v2-inventory-reserve-close]")) {
-    openV2Inventory();
+  if (event.target.closest("[data-career-inventory-reserve-close]")) {
+    openCareerInventory();
     return;
   }
-  if (event.target.closest("[data-v2-open-job-menu]")) {
-    openV2JobMenu();
+  if (event.target.closest("[data-career-open-job-menu]")) {
+    openCareerJobMenu();
     return;
   }
-  if (event.target.closest("[data-v2-cancel-job-application]")) {
-    cancelV2JobApplication();
+  if (event.target.closest("[data-career-cancel-job-application]")) {
+    cancelCareerJobApplication();
     return;
   }
-  const workOffer = event.target.closest(".v2-location-sheet [data-select-job]");
+  const workOffer = event.target.closest(".career-location-sheet [data-select-job]");
   if (workOffer) {
-    selectV2Job(workOffer.dataset.selectJob);
+    selectCareerJob(workOffer.dataset.selectJob);
     return;
   }
-  const workToggle = event.target.closest("[data-v2-toggle-work]");
+  const workToggle = event.target.closest("[data-career-toggle-work]");
   if (workToggle) {
-    setV2PlannerWorkAttendance(workToggle.getAttribute("aria-pressed") !== "true");
+    setCareerPlannerWorkAttendance(workToggle.getAttribute("aria-pressed") !== "true");
     return;
   }
-  const workZone = event.target.closest("[data-v2-work-zone]");
+  const workZone = event.target.closest("[data-career-work-zone]");
   if (workZone) {
-    if (workZone.dataset.v2WorkZone === "schedule") renderV2WorkMenu("schedule");
-    else if (["job", "employment"].includes(workZone.dataset.v2WorkZone)) openV2JobMenu();
+    if (workZone.dataset.careerWorkZone === "schedule") renderCareerWorkMenu("schedule");
+    else if (["job", "employment"].includes(workZone.dataset.careerWorkZone)) openCareerJobMenu();
     return;
   }
-  if (event.target.closest("[data-v2-work-menu-close]")) {
-    openV2Location("work");
+  if (event.target.closest("[data-career-work-menu-close]")) {
+    openCareerLocation("work");
     return;
   }
-  const homeMenu = event.target.closest("[data-v2-home-menu]");
+  const homeMenu = event.target.closest("[data-career-home-menu]");
   if (homeMenu) {
-    renderV2HomeMenu(homeMenu.dataset.v2HomeMenu);
+    renderCareerHomeMenu(homeMenu.dataset.careerHomeMenu);
     return;
   }
-  const homeAction = event.target.closest("[data-v2-home-action]");
+  const homeAction = event.target.closest("[data-career-home-action]");
   if (homeAction) {
-    runV2HomeAction(homeAction.dataset.v2HomeAction);
+    runCareerHomeAction(homeAction.dataset.careerHomeAction);
     return;
   }
-  const homeExercise = event.target.closest("[data-v2-home-exercise]");
+  const homeExercise = event.target.closest("[data-career-home-exercise]");
   if (homeExercise) {
-    toggleV2HomeExercise(homeExercise.dataset.v2HomeExercise);
+    toggleCareerHomeExercise(homeExercise.dataset.careerHomeExercise);
     return;
   }
-  if (event.target.closest("[data-v2-home-custom-confirm]")) {
-    if (!v2HomeSelection.length) return;
-    const selection = [...v2HomeSelection];
-    const added = addV2PlannerActivity("home-custom", { selection }, { reopen: "home" });
-    if (added) v2HomeSelection = [];
+  if (event.target.closest("[data-career-home-custom-confirm]")) {
+    if (!careerHomeSelection.length) return;
+    const selection = [...careerHomeSelection];
+    const added = addCareerPlannerActivity("home-custom", { selection }, { reopen: "home" });
+    if (added) careerHomeSelection = [];
     return;
   }
-  if (event.target.closest("[data-v2-home-composer-close]")) {
-    v2HomeSelection = [];
-    openV2Location("home");
+  if (event.target.closest("[data-career-home-composer-close]")) {
+    careerHomeSelection = [];
+    openCareerLocation("home");
     return;
   }
-  if (event.target.closest("[data-v2-home-menu-close]")) {
-    openV2Location("home");
+  if (event.target.closest("[data-career-home-menu-close]")) {
+    openCareerLocation("home");
     return;
   }
-  if (event.target.closest("[data-v2-home-result-close]")) {
-    openV2Location("home");
-    revealPendingV2LevelAlert();
+  if (event.target.closest("[data-career-home-result-close]")) {
+    openCareerLocation("home");
+    revealPendingCareerLevelAlert();
     return;
   }
-  if (event.target.closest("[data-v2-gym-menu-close]")) {
-    openV2Location("boxing-gym");
+  if (event.target.closest("[data-career-gym-menu-close]")) {
+    openCareerLocation("boxing-gym");
     return;
   }
-  const strengthZone = event.target.closest("[data-v2-strength-zone]");
+  const strengthZone = event.target.closest("[data-career-strength-zone]");
   if (strengthZone) {
-    const zoneId = strengthZone.dataset.v2StrengthZone;
-    if (["reception", "crossfit", "program"].includes(zoneId)) renderV2StrengthMenu(zoneId);
-    else if (zoneId === "trainer") renderV2TrainerMenu("strength-gym");
-    else if (zoneId === "shop") openV2SupplementShop();
+    const zoneId = strengthZone.dataset.careerStrengthZone;
+    if (["reception", "crossfit", "program"].includes(zoneId)) renderCareerStrengthMenu(zoneId);
+    else if (zoneId === "trainer") renderCareerTrainerMenu("strength-gym");
+    else if (zoneId === "shop") openCareerSupplementShop();
     return;
   }
-  if (event.target.closest("[data-v2-strength-menu-close]")) {
-    openV2Location("strength-gym");
+  if (event.target.closest("[data-career-strength-menu-close]")) {
+    openCareerLocation("strength-gym");
     return;
   }
-  const strengthActivity = event.target.closest("[data-v2-strength-activity]");
+  const strengthActivity = event.target.closest("[data-career-strength-activity]");
   if (strengthActivity) {
-    toggleV2StrengthActivity(strengthActivity.dataset.v2StrengthActivity);
+    toggleCareerStrengthActivity(strengthActivity.dataset.careerStrengthActivity);
     return;
   }
-  const strengthPlan = event.target.closest("[data-v2-strength-plan]");
+  const strengthPlan = event.target.closest("[data-career-strength-plan]");
   if (strengthPlan) {
-    selectV2StrengthPlan(strengthPlan.dataset.v2StrengthPlan);
+    selectCareerStrengthPlan(strengthPlan.dataset.careerStrengthPlan);
     return;
   }
-  if (event.target.closest("[data-v2-strength-confirm], [data-v2-strength-mobile-confirm]")) {
-    runV2StrengthSession();
+  if (event.target.closest("[data-career-strength-confirm], [data-career-strength-mobile-confirm]")) {
+    runCareerStrengthSession();
     return;
   }
-  if (event.target.closest("[data-v2-strength-quick]")) {
-    addV2PlannerActivity("strength-quick", {}, { reopen: "strength-gym" });
+  if (event.target.closest("[data-career-strength-quick]")) {
+    addCareerPlannerActivity("strength-quick", {}, { reopen: "strength-gym" });
     return;
   }
-  if (event.target.closest("[data-v2-strength-result-close]")) {
-    openV2Location("strength-gym");
-    revealPendingV2LevelAlert();
+  if (event.target.closest("[data-career-strength-result-close]")) {
+    openCareerLocation("strength-gym");
+    revealPendingCareerLevelAlert();
     return;
   }
-  if (event.target.closest("[data-v2-strength-shop]")) {
-    openV2SupplementShop();
+  if (event.target.closest("[data-career-strength-shop]")) {
+    openCareerSupplementShop();
     return;
   }
-  const supplementBuy = event.target.closest("[data-v2-supplement-buy]");
+  const supplementBuy = event.target.closest("[data-career-supplement-buy]");
   if (supplementBuy) {
-    purchaseV2Supplement(supplementBuy.dataset.v2SupplementBuy);
+    purchaseCareerSupplement(supplementBuy.dataset.careerSupplementBuy);
     return;
   }
-  if (event.target.closest("[data-v2-supplement-shop-close]")) {
-    openV2Location("strength-gym");
+  if (event.target.closest("[data-career-supplement-shop-close]")) {
+    openCareerLocation("strength-gym");
     return;
   }
-  if (event.target.closest("[data-v2-boxing-trainer]")) {
-    renderV2TrainerMenu("boxing-gym");
+  if (event.target.closest("[data-career-boxing-trainer]")) {
+    renderCareerTrainerMenu("boxing-gym");
     return;
   }
-  if (event.target.closest("[data-v2-strength-trainer]")) {
-    renderV2TrainerMenu("strength-gym");
+  if (event.target.closest("[data-career-strength-trainer]")) {
+    renderCareerTrainerMenu("strength-gym");
     return;
   }
-  const trainerTarget = event.target.closest("[data-v2-trainer-target]");
+  const trainerTarget = event.target.closest("[data-career-trainer-target]");
   if (trainerTarget) {
-    v2TrainerTarget = trainerTarget.dataset.v2TrainerTarget;
-    renderV2TrainerMenu(event.currentTarget.querySelector(".v2-location-sheet")?.dataset.trainerLocation || v2TrainerLocationForTarget(v2TrainerTarget));
+    careerTrainerTarget = trainerTarget.dataset.careerTrainerTarget;
+    renderCareerTrainerMenu(event.currentTarget.querySelector(".career-location-sheet")?.dataset.trainerLocation || careerTrainerLocationForTarget(careerTrainerTarget));
     return;
   }
-  const trainerStart = event.target.closest("[data-v2-trainer-start]");
+  const trainerStart = event.target.closest("[data-career-trainer-start]");
   if (trainerStart) {
-    startV2TrainerProgram(trainerStart.dataset.v2TrainerStart);
+    startCareerTrainerProgram(trainerStart.dataset.careerTrainerStart);
     return;
   }
-  if (event.target.closest("[data-v2-trainer-session]")) {
-    runV2TrainerSession();
+  if (event.target.closest("[data-career-trainer-session]")) {
+    runCareerTrainerSession();
     return;
   }
-  const trainerDestination = event.target.closest("[data-v2-trainer-go-location]");
+  const trainerDestination = event.target.closest("[data-career-trainer-go-location]");
   if (trainerDestination) {
-    openV2Location(trainerDestination.dataset.v2TrainerGoLocation);
+    openCareerLocation(trainerDestination.dataset.careerTrainerGoLocation);
     return;
   }
-  if (event.target.closest("[data-v2-trainer-close], [data-v2-trainer-result-close]")) {
-    const finishedTrainerSession = Boolean(event.target.closest("[data-v2-trainer-result-close]"));
-    const trainerLocation = event.currentTarget.querySelector(".v2-location-sheet")?.dataset.trainerLocation || "boxing-gym";
-    openV2Location(trainerLocation);
-    if (finishedTrainerSession) revealPendingV2LevelAlert();
+  if (event.target.closest("[data-career-trainer-close], [data-career-trainer-result-close]")) {
+    const finishedTrainerSession = Boolean(event.target.closest("[data-career-trainer-result-close]"));
+    const trainerLocation = event.currentTarget.querySelector(".career-location-sheet")?.dataset.trainerLocation || "boxing-gym";
+    openCareerLocation(trainerLocation);
+    if (finishedTrainerSession) revealPendingCareerLevelAlert();
     return;
   }
-  if (event.target.closest("[data-v2-coach-session]")) {
-    runV2CoachSession();
+  if (event.target.closest("[data-career-coach-session]")) {
+    runCareerCoachSession();
     return;
   }
-  const sessionPreset = event.target.closest("[data-v2-session-preset]");
+  const sessionPreset = event.target.closest("[data-career-session-preset]");
   if (sessionPreset) {
-    selectV2ComposerPreset(sessionPreset.dataset.v2SessionPreset);
+    selectCareerComposerPreset(sessionPreset.dataset.careerSessionPreset);
     return;
   }
-  const exercise = event.target.closest("[data-v2-exercise]");
+  const exercise = event.target.closest("[data-career-exercise]");
   if (exercise) {
-    toggleV2ComposerExercise(exercise.dataset.v2Exercise);
+    toggleCareerComposerExercise(exercise.dataset.careerExercise);
     return;
   }
-  if (event.target.closest("[data-v2-confirm-session]")) {
-    runV2CustomSession();
+  if (event.target.closest("[data-career-confirm-session]")) {
+    runCareerCustomSession();
     return;
   }
-  if (event.target.closest("[data-v2-close-composer], [data-v2-result-close]")) {
-    const finishedBoxingSession = Boolean(event.target.closest("[data-v2-result-close]"));
-    openV2Location("boxing-gym");
-    if (finishedBoxingSession) revealPendingV2LevelAlert();
+  if (event.target.closest("[data-career-close-composer], [data-career-result-close]")) {
+    const finishedBoxingSession = Boolean(event.target.closest("[data-career-result-close]"));
+    openCareerLocation("boxing-gym");
+    if (finishedBoxingSession) revealPendingCareerLevelAlert();
     return;
   }
-  if (event.target.closest("[data-v2-remy-sparring]")) {
-    startV2RemySparring();
+  if (event.target.closest("[data-career-remy-sparring]")) {
+    startCareerRemySparring();
     return;
   }
-  if (event.target.closest("[data-v2-sparring-activity]")) {
-    runV2TechnicalSparring();
+  if (event.target.closest("[data-career-sparring-activity]")) {
+    runCareerTechnicalSparring();
     return;
   }
-  if (event.target.closest("[data-v2-open-calendar]")) {
+  if (event.target.closest("[data-career-open-calendar]")) {
     openCalendarDialog();
     return;
   }
-  const gymZone = event.target.closest("[data-v2-gym-zone]");
+  const gymZone = event.target.closest("[data-career-gym-zone]");
   if (gymZone) {
-    if (gymZone.dataset.v2GymZone === "reception") openV2MembershipMenu();
-    else if (gymZone.dataset.v2GymZone === "coach") renderV2GymMenu("coach");
-    else if (gymZone.dataset.v2GymZone === "training") {
-      v2ComposerSelection = [];
-      renderV2Composer();
-    } else if (gymZone.dataset.v2GymZone === "ring") {
-      const context = v2GymContext();
-      if (context?.careerStatus === "recreational" && context.recreational?.remyStatus === "ready") startV2RemySparring();
-      else if (context?.careerStatus !== "recreational") renderV2GymMenu("ring");
+    if (gymZone.dataset.careerGymZone === "reception") openCareerMembershipMenu();
+    else if (gymZone.dataset.careerGymZone === "coach") renderCareerGymMenu("coach");
+    else if (gymZone.dataset.careerGymZone === "training") {
+      careerComposerSelection = [];
+      renderCareerComposer();
+    } else if (gymZone.dataset.careerGymZone === "ring") {
+      const context = careerGymContext();
+      if (context?.careerStatus === "recreational" && context.recreational?.remyStatus === "ready") startCareerRemySparring();
+      else if (context?.careerStatus !== "recreational") renderCareerGymMenu("ring");
     }
     return;
   }
-  const navigation = event.target.closest("[data-v2-nav]");
+  const navigation = event.target.closest("[data-career-nav]");
   if (navigation) {
-    navigateV2Primary(navigation.dataset.v2Nav);
+    navigateCareerPrimary(navigation.dataset.careerNav);
     return;
   }
 });
 
 document.querySelector("#job-options").addEventListener("click", event => {
-  if (event.target.closest("[data-v2-cancel-job-application]")) {
-    cancelV2JobApplication();
+  if (event.target.closest("[data-career-cancel-job-application]")) {
+    cancelCareerJobApplication();
     return;
   }
   const job = event.target.closest("[data-select-job]");
-  if (job) selectV2Job(job.dataset.selectJob);
+  if (job) selectCareerJob(job.dataset.selectJob);
 });
 
 document.querySelector("#job-dialog-close").addEventListener("click", () => closeOptionalDialog("job-dialog"));
 document.querySelector("#job-dialog-cancel").addEventListener("click", () => closeOptionalDialog("job-dialog"));
-document.querySelector("#onboarding-guide-acknowledge")?.addEventListener("click", startV2OnboardingFromWelcome);
+document.querySelector("#onboarding-guide-acknowledge")?.addEventListener("click", startCareerOnboardingFromWelcome);
 document.querySelector("#onboarding-guide-dialog")?.addEventListener("cancel", event => {
   event.preventDefault();
   showToast("Appuie sur « Commencer le parcours » pour choisir ton premier emploi.");
@@ -8032,11 +8069,11 @@ document.querySelector("#level-choices")?.addEventListener("click", event => {
   if (!combatLabels[stat] || state.combatStats[stat] >= 99) return;
   state.levelPoints -= 1;
   applyCombatChanges({ [stat]: 1 });
-  const capsule = v2PreviewCapsule || ensureV2PreviewCapsule();
+  const capsule = careerCapsule || ensureCareerPreviewCapsule();
   if (capsule?.timeState?.stats) {
     capsule.timeState.stats[stat] = state.combatStats[stat];
-    v2ProgressionSnapshot(capsule);
-    persistV2PreviewCapsule();
+    careerProgressionSnapshot(capsule);
+    persistCareerPreviewCapsule();
   }
   render();
   showToast(`+1 ${combatLabels[stat]}`);
@@ -8083,28 +8120,28 @@ document.querySelector("#tournament-recovery-choices").addEventListener("click",
 
 function openCalendarDialog() {
   if (!state.profile) return;
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  if (sheet && !sheet.hidden) closeV2Location();
+  const sheet = document.querySelector("#career-world .career-location-sheet");
+  if (sheet && !sheet.hidden) closeCareerLocation();
   renderFights();
-  const navigationHost = document.querySelector("#v2-calendar-navigation");
+  const navigationHost = document.querySelector("#career-calendar-navigation");
   if (navigationHost && window.BoxeurWorld?.renderNavigation) {
     navigationHost.innerHTML = window.BoxeurWorld.renderNavigation("calendar");
   }
   const dialog = document.querySelector("#calendar-dialog");
   dialog?.showModal();
-  dialog?.querySelector('[data-v2-nav="calendar"]')?.focus({ preventScroll: true });
+  dialog?.querySelector('[data-career-nav="calendar"]')?.focus({ preventScroll: true });
 }
 
 function closeCalendarDialog() {
   document.querySelector("#calendar-dialog")?.close();
-  const navigationHost = document.querySelector("#v2-calendar-navigation");
+  const navigationHost = document.querySelector("#career-calendar-navigation");
   if (navigationHost) navigationHost.innerHTML = "";
 }
 
-function navigateV2Primary(viewId) {
+function navigateCareerPrimary(viewId) {
   const target = ["map", "calendar", "fighter", "inventory"].includes(viewId) ? viewId : "map";
   const dialog = document.querySelector("#calendar-dialog");
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+  const sheet = document.querySelector("#career-world .career-location-sheet");
   const currentSheetView = sheet && !sheet.hidden ? sheet.dataset.originLocation : "map";
   if (target === "calendar") {
     if (!dialog?.open) openCalendarDialog();
@@ -8112,23 +8149,23 @@ function navigateV2Primary(viewId) {
   }
   if (dialog?.open) {
     closeCalendarDialog();
-    document.querySelector(`#v2-world [data-v2-nav="${target}"]`)?.focus({ preventScroll: true });
+    document.querySelector(`#career-world [data-career-nav="${target}"]`)?.focus({ preventScroll: true });
   }
   if (target === "fighter") {
-    if (currentSheetView !== "fighter") openV2Fighter();
+    if (currentSheetView !== "fighter") openCareerFighter();
     return;
   }
   if (target === "inventory") {
-    if (currentSheetView !== "inventory" || !sheet?.querySelector(".v2-inventory-view")) openV2Inventory();
+    if (currentSheetView !== "inventory" || !sheet?.querySelector(".career-inventory-view")) openCareerInventory();
     return;
   }
-  if (sheet && !sheet.hidden) closeV2Location();
-  document.querySelector('#v2-world [data-v2-nav="map"]')?.focus({ preventScroll: true });
+  if (sheet && !sheet.hidden) closeCareerLocation();
+  document.querySelector('#career-world [data-career-nav="map"]')?.focus({ preventScroll: true });
 }
 
 document.querySelector("#calendar-dialog")?.addEventListener("click", event => {
-  const navigation = event.target.closest("[data-v2-nav]");
-  if (navigation) navigateV2Primary(navigation.dataset.v2Nav);
+  const navigation = event.target.closest("[data-career-nav]");
+  if (navigation) navigateCareerPrimary(navigation.dataset.careerNav);
 });
 document.querySelector("#calendar-dialog")?.addEventListener("cancel", event => {
   event.preventDefault();
@@ -8155,7 +8192,7 @@ document.querySelector("#fight-dialog").addEventListener("cancel", event => {
 
 document.querySelector("#membership-options").addEventListener("click", event => {
   const plan = event.target.closest("[data-gym-plan]");
-  if (plan) selectV2GymPlan(plan.dataset.gymPlan);
+  if (plan) selectCareerGymPlan(plan.dataset.gymPlan);
 });
 document.querySelector("#membership-dialog-close").addEventListener("click", () => closeOptionalDialog("membership-dialog"));
 document.querySelector("#membership-dialog-cancel").addEventListener("click", () => closeOptionalDialog("membership-dialog"));

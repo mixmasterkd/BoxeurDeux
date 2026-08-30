@@ -1,0 +1,523 @@
+.career-location-sheet.career-location-sheet-full:has(.career-fighter-view) {
+  display: block;
+  padding: clamp(12px, 2vw, 28px);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 16% 8%, rgba(181, 42, 36, .13), transparent 34%),
+    #0d100f;
+}
+
+.career-fighter-view {
+  box-sizing: border-box;
+  width: min(1120px, 100%);
+  height: calc(100dvh - clamp(24px, 4vw, 56px));
+  margin: 0 auto;
+  padding: clamp(18px, 3vw, 34px);
+  padding-bottom: 104px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 18px;
+  color: var(--ink);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, .025), transparent 38%),
+    linear-gradient(145deg, rgba(18, 22, 19, .99), rgba(9, 12, 10, .99));
+  box-shadow: 0 26px 70px rgba(0, 0, 0, .42);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.career-fighter-header,
+.career-fighter-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.career-fighter-header {
+  position: sticky;
+  top: calc(0px - clamp(18px, 3vw, 34px));
+  z-index: 4;
+  margin: calc(0px - clamp(18px, 3vw, 34px)) calc(0px - clamp(18px, 3vw, 34px)) 0;
+  padding: clamp(18px, 3vw, 34px) clamp(18px, 3vw, 34px) 18px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(14, 17, 15, .94);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.career-fighter-header h2,
+.career-fighter-section-heading h3 {
+  margin: 0;
+}
+
+.career-fighter-layout {
+  display: grid;
+  grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 48px);
+  padding-top: 24px;
+}
+
+.career-fighter-identity,
+.career-fighter-visual,
+.career-fighter-details {
+  min-width: 0;
+}
+
+.career-fighter-portrait {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  border: 1px solid rgba(221, 182, 94, .45);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, .34);
+}
+
+.career-fighter-level-progress {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.career-fighter-level-progress > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+.career-fighter-level-progress > div:first-child strong {
+  color: var(--gold);
+}
+
+.career-fighter-level-progress .career-fighter-progress {
+  margin: 6px 0 0;
+}
+
+.career-fighter-badges {
+  display: flex;
+  margin: 8px 0 16px;
+}
+
+.career-fighter-badges span {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  color: var(--gold);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.career-fighter-identity dl {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.career-fighter-identity dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.career-fighter-identity dt {
+  color: var(--muted);
+}
+
+.career-fighter-identity dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+  font-weight: 800;
+}
+
+.career-fighter-identity dd.money {
+  color: #66df86;
+}
+
+.career-fighter-medal-summary {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.career-fighter-medal-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.career-fighter-medal-totals.compact {
+  justify-content: flex-end;
+  gap: 5px 8px;
+  font-size: .68rem;
+}
+
+.career-fighter-medal-totals > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.career-fighter-medal-totals i {
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 50%;
+  background: #c47748;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, .35);
+}
+
+.career-fighter-medal-totals [data-medal="gold"] i { background: #d9b658; }
+.career-fighter-medal-totals [data-medal="silver"] i { background: #cbd4dc; }
+.career-fighter-medal-totals [data-medal="bronze"] i { background: #c47748; }
+
+.career-fighter-details {
+  display: grid;
+  align-content: start;
+  gap: 30px;
+}
+
+.career-fighter-section-heading {
+  margin-bottom: 14px;
+}
+
+.career-fighter-section-heading > p {
+  max-width: 350px;
+  margin: 0;
+  color: var(--muted);
+  font-size: .84rem;
+  line-height: 1.45;
+}
+
+.career-fighter-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.career-fighter-stat {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .025);
+}
+
+.career-fighter-stat > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.career-fighter-stat > div:first-child span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.career-fighter-stat > div:first-child strong {
+  color: var(--gold);
+  font-size: 1.35rem;
+}
+
+.career-fighter-progress {
+  height: 9px;
+  margin: 11px 0 7px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 99px;
+  background: rgba(0, 0, 0, .34);
+}
+
+.career-fighter-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #9f742d, var(--gold));
+}
+
+.career-fighter-stat-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.career-fighter-stat-meta small:last-child {
+  text-align: right;
+}
+
+.career-fighter-stat-meta strong {
+  color: var(--gold);
+}
+
+.career-fighter-stat-meta .pending {
+  color: #a8d1e8;
+}
+
+.career-fighter-stat-meta .clear {
+  opacity: .68;
+}
+
+.career-fighter-stat small,
+.career-fighter-empty small,
+.career-fighter-private-program small {
+  color: var(--muted);
+}
+
+.career-fighter-private,
+.career-fighter-medals,
+.career-fighter-save {
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.career-fighter-medal-overview {
+  padding: 14px;
+  border: 1px solid rgba(217, 182, 88, .3);
+  background: rgba(217, 182, 88, .045);
+}
+
+.career-fighter-medal-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.career-fighter-medal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .022);
+}
+
+.career-fighter-medal-row > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.career-fighter-medal-row > span {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.career-fighter-medal-row b {
+  padding: 4px 7px;
+  border: 1px solid currentColor;
+  color: #c47748;
+  font-size: .68rem;
+}
+
+.career-fighter-medal-row b[data-medal="gold"] { color: #d9b658; }
+.career-fighter-medal-row b[data-medal="silver"] { color: #cbd4dc; }
+.career-fighter-medal-row b[data-medal="bronze"] { color: #c47748; }
+
+.career-fighter-save {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 4px;
+}
+
+.career-fighter-save h3,
+.career-fighter-save p {
+  margin: 0;
+}
+
+.career-fighter-save > div > p:last-child {
+  max-width: 470px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: .84rem;
+  line-height: 1.45;
+}
+
+.career-fighter-save button {
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+
+.career-fighter-private-program {
+  padding: 14px;
+  border: 1px solid rgba(221, 182, 94, .3);
+  background: rgba(221, 182, 94, .045);
+}
+
+.career-fighter-private-program > div:first-child {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.career-fighter-private-program > div:first-child span {
+  display: grid;
+  gap: 3px;
+}
+
+.career-fighter-private-program b {
+  flex: 0 0 auto;
+  color: var(--gold);
+  font-size: .8rem;
+}
+
+.career-fighter-empty {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed var(--line);
+  color: var(--ink);
+}
+
+@media (max-width: 700px) {
+  .career-location-sheet.career-location-sheet-full:has(.career-fighter-view) {
+    display: block;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .career-fighter-view {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    padding: 14px 14px max(100px, calc(78px + env(safe-area-inset-bottom)));
+    overflow-x: hidden;
+    overflow-y: auto;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .career-fighter-header {
+    top: -14px;
+    align-items: center;
+    margin: -14px -14px 0;
+    padding: max(14px, env(safe-area-inset-top)) 14px 12px;
+  }
+
+  .career-fighter-header h2 {
+    font-size: clamp(1.35rem, 6.5vw, 1.9rem);
+  }
+
+  .career-fighter-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding-top: 18px;
+  }
+
+  .career-fighter-identity {
+    display: grid;
+    grid-template-columns: 124px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+
+  .career-fighter-visual {
+    width: 124px;
+  }
+
+  .career-fighter-portrait {
+    aspect-ratio: 4 / 5;
+  }
+
+  .career-fighter-level-progress > div:first-child {
+    font-size: .58rem;
+    letter-spacing: 0;
+  }
+
+  .career-fighter-badges span {
+    padding-inline: 4px;
+    font-size: .6rem;
+    letter-spacing: .025em;
+  }
+
+  .career-fighter-identity dl {
+    align-self: start;
+  }
+
+  .career-fighter-identity dl div {
+    padding: 8px 0;
+    font-size: .78rem;
+  }
+
+  .career-fighter-section-heading {
+    display: block;
+  }
+
+  .career-fighter-section-heading > p {
+    margin-top: 8px;
+  }
+
+  .career-fighter-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .career-fighter-stat {
+    min-height: 94px;
+  }
+
+  .career-fighter-stat-meta {
+    align-items: flex-start;
+  }
+
+  .career-fighter-private-program > div:first-child {
+    display: grid;
+  }
+
+  .career-fighter-medal-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .career-fighter-medal-row > span {
+    flex-wrap: wrap;
+  }
+
+  .career-fighter-save {
+    display: grid;
+  }
+
+  .career-fighter-save button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .career-fighter-header .eyebrow {
+    display: none;
+  }
+
+  .career-fighter-identity {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .career-fighter-visual {
+    width: 112px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .career-fighter-progress span {
+    transition: none;
+  }
+}

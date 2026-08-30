@@ -614,6 +614,8 @@ Les scènes sont validées au minimum en 1440 × 900, 1280 × 720, 390 × 844, 3
 
 Le jeu doit ouvrir les sauvegardes existantes sans supprimer de progression. La migration est versionnée, idempotente et testée sur plusieurs profils : récréatif, amateur débutant, tournoi actif, carrière avancée, sans emploi et profil professionnel de test.
 
+Le schéma courant de la sauvegarde principale est la version 6, sous la clé locale `boxeur-deux-career`. La capsule d’exécution utilise la version 3 sous `boxeur-deux-career-runtime`. À la première lecture d’un ancien format, le jeu convertit ses champs et marqueurs vers les noms neutres, écrit une copie courante et conserve l’original local comme filet de sécurité. Les nouveaux exports utilisent `careerCapsule`, `supplementState`, `trainerState` et `weekPlannerState`.
+
 Le jeu actuel est ouvert directement, sans paramètre d'URL ni ancienne interface parallèle. Sa capsule écrit uniquement les champs durables prévus dans la sauvegarde principale et conserve séparément son historique détaillé. Une carrière déjà avancée ne repasse pas par l'abonnement et l'emploi bloquants destinés uniquement à une nouvelle carrière.
 
 Principes de conversion :
@@ -671,7 +673,7 @@ Le projet conserve HTML, CSS et JavaScript sans nouvelle dépendance importante.
 
 Aucune règle d'équilibrage ne doit être enfouie dans le rendu d'un écran. Une action déclenchée depuis une image, un bouton rapide ou une vue accessible appelle exactement la même règle.
 
-Le contrat transversal est exposé par `v2-balance-engine.js`. Il centralise la capacité de semaine, les emplois, les abonnements, les récompenses d'adversaire, les courbes de tournoi et les seuils mesurables. Les catalogues propres à un système restent dans leur moteur spécialisé : exercices, entraîneurs privés et suppléments.
+Le contrat transversal est exposé par `balance-engine.js`. Il centralise la capacité de semaine, les emplois, les abonnements, les récompenses d'adversaire, les courbes de tournoi et les seuils mesurables. Les catalogues propres à un système restent dans leur moteur spécialisé : exercices, entraîneurs privés et suppléments.
 
 ## 14. Équilibre et validation statistique
 
@@ -687,7 +689,7 @@ Avant de modifier les formules, la version actuelle sert de référence. Une sui
 - usure sur les tournois de trois et cinq combats;
 - progression et économie sur plusieurs saisons.
 
-Pour des boxeurs comparables, la cible centrale reste un partage proche de 50/50. Les seuils d'acceptation exacts sont définis dans le contrat d'équilibrage et vérifiés par `tests/v2-balance-engine.test.js` et `tests/balance.test.js`; ils ne sont pas choisis à partir d'une impression visuelle.
+Pour des boxeurs comparables, la cible centrale reste un partage proche de 50/50. Les seuils d'acceptation exacts sont définis dans le contrat d'équilibrage et vérifiés par `tests/balance-engine.test.js` et `tests/balance.test.js`; ils ne sont pas choisis à partir d'une impression visuelle.
 
 ### 14.1 Contrat mesuré du lot 2
 
