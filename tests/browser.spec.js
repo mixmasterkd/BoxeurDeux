@@ -610,7 +610,7 @@ test("charge les lieux actuels sans erreur JavaScript ni ressource locale manqua
   expect(missingResources).toEqual([]);
 });
 
-test("explique et verrouille le GYM V2 avant l’inscription", async ({ page }) => {
+test("explique et verrouille le GYM avant l’inscription", async ({ page }) => {
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
@@ -653,7 +653,7 @@ test("explique et verrouille le GYM V2 avant l’inscription", async ({ page }) 
   await expect(page.locator("#membership-dialog")).toBeVisible();
 });
 
-test("affiche le lieu Emploi V2 selon le poste sans modifier sa mécanique", async ({ page }) => {
+test("affiche le lieu Emploi selon le poste sans modifier sa mécanique", async ({ page }) => {
   const officeSnapshot = amateurSnapshot({
     jobId: "office",
     jobsHeldCount: 1,
@@ -718,7 +718,7 @@ test("affiche le lieu Emploi V2 selon le poste sans modifier sa mécanique", asy
   await expect(page.getByRole("button", { name: /Entrer : Emploi/ })).toHaveAccessibleName(/Candidature en cours/);
 });
 
-test("bâtit une semaine V2 modifiable puis ne l’exécute qu’à la confirmation", async ({ page }) => {
+test("bâtit une semaine modifiable puis ne l’exécute qu’à la confirmation", async ({ page }) => {
   test.setTimeout(60_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
@@ -1471,7 +1471,7 @@ test("réserve un gala et joue un combat tactique complet avant de révéler les
   expect(snapshot.state.amateurRecord.draws).toBe(0);
   expect(snapshot.state.amateurRecord.wins + snapshot.state.amateurRecord.losses).toBe(1);
   expect(snapshot.state.pendingWeekEvent).toBeNull();
-  await expect(page.locator("#week-event-dialog")).not.toBeVisible();
+  await expect(page.locator("#week-event-dialog")).toHaveCount(0);
   if (await page.locator("#calendar-dialog").isVisible()) {
     await page.locator('#calendar-dialog [data-v2-nav="map"]').click();
   }
@@ -1616,13 +1616,13 @@ test("reste utilisable à 390 × 844 px sans débordement et avec des actions ta
   expect(finishedMetrics.dialog).toBeLessThanOrEqual(finishedMetrics.viewport + 1);
 });
 
-test("guide une nouvelle carrière V2 sans permettre de contourner l’emploi ni le premier abonnement", async ({ page }) => {
+test("guide une nouvelle carrière sans permettre de contourner l’emploi ni le premier abonnement", async ({ page }) => {
   test.setTimeout(75_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   await page.evaluate(() => localStorage.clear());
-  await createCareer(page, { firstName: "Guide", lastName: "V2" });
+  await createCareer(page, { firstName: "Guide", lastName: "Parcours" });
 
   const guideIntroDialog = page.locator("#onboarding-guide-dialog");
   await expect(guideIntroDialog).toBeVisible();
@@ -2324,13 +2324,13 @@ test("retire Prochaine étape après le premier résultat amateur sur ordinateur
   expect(fit.document).toBeLessThanOrEqual(fit.viewport + 1);
 });
 
-test("cadre la carte V2 sur ordinateur et téléphone et synchronise la sauvegarde compatible", async ({ page }) => {
+test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde compatible", async ({ page }) => {
   test.setTimeout(75_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   const original = amateurSnapshot({
-    profile: { firstName: "Carte", lastName: "V2", sex: "female", weightClass: "W57", style: "balanced", corner: "pink" },
+    profile: { firstName: "Carte", lastName: "Parcours", sex: "female", weightClass: "W57", style: "balanced", corner: "pink" },
     jobId: "convenience",
     gymWeeks: 3,
   });
@@ -2698,7 +2698,7 @@ test("compose la semaine à la Maison sans appliquer le plan avant sa confirmati
   expect(afterConfirmation.capsule.previewRuntime.weeklySummaries[0].actions.some(action => action.primitive?.plannerActivityId === "meal")).toBe(true);
 });
 
-test("ouvre le menu développeur depuis Travail en V2 et restaure la vraie carrière", async ({ page }) => {
+test("ouvre le menu développeur depuis Travail et restaure la vraie carrière", async ({ page }) => {
   test.setTimeout(45_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
@@ -2963,7 +2963,7 @@ test("enchaîne pesée, combat à cinq juges et récupération vers le jour suiv
   expect(afterDayTwoWeighIn.weight.history.every(entry => entry.passed)).toBe(true);
 });
 
-test("utilise les quatre scènes olympiques avec le combat tactique V2 sur mobile", async ({ page }) => {
+test("utilise les quatre scènes olympiques avec le combat tactique sur mobile", async ({ page }) => {
   test.setTimeout(75_000);
   await page.addInitScript(() => {
     let value = 3000;
@@ -3135,7 +3135,7 @@ test("associe or, argent et bronze à leur visuel dans une ancienne sauvegarde",
   }
 });
 
-test("reconstruit la capsule V2 depuis une carrière importée avant son premier rendu", async ({ page }) => {
+test("reconstruit la capsule de carrière depuis une carrière importée avant son premier rendu", async ({ page }) => {
   await page.goto(baseURL, { waitUntil: "domcontentloaded" });
   const previous = amateurSnapshot({
     profile: { firstName: "Sam", lastName: "Import", nickname: "Avant" },
@@ -3218,7 +3218,7 @@ test("reconstruit la capsule V2 depuis une carrière importée avant son premier
   expect(afterImport.capsule.previewRuntime.trainingSessions).toBe(4);
 });
 
-test("planifie musculation, entraîneur privé et supplément dans l’inventaire V2 sur PC et mobile", async ({ page }) => {
+test("planifie musculation, entraîneur privé et supplément dans l’inventaire sur PC et mobile", async ({ page }) => {
   test.setTimeout(60_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());

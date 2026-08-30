@@ -72,7 +72,7 @@
     let timeState;
     if (isTimeState(source)) timeState = source;
     else if (source && isTimeState(source.timeState)) timeState = source.timeState;
-    else throw weekError("INVALID_WEEK_STATE", "Un état BoxeurTime ou une capsule V2 valide est requis.");
+    else throw weekError("INVALID_WEEK_STATE", "Un état BoxeurTime ou une capsule de carrière valide est requis.");
     BoxeurTime.getPublicState(timeState);
 
     const previousFinances = source && source.finances && typeof source.finances === "object"

@@ -140,7 +140,7 @@ test("refuse l'absence d'abonnement, le manque d'énergie, la surcharge et les s
 
   const legacyInjuryContext = { ...GYM, injury: 65, injuryWeeks: 2, medicalRestriction: true };
   const legacyInjuryPreview = training.previewSession(initial, normal, legacyInjuryContext);
-  assert.equal(legacyInjuryPreview.ok, true, "les anciens champs de blessure ne bloquent plus la V2");
+  assert.equal(legacyInjuryPreview.ok, true, "les anciens champs de blessure ne bloquent plus la carrière");
   assert.equal(training.executeSession(initial, normal, legacyInjuryContext).result.injuryRiskPercent, 0);
 
   assert.equal(training.createCustomSession(["mitts"]).blocks.length, 1);

@@ -186,7 +186,7 @@ test("une séance personnalisée exige préparation, travail principal et retour
   assert.equal(complete.canConfirm, true);
 });
 
-test("refuse les activités inconnues, les doublons et l'accès verrouillé sans réactiver les blessures V1", () => {
+test("refuse les activités inconnues, les doublons et l'accès verrouillé sans réactiver les anciennes blessures", () => {
   assert.throws(
     () => strength.aggregateSelection(["lower_body_strength", "inconnue"]),
     error => error.code === "UNKNOWN_ACTIVITY",

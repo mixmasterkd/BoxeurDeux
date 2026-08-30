@@ -50,8 +50,8 @@
   }
 
   /*
-   * Les coûts reprennent l'ordre de grandeur de la V1 (18 à 20 points pour une
-   * séance simple), mais la V2 laisse le joueur construire un entraînement plus
+   * Les coûts reprennent l'ordre de grandeur de l'ancien réglage (18 à 20 points pour une
+   * séance simple), mais le jeu actuel laisse le joueur construire un entraînement plus
    * court ou plus long. Une composition personnalisée doit toutefois contenir
    * un échauffement, au moins un exercice de travail et un retour au calme. La
    * dépense d'énergie limite ensuite naturellement le volume utile.

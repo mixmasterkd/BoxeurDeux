@@ -7,7 +7,7 @@
   "use strict";
 
   /*
-   * Noyau pur du planificateur hebdomadaire V2.
+   * Noyau pur du planificateur hebdomadaire actuel.
    *
    * Ce module ne fait pas avancer l'horloge et ne dépense aucun inventaire.
    * Il construit un brouillon sérialisable, réserve la capacité et les

@@ -1,14 +1,14 @@
-# BoxeurDeux V2 — Document de conception
+# BoxeurDeux — Document de conception
 
 ## Statut du document
 
-Ce document consolide la direction approuvée pour la V2 avant le développement de la carrière professionnelle. Il décrit l'expérience cible, les systèmes à conserver ou à transformer et les critères qui permettront de décider si la refonte est prête.
+Ce document consolide la direction approuvée pour la carrière actuelle avant le développement de la carrière professionnelle. Il décrit l'expérience cible, les systèmes à conserver ou à transformer et les critères qui permettront de décider si le jeu est prêt.
 
-La V2 doit préserver les carrières, l'économie, les compétitions et l'équilibre général de la version actuelle. Elle ne doit pas empiler une nouvelle interface par-dessus les anciens systèmes : chaque mécanique doit avoir un rôle clair, une seule source de vérité et une utilité visible.
+La carrière actuelle doit préserver les sauvegardes, l'économie, les compétitions et l'équilibre général du jeu. Elle ne doit pas empiler une nouvelle interface par-dessus les anciens systèmes : chaque mécanique doit avoir un rôle clair, une seule source de vérité et une utilité visible.
 
 ### État d'implantation actuel
 
-La V2 est maintenant l'interface de carrière officielle. Elle comprend le planificateur à énergie hebdomadaire, l'horloge déterministe interne, la migration additive, la carte, le guide récréatif, le gym de boxe, le gym de musculation, les activités de la maison, la récupération, l'emploi initial, les entraîneurs privés, l'inventaire et les suppléments, la fiche Boxeur et les quatre jauges de progression. Le menu caché peut lancer immédiatement un sparring ou un combat réel sans modifier la carrière testée.
+L'interface actuelle est la carrière officielle. Elle comprend le planificateur à énergie hebdomadaire, l'horloge déterministe interne, la migration additive, la carte, le guide récréatif, le gym de boxe, le gym de musculation, les activités de la maison, la récupération, l'emploi initial, les entraîneurs privés, l'inventaire et les suppléments, la fiche Boxeur et les quatre jauges de progression. Le menu caché peut lancer immédiatement un sparring ou un combat réel sans modifier la carrière testée.
 
 La capsule conserve le détail de l'horloge, de l'historique et des charges en attente pour exécuter chaque programme de façon déterministe. Pour le joueur, la semaine et sa réserve d'énergie sont toutefois le contrat principal : il compose un brouillon modifiable, puis confirme volontairement la semaine. Les champs durables nécessaires au reste du jeu — argent, abonnements, emploi, rythme d'entraînement, énergie, fatigue, statistiques fractionnaires, inventaire, programme privé et progression — sont synchronisés vers la sauvegarde principale afin de survivre au rechargement, à l'importation et à l'exportation.
 
@@ -35,7 +35,7 @@ Les principes directeurs sont les suivants :
 
 ### 1.1 Remplacement des actions hebdomadaires
 
-Le compteur de trois ou quatre actions disparaît de l'expérience V2. La ressource de décision principale devient une barre d'énergie hebdomadaire de 50 points. L'emploi actif est présélectionné et réserve sa part; chaque séance affiche son coût avant l'ajout. Le joueur visite ensuite les lieux, ajoute ou retire librement les activités du brouillon et appuie sur « Confirmer et vivre la semaine » lorsqu'il est satisfait.
+Le compteur historique de trois ou quatre actions disparaît de l'expérience actuelle. La ressource de décision principale devient une barre d'énergie hebdomadaire de 50 points. L'emploi actif est présélectionné et réserve sa part; chaque séance affiche son coût avant l'ajout. Le joueur visite ensuite les lieux, ajoute ou retire librement les activités du brouillon et appuie sur « Confirmer et vivre la semaine » lorsqu'il est satisfait.
 
 Le nombre de séances est limité par trois règles lisibles, plutôt que par un compteur arbitraire :
 
@@ -182,7 +182,7 @@ Ce modèle est conçu pour être réutilisé plus tard dans la carrière profess
 
 ### 3.1 Les trois notions physiques
 
-La V2 distingue clairement :
+Le jeu distingue clairement :
 
 - **Énergie de la semaine** : le budget principal de planification, normalement 50 points. L'emploi et les entraînements la réservent; le joueur voit immédiatement ce qui reste.
 - **Énergie physique et fatigue** : l'état persistant du boxeur exécuté jour par jour en arrière-plan. Les lieux montrent leur projection afin d'expliquer les conséquences d'une séance.
@@ -361,7 +361,7 @@ Une semaine de vacances peut servir à récupérer ou à faire un camp intensif.
 
 ### 5.3 Mini-jeux facultatifs — hors périmètre actuel
 
-Les mini-jeux d'emploi ne sont pas exposés dans la V2 actuelle. S'ils sont développés et validés plus tard, certains emplois pourraient proposer un mini-jeu très court avec un choix entre simulation et jeu actif.
+Les mini-jeux d'emploi ne sont pas exposés dans le jeu actuel. S'ils sont développés et validés plus tard, certains emplois pourraient proposer un mini-jeu très court avec un choix entre simulation et jeu actif.
 
 La simulation donnerait la paie et les effets normaux. Le mini-jeu ne serait jamais requis pour conserver son emploi ou rester compétitif. Sa récompense serait limitée : petit bonus d'argent, fatigue légèrement réduite ou sécurité d'emploi.
 
@@ -612,14 +612,14 @@ Les scènes sont validées au minimum en 1440 × 900, 1280 × 720, 390 × 844, 3
 
 ## 11. Sauvegardes et migration
 
-La V2 doit ouvrir les sauvegardes actuelles sans supprimer de progression. La migration est versionnée, idempotente et testée sur plusieurs profils : récréatif, amateur débutant, tournoi actif, carrière avancée, sans emploi et profil professionnel de test.
+Le jeu doit ouvrir les sauvegardes existantes sans supprimer de progression. La migration est versionnée, idempotente et testée sur plusieurs profils : récréatif, amateur débutant, tournoi actif, carrière avancée, sans emploi et profil professionnel de test.
 
 Le jeu actuel est ouvert directement, sans paramètre d'URL ni ancienne interface parallèle. Sa capsule écrit uniquement les champs durables prévus dans la sauvegarde principale et conserve séparément son historique détaillé. Une carrière déjà avancée ne repasse pas par l'abonnement et l'emploi bloquants destinés uniquement à une nouvelle carrière.
 
 Principes de conversion :
 
 - conserver l'identité, le sexe, les couleurs, les statistiques, le style, le niveau, l'XP, l'argent, la réputation, le bilan, les abonnements, l'emploi, les vacances, les inscriptions et les résultats;
-- préserver les anciens champs de forme, moral et blessure pour la compatibilité des fichiers, sans les afficher ni les utiliser dans les règles V2;
+- préserver les anciens champs de forme, moral et blessure pour la compatibilité des fichiers, sans les afficher ni les utiliser dans les règles actuelles;
 - convertir la forme actuelle en données initiales de préparation sans modifier les statistiques permanentes;
 - convertir l'énergie et la fatigue existantes vers les nouvelles échelles avec des bornes sûres;
 - migrer un brouillon hebdomadaire antérieur vers le contrat courant, enrichir ses familles et répétitions, ou le reconstruire proprement s'il est invalide;
@@ -658,7 +658,7 @@ La suppression est faite seulement après migration, tests et vérification qu'a
 
 ## 13. Architecture recommandée
 
-La V2 conserve HTML, CSS et JavaScript sans nouvelle dépendance importante. Les responsabilités sont séparées :
+Le projet conserve HTML, CSS et JavaScript sans nouvelle dépendance importante. Les responsabilités sont séparées :
 
 - **planificateur hebdomadaire pur** : brouillon, capacité, familles, répétitions, suppléments réservés et confirmation atomique;
 - **état de carrière** : temps interne, argent, emploi, abonnements, calendrier et progression;
@@ -698,7 +698,7 @@ Pour des boxeurs comparables, la cible centrale reste un partage proche de 50/50
 - Le plus petit salaire laisse 47,50 $ par semaine après l'équivalent de l'abonnement de boxe et 23,75 $ après les deux abonnements. L'entraîneur élite demeure un choix financé par un emploi plus payant ou par l'épargne.
 - Un supplément ne modifie jamais les statistiques, le stimulus ou l'XP; son économie maximale d'énergie immédiate reste sous 20 %, sa qualité de récupération entre 0,97 et 1,03, et deux produits différents au maximum peuvent être utilisés par semaine.
 - Les ouvertures de tournoi, pour un boxeur coté 50, sont 48, 49, 50, 51 et 52 du Bronze à l'Olympique. Les finales atteignent au moins +2 sur trois combats et +8 sur cinq combats. Les dégâts de tête, de corps et la lucidité persistent uniquement pendant le tournoi, puis les choix inter-combats les gèrent.
-- Chaque combat de tournoi reprend le format tactique V2 des galas officiels : cinq intentions, déplacement spatial automatique, trois rounds et cartes cachées de cinq juges. L'ambiance visuelle ne change pas ces règles : les tournois amateurs utilisent quatre scènes à plusieurs rings (avant, combat, coin et résultat), tandis que le parcours olympique possède quatre scènes internationales distinctes.
+- Chaque combat de tournoi reprend le format tactique actuel des galas officiels : cinq intentions, déplacement spatial automatique, trois rounds et cartes cachées de cinq juges. L'ambiance visuelle ne change pas ces règles : les tournois amateurs utilisent quatre scènes à plusieurs rings (avant, combat, coin et résultat), tandis que le parcours olympique possède quatre scènes internationales distinctes.
 - Sur 1 600 simulations déterministes par scénario, la référence du moteur donne 57,7 % de victoires entre profils comparables, 88,6 % en situation favorable et 22,8 % en situation défavorable. Les arrêts sont nuls entre profils frais comparables; le scénario Puissance 75 contre Défense 35 produit 65,2 % d'arrêts, ce qui confirme qu'ils restent liés à une vulnérabilité réelle.
 
 Le nouveau système doit démontrer que :
@@ -711,7 +711,7 @@ Le nouveau système doit démontrer que :
 - la défense protège sans rendre invincible;
 - une fatigue moyenne ne rend pas toute victoire improbable;
 - un boxeur bien préparé peut terminer un tournoi sans épuisement artificiel;
-- les anciens champs de moral, forme et blessure n'influencent jamais un résultat V2.
+- les anciens champs de moral, forme et blessure n'influencent jamais un résultat de combat actuel.
 
 ## 15. Étapes d'implantation réversibles
 
@@ -731,11 +731,11 @@ Le nouveau système doit démontrer que :
 14. Comparer statistiquement les deux versions, puis ajuster.
 15. Retirer les systèmes obsolètes uniquement après la parité fonctionnelle.
 16. Valider ordinateur, téléphone, clavier, lecteur d'écran et mouvement réduit.
-17. Publier la V2, puis bâtir la carrière professionnelle sur ses systèmes de lieux, camps et combats.
+17. Stabiliser la carrière actuelle, puis bâtir la carrière professionnelle sur ses systèmes de lieux, camps et combats.
 
 Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouveau les sauvegardes ni perdre une carrière.
 
-## 16. Critères d'acceptation de la V2
+## 16. Critères d'acceptation de la carrière actuelle
 
 ### Compréhension
 
@@ -790,6 +790,6 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 
 ## Décision de conception principale
 
-La V2 sera une carrière illustrée pilotée par une semaine simple à composer et par une exécution temporelle déterministe en arrière-plan. Le joueur choisit entre générer un plan rapide modifiable ou visiter les lieux pour répartir lui-même sa réserve; dans les deux cas, une seule confirmation fait avancer la semaine et produit le même équilibre.
+La carrière actuelle est une expérience illustrée pilotée par une semaine simple à composer et par une exécution temporelle déterministe en arrière-plan. Le joueur choisit entre générer un plan rapide modifiable ou visiter les lieux pour répartir lui-même sa réserve; dans les deux cas, une seule confirmation fait avancer la semaine et produit le même équilibre.
 
 La suppression des anciens systèmes ne se fera qu'après avoir prouvé trois choses : la nouvelle mécanique est plus claire, elle conserve la fonction utile de l'ancienne et elle maintient l'équilibre mesuré du jeu.

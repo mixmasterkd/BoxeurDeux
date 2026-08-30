@@ -27,7 +27,7 @@ function baseCareer(overrides = {}) {
   };
 }
 
-test("calcule la préparation avec l'énergie et la fatigue en ignorant les blessures V1", () => {
+test("calcule la préparation avec l'énergie et la fatigue en ignorant les anciennes blessures", () => {
   assert.deepEqual(world.preparation(baseCareer({ energy: 100, fatigue: 0, injury: 0 })), {
     label: "Très bonne",
     tone: "positive",
@@ -332,7 +332,7 @@ test("rend les cinq destinations et les deux compositions illustrées avec de vr
   assert.match(html, /srcset="assets\/carte-quartier-v2-mobile\.jpg"/);
   assert.match(html, /src="assets\/carte-quartier-v2-desktop\.jpg"/);
   assert.match(html, /class="v2-side-stack">\s*<header class="v2-world-bar">/);
-  assert.match(html, /<nav[^>]+aria-label="Navigation principale V2"/);
+  assert.match(html, /<nav[^>]+aria-label="Navigation principale de la carrière"/);
   assert.match(html, /data-v2-primary-navigation data-v2-navigation-view="map"/);
   assert.match(html, /class="active" aria-current="page" type="button" data-v2-nav="map"/);
   assert.match(html, /data-v2-nav="calendar">Calendrier/);
@@ -382,7 +382,7 @@ test("rend une fiche de lieu accessible et refuse une destination inconnue", () 
   assert.match(gym, />Retour à la carte<\/button>/);
   const arena = world.renderLocation("arena", baseCareer({ careerStatus: "amateur" }));
   assert.match(arena, /data-v2-open-calendar>Ouvrir le calendrier/);
-  assert.doesNotMatch(arena, /sera branché|prochaine étape de la V2/i);
+  assert.doesNotMatch(arena, /sera branché|prochaine étape de la carrière/i);
   assert.equal(world.renderLocation("does-not-exist", career), "");
 });
 

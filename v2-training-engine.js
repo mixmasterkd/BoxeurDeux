@@ -209,7 +209,7 @@
   }
 
   function mandatoryRecoveryReason(context = {}) {
-    // Les blessures persistantes appartiennent au modèle V1. La V2 conserve
+    // Les blessures persistantes appartiennent à l'ancien modèle. Le jeu conserve
     // les anciennes valeurs dans les sauvegardes, mais elles ne bloquent plus
     // une séance et ne participent plus à son résultat.
     return null;

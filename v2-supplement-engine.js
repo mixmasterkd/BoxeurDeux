@@ -7,7 +7,7 @@
   "use strict";
 
   /*
-   * Noyau pur des suppléments V2.
+   * Noyau pur des suppléments de la carrière actuelle.
    *
    * Un produit est acheté, placé dans l'inventaire, puis réservé avant une
    * seule séance. Il peut modifier légèrement le coût immédiat de cette
@@ -225,7 +225,7 @@
     };
   }
 
-  /** Accepte l'état V2, un inventaire de fiche ou une ancienne sauvegarde. */
+  /** Accepte l'état actuel, un inventaire de fiche ou une ancienne sauvegarde. */
   function createState(input = {}, options = {}) {
     const outer = input && typeof input === "object" ? input : {};
     const source = outer.supplements && typeof outer.supplements === "object"
@@ -251,7 +251,7 @@
       || state.schemaVersion !== SCHEMA_VERSION
       || !state.inventory
       || !state.weeklyUsage) {
-      throw supplementError("INVALID_SUPPLEMENT_STATE", "État des suppléments V2 invalide.");
+      throw supplementError("INVALID_SUPPLEMENT_STATE", "État des suppléments invalide.");
     }
     return state;
   }

@@ -57,7 +57,7 @@ function sessionsForFirstPoint(focus) {
   return sessions;
 }
 
-test("centralise un contrat d'équilibrage immuable utilisé par la V2", () => {
+test("centralise un contrat d'équilibrage immuable utilisé par la carrière actuelle", () => {
   assert.equal(globalThis.BoxeurBalance, balance);
   assert.equal(balance.VERSION, 1);
   assert.equal(Object.isFrozen(balance.WEEK), true);

@@ -310,10 +310,6 @@
     </aside>`;
   }
 
-  function workDeveloperTile() {
-    return "";
-  }
-
   function workManagement(career) {
     const job = career.v2Job && typeof career.v2Job === "object" ? career.v2Job : null;
     const firstJobRequired = isFirstJobRequired(career) && !job;
@@ -364,7 +360,7 @@
       const selected = item.id === active;
       return `<button${selected ? ' class="active" aria-current="page"' : ""} type="button" data-v2-nav="${item.id}">${item.label}</button>`;
     }).join("");
-    return `<nav class="v2-world-nav" data-v2-primary-navigation data-v2-navigation-view="${active}" aria-label="Navigation principale V2">${buttons}</nav>`;
+    return `<nav class="v2-world-nav" data-v2-primary-navigation data-v2-navigation-view="${active}" aria-label="Navigation principale de la carrière">${buttons}</nav>`;
   }
 
   function render(career) {
@@ -418,7 +414,7 @@
     if (!location) return "";
     const currentObjective = objective(career);
     const objectiveHere = currentObjective?.locationId === location.id;
-    const workContent = location.id === "work" ? `${workManagement(career)}${workDeveloperTile()}` : "";
+    const workContent = location.id === "work" ? workManagement(career) : "";
     const previewNote = location.id === "work"
       ? "Les candidatures avancent automatiquement à chaque semaine confirmée."
       : location.id === "arena" ? "Les galas, les tournois et les combats réservés se gèrent dans le calendrier." : "";
@@ -426,5 +422,5 @@
     return `<div class="v2-location-card" data-location="${location.id}"><div><p class="eyebrow">${objectiveHere ? "Destination recommandée" : "Lieu du quartier"}</p><h2>${escapeHTML(location.label)}</h2><p>${escapeHTML(location.detail)}</p></div><div class="v2-location-status"><span>État du lieu</span><strong>${escapeHTML(locationStatus(location, career))}</strong></div>${workContent}${previewNote ? `<p class="v2-location-preview-note">${previewNote}</p>` : ""}${actions}<button class="secondary-button" type="button" data-v2-close-location>Retour à la carte</button></div>`;
   }
 
-  return Object.freeze({ LOCATIONS, PRIMARY_NAVIGATION, preparation, onboardingObjective, objective, renderNavigation, renderObjectiveCard, renderLocationGuide, renderWorkDeveloperTile: workDeveloperTile, isFirstJobRequired, nextAppointment, locationStatus, locationAccess, render, renderLocation });
+  return Object.freeze({ LOCATIONS, PRIMARY_NAVIGATION, preparation, onboardingObjective, objective, renderNavigation, renderObjectiveCard, renderLocationGuide, isFirstJobRequired, nextAppointment, locationStatus, locationAccess, render, renderLocation });
 });

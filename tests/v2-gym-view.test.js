@@ -36,7 +36,7 @@ test("expose la même API en CommonJS et sur globalThis", () => {
   assert.equal(gymView.PRESETS.length, 4);
 });
 
-test("emploie le gabarit partagé des lieux V2", () => {
+test("emploie le gabarit partagé des lieux", () => {
   const html = gymView.render(baseContext({ clock: { week: 3, dayLabel: "Lundi · matin", dateLabel: "15 septembre" } }));
   assert.match(html, /v2-gym-view v2-place-view/);
   assert.match(html, /v2-gym-header v2-place-header/);

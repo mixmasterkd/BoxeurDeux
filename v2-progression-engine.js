@@ -6,7 +6,7 @@
   "use strict";
 
   /*
-   * Pure V2 progression core.
+   * Pure progression core for the current career.
    *
    * Training only creates stimulus. Recovery assimilates that stimulus into
    * visible 0-100 gauges, and a full gauge grants exactly one stat point. This
@@ -198,7 +198,7 @@
       || !state.stimulus
       || !state.stimulusReserve
       || !state.weeklyLoad) {
-      throw progressionError("INVALID_PROGRESSION_STATE", "État de progression V2 invalide.");
+      throw progressionError("INVALID_PROGRESSION_STATE", "État de progression invalide.");
     }
     return state;
   }

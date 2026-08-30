@@ -23,7 +23,6 @@ function context(overrides = {}) {
       cardio: { total: 89, nextThreshold: 90, pendingXp: 2 },
       defense: { total: 6, nextThreshold: 40, pendingXp: 0 },
     },
-    supplementInventory: [{ id: "electrolytes", label: "Électrolytes", quantity: 2, detail: "Récupération" }],
     ...overrides,
   };
 }
@@ -144,7 +143,6 @@ test("le CSS recentre le panneau et rend la fiche elle-même défilable sur mobi
 test("le statut récréatif masque le bilan et conserve le programme privé séparé", () => {
   const html = fighterView.render(context({
     careerStatus: "recreational",
-    supplementInventory: [],
   }));
   assert.match(html, /Bilan amateur à venir/);
   assert.match(html, /Aucun programme privé actif/);

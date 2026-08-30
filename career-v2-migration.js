@@ -107,7 +107,7 @@
 
   /**
    * Converts a V5 counter (ten steps historically yielded +1) into unassimilated
-   * V2 stimulus. The current diminishing-return factor is inverted so the pending
+   * current stimulus. The diminishing-return factor is inverted so the pending
    * value still represents roughly progress / 10 of a future stat point.
    */
   function progressToResidualStimulus(progressValue, currentStat) {
@@ -215,7 +215,7 @@
   }
 
   /**
-   * Creates an additive V2 capsule. The complete input remains inside
+   * Creates an additive career capsule. The complete input remains inside
    * legacySnapshot; no V5 field is deleted, renamed or executed here.
    */
   function migrateV5ToV2(snapshot, options = {}) {
@@ -293,7 +293,7 @@
   }
 
   /**
-   * Projects only the four V2-owned values back onto a copied V5 career. Money,
+   * Projects only the four runtime-owned values back onto a copied V5 career. Money,
    * employment, vacations, tournaments, records and every unknown field survive.
    */
   function syncTimeStateToCareer(snapshotOrCapsule, suppliedTimeState) {
@@ -318,7 +318,7 @@
 
   /** Returns an independent copy byte-for-byte equivalent to the migrated input. */
   function rollbackV2Migration(capsule) {
-    if (!isV2Capsule(capsule)) throw new TypeError("Une capsule de migration V2 valide est requise.");
+    if (!isV2Capsule(capsule)) throw new TypeError("Une capsule de migration de carrière valide est requise.");
     return clone(capsule.legacySnapshot);
   }
 

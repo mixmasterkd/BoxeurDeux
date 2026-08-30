@@ -7,7 +7,7 @@
   "use strict";
 
   /*
-   * Contrat d'équilibrage V2.
+   * Contrat d'équilibrage de la carrière actuelle.
    *
    * Les nombres qui relient le temps, l'emploi, l'économie et la difficulté
    * des tournois vivent ici afin que l'interface et les bancs de simulation

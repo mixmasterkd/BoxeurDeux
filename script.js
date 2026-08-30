@@ -1,7 +1,7 @@
 const CREATION_POINTS = 5;
 const BASE_COMBAT_STAT = 40;
 const V2_BALANCE = window.BoxeurBalance;
-if (!V2_BALANCE) throw new Error("Boxeur Deux requiert v2-balance-engine.js (BoxeurBalance).");
+if (!V2_BALANCE) throw new Error("Boxeur Deux requiert son moteur d’équilibrage (BoxeurBalance).");
 const GYM_PRICE = V2_BALANCE.ECONOMY.memberships.boxing.monthly.price;
 const GYM_THREE_MONTH_PRICE = V2_BALANCE.ECONOMY.memberships.boxing.threeMonths.price;
 const GYM_MONTH_WEEKS = V2_BALANCE.ECONOMY.memberships.boxing.monthly.weeks;
@@ -305,120 +305,10 @@ const INITIAL_STATE = {
   journal: [],
 };
 
-// Champs V1 conservés tels quels dans les sauvegardes pour garantir leur
-// compatibilité. La V2 ne les utilise plus dans ses règles persistantes.
+// Anciens champs conservés tels quels dans les sauvegardes pour garantir leur
+// compatibilité. Le jeu actuel ne les utilise plus dans ses règles persistantes.
 const V2_LEGACY_CONDITION_KEYS = new Set(["fitness", "morale", "injury", "injuryWeeks", "injuryStartedWeek"]);
 const V2_NEUTRAL_COMBAT_CONDITION = Object.freeze({ fitness: 50, morale: 50, injury: 0 });
-
-const betweenWeekEvents = [
-  {
-    id: "local-radio",
-    title: "Le micro est ouvert",
-    lead: "Une radio du quartier veut parler de ta progression. Ta réponse changera le début de la nouvelle semaine.",
-    choices: [
-      { id: "interview", title: "Accepter l’entrevue", detail: "Tu racontes ton parcours avec calme.", effect: "+7 réputation · +2 moral · −6 énergie", changes: { reputation: 7, morale: 2, energy: -6 }, result: "L’entrevue locale fait connaître ton nom sans détourner complètement ton attention du camp." },
-      { id: "training", title: "Rester au camp", detail: "Tu laisses parler tes résultats.", effect: "+5 énergie · +2 forme", changes: { energy: 5, fitness: 2 }, result: "Tu déclines l’entrevue et profites du temps gagné pour consolider ta préparation." },
-      { id: "challenge", title: "Lancer un défi", detail: "Tu promets un spectacle au prochain combat.", effect: "+10 réputation · +4 moral · +3 risque", changes: { reputation: 10, morale: 4, injury: 3 }, result: "Ta déclaration attire l’attention, mais ajoute un peu de pression au camp." },
-    ],
-  },
-  {
-    id: "sore-morning",
-    title: "Un réveil difficile",
-    lead: "Une douleur tenace apparaît au lendemain de la semaine. Tu dois décider comment commencer la suivante.",
-    choices: [
-      { id: "physio", title: "Consultation express", detail: "Un traitement rapide, moins complet que la physiothérapie hebdomadaire.", effect: "45 $ · −14 risque · +5 énergie", changes: { money: -45, injury: -14, energy: 5 }, result: "Le traitement rapide calme la douleur avant qu’elle devienne un problème." },
-      { id: "slow-down", title: "Lever le pied", detail: "Tu acceptes de perdre un peu de rythme.", effect: "+12 énergie · −6 risque · −2 forme", changes: { energy: 12, injury: -6, fitness: -2 }, result: "Une journée plus douce protège ton corps, au prix d’un peu de forme." },
-      { id: "push-through", title: "Maintenir le rythme", detail: "Tu refuses de modifier le programme.", effect: "+6 forme · −10 énergie · +7 risque", changes: { fitness: 6, energy: -10, injury: 7 }, result: "Tu gagnes du rythme, mais la douleur reste dans un coin de ta tête." },
-    ],
-  },
-  {
-    id: "community-night",
-    title: "Le quartier t’appelle",
-    lead: "Le centre communautaire te propose une soirée avec les jeunes boxeurs avant le début de la semaine.",
-    choices: [
-      { id: "workshop", title: "Donner un atelier", detail: "Tu partages tes premiers apprentissages.", effect: "+7 réputation · +6 moral · −8 énergie", changes: { reputation: 7, morale: 6, energy: -8 }, result: "L’atelier crée un vrai lien avec le quartier et te rappelle pourquoi tu boxes." },
-      { id: "extra-shift", title: "Prendre un quart de travail", detail: "Tu profites plutôt de la soirée pour travailler.", effect: "+55 $ · −15 énergie · −3 moral", changes: { money: 55, energy: -15, morale: -3 }, result: "Le compte en banque respire, même si la soirée laisse des traces." },
-      { id: "quiet-night", title: "Garder la soirée libre", detail: "Tu coupes le téléphone et récupères.", effect: "+10 énergie · +2 moral", changes: { energy: 10, morale: 2 }, result: "Une soirée calme te permet d’attaquer la semaine avec plus de fraîcheur." },
-    ],
-  },
-  {
-    id: "open-sparring",
-    title: "Une invitation imprévue",
-    lead: "Un autre club ouvre ses portes pour une séance de sparring informelle. Tu peux participer, observer ou récupérer.",
-    choices: [
-      { id: "join", title: "Monter sur le ring", detail: "De l’expérience réelle, avec les risques qui viennent avec.", effect: "+10 expérience · −12 énergie · +7 risque", changes: { experience: 10, energy: -12, injury: 7 }, result: "Les rounds improvisés donnent de nouveaux repères, mais le corps encaisse." },
-      { id: "observe", title: "Observer les rounds", detail: "Tu étudies les réactions sans prendre de coups.", effect: "+8 XP · −3 énergie", changes: { experience: 8, energy: -3 }, result: "L’observation attentive ajoute de l’expérience utile à ton arsenal." },
-      { id: "recover", title: "Rester au repos", detail: "Tu privilégies la prochaine semaine.", effect: "+10 énergie · −3 risque", changes: { energy: 10, injury: -3 }, result: "Tu refuses poliment et gardes du carburant pour ton propre programme." },
-    ],
-  },
-  {
-    id: "tactical-choice",
-    title: "Une idée à travailler",
-    lead: "En revoyant tes dernières séances, trois pistes de progression ressortent pour la semaine qui commence.",
-    choices: [
-      { id: "film", title: "Étudier les angles", detail: "Tu privilégies la lecture et le placement.", effect: "+8 XP · −5 énergie", changes: { experience: 8, energy: -5 }, result: "Le travail d’angles améliore ta lecture du ring et ton expérience." },
-      { id: "power", title: "Chercher plus d’impact", detail: "Tu mets l’accent sur l’explosivité.", effect: "+9 XP · −8 énergie · +3 risque", changes: { experience: 9, energy: -8, injury: 3 }, result: "La séance explosive demande un effort, mais enrichit ton expérience." },
-      { id: "visualize", title: "Faire de la visualisation", detail: "Tu travailles la confiance et le calme.", effect: "+8 moral · +3 énergie", changes: { morale: 8, energy: 3 }, result: "Quelques minutes de visualisation clarifient ton objectif pour la semaine." },
-    ],
-  },
-];
-
-const recreationalBetweenWeekEvents = [
-  {
-    id: "rec-gym-routine",
-    title: "Les repères du GYM",
-    lead: "Tu commences à reconnaître les visages et les habitudes du gym. Une petite décision peut rendre les prochaines séances plus faciles.",
-    choices: [
-      { id: "arrive-early", title: "Arriver un peu plus tôt", detail: "Tu observes l’échauffement avant le cours.", effect: "+6 XP · −4 énergie", changes: { experience: 6, energy: -4 }, result: "Tu repars avec quelques repères simples sur la garde et le rythme." },
-      { id: "keep-fresh", title: "Garder de l’énergie", detail: "Tu rentres tôt pour récupérer.", effect: "+8 énergie · +2 moral", changes: { energy: 8, morale: 2 }, result: "Tu choisis la régularité plutôt que d’en faire trop dès le début." },
-      { id: "ask-question", title: "Poser une question au coach", detail: "Tu fais préciser une base qui te bloque.", effect: "+4 XP · +3 moral", changes: { experience: 4, morale: 3 }, result: "Le coach apprécie ta curiosité et reformule le geste simplement." },
-    ],
-  },
-  {
-    id: "rec-work-balance",
-    title: "Trouver son rythme",
-    lead: "Entre ton emploi et le GYM, la première routine se construit. Tu ajustes ton début de semaine.",
-    choices: [
-      { id: "protect-sleep", title: "Protéger ton sommeil", detail: "Tu refuses de remplir toutes tes soirées.", effect: "+12 énergie · −5 fatigue", changes: { energy: 12, fatigue: -5 }, result: "Tu attaques la semaine moins lourd, même si ton horaire reste simple." },
-      { id: "extra-effort", title: "Ajouter un petit effort", detail: "Tu allonges légèrement ton échauffement.", effect: "+5 XP · −7 énergie", changes: { experience: 5, energy: -7 }, result: "Tu gagnes un peu de confiance, sans brûler les étapes." },
-      { id: "call-home", title: "Prendre une soirée calme", detail: "Tu gardes du temps pour les proches.", effect: "+7 moral · +4 énergie", changes: { morale: 7, energy: 4 }, result: "Une soirée tranquille remet tes priorités en ordre." },
-    ],
-  },
-  {
-    id: "rec-sore-muscles",
-    title: "Les premières courbatures",
-    lead: "Tes épaules et tes jambes découvrent un rythme nouveau. Tu peux récupérer, bouger doucement ou forcer un peu.",
-    choices: [
-      { id: "easy-recovery", title: "Récupérer doucement", detail: "Marche, eau et étirements légers.", effect: "+10 énergie · −7 fatigue · −3 risque", changes: { energy: 10, fatigue: -7, injury: -3 }, result: "Tu laisses ton corps assimiler le travail plutôt que de lui demander trop vite." },
-      { id: "light-mobility", title: "Faire de la mobilité", detail: "Tu gardes le corps en mouvement.", effect: "+4 XP · +4 énergie · −3 fatigue", changes: { experience: 4, energy: 4, fatigue: -3 }, result: "La séance légère te donne de meilleures sensations sans te vider." },
-      { id: "push-on", title: "Passer au travers", detail: "Tu refuses de ralentir dès le départ.", effect: "+7 XP · −10 énergie · +4 risque", changes: { experience: 7, energy: -10, injury: 4 }, result: "Tu accumules de la pratique, mais le corps te rappelle qu’il apprend encore." },
-    ],
-  },
-  {
-    id: "rec-coach-tip",
-    title: "Un conseil qui reste",
-    lead: "Après une séance, le coach résume la boxe avec trois idées simples. Tu choisis celle que tu veux retenir cette semaine.",
-    choices: [
-      { id: "keep-guard", title: "Garder les mains hautes", detail: "Tu privilégies la sécurité et le calme.", effect: "+5 XP · +3 moral", changes: { experience: 5, morale: 3 }, result: "La phrase devient un réflexe : calme, garde, respiration." },
-      { id: "move-feet", title: "Bouger après le jab", detail: "Tu travailles le placement avant la vitesse.", effect: "+6 XP · −4 énergie", changes: { experience: 6, energy: -4 }, result: "Tu observes déjà mieux l’espace autour de toi." },
-      { id: "breathe", title: "Respirer et ralentir", detail: "Tu retiens surtout la gestion de l’effort.", effect: "+9 énergie · −4 fatigue", changes: { energy: 9, fatigue: -4 }, result: "Tu comprends qu’un bon rythme se construit aussi en récupérant." },
-    ],
-  },
-];
-
-const allBetweenWeekEvents = [...betweenWeekEvents, ...recreationalBetweenWeekEvents];
-// Les décisions « Entre deux semaines » appartiennent à l'ancienne interface.
-// On garde leur contenu prêt pour une éventuelle réactivation, sans les injecter
-// dans le parcours actuel.
-const betweenWeekEventsEnabled = false;
-
-function betweenWeekEventsForCurrentCareer() {
-  return isRecreationalCareer() ? recreationalBetweenWeekEvents : betweenWeekEvents;
-}
-
-function betweenWeekEventById(eventId) {
-  return allBetweenWeekEvents.find(event => event.id === eventId);
-}
 
 const strengthGymProducts = [
   { id: "protein-bar", label: "Barre protéinée", price: 10, effect: "+3 E · −1 Fa · +1 M", changes: { energy: 3, fatigue: -1, morale: 1 } },
@@ -578,7 +468,7 @@ function normalizeCareerState(source) {
         ? source.careerStatus
       : "amateur",
     // La partie entière reste la statistique affichée. La fraction représente
-    // la jauge V2 déjà assimilée et doit survivre aux sauvegardes/imports.
+    // la jauge de progression déjà assimilée et doit survivre aux sauvegardes/imports.
     combatStats: Object.fromEntries(Object.keys(combatLabels).map(key => [key, safeNumber(source.combatStats?.[key], base.combatStats[key], 0, 99, false)])),
     amateurRecord: normalizeRecord(source.amateurRecord, base.amateurRecord),
     professionalRecord: normalizeRecord(source.professionalRecord, base.professionalRecord),
@@ -612,7 +502,9 @@ function normalizeCareerState(source) {
   normalized.levelPoints = safeNumber(source.levelPoints, base.levelPoints, 0, 9999);
   normalized.goldenPlacement = [1, 2, 3].includes(Number(source.goldenPlacement)) ? Number(source.goldenPlacement) : null;
   normalized.olympicCompleted = Boolean(source.olympicCompleted);
-  normalized.pendingWeekEvent = betweenWeekEventsEnabled && allBetweenWeekEvents.some(event => event.id === source.pendingWeekEvent) ? source.pendingWeekEvent : null;
+  // L'ancien champ reste accepté dans les sauvegardes, mais aucune décision
+  // intersemaine n'est restaurée dans le parcours actuel.
+  normalized.pendingWeekEvent = null;
   normalized.levelNotice = source.levelNotice ? safeText(source.levelNotice, "", 500) : null;
   normalized.levelAnnouncementPending = Boolean(source.levelAnnouncementPending);
   normalized.levelRewardsPending = Array.isArray(source.levelRewardsPending)
@@ -1142,7 +1034,7 @@ function restoreCareer(snapshot, options = {}) {
     }
     hydrateCareer(snapshot);
     // Une importation doit reconstruire sa capsule depuis les données qui
-    // viennent d'être validées, avant que le premier rendu V2 puisse la lire.
+    // viennent d'être validées, avant que le premier rendu de carrière puisse la lire.
     if (options.invalidateV2 === true) {
       invalidateV2PreviewCapsule();
       if (suppliedCapsule) {
@@ -1156,7 +1048,7 @@ function restoreCareer(snapshot, options = {}) {
     render();
     maybeShowDivisionMigration();
     showToast("Carrière restaurée");
-    if (state.pendingWeekEvent || state.jobLossNotice || state.levelAnnouncementPending) setTimeout(showCareerAlertOrContinue, 0);
+    if (state.jobLossNotice || state.levelAnnouncementPending) setTimeout(showCareerAlertOrContinue, 0);
     return true;
   } catch (error) {
     console.error("[Boxeur Deux] Sauvegarde refusée :", error);
@@ -1303,7 +1195,7 @@ function runDeveloperTool(id) {
   if (id === "v2-reset") {
     invalidateV2PreviewCapsule();
     renderV2WorldPreview(Boolean(state.profile));
-    showToast("Capsule de test V2 réinitialisée · carrière actuelle intacte");
+    showToast("Données de test réinitialisées · carrière actuelle intacte");
     return;
   }
   if (id === "funds") {
@@ -1480,11 +1372,8 @@ function showCareerAlertOrContinue() {
     document.querySelector("#level-up-dialog")?.showModal();
     return true;
   }
-  if (betweenWeekEventsEnabled && state.pendingWeekEvent) showBetweenWeekEvent();
-  else {
-    state.pendingWeekEvent = null;
-    continueAfterWeekTransition();
-  }
+  state.pendingWeekEvent = null;
+  continueAfterWeekTransition();
   return false;
 }
 
@@ -1770,7 +1659,7 @@ function resolveTournamentRound(fight, result, method = "decision", score = "") 
     fitness: V2_NEUTRAL_COMBAT_CONDITION.fitness,
     cardio: state.combatStats.cardio,
     // Ces séquelles restent limitées au tournoi. Elles donnent un sens aux
-    // choix Repos/Protection sans réactiver les blessures persistantes V1.
+    // choix Repos/Protection sans réactiver les anciennes blessures persistantes.
     headDamage: fight.fighters.player.head,
     bodyDamage: fight.fighters.player.body,
     lucidity: fight.fighters.player.lucidity,
@@ -1794,14 +1683,6 @@ function resolveTournamentRound(fight, result, method = "decision", score = "") 
   active.currentRound = active.competition?.wins ?? active.currentRound + 1;
   if (active.currentRound >= tournament.rounds) return completeTournament("gold");
   return `Victoire en ${roundName(tournament.rounds, roundIndex)}. ${tournament.rounds - active.currentRound} combat${tournament.rounds - active.currentRound > 1 ? "s" : ""} à gagner.`;
-}
-
-function professionalEligibility() {
-  const count = amateurFightCount();
-  if (state.olympicCompleted) return { eligible: true, reason: "Parcours olympique terminé" };
-  if (state.goldenPlacement && state.goldenPlacement <= 3) return { eligible: true, reason: `Podium aux Gants dorés · ${state.goldenPlacement}${state.goldenPlacement === 1 ? "re" : "e"} place` };
-  if (count >= 20) return { eligible: true, reason: `${count} combats amateurs disputés` };
-  return { eligible: false, reason: `Termine un parcours majeur ou dispute encore ${20 - count} combat${20 - count > 1 ? "s" : ""}` };
 }
 
 function renderRecreationalCalendar(path, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, tournamentCatalog) {
@@ -2395,7 +2276,7 @@ function invalidateV2PreviewCapsule() {
   try {
     localStorage.removeItem(V2_PREVIEW_SAVE_KEY);
   } catch (error) {
-    console.warn("[Boxeur Deux] Capsule V2 impossible à invalider :", error);
+    console.warn("[Boxeur Deux] Données d’exécution impossibles à invalider :", error);
   }
 }
 
@@ -2413,7 +2294,7 @@ function ensureV2PreviewCapsule() {
       v2PreviewCapsule = createV2PreviewCapsule();
     }
   } catch (error) {
-    console.warn("[Boxeur Deux] Capsule V2 recréée :", error);
+    console.warn("[Boxeur Deux] Données d’exécution recréées :", error);
     v2PreviewCapsule = createV2PreviewCapsule();
   }
   normalizeV2PreviewRuntime(v2PreviewCapsule);
@@ -2471,7 +2352,7 @@ function persistV2PreviewCapsule() {
     localStorage.setItem(V2_PREVIEW_SAVE_KEY, JSON.stringify(v2PreviewCapsule));
     persistCareer();
   } catch (error) {
-    console.warn("[Boxeur Deux] Capsule V2 non enregistrée :", error);
+    console.warn("[Boxeur Deux] Données d’exécution non enregistrées :", error);
   }
 }
 
@@ -3202,7 +3083,6 @@ function v2FighterContext() {
   const statXpProgress = capsule?.timeState && window.BoxeurTime
     ? window.BoxeurTime.getPublicState(capsule.timeState).statXpProgress
     : null;
-  const supplementState = runtime?.career?.v2SupplementState;
   const trainerState = runtime?.career?.v2TrainerState;
   return {
     profile: state.profile,
@@ -3225,12 +3105,6 @@ function v2FighterContext() {
     })),
     combatStats: timeStats,
     statXpProgress,
-    supplementInventory: window.BoxeurSupplements && supplementState
-      ? window.BoxeurSupplements.inventoryList(supplementState)
-      : [],
-    supplementNote: state.careerStatus === "recreational"
-      ? "Le gym de musculation et sa boutique se débloquent après le passage amateur."
-      : "Achète tes produits au gym de musculation; leur utilisation sera proposée avant une séance.",
     privateTrainerProgram: window.BoxeurTrainer && trainerState
       ? window.BoxeurTrainer.getPublicState(trainerState).activeProgram
       : null,
@@ -3359,9 +3233,6 @@ function openV2Location(locationId) {
           ? sheet.querySelector(".v2-work-dashboard")
           : sheet.querySelector(".v2-location-card");
     if (guide && guideTarget) guideTarget.insertAdjacentHTML("afterbegin", guide);
-  }
-  if (isWork && window.BoxeurWorld?.renderWorkDeveloperTile) {
-    sheet.querySelector(".v2-work-dashboard")?.insertAdjacentHTML("beforeend", window.BoxeurWorld.renderWorkDeveloperTile());
   }
   activateV2LocationSheet(sheet, "[data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-leave-work], [data-v2-close-location], button");
 }
@@ -3586,7 +3457,7 @@ function v2PrimaryTrainingOnDay(timeState, dayStartSlot = v2DayStartSlot(timeSta
 }
 
 function v2NextTrainingWindow(timeState) {
-  if (!timeState?.clock || !window.BoxeurTime) return { available: false, reason: "Horaire V2 indisponible." };
+  if (!timeState?.clock || !window.BoxeurTime) return { available: false, reason: "Horaire de carrière indisponible." };
   const now = timeState.clock.absoluteSlot;
   const currentDayStart = v2DayStartSlot(timeState, now);
   const trainedToday = v2PrimaryTrainingOnDay(timeState, currentDayStart);
@@ -3688,9 +3559,7 @@ function recordV2Work(runtime, weekNumber, grossWages, workShifts = 1) {
   return ledger;
 }
 
-const V2_WEEK_CAPACITY_TOTAL = V2_BALANCE.WEEK.baseCapacity;
 const V2_WEEK_CAPACITY_MILESTONE_GAIN = V2_BALANCE.WEEK.milestoneGain;
-const V2_WEEK_CAPACITY_MAX = V2_BALANCE.WEEK.maximumCapacity;
 const V2_WEEK_RULESET_VERSION = 10;
 const V2_CONDITION_CRITICAL_ENERGY = V2_BALANCE.WEEK.condition.criticalEnergy;
 const V2_CONDITION_CRITICAL_FATIGUE = V2_BALANCE.WEEK.condition.criticalFatigue;
@@ -5544,17 +5413,6 @@ function closeOptionalDialog(dialogId) {
   dialog.close();
 }
 
-function runV2WorkShift() {
-  const capsule = ensureV2PreviewCapsule();
-  if (!capsule || !window.BoxeurWeekPlanner) return;
-  const runtime = normalizeV2PreviewRuntime(capsule);
-  const job = jobs.find(item => item.id === runtime.career.jobId) || null;
-  if (!job) return showToast("Choisis d’abord un emploi.");
-  ensureV2WeekPlanner(capsule);
-  openV2WeekPlan();
-  showToast(`${job.title} est déjà réservé par défaut · paie de ${job.wage} $ à la confirmation`);
-}
-
 function v2SupplementState(capsule = ensureV2PreviewCapsule()) {
   if (!capsule || !window.BoxeurSupplements) return null;
   const runtime = normalizeV2PreviewRuntime(capsule);
@@ -5757,15 +5615,6 @@ function runV2CustomSession() {
   if (outcome) v2ComposerSelection = [];
 }
 
-function renderV2StrengthGym(preferredFocusSelector = "[data-v2-strength-zone]:not([disabled]), [data-v2-leave-strength-gym]") {
-  const sheet = document.querySelector("#v2-world .v2-location-sheet");
-  if (!sheet || !window.BoxeurStrengthView) return;
-  sheet.dataset.originLocation = "strength-gym";
-  sheet.classList.add("v2-location-sheet-full", "v2-location-sheet-strength");
-  sheet.innerHTML = window.BoxeurStrengthView.render(v2StrengthContext());
-  activateV2LocationSheet(sheet, preferredFocusSelector);
-}
-
 function renderV2StrengthMenu(menuId, preferredFocusSelector = "") {
   const sheet = document.querySelector("#v2-world .v2-location-sheet");
   if (!sheet || !window.BoxeurStrengthView?.renderMenu) return;
@@ -5840,7 +5689,7 @@ function v2TrainerTargetLabel(target) {
 function v2TrainerAccess(locationId, program = null) {
   const capsule = ensureV2PreviewCapsule();
   const career = capsule ? normalizeV2PreviewRuntime(capsule).career : null;
-  if (!capsule?.timeState || !career) return { available: false, reason: "Carrière V2 indisponible." };
+  if (!capsule?.timeState || !career) return { available: false, reason: "Carrière indisponible." };
   if (!["amateur", "professional"].includes(state.careerStatus)) {
     return { available: false, reason: "Les programmes privés se débloquent après le passage amateur." };
   }
@@ -6079,12 +5928,7 @@ function endWeek(events) {
   activateReadyJobOffer(events);
   state.supplementWeek = state.week;
   state.supplementsUsed = [];
-  if (betweenWeekEventsEnabled) {
-    const weekEvents = betweenWeekEventsForCurrentCareer();
-    state.pendingWeekEvent = weekEvents[(state.week - 2) % weekEvents.length].id;
-  } else {
-    state.pendingWeekEvent = null;
-  }
+  state.pendingWeekEvent = null;
   state.energy = clamp(state.energy + 6);
   state.fatigue = clamp(state.fatigue - (state.energy < 35 ? 4 : 6));
   if (state.profile && !state.activeTournament) {
@@ -6133,35 +5977,6 @@ function endWeek(events) {
 
 function continueAfterWeekTransition() {
   if (state.activeTournament && state.week >= state.activeTournament.startWeek && state.activeTournament.status !== "completed") openTournamentBoard();
-}
-
-function showBetweenWeekEvent() {
-  const event = betweenWeekEventById(state.pendingWeekEvent);
-  if (!event) return continueAfterWeekTransition();
-  document.querySelector("#week-event-title").textContent = event.title;
-  document.querySelector("#week-event-lead").textContent = event.lead;
-  document.querySelector("#week-event-choices").innerHTML = event.choices.map(choice => {
-    const cost = Math.max(0, -(choice.changes?.money || 0));
-    const unavailable = cost > state.money;
-    return `<button class="week-choice-card" type="button" data-week-choice="${choice.id}" ${unavailable ? "disabled" : ""}><span><strong>${choice.title}</strong><small>${choice.detail}</small></span><em>${unavailable ? `Il manque ${cost - state.money} $` : choice.effect}</em></button>`;
-  }).join("");
-  document.querySelector("#week-event-dialog").showModal();
-}
-
-function resolveBetweenWeekChoice(choiceId) {
-  const event = betweenWeekEventById(state.pendingWeekEvent);
-  const choice = event?.choices.find(item => item.id === choiceId);
-  if (!event || !choice) return;
-  const cost = Math.max(0, -(choice.changes?.money || 0));
-  if (cost > state.money) return showToast("Pas assez d’argent pour ce choix.");
-  const levelBefore = state.level;
-  applyChanges(choice.changes);
-  state.journal.unshift({ week: state.week, text: `Entre les semaines : ${choice.result}` });
-  state.pendingWeekEvent = null;
-  document.querySelector("#week-event-dialog").close();
-  render();
-  showToast(state.level > levelBefore && state.levelNotice ? state.levelNotice : "Décision appliquée à la nouvelle semaine");
-  showCareerAlertOrContinue();
 }
 
 async function startDeveloperBout(kind = "fight") {
@@ -6509,17 +6324,6 @@ function registerTournament(id) {
   showToast(`${tournament.name} : ${TOURNAMENT_PREP_WEEKS} semaines de préparation`);
 }
 
-function turnProfessional() {
-  const eligibility = professionalEligibility();
-  if (!eligibility.eligible || state.scheduledFight || state.activeTournament || state.careerStatus === "professional") return;
-  if (!window.confirm(`Passer professionnel ?\n\nCe choix est définitif. Le circuit amateur sera fermé et un nouveau bilan professionnel commencera à 0–0–0.`)) return;
-  state.careerStatus = "professional";
-  state.professionalRecord = { wins: 0, losses: 0, draws: 0 };
-  state.journal.unshift({ week: state.week, text: `${state.profile.firstName} quitte définitivement le circuit amateur et passe professionnel.` });
-  render();
-  showToast("Carrière professionnelle commencée");
-}
-
 function completeAmateurCareerAfterSparring() {
   if (!isRecreationalCareer() || state.recreationalSparringStatus !== "completed") return false;
   const capsule = v2PreviewCapsule;
@@ -6539,7 +6343,7 @@ function completeAmateurCareerAfterSparring() {
   state.journal.unshift({ week: 1, text: `${state.profile.firstName} passe automatiquement amateur après le sparring d’évaluation. Le calendrier des galas et tournois est ouvert.` });
   invalidateV2PreviewCapsule();
   ensureCareerCalendar();
-  closeCalendarDialog({ resumePendingEvent: false });
+  closeCalendarDialog();
   persistCareer();
   return true;
 }
@@ -6651,7 +6455,7 @@ function closeTournamentBoard() {
     endWeek(events);
     render();
     showToast("Tournoi terminé · retour au calendrier");
-    if (state.pendingWeekEvent || state.jobLossNotice || state.levelAnnouncementPending) setTimeout(showCareerAlertOrContinue, 0);
+    if (state.jobLossNotice || state.levelAnnouncementPending) setTimeout(showCareerAlertOrContinue, 0);
   }
 }
 
@@ -6896,7 +6700,6 @@ function localFightFighterAsset(role, visual, scene = "ring") {
 function renderSparringRing(view) {
   const dialog = document.querySelector("#fight-dialog");
   const stage = document.querySelector("#fight-ring-stage");
-  const destinations = document.querySelector("#sparring-ring-destinations");
   const coachCallout = document.querySelector("#sparring-coach-callout");
   const prototypeActive = isImmersiveRingFight();
   const localFightActive = isLocalOfficialFight();
@@ -6907,12 +6710,11 @@ function renderSparringRing(view) {
   dialog?.classList.toggle("local-fight-prototype", localFightActive);
   dialog?.classList.toggle("tournament-fight-prototype", tournamentFightActive);
   dialog?.classList.toggle("olympic-fight-prototype", olympicFightActive);
-  if (!stage || !destinations || !coachCallout) return;
+  if (!stage || !coachCallout) return;
   if (!prototypeActive) {
     delete stage.dataset.sparringScene;
     delete stage.dataset.sparringStep;
     delete stage.dataset.sparringMovement;
-    destinations.innerHTML = "";
     coachCallout.hidden = true;
     coachCallout.classList.remove("coach-warning");
     const logDisclosure = document.querySelector(".fight-log-disclosure");
@@ -6957,9 +6759,8 @@ function renderSparringRing(view) {
   stage.dataset.sparringStep = sparringAutoResolving ? "resolving" : "decision";
   if (sparringAutoResolving && ringView.pendingMovement) stage.dataset.sparringMovement = ringView.pendingMovement.role;
   else delete stage.dataset.sparringMovement;
-  // La grille 5 × 5 reste le moteur du placement, mais les décisions tactiques
-  // y déplacent maintenant le boxeur automatiquement : aucun clic parasite sur le ring.
-  destinations.innerHTML = "";
+  // La grille 5 × 5 reste le moteur du placement; les décisions tactiques
+  // déplacent automatiquement le boxeur sans contrôle de déplacement séparé.
 
   const playerEnergy = clamp(Math.round(view.fighters.player.energy), 0, 100);
   const opponentEnergy = clamp(Math.round(view.fighters.opponent.energy), 0, 100);
@@ -7484,7 +7285,7 @@ function settleV2Sparring(fight, fightFatigue, exposure) {
         : { technique: 3, power: 0, cardio: 2, defense: 4 },
     });
   } catch (error) {
-    console.warn("[Boxeur Deux] Bilan temporel du sparring V2 simplifié :", error);
+    console.warn("[Boxeur Deux] Bilan temporel du sparring simplifié :", error);
     capsule.timeState.condition.energy = finalEnergy;
     capsule.timeState.condition.fatigue = clamp(capsule.timeState.condition.fatigue + Math.max(6, Math.round(fightFatigue * .72)));
     capsule.timeState = window.BoxeurTime.advanceTime(capsule.timeState, 1);
@@ -7982,10 +7783,6 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     setV2PlannerWorkAttendance(workToggle.getAttribute("aria-pressed") !== "true");
     return;
   }
-  if (event.target.closest("[data-v2-work-shift]")) {
-    runV2WorkShift();
-    return;
-  }
   const workZone = event.target.closest("[data-v2-work-zone]");
   if (workZone) {
     if (workZone.dataset.v2WorkZone === "schedule") renderV2WorkMenu("schedule");
@@ -8123,11 +7920,6 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     runV2CoachSession();
     return;
   }
-  if (event.target.closest("[data-v2-compose-session]")) {
-    v2ComposerSelection = [];
-    renderV2Composer();
-    return;
-  }
   const sessionPreset = event.target.closest("[data-v2-session-preset]");
   if (sessionPreset) {
     selectV2ComposerPreset(sessionPreset.dataset.v2SessionPreset);
@@ -8250,12 +8042,6 @@ document.querySelector("#level-choices")?.addEventListener("click", event => {
   showToast(`+1 ${combatLabels[stat]}`);
   if (state.levelPoints === 0 && resumeCareerAlertsAfterLevelDialog) setTimeout(() => document.querySelector("#level-dialog")?.close(), 0);
 });
-document.querySelector("#week-event-choices").addEventListener("click", event => {
-  const choice = event.target.closest("[data-week-choice]");
-  if (choice) resolveBetweenWeekChoice(choice.dataset.weekChoice);
-});
-document.querySelector("#week-event-dialog").addEventListener("cancel", event => event.preventDefault());
-
 document.querySelector("#calendar-events").addEventListener("click", event => {
   const weekSummary = event.target.closest(".calendar-week-summary");
   if (weekSummary) {
@@ -8309,11 +8095,10 @@ function openCalendarDialog() {
   dialog?.querySelector('[data-v2-nav="calendar"]')?.focus({ preventScroll: true });
 }
 
-function closeCalendarDialog({ resumePendingEvent = true } = {}) {
+function closeCalendarDialog() {
   document.querySelector("#calendar-dialog")?.close();
   const navigationHost = document.querySelector("#v2-calendar-navigation");
   if (navigationHost) navigationHost.innerHTML = "";
-  if (resumePendingEvent && isRecreationalCareer() && state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
 }
 
 function navigateV2Primary(viewId) {
@@ -8326,7 +8111,7 @@ function navigateV2Primary(viewId) {
     return;
   }
   if (dialog?.open) {
-    closeCalendarDialog({ resumePendingEvent: false });
+    closeCalendarDialog();
     document.querySelector(`#v2-world [data-v2-nav="${target}"]`)?.focus({ preventScroll: true });
   }
   if (target === "fighter") {

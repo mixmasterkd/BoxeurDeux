@@ -6,7 +6,7 @@
   "use strict";
 
   /**
-   * BoxeurTime is the deterministic career clock planned for the V2 interface.
+   * BoxeurTime is the deterministic clock used by the current career interface.
    *
    * Public transitions are pure: they return a new serializable state and never
    * mutate the state received by the caller. A week contains 21 fixed periods

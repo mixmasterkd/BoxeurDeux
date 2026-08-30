@@ -1,4 +1,4 @@
-# Visuels du gym de musculation V2
+# Visuels du gym de musculation
 
 Mode de génération : **Built-in ImageGen**
 

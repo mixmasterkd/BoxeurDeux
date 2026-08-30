@@ -42,7 +42,7 @@ test("expose la même API pure en CommonJS et dans le navigateur", () => {
   assert.equal(Object.isFrozen(homeView.ACTIONS), true);
 });
 
-test("emploie le gabarit partagé des lieux V2", () => {
+test("emploie le gabarit partagé des lieux", () => {
   const html = homeView.render(baseContext());
   assert.match(html, /v2-home-view v2-place-view/);
   assert.match(html, /v2-home-header v2-place-header/);

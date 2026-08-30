@@ -99,7 +99,7 @@ test("progression partielle devient de l’XP ciblée cumulative sans hausse imm
   assert.equal(extreme.timeState.stats.technique, 99, "la réserve ne doit pas devenir un point immédiat");
 });
 
-test("répare rétrocompatiblement une capsule V2 antérieure sans réserve", () => {
+test("répare rétrocompatiblement une ancienne capsule de carrière sans réserve", () => {
   const source = v5Snapshot({ state: {
     combatStats: { technique: 99, power: 99, cardio: 99, defense: 99 },
     trainingProgress: { technique: 9, power: 8, cardio: 7, defense: 6 },
@@ -231,6 +231,6 @@ test("synchronise seulement semaine, condition et stats vers une copie carrière
       injuryStartedWeek: synced.state.injuryStartedWeek,
     },
     { fitness: 23, morale: 81, injury: 67, injuryWeeks: 3, injuryStartedWeek: 16 },
-    "les champs V1 restent sérialisés même s'ils sont inactifs en V2",
+    "les anciens champs restent sérialisés même s'ils sont désormais inactifs",
   );
 });

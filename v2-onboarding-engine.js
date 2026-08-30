@@ -7,7 +7,7 @@
   "use strict";
 
   /**
-   * Pure state machine for the V2 recreational introduction.
+   * Pure state machine for the current recreational introduction.
    *
    * The engine deliberately owns no DOM, money, training or combat side effect.
    * It only describes the current tutorial step and the gates that adapters must

@@ -223,7 +223,7 @@ test("une ancienne sauvegarde non marquée reste compatible et non bloquante", (
   assert.equal(onboarding.getGates(existingAmateur).fullCalendar.allowed, true);
 });
 
-test("normalise directement une capsule V2 sans perdre sa phase ni sa semaine", () => {
+test("normalise directement une capsule de carrière sans perdre sa phase ni sa semaine", () => {
   const capsule = {
     phase: "recreational",
     legacySnapshot: { state: freshCareer() },

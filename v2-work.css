@@ -13,7 +13,6 @@
 .v2-work-hotspot[aria-disabled="true"] { opacity: .78; cursor: not-allowed; }
 .v2-work-hotspot-schedule { left: 20%; top: 57%; }
 .v2-work-hotspot-job { left: 79%; top: 45%; }
-.v2-work-hotspot-minigame { left: 51%; top: 81%; }
 .v2-work-dashboard { display: grid; gap: 12px; }
 .v2-work-status-card { display: grid; gap: 10px; min-width: 0; padding: 15px; border: 1px solid var(--v2-work-border); border-left: 3px solid var(--gold, #ddb65e); border-radius: 11px; background: var(--v2-work-panel); }
 .v2-work-status-card > span { color: var(--gold, #ddb65e); font-size: .58rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
@@ -68,7 +67,6 @@
   .v2-work-hotspot strong { font-size: .7rem; text-shadow: 0 2px 5px rgba(0, 0, 0, .9); }
   .v2-work-hotspot-schedule { left: 25%; top: 25%; }
   .v2-work-hotspot-job { left: 75%; top: 25%; }
-  .v2-work-hotspot-minigame { left: 25%; top: 74%; }
   .v2-work-board-scene { padding: 12px; border-radius: 12px; }
   .v2-work-board-frame { padding: 15px 11px; }
   .v2-work-board-offers { gap: 10px; }

@@ -115,7 +115,6 @@ body.v2-preview #v2-world[hidden] {
 .v2-world-nav button:focus-visible,
 .v2-appointment-card button:focus-visible,
 .v2-test-mode-banner button:focus-visible,
-.v2-future-work-tile:focus-visible,
 .v2-location-card button:focus-visible {
   outline: 3px solid #ffe7a9;
   outline-offset: 3px;
@@ -845,16 +844,6 @@ body.v2-preview #v2-world[hidden] {
   line-height: 1.5;
 }
 
-.v2-work-actions {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  padding: 15px;
-  border: 1px solid rgba(255, 255, 255, .13);
-  border-radius: 11px;
-  background: #101311;
-}
-
 .v2-work-management {
   display: grid;
   gap: 12px;
@@ -927,74 +916,6 @@ body.v2-preview #v2-world[hidden] {
 .v2-work-management-actions {
   display: grid;
   gap: 8px;
-}
-
-.v2-work-actions h3 {
-  margin-top: 2px;
-  font: 800 1.35rem/1 "Barlow Condensed", sans-serif;
-  text-transform: uppercase;
-}
-
-.v2-future-work-tile {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  min-width: 0;
-  min-height: 66px;
-  padding: 10px;
-  overflow: hidden;
-  border: 1px dashed rgba(255, 255, 255, .28);
-  border-radius: 9px;
-  color: #e7e4dc;
-  background: #181b19;
-  cursor: pointer;
-  text-align: left;
-}
-
-.v2-future-work-tile:hover {
-  border-color: var(--gold);
-  background: #1d201d;
-}
-
-.v2-future-work-icon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(255, 255, 255, .2);
-  border-radius: 50%;
-  color: #111;
-  background: #999b94;
-  font: 800 1.15rem/1 "Barlow Condensed", sans-serif;
-}
-
-.v2-future-work-tile strong,
-.v2-future-work-tile small {
-  display: block;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.v2-future-work-tile strong {
-  font: 800 1rem/1.05 "Barlow Condensed", sans-serif;
-  text-transform: uppercase;
-}
-
-.v2-future-work-tile small {
-  margin-top: 4px;
-  color: var(--gold);
-  font-size: .61rem;
-  font-weight: 800;
-  letter-spacing: .09em;
-  text-transform: uppercase;
-}
-
-.v2-work-actions > p:last-child {
-  color: #aaa8a2;
-  font-size: .68rem;
-  line-height: 1.45;
 }
 
 .v2-location-card .secondary-button {
@@ -1467,34 +1388,15 @@ body.v2-preview #v2-world[hidden] {
   accent-color: var(--gold);
 }
 
-.v2-trainer-reason,
-.v2-service-reason,
-.v2-service-empty {
+.v2-trainer-reason {
   color: #e9b36d;
 }
 
-.v2-service-actions,
 .v2-trainer-result > div:last-child {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 22px;
-}
-
-.v2-service-result-list {
-  display: grid;
-  gap: 8px;
-  margin: 20px 0;
-  padding: 0;
-  list-style: none;
-}
-
-.v2-service-result-list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
-  padding: 11px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, .1);
 }
 
 @media (max-width: 760px) {
@@ -1527,7 +1429,6 @@ body.v2-preview #v2-world[hidden] {
   }
 
   .v2-trainer-targets,
-  .v2-service-actions,
   .v2-trainer-result > div:last-child {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
