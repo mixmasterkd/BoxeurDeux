@@ -54,7 +54,7 @@ test("rend une fiche accessible avec jauges et argent sans dupliquer l’inventa
   assert.match(html, /data-v2-level-up-slot data-level-points="3" hidden/);
   assert.doesNotMatch(html, /Électrolytes/);
   assert.doesNotMatch(html, /Suppléments/);
-  assert.match(html, /data-v2-close-fighter/);
+  assert.doesNotMatch(html, /data-v2-close-fighter|Retour à la carte/);
   assert.match(html, /Sauvegarde externe/);
   assert.match(html, /Télécharger la sauvegarde JSON/);
   assert.match(html, /data-v2-export-career/);
@@ -102,6 +102,35 @@ test("affiche les bons de cours privé reçus lors des montées de niveau", () =
   assert.match(html, /2 bons/);
 });
 
+test("résume les médailles dans le bilan et détaille seulement les tournois récompensés", () => {
+  const html = fighterView.render(context({
+    medals: [
+      { id: "golden", label: "Gants dorés", gold: 2, silver: 1, bronze: 0 },
+      { id: "regional-cup", label: "Coupe régionale des clubs", gold: 0, silver: 0, bronze: 3 },
+      { id: "olympic", label: "Parcours olympique", gold: 0, silver: 0, bronze: 0 },
+    ],
+  }));
+  const normalized = fighterView.normalizeContext(context({
+    medals: [{ id: "regional-cup", label: "Coupe régionale", gold: 2, silver: 1, bronze: 3 }],
+  }));
+
+  assert.deepEqual(normalized.medals.totals, { gold: 2, silver: 1, bronze: 3 });
+  assert.equal(normalized.medals.count, 6);
+  assert.match(html, /Bilan de tournoi/);
+  assert.match(html, /Gants dorés/);
+  assert.match(html, /Coupe régionale des clubs/);
+  assert.doesNotMatch(html, /Parcours olympique/);
+  assert.match(html, /Or 2/);
+  assert.match(html, /Argent 1/);
+  assert.match(html, /Bronze 3/);
+});
+
+test("explique le bilan de médailles vide pour une carrière amateur", () => {
+  const html = fighterView.render(context({ medals: [] }));
+  assert.match(html, /Aucune médaille pour le moment/);
+  assert.match(html, /défaite en demi-finale donne le bronze/);
+});
+
 test("le CSS recentre le panneau et rend la fiche elle-même défilable sur mobile", () => {
   const css = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "v2-fighter.css"), "utf8");
   assert.match(css, /width:\s*min\(1120px, 100%\)/);
@@ -120,4 +149,5 @@ test("le statut récréatif masque le bilan et conserve le programme privé sép
   assert.match(html, /Bilan amateur à venir/);
   assert.match(html, /Aucun programme privé actif/);
   assert.doesNotMatch(html, /2 V · 1 D/);
+  assert.doesNotMatch(html, /Bilan de tournoi/);
 });

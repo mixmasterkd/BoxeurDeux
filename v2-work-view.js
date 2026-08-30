@@ -30,10 +30,10 @@
   });
 
   const DEFAULT_OFFERS = Object.freeze([
-    Object.freeze({ id: "convenience", title: "Commis de dépanneur", wage: 75, schedule: "Horaire souple" }),
-    Object.freeze({ id: "courier", title: "Coursier local", wage: 100, schedule: "Horaire variable" }),
-    Object.freeze({ id: "office", title: "Employé de bureau", wage: 120, schedule: "Bureau · longues heures" }),
-    Object.freeze({ id: "warehouse", title: "Manutention de nuit", wage: 130, schedule: "Horaire exigeant" }),
+    Object.freeze({ id: "convenience", title: "Commis de dépanneur", wage: 75, schedule: "Horaire souple", interviewWeeks: 1, energy: -14, fatigue: 10, weekCapacityCost: 15, detail: "La solution la moins payante, mais la plus facile à concilier avec le camp." }),
+    Object.freeze({ id: "courier", title: "Coursier local", wage: 100, schedule: "Horaire variable", interviewWeeks: 2, energy: -20, fatigue: 16, weekCapacityCost: 22, detail: "Une meilleure paie hebdomadaire avec plus de kilomètres et de fatigue dans les jambes." }),
+    Object.freeze({ id: "office", title: "Employé de bureau", wage: 120, schedule: "Bureau · longues heures", interviewWeeks: 2, energy: -14, fatigue: 7, weekCapacityCost: 30, detail: "Une paie solide et peu de fatigue physique, mais de longues journées de bureau." }),
+    Object.freeze({ id: "warehouse", title: "Manutention de nuit", wage: 130, schedule: "Horaire exigeant", interviewWeeks: 3, energy: -27, fatigue: 23, weekCapacityCost: 30, detail: "La paie la plus élevée, au prix d’une lourde dépense physique." }),
   ]);
 
   function escapeHTML(value) {
@@ -64,6 +64,11 @@
       title: safeText(source.title, fallback.title, 100),
       wage: wholeNumber(source.wage, fallback.wage, 0, 999999),
       schedule: safeText(source.schedule, fallback.schedule, 100),
+      interviewWeeks: wholeNumber(source.interviewWeeks, fallback.interviewWeeks, 1, 99),
+      energy: wholeNumber(source.energy, fallback.energy, -100, 100),
+      fatigue: wholeNumber(source.fatigue, fallback.fatigue, -100, 100),
+      weekCapacityCost: wholeNumber(source.weekCapacityCost, fallback.weekCapacityCost, 0, 100),
+      detail: safeText(source.detail, fallback.detail, 260),
     };
   }
 
@@ -88,6 +93,7 @@
       : null;
     const application = rawApplication
       ? {
+        jobId: safeText(rawApplication.jobId, "", 80),
         title: safeText(raw.v2JobApplicationLabel, "Emploi visé", 100),
         progress: wholeNumber(rawApplication.progress, 0, 0, 99),
         requiredWeeks: wholeNumber(rawApplication.requiredWeeks, 1, 1, 99),
@@ -135,11 +141,26 @@
     const application = context.application
       ? `<p class="v2-work-board-application"><strong>Candidature en cours : ${escapeHTML(context.application.title)}</strong><span>${context.application.progress}/${context.application.requiredWeeks} semaine${context.application.requiredWeeks > 1 ? "s" : ""} écoulée${context.application.progress > 1 ? "s" : ""}</span></p>`
       : "";
-    const headline = context.firstJobRequired ? "Ton premier emploi est requis" : "Les offres sont prêtes à être consultées";
+    const headline = context.firstJobRequired ? "Ton premier emploi est requis" : "Choisis directement ton prochain emploi";
+    const instructions = context.firstJobRequired
+      ? "Choisis une feuille sur le babillard pour consulter les offres."
+      : "Compare les conditions, puis sélectionne l’offre à laquelle tu veux postuler.";
+    const offers = context.offers.map((offer, index) => {
+      const targeted = context.application?.jobId === offer.id;
+      const waitLabel = targeted
+        ? `Candidature en cours · ${context.application.progress}/${context.application.requiredWeeks}`
+        : `${offer.interviewWeeks} semaine${offer.interviewWeeks > 1 ? "s" : ""} d’attente`;
+      const actionAttribute = context.firstJobRequired
+        ? 'data-v2-work-zone="employment"'
+        : `data-select-job="${escapeHTML(offer.id)}"`;
+      const disabled = !context.firstJobRequired && targeted ? ' disabled aria-disabled="true"' : "";
+      const accessibleAction = context.firstJobRequired ? "Consulter l’offre" : targeted ? "Candidature en cours" : "Postuler";
+      return `<button type="button" class="v2-work-board-sheet v2-work-board-sheet-${index + 1}${targeted ? " selected" : ""}" ${actionAttribute}${disabled} aria-label="${accessibleAction} : ${escapeHTML(offer.title)}"><span class="v2-work-board-pin" aria-hidden="true"></span><small>OFFRE D’EMPLOI</small><strong>${escapeHTML(offer.title)}</strong><em>${offer.wage} $ / semaine</em><span class="v2-work-board-schedule">${escapeHTML(offer.schedule)}</span><span class="v2-work-board-status">${escapeHTML(waitLabel)}</span><span class="v2-work-board-effects">${offer.energy} énergie · +${offer.fatigue} fatigue · ${offer.weekCapacityCost} capacité</span><span class="v2-work-board-detail">${escapeHTML(offer.detail)}</span></button>`;
+    }).join("");
     return `<section class="v2-work-board-scene" aria-labelledby="v2-work-board-title">
       <div class="v2-work-board-frame">
-        <div class="v2-work-board-heading"><p class="eyebrow">Bureau d’emploi</p><h3 id="v2-work-board-title">${escapeHTML(headline)}</h3><p>Choisis une feuille sur le babillard pour consulter les offres.</p></div>
-        <div class="v2-work-board-offers">${context.offers.map((offer, index) => `<button type="button" class="v2-work-board-sheet v2-work-board-sheet-${index + 1}" data-v2-work-zone="employment" aria-label="Consulter l’offre : ${escapeHTML(offer.title)}"><span class="v2-work-board-pin" aria-hidden="true"></span><small>OFFRE D’EMPLOI</small><strong>${escapeHTML(offer.title)}</strong><em>${offer.wage} $ / semaine</em><span>${escapeHTML(offer.schedule)}</span></button>`).join("")}</div>
+        <div class="v2-work-board-heading"><p class="eyebrow">Bureau d’emploi</p><h3 id="v2-work-board-title">${escapeHTML(headline)}</h3><p>${escapeHTML(instructions)}</p></div>
+        <div class="v2-work-board-offers">${offers}</div>
         ${application}
       </div>
     </section>`;

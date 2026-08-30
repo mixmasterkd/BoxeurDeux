@@ -13,6 +13,7 @@
   height: calc(100dvh - clamp(24px, 4vw, 56px));
   margin: 0 auto;
   padding: clamp(18px, 3vw, 34px);
+  padding-bottom: 104px;
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, .12);
@@ -143,6 +144,43 @@
   color: #66df86;
 }
 
+.v2-fighter-medal-summary {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.v2-fighter-medal-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.v2-fighter-medal-totals.compact {
+  justify-content: flex-end;
+  gap: 5px 8px;
+  font-size: .68rem;
+}
+
+.v2-fighter-medal-totals > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.v2-fighter-medal-totals i {
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 50%;
+  background: #c47748;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, .35);
+}
+
+.v2-fighter-medal-totals [data-medal="gold"] i { background: #d9b658; }
+.v2-fighter-medal-totals [data-medal="silver"] i { background: #cbd4dc; }
+.v2-fighter-medal-totals [data-medal="bronze"] i { background: #c47748; }
+
 .v2-fighter-details {
   display: grid;
   align-content: start;
@@ -242,11 +280,57 @@
 }
 
 .v2-fighter-private,
+.v2-fighter-medals,
 .v2-fighter-inventory,
 .v2-fighter-save {
   padding-top: 24px;
   border-top: 1px solid var(--line);
 }
+
+.v2-fighter-medal-overview {
+  padding: 14px;
+  border: 1px solid rgba(217, 182, 88, .3);
+  background: rgba(217, 182, 88, .045);
+}
+
+.v2-fighter-medal-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.v2-fighter-medal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .022);
+}
+
+.v2-fighter-medal-row > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.v2-fighter-medal-row > span {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.v2-fighter-medal-row b {
+  padding: 4px 7px;
+  border: 1px solid currentColor;
+  color: #c47748;
+  font-size: .68rem;
+}
+
+.v2-fighter-medal-row b[data-medal="gold"] { color: #d9b658; }
+.v2-fighter-medal-row b[data-medal="silver"] { color: #cbd4dc; }
+.v2-fighter-medal-row b[data-medal="bronze"] { color: #c47748; }
 
 .v2-fighter-save {
   display: flex;
@@ -371,10 +455,6 @@
     font-size: clamp(1.35rem, 6.5vw, 1.9rem);
   }
 
-  .v2-fighter-header button {
-    min-height: 44px;
-  }
-
   .v2-fighter-layout {
     grid-template-columns: 1fr;
     gap: 24px;
@@ -441,6 +521,15 @@
     display: grid;
   }
 
+  .v2-fighter-medal-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .v2-fighter-medal-row > span {
+    flex-wrap: wrap;
+  }
+
   .v2-fighter-save {
     display: grid;
   }
@@ -453,11 +542,6 @@
 @media (max-width: 390px) {
   .v2-fighter-header .eyebrow {
     display: none;
-  }
-
-  .v2-fighter-header button {
-    padding-inline: 10px;
-    font-size: .72rem;
   }
 
   .v2-fighter-identity {

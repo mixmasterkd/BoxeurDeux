@@ -40,6 +40,29 @@
     };
   }
 
+  function normalizeMedals(value) {
+    const rows = (Array.isArray(value) ? value : []).slice(0, 20).map((entry, index) => {
+      const source = entry && typeof entry === "object" ? entry : {};
+      return {
+        id: String(source.id || `tournament-${index}`).slice(0, 80),
+        label: String(source.label || "Tournoi amateur").slice(0, 120),
+        gold: Math.round(boundedNumber(source.gold, 0, 0, 999)),
+        silver: Math.round(boundedNumber(source.silver, 0, 0, 999)),
+        bronze: Math.round(boundedNumber(source.bronze, 0, 0, 999)),
+      };
+    });
+    const totals = rows.reduce((sum, row) => ({
+      gold: sum.gold + row.gold,
+      silver: sum.silver + row.silver,
+      bronze: sum.bronze + row.bronze,
+    }), { gold: 0, silver: 0, bronze: 0 });
+    return {
+      rows: rows.filter(row => row.gold + row.silver + row.bronze > 0),
+      totals,
+      count: totals.gold + totals.silver + totals.bronze,
+    };
+  }
+
   function xpForLevel(level) {
     const safeLevel = Math.max(1, Math.round(boundedNumber(level, 1, 1, 999)));
     if (safeLevel <= 1) return 0;
@@ -113,6 +136,7 @@
       privateLessonCredits: Math.round(boundedNumber(raw.privateLessonCredits, 0, 0, 99)),
       levelProgress: normalizeLevel(raw, level, experience),
       record: normalizeRecord(raw.amateurRecord),
+      medals: normalizeMedals(raw.medals),
       stats: Object.fromEntries(STAT_KEYS.map(key => {
         const supplied = boundedNumber(rawStats[key], 40, 0, 99.9999);
         return [key, Math.floor(supplied)];
@@ -178,16 +202,39 @@
     </article>`;
   }
 
+  function renderMedalTotals(medals, compact = false) {
+    const order = [
+      { id: "gold", label: "Or" },
+      { id: "silver", label: "Argent" },
+      { id: "bronze", label: "Bronze" },
+    ];
+    return `<span class="v2-fighter-medal-totals${compact ? " compact" : ""}" aria-label="${medals.totals.gold} or, ${medals.totals.silver} argent et ${medals.totals.bronze} bronze">${order.map(item => `<span data-medal="${item.id}"><i aria-hidden="true"></i><strong>${item.label}</strong> ${medals.totals[item.id]}</span>`).join("")}</span>`;
+  }
+
+  function renderMedalPalmares(context) {
+    if (context.careerStatus === "recreational") return "";
+    const medals = context.medals;
+    const content = medals.count
+      ? `<div class="v2-fighter-medal-overview">${renderMedalTotals(medals)}</div><div class="v2-fighter-medal-list">${medals.rows.map(row => `<article class="v2-fighter-medal-row"><strong>${escapeHTML(row.label)}</strong><span><b data-medal="gold">Or ${row.gold}</b><b data-medal="silver">Argent ${row.silver}</b><b data-medal="bronze">Bronze ${row.bronze}</b></span></article>`).join("")}</div>`
+      : `<p class="v2-fighter-empty">Aucune médaille pour le moment.<br><small>Une victoire en finale donne l’or; une défaite en finale donne l’argent et une défaite en demi-finale donne le bronze.</small></p>`;
+    return `<section class="v2-fighter-medals" aria-labelledby="v2-fighter-medals-title">
+      <div class="v2-fighter-section-heading"><div><p class="eyebrow">Bilan de tournoi</p><h3 id="v2-fighter-medals-title">Médailles</h3></div><p>Les podiums de tous les tournois amateurs, y compris les compétitions indépendantes, sont conservés ici.</p></div>
+      ${content}
+    </section>`;
+  }
+
   function render(rawContext) {
     const context = normalizeContext(rawContext);
     const nickname = context.profile.nickname ? ` « ${escapeHTML(context.profile.nickname)} »` : "";
     const record = context.careerStatus === "recreational"
       ? "Bilan amateur à venir"
       : `${context.record.wins} V · ${context.record.losses} D`;
+    const compactMedals = context.careerStatus === "recreational"
+      ? "À venir"
+      : context.medals.count ? renderMedalTotals(context.medals, true) : "Aucune";
     return `<section class="v2-fighter-view" aria-labelledby="v2-fighter-title">
       <header class="v2-fighter-header">
         <div><p class="eyebrow">Fiche du boxeur</p><h2 id="v2-fighter-title">${escapeHTML(context.profile.firstName)}${nickname} ${escapeHTML(context.profile.lastName)}</h2></div>
-        <button type="button" class="secondary-button" data-v2-close-fighter>Retour à la carte</button>
       </header>
       <div class="v2-fighter-layout">
         <aside class="v2-fighter-identity">
@@ -202,6 +249,7 @@
             <div><dt>Style</dt><dd>${escapeHTML(context.styleLabel)}</dd></div>
             <div><dt>Catégorie</dt><dd>${escapeHTML(context.weightLabel)}</dd></div>
             <div><dt>Bilan</dt><dd>${escapeHTML(record)}</dd></div>
+            <div><dt>Médailles</dt><dd class="v2-fighter-medal-summary">${compactMedals}</dd></div>
             <div><dt>Argent</dt><dd class="money">${context.money} $</dd></div>
             ${context.privateLessonCredits > 0 ? `<div><dt>Cours privé offert</dt><dd>${context.privateLessonCredits} bon${context.privateLessonCredits > 1 ? "s" : ""}</dd></div>` : ""}
           </dl>
@@ -212,6 +260,7 @@
             <div class="v2-fighter-stats">${STAT_KEYS.map(key => renderStat(key, context)).join("")}</div>
             <div data-v2-level-up-slot data-level-points="${context.levelProgress.manualPoints}" hidden></div>
           </section>
+          ${renderMedalPalmares(context)}
           <section class="v2-fighter-private" aria-labelledby="v2-fighter-private-title">
             <div class="v2-fighter-section-heading"><div><p class="eyebrow">Développement ciblé</p><h3 id="v2-fighter-private-title">Programme privé</h3></div><p>Un entraîneur plus expérimenté coûte davantage, mais produit plus d’XP ciblée vers la qualité choisie.</p></div>
             ${renderPrivateProgram(context)}

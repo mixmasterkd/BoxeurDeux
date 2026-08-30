@@ -31,13 +31,18 @@
 .v2-work-board-heading h3 { margin-top: 3px; font: 800 clamp(1.45rem, 3vw, 2.25rem)/1 "Barlow Condensed", sans-serif; text-transform: uppercase; }
 .v2-work-board-heading p:last-child { margin-top: 6px; color: #eadbbd; font-size: .72rem; line-height: 1.4; }
 .v2-work-board-offers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(11px, 2vw, 18px); }
-.v2-work-board-sheet { position: relative; display: grid; align-content: start; gap: 5px; min-height: 142px; padding: 22px 13px 12px; border: 1px solid #c8b88f; color: #242018; background: linear-gradient(135deg, rgba(255, 255, 255, .45), transparent 38%), #eee2c5; box-shadow: 2px 4px 6px rgba(0, 0, 0, .38); cursor: pointer; text-align: left; transform: rotate(-.8deg); transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.v2-work-board-sheet { position: relative; display: grid; align-content: start; gap: 5px; min-height: 218px; padding: 22px 13px 12px; border: 1px solid #c8b88f; color: #242018; background: linear-gradient(135deg, rgba(255, 255, 255, .45), transparent 38%), #eee2c5; box-shadow: 2px 4px 6px rgba(0, 0, 0, .38); cursor: pointer; text-align: left; transform: rotate(-.8deg); transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
 .v2-work-board-sheet-2, .v2-work-board-sheet-4 { transform: rotate(.8deg); }
-.v2-work-board-sheet:hover, .v2-work-board-sheet:focus-visible { z-index: 1; border-color: var(--red, #e3513d); box-shadow: 4px 7px 13px rgba(0, 0, 0, .48); transform: translateY(-3px) rotate(0); }
+.v2-work-board-sheet:not(:disabled):hover, .v2-work-board-sheet:not(:disabled):focus-visible { z-index: 1; border-color: var(--red, #e3513d); box-shadow: 4px 7px 13px rgba(0, 0, 0, .48); transform: translateY(-3px) rotate(0); }
+.v2-work-board-sheet.selected { border: 2px solid #a94a36; background: #f1ddb4; box-shadow: 0 0 0 3px rgba(255, 231, 169, .18), 2px 4px 6px rgba(0, 0, 0, .38); }
+.v2-work-board-sheet:disabled { cursor: default; opacity: .78; }
 .v2-work-board-sheet small { color: #7d4431; font-size: .53rem; font-weight: 900; letter-spacing: .12em; }
 .v2-work-board-sheet strong { font: 800 1.05rem/1 "Barlow Condensed", sans-serif; text-transform: uppercase; }
 .v2-work-board-sheet em { color: #6a4e19; font-size: .67rem; font-style: normal; font-weight: 800; }
-.v2-work-board-sheet > span:last-child { color: #544b3b; font-size: .6rem; line-height: 1.25; }
+.v2-work-board-schedule, .v2-work-board-status, .v2-work-board-effects, .v2-work-board-detail { color: #544b3b; font-size: .6rem; line-height: 1.3; }
+.v2-work-board-status { margin-top: 3px; color: #7d3128; font-weight: 900; }
+.v2-work-board-effects { color: #684e24; font-weight: 700; }
+.v2-work-board-detail { padding-top: 5px; border-top: 1px solid rgba(84, 75, 59, .24); }
 .v2-work-board-pin { position: absolute; top: 7px; left: 50%; width: 10px; height: 10px; border: 1px solid rgba(69, 16, 12, .7); border-radius: 50%; background: #b13e31; box-shadow: 0 1px 1px rgba(0, 0, 0, .5); transform: translateX(-50%); }
 .v2-work-board-application { display: grid; gap: 3px; padding: 10px 12px; border-left: 3px solid #ffe3a5; color: #fff3d9; background: rgba(15, 11, 7, .38); font-size: .71rem; line-height: 1.35; }
 .v2-work-board-application span { color: #e7d8ba; }
@@ -67,10 +72,15 @@
   .v2-work-board-scene { padding: 12px; border-radius: 12px; }
   .v2-work-board-frame { padding: 15px 11px; }
   .v2-work-board-offers { gap: 10px; }
-  .v2-work-board-sheet, .v2-work-board-sheet-2, .v2-work-board-sheet-4 { min-height: 124px; padding: 20px 10px 10px; transform: none; }
+  .v2-work-board-sheet, .v2-work-board-sheet-2, .v2-work-board-sheet-4 { min-height: 218px; padding: 20px 10px 10px; transform: none; }
   .v2-work-board-sheet strong { font-size: .95rem; }
   .v2-work-status-card dl, .v2-work-menu-card dl { grid-template-columns: 1fr; }
   .v2-work-menu { width: min(100%, calc(100% - 16px)); max-height: calc(100dvh - 16px); }
+}
+
+@media (max-width: 520px) {
+  .v2-work-board-offers { grid-template-columns: 1fr; }
+  .v2-work-board-sheet, .v2-work-board-sheet-2, .v2-work-board-sheet-4 { min-height: 0; padding: 22px 14px 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

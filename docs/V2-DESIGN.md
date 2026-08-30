@@ -22,7 +22,7 @@ La profondeur demeure disponible, mais elle devient facultative. Un nouveau joue
 
 Les principes directeurs sont les suivants :
 
-- une prochaine étape toujours visible;
+- une prochaine étape visible pendant le parcours récréatif et les débuts amateurs, jusqu’au premier résultat officiel;
 - un maximum de deux interactions pour lancer une activité ordinaire;
 - une seule confirmation volontaire pour faire avancer la semaine;
 - de la profondeur par les choix et leurs compromis, pas par une multiplication de jauges;
@@ -56,7 +56,7 @@ Le panneau « Maintenant » présente toujours :
 - la fatigue accumulée;
 - la préparation générale;
 - le prochain rendez-vous;
-- la prochaine étape de carrière.
+- au début de la carrière, la prochaine étape recommandée.
 
 Deux rythmes sont proposés directement dans le panneau « Maintenant » :
 
@@ -79,6 +79,8 @@ Une nouvelle carrière commence avec le statut récréatif et un guide progressi
 - **fin de la semaine 6** : dès que le sparring avec Rémy est terminé, activer automatiquement le statut amateur et afficher une célébration qui explique les nouveaux accès.
 
 Le guide utilise une prochaine étape visible, le lieu pertinent mis en évidence et de courtes interventions de l'entraîneur. Il ne doit pas devenir une chaîne de fenêtres. Seuls les choix initiaux indispensables — abonnement et emploi — sont bloquants. Le calendrier amateur, le gym de musculation et le sparring ordinaire demeurent verrouillés jusqu'à la fin du sparring d'évaluation. La promotion est alors automatique; la célébration qui suit est informative et ne constitue pas une confirmation du changement de statut.
+
+Après la promotion, la carte conserve une recommandation légère pour aider le nouveau boxeur à trouver son premier gala ou tournoi. Dès qu’une victoire, une défaite ou un verdict nul est inscrit au bilan amateur, cette carte « Prochaine étape » disparaît : les systèmes demeurent accessibles, mais le joueur est désormais considéré autonome.
 
 Après l'ajout du premier cours de groupe, le guide remplace l'objectif d'entraînement par deux commandes explicites : « Voir mon programme » et « Confirmer et vivre la semaine ». Il rappelle que le brouillon n'a encore produit aucun salaire, coût, fatigue ni progression. Le premier bilan explique ensuite les indicateurs principaux et annonce l'objectif de la semaine 2 avant de rendre la carte au joueur.
 
@@ -107,6 +109,8 @@ La carte de la ville devient l'écran d'accueil. Elle montre uniquement les lieu
 Le lieu recommandé est mis en évidence par l'entraîneur. Les lieux verrouillés peuvent être visibles s'ils aident à comprendre la progression, mais leur condition doit être écrite directement : « Disponible après le sparring avec Rémy » plutôt qu'un cadenas inexpliqué.
 
 Une vue « Liste des lieux » offre exactement les mêmes commandes pour le clavier, les lecteurs d'écran et les joueurs qui préfèrent une navigation rapide.
+
+Le menu principal « Carte · Calendrier · Boxeur · Inventaire » demeure disponible dans chacune de ces quatre vues. Il remplace les boutons génériques « Fermer » et « Retour à la carte » : le joueur peut donc passer directement d’une vue à l’autre, tandis que les boutons de retour propres à une sous-action restent contextuels.
 
 Les intérieurs utilisent un gabarit commun sur ordinateur et téléphone : en-tête avec statut, semaine et date; scène interactive; panneau d'actions; programme hebdomadaire; état de récupération; puis services propres au lieu. Les images et les mécaniques restent distinctes, mais les cartes, la hiérarchie et la position des commandes sont cohérentes. Sur téléphone, les actions principales passent avant les détails et toutes les commandes tactiles conservent au moins 44 px de hauteur.
 
@@ -321,6 +325,8 @@ Un tournoi forme un parcours continu de 3 ou 5 combats selon son niveau :
 Un combat a lieu par jour. La récupération quotidienne doit empêcher qu'un boxeur normalement préparé arrive automatiquement épuisé au troisième ou au cinquième combat. Les décisions entre les combats doivent créer des compromis sans condamner d'avance le reste du tournoi.
 
 En amateur, il n'y a aucun match nul. Les combats locaux utilisent trois juges et les tournois cinq juges; les cartes demeurent cachées jusqu'à la fin.
+
+Le classement attribue l'or au vainqueur de la finale, l'argent au finaliste battu et le bronze au demi-finaliste battu. Une célébration visuelle distincte apparaît uniquement lorsqu'une médaille est gagnée, puis mène au tableau final. Les compteurs or, argent et bronze de tous les parcours, y compris les tournois indépendants, restent dans la sauvegarde et sont présentés dans le bilan de l'onglet Boxeur.
 
 ## 5. Emplois, entrevues, vacances et mini-jeux
 
@@ -586,7 +592,7 @@ Les scènes sont validées au minimum en 1440 × 900, 1280 × 720, 390 × 844, 3
 - conception verticale propre à environ 390 × 844;
 - scène sur environ 35 à 45 % de la hauteur selon le contexte;
 - panneau d'actions près du pouce;
-- navigation fixe et courte : Carte, Agenda, Boxeur, Messages;
+- navigation fixe et courte : Carte, Calendrier, Boxeur, Inventaire;
 - boutons d'au moins 44 pixels de hauteur;
 - aucune largeur fixe ni défilement horizontal de la page;
 - agenda de sept jours défilable indépendamment;
@@ -734,6 +740,7 @@ Chaque étape doit pouvoir être désactivée ou annulée sans convertir à nouv
 ### Compréhension
 
 - Un nouveau joueur peut expliquer sa prochaine étape en moins de 30 secondes.
+- La recommandation « Prochaine étape » disparaît après le premier résultat officiel amateur.
 - Une nouvelle carrière ne peut quitter l'inscription initiale sans abonnement au gym et emploi pour la semaine 1.
 - Il trouve Rémy, termine le sparring et voit immédiatement que son statut amateur est activé.
 - Le passage amateur arrive automatiquement après Rémy; la célébration suivante ne fait qu'expliquer ce changement.

@@ -325,6 +325,43 @@ h2 { font-size: 1.65rem; }
 .tournament-dialog { width: min(900px, calc(100% - 24px)); padding: 0; border: 0; color: var(--ink); background: transparent; }
 .tournament-dialog::backdrop { background: rgba(0,0,0,.84); backdrop-filter: blur(5px); }
 .tournament-board-card { padding: 26px; border: 1px solid var(--line); border-top: 4px solid var(--gold); background: #171917; }
+.tournament-medal-dialog { width: min(520px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 0; color: var(--ink); background: transparent; }
+.tournament-medal-dialog::backdrop { background: rgba(0, 0, 0, .9); backdrop-filter: blur(8px); }
+.tournament-medal-card {
+  --medal-accent: #d9b658;
+  --medal-glow: rgba(217, 182, 88, .28);
+  max-height: calc(100dvh - 24px);
+  padding: clamp(22px, 4vw, 34px);
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--medal-accent) 55%, #30342f);
+  border-top: 4px solid var(--medal-accent);
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 50% 31%, var(--medal-glow), transparent 42%),
+    linear-gradient(160deg, #1a1e1b, #0d100e 72%);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .62);
+  text-align: center;
+}
+.tournament-medal-card[data-medal="silver"] { --medal-accent: #cbd4dc; --medal-glow: rgba(203, 212, 220, .22); }
+.tournament-medal-card[data-medal="bronze"] { --medal-accent: #c47748; --medal-glow: rgba(196, 119, 72, .24); }
+.tournament-medal-card .eyebrow { margin: 0 0 4px; color: var(--medal-accent); }
+.tournament-medal-card h2 { margin: 0; color: var(--medal-accent); font-size: clamp(2rem, 7vw, 3rem); }
+.tournament-medal-visual {
+  width: min(310px, 72vw);
+  aspect-ratio: 1;
+  margin: 10px auto 4px;
+}
+.tournament-medal-visual img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 22px rgba(0, 0, 0, .48));
+}
+.tournament-medal-congratulations { margin: 0; color: var(--ink); font: 800 clamp(1.25rem, 4vw, 1.7rem) "Barlow Condensed"; text-transform: uppercase; }
+.tournament-medal-copy { max-width: 390px; margin: 8px auto 0; color: var(--muted); font-size: .84rem; line-height: 1.5; }
+.tournament-medal-actions { display: flex; justify-content: center; margin-top: 22px; }
+.tournament-medal-actions button { min-width: min(260px, 100%); min-height: 48px; }
 .tournament-board-status { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 20px 0; padding: 14px; border: 1px solid var(--line); background: #111311; }
 .tournament-board-status strong { font-family: "Barlow Condensed"; font-size: 1.3rem; text-transform: uppercase; }
 .tournament-board-status span { color: var(--muted); font-size: .72rem; }
@@ -423,6 +460,10 @@ h2 { font-size: 1.65rem; }
   .level-choice { min-height: 48px; }
   .tournament-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
   .tournament-board-card { max-height: calc(100dvh - 12px); padding: 14px 10px calc(14px + env(safe-area-inset-bottom)); overflow-y: auto; }
+  .tournament-medal-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
+  .tournament-medal-card { max-height: calc(100dvh - 12px); padding: 18px 14px calc(18px + env(safe-area-inset-bottom)); }
+  .tournament-medal-visual { width: min(245px, 66vw); }
+  .tournament-medal-actions, .tournament-medal-actions button { width: 100%; }
   .tournament-board-status { align-items: flex-start; flex-direction: column; }
   .tournament-board-actions, .tournament-board-actions button { width: 100%; }
   .toast { width: calc(100% - 20px); bottom: calc(10px + env(safe-area-inset-bottom)); text-align: center; }
@@ -455,7 +496,35 @@ h2 { font-size: 1.65rem; }
 .calendar-heading-meta { display: grid; gap: 4px; color: var(--muted); font-size: .68rem; text-align: right; text-transform: uppercase; }
 .calendar-heading-meta span:first-child { color: var(--gold); font-weight: 800; }
 .calendar-lead { margin-bottom: 18px; color: var(--muted); font-size: .78rem; line-height: 1.45; }
-.calendar-events { display: grid; gap: 18px; }
+.calendar-events { display: grid; gap: 10px; }
+.calendar-week-group { overflow: hidden; border: 1px solid var(--line); background: #101210; }
+.calendar-week-group.current { border-color: rgba(221,182,94,.7); }
+.calendar-week-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 66px;
+  padding: 12px 15px;
+  color: var(--ink);
+  background: linear-gradient(105deg, rgba(255,255,255,.035), transparent 62%);
+  cursor: pointer;
+  list-style: none;
+}
+.calendar-week-summary::-webkit-details-marker { display: none; }
+.calendar-week-summary > div { display: grid; gap: 3px; }
+.calendar-week-summary > div span { color: var(--gold); font-size: .65rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.calendar-week-summary > div strong { font: 800 1.15rem "Barlow Condensed"; text-transform: uppercase; }
+.calendar-week-summary > em { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: .67rem; font-style: normal; font-weight: 800; text-transform: uppercase; }
+.calendar-week-summary > em::after { color: var(--gold); content: "+"; font-size: 1.25rem; line-height: 1; }
+.calendar-week-summary > em.has-tournament { justify-content: flex-end; color: var(--gold); }
+.calendar-week-tournament-badge { padding: 4px 7px; border: 1px solid rgba(221,182,94,.7); background: rgba(221,182,94,.1); letter-spacing: .06em; }
+.calendar-week-group[open] > .calendar-week-summary { border-bottom: 1px solid var(--line); background: linear-gradient(105deg, rgba(221,182,94,.1), transparent 66%); }
+.calendar-week-group[open] > .calendar-week-summary > em::after { content: "−"; }
+.calendar-week-content { display: grid; gap: 12px; padding: 12px; }
+.calendar-week-empty { display: grid; gap: 4px; padding: 16px; border: 1px dashed rgba(255,255,255,.14); color: var(--muted); background: #121412; }
+.calendar-week-empty strong { color: var(--ink); font: 800 1rem "Barlow Condensed"; text-transform: uppercase; }
+.calendar-week-empty span { font-size: .7rem; }
 .calendar-date-group { display: grid; grid-template-columns: 125px minmax(0, 1fr); gap: 12px; }
 .calendar-date { padding: 14px 12px; border-top: 3px solid var(--red); color: var(--muted); background: #121412; text-transform: uppercase; }
 .calendar-date strong { display: block; color: var(--ink); font: 800 1.25rem "Barlow Condensed"; }
@@ -465,6 +534,7 @@ h2 { font-size: 1.65rem; }
 .calendar-event { display: flex; min-width: 0; min-height: 190px; padding: 16px; border: 1px solid var(--line); background: #171917; flex-direction: column; }
 .calendar-event.home { border-color: var(--green); background: linear-gradient(145deg, rgba(108,183,137,.11), #171917 62%); }
 .calendar-event.tournament { border-color: var(--gold); background: linear-gradient(145deg, rgba(221,182,94,.1), #171917 62%); }
+.calendar-event.recommended { border-color: var(--gold); box-shadow: inset 3px 0 0 var(--gold); }
 .calendar-event.booked { box-shadow: inset 0 0 0 2px var(--red); }
 .calendar-event.unavailable { opacity: .72; }
 .calendar-event-head { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
@@ -474,14 +544,46 @@ h2 { font-size: 1.65rem; }
 .calendar-event p { color: var(--muted); font-size: .71rem; line-height: 1.45; }
 .calendar-event-meta { display: flex; flex-wrap: wrap; gap: 5px 10px; margin: 12px 0; color: var(--gold); font-size: .62rem; font-weight: 700; text-transform: uppercase; }
 .calendar-coach-advice { margin: -3px 0 12px; padding: 8px 9px; border-left: 2px solid var(--green); color: var(--muted); background: rgba(108,183,137,.08); font-size: .68rem; line-height: 1.4; }
+.calendar-event .calendar-coach-pick { display: grid; gap: 3px; margin: -2px 0 12px; padding: 9px 10px; border-left: 3px solid var(--gold); background: rgba(221,182,94,.09); }
+.calendar-coach-pick strong { color: var(--gold); font: 800 .76rem "Barlow Condensed"; letter-spacing: .05em; text-transform: uppercase; }
+.calendar-coach-pick span { color: #d3d5d0; font-size: .68rem; line-height: 1.35; }
 .calendar-event-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: auto; }
 .calendar-event-actions button { min-width: 0; min-height: 44px; padding: 8px; font-size: .68rem; }
 .calendar-opponent-choice { display: grid; gap: 3px; text-align: left; }
+.calendar-event-actions > .calendar-opponent-primary { grid-column: 1 / -1; min-height: 66px; border-color: rgba(221,182,94,.64); }
+.calendar-event-actions > .calendar-opponent-primary.recommended { background: linear-gradient(110deg, rgba(221,182,94,.14), #151815 72%); }
 .calendar-opponent-choice strong { font: 800 .86rem/1.1 "Barlow Condensed"; text-transform: uppercase; }
 .calendar-opponent-choice span { color: var(--muted); font-size: .6rem; line-height: 1.25; }
 .calendar-opponent-choice em { color: var(--gold); font-size: .58rem; font-style: normal; }
+.calendar-opponent-choice .calendar-opponent-recommendation { color: var(--green); font-size: .59rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.calendar-opponent-alternatives { grid-column: 1 / -1; border-top: 1px solid rgba(255,255,255,.1); }
+.calendar-opponent-alternatives summary { min-height: 44px; padding: 12px 2px 8px; color: var(--muted); cursor: pointer; font-size: .65rem; font-weight: 800; text-transform: uppercase; }
+.calendar-opponent-alternative-list { display: grid; gap: 7px; padding-top: 3px; }
+.calendar-opponent-alternative-list .calendar-opponent-choice { width: 100%; }
 .tournament-catalog { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
-.tournament-catalog summary, .tournament-bracket-disclosure summary, .fight-log-disclosure summary { min-height: 44px; padding: 11px 0; color: var(--gold); cursor: pointer; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.tournament-catalog > summary {
+  display: grid;
+  grid-template-columns: auto minmax(210px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  padding: 9px 0;
+  color: var(--gold);
+  cursor: pointer;
+  font-size: .72rem;
+  font-weight: 800;
+  list-style: none;
+  text-transform: uppercase;
+}
+.tournament-catalog > summary::-webkit-details-marker { display: none; }
+.tournament-catalog > summary::after { content: "+"; font-size: 1.35rem; }
+.tournament-catalog[open] > summary::after { content: "−"; }
+.next-tournament-indicator { display: grid; gap: 2px; padding: 8px 10px; border-left: 3px solid var(--gold); color: var(--ink); background: rgba(221,182,94,.08); text-transform: none; }
+.next-tournament-indicator small { color: var(--gold); font-size: .58rem; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; }
+.next-tournament-indicator strong { overflow: hidden; font: 800 .91rem/1.1 "Barlow Condensed"; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.next-tournament-indicator span { color: var(--muted); font-size: .64rem; font-weight: 700; }
+.next-tournament-indicator b { width: max-content; margin-top: 3px; padding: 3px 6px; color: #fff2c8; background: rgba(180,35,45,.72); font-size: .58rem; letter-spacing: .04em; text-transform: uppercase; }
+.tournament-bracket-disclosure summary, .fight-log-disclosure summary { min-height: 44px; padding: 11px 0; color: var(--gold); cursor: pointer; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
 .tournament-catalog .tournament-grid { margin-top: 10px; }
 
 .fight-dialog { width: min(1040px, calc(100% - 24px)); max-height: calc(100dvh - 24px); }
@@ -572,6 +674,9 @@ h2 { font-size: 1.65rem; }
   .portrait-options { gap: 7px; }
   .portrait-option { height: clamp(128px, 34vw, 150px); min-height: 0; }
   .calendar-date-group { grid-template-columns: 1fr; gap: 6px; }
+  .calendar-week-summary { min-height: 62px; padding: 11px 12px; }
+  .calendar-week-summary > div strong { font-size: 1.05rem; }
+  .calendar-week-content { padding: 8px; }
   .calendar-date { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px 8px; padding: 9px 10px; }
   .calendar-date strong { grid-column: 1 / -1; }
   .calendar-date span { margin: 0; }
@@ -587,6 +692,13 @@ h2 { font-size: 1.65rem; }
   .calendar-day-events { grid-template-columns: 1fr; }
   .calendar-event { min-height: 0; }
   .calendar-event-actions { grid-template-columns: 1fr; }
+  .calendar-week-summary { align-items: flex-start; }
+  .calendar-week-summary > em { flex: 0 0 auto; font-size: .67rem; }
+  .calendar-week-summary > em.has-tournament { align-items: flex-end; flex-direction: column; gap: 4px; }
+  .tournament-catalog > summary { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .tournament-catalog > summary .next-tournament-indicator { grid-column: 1 / -1; grid-row: 2; }
+  .calendar-event-actions > .calendar-opponent-primary,
+  .calendar-opponent-alternatives { grid-column: 1; }
   .fight-dialog { width: 100%; max-height: 100dvh; }
   .fight-card { max-height: 100dvh; padding: 8px 8px calc(10px + env(safe-area-inset-bottom)); border-right: 0; border-left: 0; }
   .fight-ring-stage { margin-top: 8px; aspect-ratio: 4 / 2.1; }
@@ -626,10 +738,12 @@ h2 { font-size: 1.65rem; }
 
 .calendar-dialog { width: min(1080px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 0; color: var(--ink); background: transparent; }
 .calendar-dialog::backdrop { background: rgba(0,0,0,.78); backdrop-filter: blur(5px); }
-.calendar-dialog-card { max-height: calc(100dvh - 24px); padding: 26px; overflow-y: auto; border: 1px solid var(--line); border-top: 4px solid var(--red); background: #171917; }
+.calendar-dialog-card { max-height: calc(100dvh - 24px); padding: 26px 26px max(106px, calc(90px + env(safe-area-inset-bottom))); overflow-y: auto; border: 1px solid var(--line); border-top: 4px solid var(--red); background: #171917; }
 .calendar-dialog-card > .calendar-heading-meta { margin: 12px 0 4px; text-align: left; }
-.calendar-dialog-actions { position: sticky; bottom: -26px; z-index: 3; margin: 18px -26px -26px; padding: 14px 26px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, #171917 35%); }
+.v2-calendar-navigation { margin: 0; padding: 0; }
+.v2-calendar-navigation > .v2-world-nav { position: fixed; right: 50%; bottom: max(12px, env(safe-area-inset-bottom)); left: auto; z-index: 70; width: min(720px, calc(100% - 28px)); transform: translateX(50%); }
 .recreational-path { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .75fr); gap: 16px; margin-bottom: 16px; padding: 18px; border: 1px solid var(--gold); background: linear-gradient(145deg, rgba(221,182,94,.1), #111311 65%); }
+.recreational-path[hidden] { display: none; }
 .recreational-path strong { display: block; color: var(--gold); font: 800 1.45rem "Barlow Condensed"; text-transform: uppercase; }
 .recreational-path p:not(.eyebrow) { margin-top: 6px; color: var(--muted); font-size: .76rem; line-height: 1.45; }
 .recreational-path ul { align-self: center; margin: 0; padding-left: 18px; color: var(--muted); font-size: .7rem; line-height: 1.55; }
@@ -639,9 +753,13 @@ h2 { font-size: 1.65rem; }
 
 @media (max-width: 760px) {
   .calendar-dialog { width: calc(100% - 12px); max-height: calc(100dvh - 12px); }
-  .calendar-dialog-card { max-height: calc(100dvh - 12px); padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); }
-  .calendar-dialog-actions { bottom: calc(-16px - env(safe-area-inset-bottom)); margin: 16px -12px calc(-16px - env(safe-area-inset-bottom)); padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
+  .calendar-dialog-card { max-height: calc(100dvh - 12px); padding: 16px 12px max(92px, calc(78px + env(safe-area-inset-bottom))); }
+  .v2-calendar-navigation { margin: 0; }
   .recreational-path { grid-template-columns: 1fr; gap: 10px; padding: 13px; }
+}
+
+@media (max-width: 640px) {
+  .v2-calendar-navigation > .v2-world-nav { right: max(7px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); left: max(7px, env(safe-area-inset-left)); width: auto; transform: none; }
 }
 
 @media (max-width: 560px) {
@@ -1393,4 +1511,261 @@ h2 { font-size: 1.65rem; }
   .tournament-fight-prototype .fight-ring-stage[data-sparring-scene="corner"] .ring-fighter-player { width: 21%; }
   .tournament-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .ring-fighter-player,
   .tournament-fight-prototype .fight-ring-stage[data-sparring-scene="after"] .ring-fighter-opponent { width: 17%; }
+}
+
+/* Lot 3A — combat V2 lisible et réellement adapté au téléphone */
+.fight-mobile-details,
+.fight-decision-heading { display: none; }
+
+.sparring-ring-prototype .fight-ring-stage:not([data-sparring-scene="ring"]) .sparring-combat-hud {
+  display: none;
+}
+
+.sparring-ring-prototype .sparring-round-status {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 82px;
+}
+.sparring-ring-prototype .sparring-round-status #sparring-round-hud {
+  grid-column: auto;
+}
+.sparring-ring-prototype .sparring-round-status small {
+  color: #ded9cf;
+  font: 800 .62rem/1 "Barlow Condensed", sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 5px #000;
+}
+.sparring-ring-prototype .sparring-player-energy b,
+.sparring-ring-prototype .sparring-opponent-energy b {
+  right: 7px;
+  left: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  transform: translateY(-50%);
+}
+.sparring-ring-prototype .sparring-player-energy b i,
+.sparring-ring-prototype .sparring-opponent-energy b i {
+  overflow: hidden;
+  font-style: normal;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sparring-ring-prototype .sparring-player-energy b output,
+.sparring-ring-prototype .sparring-opponent-energy b output { flex: 0 0 auto; }
+.sparring-ring-prototype #fight-coach-analysis { font-size: .78rem; }
+.sparring-ring-prototype .fight-coach-choices span,
+.sparring-ring-prototype .fight-choices span { font-size: .7rem; }
+.sparring-ring-prototype .fight-choices em { font-size: .64rem; }
+.sparring-ring-prototype .fight-instruction > p { font-size: .75rem; line-height: 1.45; }
+.sparring-ring-prototype .sparring-resolution-prompt {
+  display: grid;
+  gap: 5px;
+  padding: 13px;
+  border: 1px solid rgba(221,182,94,.42);
+  background: rgba(221,182,94,.08);
+  letter-spacing: normal;
+  text-align: left;
+  text-transform: none;
+}
+.sparring-ring-prototype .sparring-resolution-prompt strong {
+  color: var(--gold);
+  font-size: .92rem;
+  text-transform: uppercase;
+}
+.sparring-ring-prototype .sparring-resolution-prompt span {
+  margin: 0;
+  color: #d7d4cc;
+  font-size: .75rem;
+}
+
+@media (max-width: 760px) {
+  .fight-dialog.sparring-ring-prototype {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    overflow: hidden;
+    background: #080a09;
+  }
+  .sparring-ring-prototype .fight-card {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    padding: max(6px, env(safe-area-inset-top)) 8px calc(14px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 0;
+  }
+  .sparring-ring-prototype .fight-ring-stage {
+    height: clamp(190px, 28dvh, 230px);
+    aspect-ratio: auto;
+    border-right: 0;
+    border-left: 0;
+  }
+  .sparring-ring-prototype .ring-fighter { width: clamp(64px, 19%, 92px); }
+  .sparring-ring-prototype .sparring-combat-hud {
+    top: 8px;
+    right: 7px;
+    left: 7px;
+    grid-template-columns: minmax(102px, 1fr) auto minmax(102px, 1fr);
+    gap: 5px;
+  }
+  .sparring-ring-prototype .sparring-player-energy,
+  .sparring-ring-prototype .sparring-opponent-energy {
+    align-self: center;
+    width: 100%;
+    height: 28px;
+    transform: none;
+  }
+  .sparring-ring-prototype .sparring-player-energy,
+  .sparring-ring-prototype .sparring-opponent-energy { background: rgba(2,3,3,.56); }
+  .sparring-ring-prototype .sparring-player-energy > span,
+  .sparring-ring-prototype .sparring-opponent-energy > span { opacity: .78; }
+  .sparring-ring-prototype .sparring-player-energy b,
+  .sparring-ring-prototype .sparring-opponent-energy b {
+    font-size: .68rem;
+  }
+  .sparring-ring-prototype .sparring-round-status { min-width: 72px; gap: 4px; }
+  .sparring-ring-prototype .sparring-round-status #sparring-round-hud { font-size: .72rem; }
+  .sparring-ring-prototype .sparring-round-status small { font-size: .64rem; }
+  .sparring-ring-prototype .sparring-perception-hud { height: 22px; }
+  .sparring-ring-prototype .sparring-perception-hud .sparring-perception-track { inset: 5px 7px; }
+  .sparring-ring-prototype .sparring-perception-hud .sparring-perception-zone { top: 3px; height: 16px; }
+  .sparring-ring-prototype .sparring-perception-hud .sparring-perception-needle { height: 20px; }
+
+  .sparring-ring-prototype .fight-mobile-details {
+    display: block;
+    margin: 7px 0 0;
+    border: 1px solid rgba(255,255,255,.16);
+    background: #0e110f;
+  }
+  .sparring-ring-prototype .fight-mobile-details summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 44px;
+    padding: 9px 11px;
+    color: var(--gold);
+    cursor: pointer;
+  }
+  .sparring-ring-prototype .fight-mobile-details summary span {
+    font-size: .75rem;
+    font-weight: 900;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .sparring-ring-prototype .fight-mobile-details summary strong {
+    color: #d6d8d3;
+    font-size: .72rem;
+    text-align: right;
+  }
+  .sparring-ring-prototype .fight-mobile-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 0 8px 8px;
+  }
+  .sparring-ring-prototype .fight-mobile-details-grid > div {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: #111412;
+  }
+  .sparring-ring-prototype .fight-mobile-details-grid span {
+    display: block;
+    color: #aeb2ad;
+    font-size: .7rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+  .sparring-ring-prototype .fight-mobile-details-grid strong {
+    display: block;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+    font: 800 .8rem/1.25 "Barlow Condensed", sans-serif;
+    text-transform: uppercase;
+  }
+
+  .sparring-ring-prototype .fight-coach-panel,
+  .sparring-ring-prototype .fight-coach-panel[data-sparring-phase="round"] {
+    gap: 7px;
+    margin-top: 7px;
+    padding: 12px;
+  }
+  .sparring-ring-prototype .fight-coach-panel h3 { font-size: 1rem; }
+  .sparring-ring-prototype #fight-coach-analysis,
+  .sparring-ring-prototype .fight-coach-panel[data-sparring-phase="round"] #fight-coach-analysis {
+    max-height: none;
+    font-size: .81rem;
+    line-height: 1.45;
+  }
+  .sparring-ring-prototype .fight-coach-choices { grid-template-columns: 1fr; gap: 7px; }
+  .sparring-ring-prototype .fight-coach-choices button {
+    min-height: 68px;
+    padding: 10px 11px;
+  }
+  .sparring-ring-prototype .fight-coach-choices strong,
+  .sparring-ring-prototype .fight-choices strong { font-size: .88rem; line-height: 1.15; }
+  .sparring-ring-prototype .fight-coach-choices span,
+  .sparring-ring-prototype .fight-choices span {
+    display: block;
+    margin-top: 5px;
+    font-size: .75rem;
+    line-height: 1.35;
+  }
+  .sparring-ring-prototype .fight-decision-area {
+    padding: 0 10px 11px;
+    border-top: 1px solid rgba(221,182,94,.34);
+  }
+  .sparring-ring-prototype .fight-decision-heading:not([hidden]) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 1px 9px;
+  }
+  .sparring-ring-prototype .fight-decision-heading span {
+    color: var(--gold);
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .sparring-ring-prototype .fight-decision-heading strong { font-size: .84rem; }
+  .sparring-ring-prototype .fight-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .sparring-ring-prototype .fight-choices button {
+    min-height: 96px;
+    padding: 10px;
+  }
+  .sparring-ring-prototype .fight-choices em {
+    margin-top: 6px;
+    font-size: .69rem;
+    line-height: 1.3;
+  }
+  .sparring-ring-prototype .fight-instruction > p { font-size: .78rem; }
+  .sparring-ring-prototype .sparring-resolution-prompt { min-height: 82px; padding: 14px; }
+  .sparring-ring-prototype .sparring-resolution-prompt strong { font-size: .94rem; }
+  .sparring-ring-prototype .sparring-resolution-prompt span { font-size: .8rem; }
+}
+
+@media (max-width: 360px) {
+  .sparring-ring-prototype .sparring-combat-hud { grid-template-columns: minmax(88px, 1fr) auto minmax(88px, 1fr); }
+  .sparring-ring-prototype .sparring-player-energy b i,
+  .sparring-ring-prototype .sparring-opponent-energy b i { max-width: 50px; }
+  .sparring-ring-prototype .fight-choices { grid-template-columns: 1fr; }
+  .sparring-ring-prototype .fight-choices > button:nth-child(5) { grid-column: auto; }
 }

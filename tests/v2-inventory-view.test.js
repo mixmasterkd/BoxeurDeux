@@ -67,8 +67,7 @@ test("rend les suppléments hors de la fiche Boxeur avec des repères explicites
   assert.match(html, /<section class="v2-inventory-view" aria-labelledby="v2-inventory-title">/);
   assert.match(html, /<h2 id="v2-inventory-title">Ton inventaire<\/h2>/);
   assert.doesNotMatch(html, /Fiche du boxeur/i);
-  assert.match(html, /data-v2-close-inventory/);
-  assert.match(html, /<button type="button"[^>]*data-v2-close-inventory/);
+  assert.doesNotMatch(html, /data-v2-close-inventory|Retour à la carte/);
   assert.match(html, /data-v2-inventory-category="supplements"/);
   assert.match(html, /<ul class="v2-inventory-grid" role="list">/);
   assert.match(html, /aria-label="Quantité : 2">×2/);
@@ -161,7 +160,7 @@ test("la feuille de style garantit une vue mobile défilable et des cibles acces
 
   assert.match(css, /\.v2-inventory-view\s*\{[^}]*width:\s*min\(1060px, 100%\)/s);
   assert.match(css, /\.v2-inventory-view\s*\{[^}]*overflow-x:\s*hidden[^}]*overflow-y:\s*auto/s);
-  assert.match(css, /\.v2-inventory-header > button,\s*\.v2-inventory-item-action button\s*\{[^}]*min-height:\s*44px/s);
+  assert.match(css, /\.v2-inventory-item-action button\s*\{[^}]*min-height:\s*44px/s);
   assert.match(css, /\.v2-inventory-view button:focus-visible[^}]*outline:/s);
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.v2-inventory-view\s*\{[^}]*width:\s*100%[^}]*height:\s*100dvh/s);
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.v2-inventory-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s);

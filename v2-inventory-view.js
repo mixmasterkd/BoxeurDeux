@@ -224,7 +224,6 @@
         "Retrouve ici les objets que tu possèdes. Les suppléments se sélectionnent seulement au moment prévu avant une séance.",
         360,
       ),
-      closeLabel: safeText(raw.closeLabel, "Retour à la carte", 80),
       emptyTitle: safeText(raw.emptyTitle, "Ton inventaire est vide", 100),
       emptyMessage: safeText(raw.emptyMessage, "Les objets achetés ou obtenus pendant la carrière apparaîtront ici.", 280),
       access: {
@@ -293,7 +292,7 @@
     const distinctLabel = `${context.summary.distinctItems} objet${context.summary.distinctItems > 1 ? "s" : ""} distinct${context.summary.distinctItems > 1 ? "s" : ""}`;
 
     return `<section class="v2-inventory-view" aria-labelledby="v2-inventory-title">
-      <header class="v2-inventory-header"><div><p class="eyebrow">${escapeHTML(context.eyebrow)}</p><h2 id="v2-inventory-title">${escapeHTML(context.title)}</h2><p>${escapeHTML(context.introduction)}</p></div><button type="button" class="secondary-button" data-v2-close-inventory>${escapeHTML(context.closeLabel)}</button></header>
+      <header class="v2-inventory-header"><div><p class="eyebrow">${escapeHTML(context.eyebrow)}</p><h2 id="v2-inventory-title">${escapeHTML(context.title)}</h2><p>${escapeHTML(context.introduction)}</p></div></header>
       <section class="v2-inventory-summary" aria-label="Résumé de l’inventaire" aria-live="polite">
         <div><span>Propriétaire</span><strong>${escapeHTML(context.profile.firstName)}</strong></div>
         <div><span>Dans le sac</span><strong>${escapeHTML(totalLabel)}</strong><small>${escapeHTML(distinctLabel)}</small></div>

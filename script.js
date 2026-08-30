@@ -147,6 +147,12 @@ const tournamentDefs = [
   { id: "regional-cup", medal: "RC", name: "Coupe régionale des clubs", description: "Tournoi extérieur indépendant · divisions Relève (0–10) et Ouverte (10+).", participants: 8, rounds: 3, baseDifficulty: 50, independent: true },
 ];
 
+const TOURNAMENT_MEDAL_PRESENTATION = Object.freeze({
+  gold: Object.freeze({ label: "Médaille d’or", noun: "la médaille d’or", asset: "assets/tournament-medal-gold-v1.png" }),
+  silver: Object.freeze({ label: "Médaille d’argent", noun: "la médaille d’argent", asset: "assets/tournament-medal-silver-v1.png" }),
+  bronze: Object.freeze({ label: "Médaille de bronze", noun: "la médaille de bronze", asset: "assets/tournament-medal-bronze-v1.png" }),
+});
+
 const tournamentNames = [
   ["Nicolas", "Roy", "Le Marteau"], ["Isaac", "Tremblay", "L’Éclair"], ["Marcus", "Diallo", "L’Architecte"],
   ["Ryan", "McKenna", "North Star"], ["Aleksandar", "Petrov", "Le Métronome"], ["Diego", "Vargas", "El Fuego"],
@@ -268,7 +274,7 @@ const INITIAL_STATE = {
   medals: {
     bronze: { bronze: 0, silver: 0, gold: 0 }, silver: { bronze: 0, silver: 0, gold: 0 },
     golden: { bronze: 0, silver: 0, gold: 0 }, canadian: { bronze: 0, silver: 0, gold: 0 },
-    olympic: { bronze: 0, silver: 0, gold: 0 },
+    olympic: { bronze: 0, silver: 0, gold: 0 }, "regional-cup": { bronze: 0, silver: 0, gold: 0 },
   },
   goldenPlacement: null,
   olympicCompleted: false,
@@ -443,6 +449,7 @@ let fightState = null;
 let sparringRingState = null;
 let sparringAutoResolveTimer = null;
 let sparringAutoResolving = false;
+let sparringPendingActionId = null;
 let draftPortraitId = 0;
 let drugSalesTapCount = 0;
 let resumeCareerAlertsAfterLevelDialog = false;
@@ -979,6 +986,7 @@ function normalizeCompetitionState() {
         score: safeText(result?.score, "—", 60),
       })) : [];
       raw.medal = ["bronze", "silver", "gold"].includes(raw.medal) ? raw.medal : null;
+      raw.medalCelebrated = Boolean(raw.medalCelebrated);
       raw.summary = safeText(raw.summary, "", 300);
       raw.eventId = safeText(raw.eventId, "", 140) || null;
       raw.bookingId = safeText(raw.bookingId, "", 180) || null;
@@ -1455,6 +1463,7 @@ function openLevelDialog(resumeCareerAlerts = false) {
 }
 
 function showCareerAlertOrContinue() {
+  if (maybeOpenTournamentMedalDialog()) return true;
   if (state.jobLossNotice) {
     document.querySelector("#job-loss-copy").textContent = state.jobLossNotice;
     document.querySelector("#job-loss-dialog")?.showModal();
@@ -1691,6 +1700,39 @@ function tournamentMedalForLoss(tournament, roundIndex) {
   return null;
 }
 
+function maybeOpenTournamentMedalDialog() {
+  const active = state.activeTournament;
+  const presentation = TOURNAMENT_MEDAL_PRESENTATION[active?.medal];
+  const dialog = document.querySelector("#tournament-medal-dialog");
+  if (!active || active.status !== "completed" || active.medalCelebrated || !presentation || !dialog) return false;
+
+  const tournament = tournamentDefs.find(item => item.id === active.id);
+  const tournamentName = active.name || tournament?.name || "Tournoi amateur";
+  const category = state.profile ? weightClassLabel(state.profile.weightClass, state.profile.sex) : "Catégorie amateur";
+  const details = [active.division, category].filter(Boolean).join(" · ");
+  const card = document.querySelector("#tournament-medal-card");
+  const image = document.querySelector("#tournament-medal-image");
+  if (card) card.dataset.medal = active.medal;
+  document.querySelector("#tournament-medal-title").textContent = presentation.label;
+  document.querySelector("#tournament-medal-congratulations").textContent = `Félicitations, ${state.profile?.firstName || "champion"} !`;
+  document.querySelector("#tournament-medal-copy").textContent = `Tu remportes ${presentation.noun}. ${tournamentName} · ${details}.`;
+  if (image) {
+    image.src = presentation.asset;
+    image.alt = `${presentation.label} de tournoi avec deux gants de boxe en relief`;
+  }
+
+  active.medalCelebrated = true;
+  persistCareer();
+  if (!dialog.open) dialog.showModal();
+  return true;
+}
+
+function continueAfterTournamentMedal() {
+  document.querySelector("#tournament-medal-dialog")?.close();
+  if (state.activeTournament) openTournamentBoard();
+  else render();
+}
+
 function completeTournament(medal = null, reason = "") {
   const active = state.activeTournament;
   if (!active) return "";
@@ -1707,6 +1749,7 @@ function completeTournament(medal = null, reason = "") {
   applyChanges({ reputation: medal === "gold" ? 15 : medal ? 9 : 3, experience: medal === "gold" ? 20 : 12 });
   active.status = "completed";
   active.medal = medal;
+  active.medalCelebrated = !medal;
   const booking = state.bookings.find(item => item.id === active.bookingId);
   if (booking) booking.status = "completed";
   const tournamentName = active.name || tournament.name;
@@ -1761,7 +1804,7 @@ function professionalEligibility() {
   return { eligible: false, reason: `Termine un parcours majeur ou dispute encore ${20 - count} combat${20 - count > 1 ? "s" : ""}` };
 }
 
-function renderRecreationalCalendar(path, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition) {
+function renderRecreationalCalendar(path, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, tournamentCatalog) {
   const partner = sparringPartnerView();
   const isSparringDue = Boolean(state.scheduledFight?.isRecreationalSparring && state.week >= state.scheduledFight.week);
   document.querySelector("#calendar-dialog-eyebrow").textContent = "Parcours récréatif";
@@ -1780,9 +1823,7 @@ function renderRecreationalCalendar(path, scheduled, calendarContainer, tourname
   calendarContainer.innerHTML = "";
   tournamentsContainer.innerHTML = "";
   activeTournamentContainer.innerHTML = "";
-  proTransition.innerHTML = "";
-  amateurTransition.hidden = true;
-  amateurTransition.innerHTML = "";
+  if (tournamentCatalog) tournamentCatalog.hidden = true;
 }
 
 function renderFights() {
@@ -1793,8 +1834,7 @@ function renderFights() {
   const calendarContainer = document.querySelector("#calendar-events");
   const tournamentsContainer = document.querySelector("#tournaments");
   const activeTournamentContainer = document.querySelector("#active-tournament");
-  const proTransition = document.querySelector("#pro-transition");
-  const amateurTransition = document.querySelector("#amateur-transition");
+  const tournamentCatalog = document.querySelector("#tournament-catalog");
   const recreationalPath = document.querySelector("#recreational-path");
   const avoidanceWarning = document.querySelector("#fight-avoidance-warning");
   const fightCount = amateurFightCount();
@@ -1806,12 +1846,15 @@ function renderFights() {
 
   if (isRecreationalCareer()) {
     if (avoidanceWarning) avoidanceWarning.hidden = true;
-    renderRecreationalCalendar(recreationalPath, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, proTransition, amateurTransition);
+    renderRecreationalCalendar(recreationalPath, scheduled, calendarContainer, tournamentsContainer, activeTournamentContainer, tournamentCatalog);
     return;
   }
 
   recreationalPath.hidden = true;
-  amateurTransition.hidden = true;
+  if (tournamentCatalog) {
+    tournamentCatalog.hidden = false;
+    tournamentCatalog.open = false;
+  }
   document.querySelector("#calendar-dialog-eyebrow").textContent = "Saison amateur";
   document.querySelector("#calendar-title").textContent = "Calendrier des galas et tournois";
   document.querySelector("#calendar-dialog-lead").textContent = "Les événements sont annoncés quelques semaines à l’avance. Lorsqu’ils ont lieu le même soir, il faut choisir.";
@@ -1821,7 +1864,7 @@ function renderFights() {
     calendarContainer.innerHTML = '<div class="amateur-closed"><strong>Circuit amateur fermé</strong><p>La carrière professionnelle a commencé. Le bilan amateur est désormais définitif.</p></div>';
     activeTournamentContainer.innerHTML = "";
     tournamentsContainer.innerHTML = "";
-    proTransition.innerHTML = "";
+    if (tournamentCatalog) tournamentCatalog.hidden = true;
     return;
   }
 
@@ -1838,11 +1881,70 @@ function renderFights() {
   const weekStart = careerWeekDate(0);
   const weekEnd = BoxeurCalendar.dateForCareerWeek(state.calendar.epoch, state.week + 5, 6);
   const currentEvents = state.calendar.events.filter(event => event.endDate >= weekStart && event.startDate <= weekEnd);
-  const grouped = BoxeurCalendar.groupEventsByDate(currentEvents);
   const formatDate = value => new Intl.DateTimeFormat("fr-CA", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
+  const formatShortDate = value => new Intl.DateTimeFormat("fr-CA", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
   document.querySelector("#calendar-date-label").textContent = `${formatDate(weekStart)} · 6 semaines annoncées`;
-  calendarContainer.innerHTML = Object.entries(grouped).sort(([left], [right]) => left.localeCompare(right)).map(([date, events]) => {
-    const eventCards = events.map(event => {
+  const tournamentIndicator = document.querySelector("#next-tournament-indicator");
+  const tournamentIsEligible = event => {
+    if (bookingForEvent(event.id)) return true;
+    if (event.registrationDeadline && weekStart > event.registrationDeadline) return false;
+    const divisions = event.divisions?.length ? event.divisions : [null];
+    return divisions.some(division => BoxeurCalendar.evaluateEligibility(event, state, {
+      bookings: activeBookings(),
+      includeBookings: true,
+      divisionId: division?.id,
+    }).eligible);
+  };
+  const upcomingTournaments = state.calendar.events
+    .filter(event => event.kind === "tournament" && event.endDate >= weekStart)
+    .sort((left, right) => safeNumber(left.careerWeek, state.week) - safeNumber(right.careerWeek, state.week) || left.startDate.localeCompare(right.startDate));
+  let nextEligibleTournament = upcomingTournaments.find(tournamentIsEligible) || null;
+  if (!nextEligibleTournament && BoxeurCalendar.nextTournamentPreview) {
+    let previewWeek = Math.max(state.week, safeNumber(state.calendar.endWeek, state.week + 8, state.week, 99999) + 1);
+    for (let attempt = 0; attempt < 24 && !nextEligibleTournament; attempt += 1) {
+      const preview = BoxeurCalendar.nextTournamentPreview({
+        ...(state.calendar.settings || {}),
+        epoch: state.calendar.epoch,
+        seed: state.calendar.seed,
+        afterWeek: previewWeek,
+      });
+      if (!preview) break;
+      if (tournamentIsEligible(preview)) nextEligibleTournament = preview;
+      previewWeek = safeNumber(preview.careerWeek, previewWeek, previewWeek, 99999) + 1;
+    }
+  }
+  if (tournamentIndicator) {
+    if (nextEligibleTournament) {
+      const weeksUntil = Math.max(0, safeNumber(nextEligibleTournament.careerWeek, state.week, state.week, 99999) - state.week);
+      const timing = weeksUntil === 0 ? "cette semaine" : `dans ${weeksUntil} semaine${weeksUntil > 1 ? "s" : ""}`;
+      const registered = Boolean(bookingForEvent(nextEligibleTournament.id));
+      const finalPreparation = weeksUntil === 1 ? '<b>Dernière semaine pour se préparer</b>' : "";
+      tournamentIndicator.innerHTML = `<small>${registered ? "Inscription confirmée" : "Prochain tournoi admissible"}</small><strong>${escapeHTML(nextEligibleTournament.name)}</strong><span>Semaine ${nextEligibleTournament.careerWeek} · ${timing}</span>${finalPreparation}`;
+    } else {
+      tournamentIndicator.innerHTML = "<small>Prochain tournoi</small><strong>Aucun tournoi admissible annoncé</strong>";
+    }
+  }
+  const galaCandidatesByEvent = new Map(currentEvents.filter(event => event.kind !== "tournament").map(event => {
+    const candidates = (event.opponentSlots || []).map((slot, index) => {
+      const candidate = opponentForGala(event, index);
+      return { slot, index, candidate, difficulty: opponentDifficulty(candidate) };
+    }).sort((left, right) => left.difficulty - right.difficulty || left.index - right.index);
+    return [event.id, { event, candidates }];
+  }));
+  const recommendedGala = state.scheduledFight ? null : Array.from(galaCandidatesByEvent.values())
+    .filter(item => item.candidates.length)
+    .sort((left, right) => safeNumber(left.event.careerWeek, state.week) - safeNumber(right.event.careerWeek, state.week)
+      || left.event.startDate.localeCompare(right.event.startDate)
+      || Number(Boolean(right.event.homeAdvantage)) - Number(Boolean(left.event.homeAdvantage))
+      || left.candidates[0].difficulty - right.candidates[0].difficulty)[0] || null;
+
+  const renderGalaChoice = (event, entry, { primary = false, recommended = false } = {}) => {
+    const travel = BoxeurCalendar.travelOptionsForEvent(event)[0];
+    const quote = BoxeurCalendar.quoteEventCost(event, travel?.id || "none");
+    return `<button class="secondary-button calendar-opponent-choice${primary ? " calendar-opponent-primary" : ""}${recommended ? " recommended" : ""}" type="button" data-book-gala="${event.id}" data-slot="${entry.index}">${recommended ? '<span class="calendar-opponent-recommendation">Recommandé par le coach</span>' : ""}<strong>${escapeHTML(entry.candidate.name)} « ${escapeHTML(entry.candidate.nickname)} »</strong><span>${escapeHTML(entry.candidate.style)} · ${escapeHTML(entry.candidate.record)} · difficulté ${entry.difficulty}</span><em>${escapeHTML(entry.slot.label)}${quote.total ? ` · ${quote.total} $` : " · gratuit"}</em></button>`;
+  };
+
+  const renderCalendarEvent = event => {
       const booked = bookingForEvent(event.id);
       const eventClass = event.kind === "tournament" ? "tournament" : event.scope === "home-gym" ? "home" : "";
       const type = event.kind === "tournament" ? event.independent ? "Tournoi extérieur" : "Tournoi" : event.scope === "home-gym" ? "Gala à ton gym" : event.scope === "regional" ? "Gala régional" : "Gala local";
@@ -1866,23 +1968,40 @@ function renderFights() {
         const coachAdvice = boxingGymTournamentAdvice(event, eligibilityStates);
         return `<article class="calendar-event ${eventClass}${booked ? " booked" : ""}${available || booked ? "" : " unavailable"}"><div class="calendar-event-head"><span class="calendar-event-type">${type}</span><span class="calendar-event-badge">${event.rounds} jours · 5 juges</span></div><h3>${escapeHTML(event.name)}</h3><p>${venue} · pesée quotidienne · un combat par jour.</p><div class="calendar-event-meta"><span>${weightClassLabel(state.profile.weightClass, state.profile.sex)}</span><span>${escapeHTML(eligibilityNotes.join(" · "))}</span><span>Date limite ${formatDate(event.registrationDeadline)}</span></div>${coachAdvice ? `<p class="calendar-coach-advice">${escapeHTML(coachAdvice)}</p>` : ""}<div class="calendar-event-actions">${buttons}</div></article>`;
       }
-      const slots = event.opponentSlots || [];
-      const travel = BoxeurCalendar.travelOptionsForEvent(event)[0];
-      const quote = BoxeurCalendar.quoteEventCost(event, travel?.id || "none");
+      const candidateSet = galaCandidatesByEvent.get(event.id)?.candidates || [];
+      const eventRecommended = recommendedGala?.event.id === event.id;
+      const primaryChoice = candidateSet[0];
+      const alternateChoices = candidateSet.slice(1);
       const buttons = booked
-        ? `<button class="secondary-button" type="button" disabled>Combat réservé</button>`
-        : slots.map((slot, index) => {
-          const candidate = opponentForGala(event, index);
-          return `<button class="secondary-button calendar-opponent-choice" type="button" data-book-gala="${event.id}" data-slot="${index}"><strong>${escapeHTML(candidate.name)} « ${escapeHTML(candidate.nickname)} »</strong><span>${escapeHTML(candidate.style)} · ${escapeHTML(candidate.record)} · difficulté ${opponentDifficulty(candidate)}</span><em>${escapeHTML(slot.label)}${quote.total ? ` · ${quote.total} $` : " · gratuit"}</em></button>`;
-        }).join("");
+        ? '<button class="secondary-button calendar-opponent-primary" type="button" disabled>Combat réservé</button>'
+        : `${primaryChoice ? renderGalaChoice(event, primaryChoice, { primary: true, recommended: eventRecommended }) : ""}${alternateChoices.length ? `<details class="calendar-opponent-alternatives"><summary>Voir les ${alternateChoices.length} autre${alternateChoices.length > 1 ? "s" : ""} adversaire${alternateChoices.length > 1 ? "s" : ""}</summary><div class="calendar-opponent-alternative-list">${alternateChoices.map(entry => renderGalaChoice(event, entry)).join("")}</div></details>` : ""}`;
       const advantage = event.homeAdvantage ? " · légère aide du coin à domicile" : "";
-      return `<article class="calendar-event ${eventClass}${booked ? " booked" : ""}"><div class="calendar-event-head"><span class="calendar-event-type">${type}</span><span class="calendar-event-badge">3 juges</span></div><h3>${escapeHTML(event.name)}</h3><p>${venue}${advantage}. Aucune pesée à gérer.</p><div class="calendar-event-meta"><span>${weightClassLabel(state.profile.weightClass, state.profile.sex)}</span><span>${event.scope === "regional" ? "Transport et hébergement requis" : "Aucuns frais"}</span><span>Vendredi ou samedi</span></div><div class="calendar-event-actions">${buttons}</div></article>`;
+      const recommendation = eventRecommended && primaryChoice ? `<p class="calendar-coach-pick"><strong>Choix du coach</strong><span>${escapeHTML(primaryChoice.candidate.name)} représente l’option la plus accessible de la prochaine occasion.</span></p>` : "";
+      return `<article class="calendar-event ${eventClass}${booked ? " booked" : ""}${eventRecommended ? " recommended" : ""}"><div class="calendar-event-head"><span class="calendar-event-type">${type}</span><span class="calendar-event-badge">3 juges</span></div><h3>${escapeHTML(event.name)}</h3><p>${venue}${advantage}. Aucune pesée à gérer.</p><div class="calendar-event-meta"><span>${weightClassLabel(state.profile.weightClass, state.profile.sex)}</span><span>${event.scope === "regional" ? "Transport et hébergement requis" : "Aucuns frais"}</span><span>Vendredi ou samedi</span></div>${recommendation}<div class="calendar-event-actions">${buttons}</div></article>`;
+  };
+
+  const renderCalendarDates = weekEvents => {
+    if (!weekEvents.length) return '<div class="calendar-week-empty"><strong>Aucun événement cette semaine</strong><span>Profite de cette période pour préparer ton prochain rendez-vous.</span></div>';
+    const grouped = BoxeurCalendar.groupEventsByDate(weekEvents);
+    return Object.entries(grouped).sort(([left], [right]) => left.localeCompare(right)).map(([date, events]) => {
+      const orderedEvents = events.slice().sort((left, right) => Number(right.id === recommendedGala?.event.id) - Number(left.id === recommendedGala?.event.id));
+      return `<section class="calendar-date-group"><div class="calendar-date"><strong>${escapeHTML(formatDate(date))}</strong><span>${events.length} événement${events.length > 1 ? "s" : ""}</span></div><div class="calendar-day-events">${orderedEvents.map(renderCalendarEvent).join("")}</div></section>`;
     }).join("");
-    const eventWeek = safeNumber(events[0]?.careerWeek, state.week, 1, 99999);
-    const weeksAway = eventWeek - state.week;
-    const relativeWeek = weeksAway <= 0 ? "cette semaine" : weeksAway === 1 ? "dans 1 semaine" : `dans ${weeksAway} semaines`;
-    return `<section class="calendar-date-group"><div class="calendar-date"><strong>${escapeHTML(formatDate(date))}</strong><span class="calendar-week-reference">Semaine ${eventWeek} · ${relativeWeek}</span><span>${events.length} événement${events.length > 1 ? "s" : ""}</span></div><div class="calendar-day-events">${eventCards}</div></section>`;
-  }).join("") || '<div class="amateur-closed"><strong>Aucun événement annoncé</strong><p>Le calendrier sera prolongé à la prochaine semaine.</p></div>';
+  };
+
+  calendarContainer.innerHTML = Array.from({ length: 6 }, (_, offset) => {
+    const calendarWeek = state.week + offset;
+    const events = currentEvents.filter(event => safeNumber(event.careerWeek, state.week, 1, 99999) === calendarWeek);
+    const startDate = BoxeurCalendar.dateForCareerWeek(state.calendar.epoch, calendarWeek, 0);
+    const endDate = BoxeurCalendar.dateForCareerWeek(state.calendar.epoch, calendarWeek, 6);
+    const relativeLabel = offset === 0 ? "Cette semaine" : offset === 1 ? "Semaine prochaine" : `Dans ${offset} semaines`;
+    const countLabel = events.length ? `${events.length} événement${events.length > 1 ? "s" : ""}` : "Préparation";
+    const tournamentCount = events.filter(event => event.kind === "tournament").length;
+    const status = tournamentCount
+      ? `<em class="has-tournament"><span class="calendar-week-tournament-badge">${tournamentCount > 1 ? `${tournamentCount} tournois` : "Tournoi"}</span><span>${countLabel}</span></em>`
+      : `<em>${countLabel}</em>`;
+    return `<details class="calendar-week-group${offset === 0 ? " current" : ""}" data-calendar-week="${calendarWeek}"${offset === 0 ? " open" : ""}><summary class="calendar-week-summary"><div><span>${relativeLabel} · semaine ${calendarWeek}</span><strong>${escapeHTML(formatShortDate(startDate))} — ${escapeHTML(formatShortDate(endDate))}</strong></div>${status}</summary><div class="calendar-week-content">${renderCalendarDates(events)}</div></details>`;
+  }).join("");
 
   if (fightCount > 5 && state.tournaments.bronze === "pending") state.tournaments.bronze = "missed";
   if (fightCount > 10 && state.tournaments.silver === "pending") state.tournaments.silver = "missed";
@@ -1904,8 +2023,6 @@ function renderFights() {
     const nextEvent = state.calendar.events.find(event => event.kind === "tournament" && event.tournamentId === tournament.id && event.endDate >= weekStart);
     return `<article class="tournament-card ${cardClass}"><span class="tournament-medal">${tournament.medal}</span><h3>${tournament.name}</h3><p>${tournament.description}</p>${medalSummary}<p class="tournament-state">${nextEvent ? `${formatDate(nextEvent.startDate)} · inscription dans le calendrier` : availability.label}</p></article>`;
   }).join("");
-
-  proTransition.innerHTML = "";
 }
 
 function currentJob() {
@@ -2706,7 +2823,17 @@ function v2WorkLocationContext() {
   const workAccess = capsule && job ? v2PlannerWorkAccess(capsule, job) : { available: false, reason: "" };
   return {
     ...career,
-    v2JobOffers: jobs.map(job => ({ id: job.id, title: job.title, wage: job.wage, schedule: job.schedule })),
+    v2JobOffers: jobs.map(job => ({
+      id: job.id,
+      title: job.title,
+      wage: job.wage,
+      schedule: job.schedule,
+      interviewWeeks: job.interviewWeeks,
+      energy: job.energy,
+      fatigue: job.fatigue,
+      weekCapacityCost: v2PlannerWorkCost(job),
+      detail: job.detail,
+    })),
     v2JobApplicationLabel: jobs.find(job => job.id === career.jobApplication?.jobId)?.title || "",
     v2WorkPlan: {
       planned: Boolean(workEntry),
@@ -3089,6 +3216,13 @@ function v2FighterContext() {
     privateLessonCredits: career.privateLessonCredits,
     experience: career.experience,
     amateurRecord: state.amateurRecord,
+    medals: tournamentDefs.map(tournament => ({
+      id: tournament.id,
+      label: tournament.name,
+      bronze: state.medals[tournament.id]?.bronze || 0,
+      silver: state.medals[tournament.id]?.silver || 0,
+      gold: state.medals[tournament.id]?.gold || 0,
+    })),
     combatStats: timeStats,
     statXpProgress,
     supplementInventory: window.BoxeurSupplements && supplementState
@@ -3104,6 +3238,39 @@ function v2FighterContext() {
 }
 
 let v2LocationReturnFocus = null;
+
+function setV2PrimaryNavigationView(navigation, viewId) {
+  if (!navigation) return;
+  const activeView = ["map", "calendar", "fighter", "inventory"].includes(viewId) ? viewId : "map";
+  navigation.dataset.v2NavigationView = activeView;
+  navigation.querySelectorAll("[data-v2-nav]").forEach(button => {
+    const active = button.dataset.v2Nav === activeView;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+}
+
+function v2PrimaryNavigation() {
+  return document.querySelector("#v2-world [data-v2-primary-navigation]");
+}
+
+function renderV2PrimarySheet(sheet, html, activeView) {
+  const navigation = v2PrimaryNavigation();
+  if (navigation && sheet.contains(navigation)) navigation.remove();
+  sheet.innerHTML = html;
+  if (!navigation) return;
+  setV2PrimaryNavigationView(navigation, activeView);
+  sheet.append(navigation);
+}
+
+function restoreV2PrimaryNavigation() {
+  const navigation = v2PrimaryNavigation();
+  const host = document.querySelector("#v2-world .v2-map-stack");
+  if (!navigation || !host) return;
+  setV2PrimaryNavigationView(navigation, "map");
+  host.append(navigation);
+}
 
 function v2LocationFocusableElements(sheet) {
   if (!sheet) return [];
@@ -3129,6 +3296,8 @@ function setV2LocationBackgroundInert(sheet, inactive) {
 
 function activateV2LocationSheet(sheet, preferredFocusSelector) {
   if (!sheet) return;
+  const isWeekSurface = Boolean(sheet.querySelector(":scope > .v2-week-plan, :scope > .v2-week-summary"));
+  sheet.classList.toggle("v2-location-sheet-week", isWeekSurface);
   sheet.hidden = false;
   sheet.setAttribute("role", "dialog");
   sheet.setAttribute("aria-modal", "true");
@@ -3151,6 +3320,7 @@ function activateV2LocationSheet(sheet, preferredFocusSelector) {
 function openV2Location(locationId) {
   const sheet = document.querySelector("#v2-world .v2-location-sheet");
   if (!sheet) return;
+  restoreV2PrimaryNavigation();
   const career = v2CareerView();
   const access = window.BoxeurWorld?.locationAccess?.(locationId, career);
   if (access?.locked) {
@@ -3207,8 +3377,9 @@ function openV2Fighter() {
   }
   sheet.dataset.originLocation = "fighter";
   sheet.classList.add("v2-location-sheet-full");
-  sheet.innerHTML = window.BoxeurFighterView.render(v2FighterContext());
-  activateV2LocationSheet(sheet, "[data-v2-close-fighter]");
+  sheet.classList.remove("v2-location-sheet-strength", "v2-location-sheet-week");
+  renderV2PrimarySheet(sheet, window.BoxeurFighterView.render(v2FighterContext()), "fighter");
+  activateV2LocationSheet(sheet, '[data-v2-nav="fighter"]');
 }
 
 function v2InventoryContext() {
@@ -3269,8 +3440,9 @@ function openV2Inventory() {
   }
   sheet.dataset.originLocation = "inventory";
   sheet.classList.add("v2-location-sheet-full");
-  sheet.innerHTML = window.BoxeurInventoryView.render(v2InventoryContext());
-  activateV2LocationSheet(sheet, "[data-v2-close-inventory], [data-v2-inventory-action]");
+  sheet.classList.remove("v2-location-sheet-strength", "v2-location-sheet-week");
+  renderV2PrimarySheet(sheet, window.BoxeurInventoryView.render(v2InventoryContext()), "inventory");
+  activateV2LocationSheet(sheet, '[data-v2-nav="inventory"], [data-v2-inventory-action]');
 }
 
 function openV2SupplementReservation(productId) {
@@ -3286,7 +3458,8 @@ function openV2SupplementReservation(productId) {
   }).join("");
   sheet.dataset.originLocation = "inventory";
   sheet.classList.add("v2-location-sheet-full");
-  sheet.innerHTML = `<section class="v2-service-panel v2-supplement-picker" aria-labelledby="v2-inventory-reserve-title"><header><div><p class="eyebrow">${escapeHTML(product.label)} · ×${v2SupplementState(capsule).inventory[productId] || 0}</p><h2 id="v2-inventory-reserve-title">Choisis une séance</h2></div><button type="button" class="secondary-button" data-v2-inventory-reserve-close>Retour à l’inventaire</button></header><p>${escapeHTML(product.benefit)} Le coût hebdomadaire sera recalculé à partir du même effet appliqué pendant la séance; le produit sera consommé seulement à la confirmation.</p><div class="v2-supplement-grid">${choices}</div></section>`;
+  sheet.classList.remove("v2-location-sheet-strength", "v2-location-sheet-week");
+  renderV2PrimarySheet(sheet, `<section class="v2-service-panel v2-supplement-picker" aria-labelledby="v2-inventory-reserve-title"><header><div><p class="eyebrow">${escapeHTML(product.label)} · ×${v2SupplementState(capsule).inventory[productId] || 0}</p><h2 id="v2-inventory-reserve-title">Choisis une séance</h2></div><button type="button" class="secondary-button" data-v2-inventory-reserve-close>Retour à l’inventaire</button></header><p>${escapeHTML(product.benefit)} Le coût hebdomadaire sera recalculé à partir du même effet appliqué pendant la séance; le produit sera consommé seulement à la confirmation.</p><div class="v2-supplement-grid">${choices}</div></section>`, "inventory");
   activateV2LocationSheet(sheet, "[data-v2-plan-supplement-entry], [data-v2-inventory-reserve-close]");
 }
 
@@ -3340,9 +3513,11 @@ function closeV2Location() {
   if (!sheet) return;
   const origin = sheet.dataset.originLocation;
   const rememberedFocus = v2LocationReturnFocus;
+  restoreV2PrimaryNavigation();
   sheet.hidden = true;
   sheet.classList.remove("v2-location-sheet-full");
   sheet.classList.remove("v2-location-sheet-strength");
+  sheet.classList.remove("v2-location-sheet-week");
   setV2LocationBackgroundInert(sheet, false);
   v2LocationReturnFocus = null;
   const fallback = document.querySelector(`#v2-world [data-v2-location="${safeIdentifier(origin, "home")}"]`);
@@ -6280,6 +6455,7 @@ function activateTournamentBooking(booking) {
     opponents: generateTournamentOpponents(definition),
     results: [],
     medal: null,
+    medalCelebrated: false,
     summary: "",
     competition,
   };
@@ -6325,6 +6501,7 @@ function registerTournament(id) {
     opponents: generateTournamentOpponents(tournament),
     results: [],
     medal: null,
+    medalCelebrated: false,
     summary: "",
   };
   state.journal.unshift({ week: state.week, text: `Inscription aux ${tournament.name}. Début prévu dans ${TOURNAMENT_PREP_WEEKS} semaines, à la semaine ${state.activeTournament.startWeek}.` });
@@ -6362,7 +6539,7 @@ function completeAmateurCareerAfterSparring() {
   state.journal.unshift({ week: 1, text: `${state.profile.firstName} passe automatiquement amateur après le sparring d’évaluation. Le calendrier des galas et tournois est ouvert.` });
   invalidateV2PreviewCapsule();
   ensureCareerCalendar();
-  document.querySelector("#calendar-dialog")?.close();
+  closeCalendarDialog({ resumePendingEvent: false });
   persistCareer();
   return true;
 }
@@ -6459,6 +6636,7 @@ function renderTournamentBoard() {
 
 function openTournamentBoard() {
   if (!state.activeTournament) return;
+  if (maybeOpenTournamentMedalDialog()) return;
   renderTournamentBoard();
   const dialog = document.querySelector("#tournament-dialog");
   if (!dialog.open) dialog.showModal();
@@ -6789,13 +6967,27 @@ function renderSparringRing(view) {
   const opponentEnergyTrack = stage.querySelector(".sparring-opponent-energy");
   const playerEnergyBar = document.querySelector("#sparring-player-energy-bar");
   const opponentEnergyBar = document.querySelector("#sparring-opponent-energy-bar");
+  const playerEnergyValue = document.querySelector("#sparring-player-energy-value");
+  const opponentEnergyValue = document.querySelector("#sparring-opponent-energy-value");
+  const opponentEnergyLabel = document.querySelector("#sparring-opponent-energy-label");
   const roundHud = document.querySelector("#sparring-round-hud");
+  const exchangeHud = document.querySelector("#sparring-exchange-hud");
   if (playerEnergyBar) playerEnergyBar.style.width = `${playerEnergy}%`;
   if (opponentEnergyBar) opponentEnergyBar.style.width = `${opponentEnergy}%`;
+  if (playerEnergyValue) playerEnergyValue.textContent = `${playerEnergy} %`;
+  if (opponentEnergyValue) opponentEnergyValue.textContent = `${opponentEnergy} %`;
+  if (opponentEnergyLabel) opponentEnergyLabel.textContent = immersiveOpponentFirstName();
   playerEnergyTrack?.setAttribute("aria-valuenow", String(playerEnergy));
   opponentEnergyTrack?.setAttribute("aria-valuenow", String(opponentEnergy));
   opponentEnergyTrack?.setAttribute("aria-label", `Énergie de ${immersiveOpponentFirstName()}`);
   if (roundHud) roundHud.textContent = `ROUND ${Math.min(view.format.rounds || 3, view.round)} / ${view.format.rounds || 3}`;
+  if (exchangeHud) {
+    exchangeHud.textContent = view.status.finished
+      ? "Terminé"
+      : view.phase === "corner"
+        ? view.round === 1 ? "Briefing" : "Entre les rounds"
+        : `Échange ${view.currentExchange?.number || view.exchange || 1} / ${view.format.exchangesPerRound}`;
+  }
 
   if (view.status.finished) {
     coachCallout.hidden = true;
@@ -6837,6 +7029,8 @@ function renderFightRoundDynamic(view) {
       hud.style.setProperty("--perception-value", `${value}%`);
       hud.setAttribute("aria-label", `${perception.label}. ${clarity}.`);
     }
+    const mobileReading = document.querySelector("#fight-mobile-reading");
+    if (mobileReading) mobileReading.textContent = `${perception.label} · ${clarity}`;
     container.innerHTML = `<span class="visually-hidden">${escapeHTML(perception.label)}. ${clarity}. Cette perception n’est jamais une carte de juge.</span>`;
     return;
   }
@@ -6977,16 +7171,24 @@ function remyTacticPresentation(action) {
 
 function renderFightChoices() {
   const container = document.querySelector("#fight-choices");
+  const heading = document.querySelector("#fight-decision-heading");
+  const decisionArea = container.closest(".fight-decision-area");
   if (!fightState || fightState.phase !== "exchange") {
     container.innerHTML = "";
+    if (heading) heading.hidden = true;
+    if (decisionArea) decisionArea.hidden = true;
     return;
   }
+  if (heading) heading.hidden = false;
+  if (decisionArea) decisionArea.hidden = false;
   const riskLabels = { low: "Risque faible", medium: "Risque mesuré", high: "Risque élevé" };
   const actions = BoxeurCombat.getAvailableActions(fightState);
   if (isImmersiveRingFight()) {
     if (sparringAutoResolving) {
       const movement = sparringRingState?.pendingMovement;
-      container.innerHTML = `<p class="sparring-resolution-prompt">${escapeHTML(movement ? `${movement.label}… le ring réagit à ton intention.` : "Le ring réagit à ton intention.")}</p>`;
+      const pendingAction = BoxeurCombat.ACTIONS[sparringPendingActionId] || null;
+      const tactic = pendingAction ? remyTacticPresentation(pendingAction) : null;
+      container.innerHTML = `<p class="sparring-resolution-prompt"><strong>${escapeHTML(tactic?.label || "Action engagée")}</strong><span>${escapeHTML(movement ? `${movement.label} · le ring réagit à ton intention.` : "Le ring réagit à ton intention.")}</span></p>`;
       return;
     }
     container.innerHTML = actions.slice(0, 5).map(action => {
@@ -7095,6 +7297,16 @@ function renderFight(message = "Observe la situation puis choisis une réponse."
   document.querySelector("#fight-composure").textContent = fightComposureLabel(view.fighters.player.lucidity);
   document.querySelector("#fight-head-status").textContent = fightDamageLabel(view.fighters.player.head, "head");
   document.querySelector("#fight-body-status").textContent = fightDamageLabel(view.fighters.player.body, "body");
+  const mobileDistance = fightDistanceLabel(view.ring.distance);
+  const mobilePosition = fightPositionLabel(view.ring);
+  const mobileHead = fightDamageLabel(view.fighters.player.head, "head");
+  const mobileBody = fightDamageLabel(view.fighters.player.body, "body");
+  document.querySelector("#fight-mobile-details-summary").textContent = `${mobileDistance} · ${mobilePosition}`;
+  document.querySelector("#fight-mobile-distance").textContent = mobileDistance;
+  document.querySelector("#fight-mobile-position").textContent = mobilePosition;
+  document.querySelector("#fight-mobile-momentum").textContent = momentumLabel(view);
+  document.querySelector("#fight-mobile-composure").textContent = fightComposureLabel(view.fighters.player.lucidity);
+  document.querySelector("#fight-mobile-damage").textContent = `Tête : ${mobileHead} · Corps : ${mobileBody}`;
   const stage = document.querySelector("#fight-ring-stage");
   stage.dataset.playerCorner = playerCornerTheme;
   stage.dataset.distance = view.ring.distance;
@@ -7180,6 +7392,7 @@ function clearSparringAutoResolve() {
   if (sparringAutoResolveTimer) clearTimeout(sparringAutoResolveTimer);
   sparringAutoResolveTimer = null;
   sparringAutoResolving = false;
+  sparringPendingActionId = null;
 }
 
 function beginSparringExchange(actionId, movementPurpose = "hold") {
@@ -7199,6 +7412,7 @@ function beginSparringExchange(actionId, movementPurpose = "hold") {
     sparringRingState = movementTransition.state;
     fightState = movementTransition.combatState;
     sparringAutoResolving = true;
+    sparringPendingActionId = actionId;
     const movement = sparringRingState.pendingMovement;
     renderFight(movement?.label ? `${movement.label} : le placement suit ton choix.` : "Le placement suit ton choix.");
     sparringAutoResolveTimer = setTimeout(() => {
@@ -7206,6 +7420,7 @@ function beginSparringExchange(actionId, movementPurpose = "hold") {
       sparringAutoResolving = false;
       if (!isImmersiveRingFight() || fightState?.phase !== "exchange") return;
       playRound(actionId, movementPurpose);
+      sparringPendingActionId = null;
     }, 360);
   } catch (error) {
     console.error("[Boxeur Deux] Placement automatique du sparring impossible :", error);
@@ -7709,7 +7924,7 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     closeV2Location();
     return;
   }
-  if (event.target.closest("[data-v2-close-location], [data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-leave-work], [data-v2-close-fighter], [data-v2-close-inventory]")) {
+  if (event.target.closest("[data-v2-close-location], [data-v2-leave-gym], [data-v2-leave-strength-gym], [data-v2-leave-home], [data-v2-leave-work]")) {
     closeV2Location();
     revealPendingV2LevelAlert();
     return;
@@ -7755,6 +7970,11 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
   }
   if (event.target.closest("[data-v2-cancel-job-application]")) {
     cancelV2JobApplication();
+    return;
+  }
+  const workOffer = event.target.closest(".v2-location-sheet [data-select-job]");
+  if (workOffer) {
+    selectV2Job(workOffer.dataset.selectJob);
     return;
   }
   const workToggle = event.target.closest("[data-v2-toggle-work]");
@@ -7955,16 +8175,8 @@ document.querySelector("#v2-world")?.addEventListener("click", event => {
     return;
   }
   const navigation = event.target.closest("[data-v2-nav]");
-  if (navigation?.dataset.v2Nav === "fighter") {
-    openV2Fighter();
-    return;
-  }
-  if (navigation?.dataset.v2Nav === "inventory") {
-    openV2Inventory();
-    return;
-  }
-  if (navigation?.dataset.v2Nav === "map") {
-    closeV2Location();
+  if (navigation) {
+    navigateV2Primary(navigation.dataset.v2Nav);
     return;
   }
 });
@@ -8045,6 +8257,16 @@ document.querySelector("#week-event-choices").addEventListener("click", event =>
 document.querySelector("#week-event-dialog").addEventListener("cancel", event => event.preventDefault());
 
 document.querySelector("#calendar-events").addEventListener("click", event => {
+  const weekSummary = event.target.closest(".calendar-week-summary");
+  if (weekSummary) {
+    const selectedWeek = weekSummary.closest(".calendar-week-group");
+    if (selectedWeek && !selectedWeek.open) {
+      document.querySelectorAll("#calendar-events .calendar-week-group[open]").forEach(week => {
+        if (week !== selectedWeek) week.open = false;
+      });
+    }
+    return;
+  }
   const gala = event.target.closest("[data-book-gala]");
   if (gala) return bookGalaEvent(gala.dataset.bookGala, gala.dataset.slot);
   const tournament = event.target.closest("[data-book-tournament]");
@@ -8065,28 +8287,68 @@ document.querySelector("#tournament-dialog").addEventListener("cancel", event =>
   event.preventDefault();
   closeTournamentBoard();
 });
+document.querySelector("#tournament-medal-continue").addEventListener("click", continueAfterTournamentMedal);
+document.querySelector("#tournament-medal-dialog").addEventListener("cancel", event => event.preventDefault());
 document.querySelector("#tournament-next-fight").addEventListener("click", startTournamentRound);
 document.querySelector("#tournament-recovery-choices").addEventListener("click", event => {
   const choice = event.target.closest("[data-tournament-recovery]");
   if (choice) applyTournamentRecovery(choice.dataset.tournamentRecovery);
 });
 
-document.querySelector("#pro-transition").addEventListener("click", event => {
-  if (event.target.closest("#turn-pro")) turnProfessional();
-});
-
 function openCalendarDialog() {
   if (!state.profile) return;
+  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+  if (sheet && !sheet.hidden) closeV2Location();
   renderFights();
-  document.querySelector("#calendar-dialog")?.showModal();
+  const navigationHost = document.querySelector("#v2-calendar-navigation");
+  if (navigationHost && window.BoxeurWorld?.renderNavigation) {
+    navigationHost.innerHTML = window.BoxeurWorld.renderNavigation("calendar");
+  }
+  const dialog = document.querySelector("#calendar-dialog");
+  dialog?.showModal();
+  dialog?.querySelector('[data-v2-nav="calendar"]')?.focus({ preventScroll: true });
 }
 
-function closeCalendarDialog() {
+function closeCalendarDialog({ resumePendingEvent = true } = {}) {
   document.querySelector("#calendar-dialog")?.close();
-  if (isRecreationalCareer() && state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
+  const navigationHost = document.querySelector("#v2-calendar-navigation");
+  if (navigationHost) navigationHost.innerHTML = "";
+  if (resumePendingEvent && isRecreationalCareer() && state.pendingWeekEvent) setTimeout(showBetweenWeekEvent, 0);
 }
-document.querySelector("#calendar-dialog-close").addEventListener("click", closeCalendarDialog);
-document.querySelector("#calendar-dialog-done").addEventListener("click", closeCalendarDialog);
+
+function navigateV2Primary(viewId) {
+  const target = ["map", "calendar", "fighter", "inventory"].includes(viewId) ? viewId : "map";
+  const dialog = document.querySelector("#calendar-dialog");
+  const sheet = document.querySelector("#v2-world .v2-location-sheet");
+  const currentSheetView = sheet && !sheet.hidden ? sheet.dataset.originLocation : "map";
+  if (target === "calendar") {
+    if (!dialog?.open) openCalendarDialog();
+    return;
+  }
+  if (dialog?.open) {
+    closeCalendarDialog({ resumePendingEvent: false });
+    document.querySelector(`#v2-world [data-v2-nav="${target}"]`)?.focus({ preventScroll: true });
+  }
+  if (target === "fighter") {
+    if (currentSheetView !== "fighter") openV2Fighter();
+    return;
+  }
+  if (target === "inventory") {
+    if (currentSheetView !== "inventory" || !sheet?.querySelector(".v2-inventory-view")) openV2Inventory();
+    return;
+  }
+  if (sheet && !sheet.hidden) closeV2Location();
+  document.querySelector('#v2-world [data-v2-nav="map"]')?.focus({ preventScroll: true });
+}
+
+document.querySelector("#calendar-dialog")?.addEventListener("click", event => {
+  const navigation = event.target.closest("[data-v2-nav]");
+  if (navigation) navigateV2Primary(navigation.dataset.v2Nav);
+});
+document.querySelector("#calendar-dialog")?.addEventListener("cancel", event => {
+  event.preventDefault();
+  closeCalendarDialog();
+});
 
 document.querySelector("#scheduled-fight").addEventListener("click", event => {
   if (event.target.closest("#start-fight")) startFight();

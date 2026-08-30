@@ -17,6 +17,7 @@ function baseCareer(overrides = {}) {
     strengthGymWeeks: 0,
     recreationalTrainingWeeks: 2,
     recreationalSparringStatus: "locked",
+    amateurRecord: { wins: 0, losses: 0, draws: 0 },
     energy: 80,
     fatigue: 15,
     injury: 0,
@@ -287,7 +288,7 @@ test("rend l’emploi facultatif après un premier poste et n’invente aucun qu
   assert.equal(world.locationAccess("strength-gym", baseCareer({ careerStatus: "amateur" })).locked, false);
 });
 
-test("oriente le boxeur amateur vers le gala ou le tournoi pertinent", () => {
+test("oriente le début amateur puis retire le tutoriel après le premier résultat officiel", () => {
   const amateur = baseCareer({ careerStatus: "amateur" });
   assert.equal(world.objective(amateur).title, "Choisir la prochaine occasion");
 
@@ -303,6 +304,19 @@ test("oriente le boxeur amateur vers le gala ou le tournoi pertinent", () => {
   });
   assert.equal(tournament.title, "Tournoi en cours");
   assert.equal(tournament.locationId, "arena");
+
+  for (const amateurRecord of [
+    { wins: 1, losses: 0, draws: 0 },
+    { wins: 0, losses: 1, draws: 0 },
+    { wins: 0, losses: 0, draws: 1 },
+  ]) {
+    const experienced = { ...amateur, amateurRecord, scheduledFight: { week: 12 } };
+    assert.equal(world.objective(experienced), null);
+    assert.doesNotMatch(world.render(experienced), /v2-objective-card|Prochaine étape/);
+    assert.doesNotMatch(world.renderLocation("arena", experienced), /Destination recommandée/);
+  }
+
+  assert.equal(world.objective({ ...amateur, careerStatus: "professional" }), null);
 });
 
 test("rend les cinq destinations et les deux compositions illustrées avec de vrais boutons", () => {
@@ -317,7 +331,11 @@ test("rend les cinq destinations et les deux compositions illustrées avec de vr
   assert.match(html, /<picture>/);
   assert.match(html, /srcset="assets\/carte-quartier-v2-mobile\.jpg"/);
   assert.match(html, /src="assets\/carte-quartier-v2-desktop\.jpg"/);
+  assert.match(html, /class="v2-side-stack">\s*<header class="v2-world-bar">/);
   assert.match(html, /<nav[^>]+aria-label="Navigation principale V2"/);
+  assert.match(html, /data-v2-primary-navigation data-v2-navigation-view="map"/);
+  assert.match(html, /class="active" aria-current="page" type="button" data-v2-nav="map"/);
+  assert.match(html, /data-v2-nav="calendar">Calendrier/);
   assert.match(html, /<section class="v2-location-sheet" role="dialog" aria-modal="true" aria-label="Lieu du quartier" tabindex="-1" hidden>/);
   assert.equal((html.match(/<button\b/g) || []).length, 11);
   assert.equal((html.match(/<button\b[^>]*\btype="button"/g) || []).length, 11);
@@ -327,6 +345,16 @@ test("rend les cinq destinations et les deux compositions illustrées avec de vr
   assert.match(html, /data-v2-location="arena"[^>]+disabled aria-disabled="true"/);
   assert.match(html, /Accès verrouillé : Gym de musculation\. Disponible après le passage amateur\./);
   assert.match(html, /Accès verrouillé : Aréna\. Disponible après le passage amateur\./);
+});
+
+test("rend les quatre états du menu principal avec une seule vue active", () => {
+  for (const active of ["map", "calendar", "fighter", "inventory"]) {
+    const html = world.renderNavigation(active);
+    assert.equal((html.match(/data-v2-nav=/g) || []).length, 4);
+    assert.equal((html.match(/aria-current="page"/g) || []).length, 1);
+    assert.match(html, new RegExp(`data-v2-navigation-view="${active}"`));
+    assert.match(html, new RegExp(`aria-current="page" type="button" data-v2-nav="${active}"`));
+  }
 });
 
 test("échappe les données de sauvegarde avant de les insérer dans le HTML", () => {

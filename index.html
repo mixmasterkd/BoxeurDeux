@@ -234,8 +234,8 @@
       <div class="calendar-dialog-card">
         <div class="service-heading">
           <div><p id="calendar-dialog-eyebrow" class="eyebrow">Saison amateur</p><h2 id="calendar-title">Calendrier des galas et tournois</h2></div>
-          <button id="calendar-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button>
         </div>
+        <div id="v2-calendar-navigation" class="v2-calendar-navigation"></div>
         <div class="calendar-heading-meta"><span id="calendar-date-label">Septembre · semaine 1</span><span id="amateur-fight-count">0 combat disputé</span></div>
         <p id="calendar-dialog-lead" class="calendar-lead">Les événements sont annoncés quelques semaines à l’avance. Lorsqu’ils ont lieu le même soir, il faut choisir.</p>
         <section id="recreational-path" class="recreational-path" hidden aria-live="polite"></section>
@@ -243,13 +243,10 @@
         <div id="scheduled-fight" class="scheduled-fight"></div>
         <div id="active-tournament" class="active-tournament"></div>
         <div id="calendar-events" class="calendar-events" aria-live="polite"></div>
-        <details class="tournament-catalog">
-          <summary>Voir les parcours de tournoi</summary>
+        <details id="tournament-catalog" class="tournament-catalog">
+          <summary><span class="tournament-catalog-label">Voir les parcours de tournoi</span><span id="next-tournament-indicator" class="next-tournament-indicator" aria-live="polite"></span></summary>
           <div id="tournaments" class="tournament-grid"></div>
         </details>
-        <div id="amateur-transition" class="pro-transition" hidden></div>
-        <div id="pro-transition" class="pro-transition"></div>
-        <div class="service-actions calendar-dialog-actions"><button id="calendar-dialog-done" class="primary-button" type="button">Fermer le calendrier</button></div>
       </div>
     </dialog>
 
@@ -281,6 +278,21 @@
           <div id="tournament-recovery-choices" class="tournament-recovery-choices"></div>
         </section>
         <div class="tournament-board-actions"><button id="tournament-next-fight" class="primary-button" type="button">Disputer le prochain combat</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="tournament-medal-dialog" class="tournament-medal-dialog" aria-labelledby="tournament-medal-title" aria-describedby="tournament-medal-copy">
+      <div id="tournament-medal-card" class="tournament-medal-card" data-medal="gold">
+        <p class="eyebrow">Résultat du tournoi</p>
+        <h2 id="tournament-medal-title">Médaille d’or</h2>
+        <div class="tournament-medal-visual">
+          <img id="tournament-medal-image" src="assets/tournament-medal-gold-v1.png" width="1254" height="1254" decoding="async" alt="" />
+        </div>
+        <p id="tournament-medal-congratulations" class="tournament-medal-congratulations">Félicitations !</p>
+        <p id="tournament-medal-copy" class="tournament-medal-copy"></p>
+        <div class="tournament-medal-actions">
+          <button id="tournament-medal-continue" class="primary-button" type="button">Voir le tableau final</button>
+        </div>
       </div>
     </dialog>
 
@@ -331,9 +343,9 @@
           <div id="sparring-ring-destinations" class="sparring-ring-destinations" aria-label="Déplacements possibles sur le ring"></div>
           <aside id="sparring-coach-callout" class="sparring-coach-callout" hidden aria-live="polite"></aside>
           <div class="sparring-combat-hud">
-            <div class="sparring-player-energy" role="progressbar" aria-label="Énergie du boxeur" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-player-energy-bar"></span><b aria-hidden="true">⚡</b></div>
-            <strong id="sparring-round-hud">ROUND 1 / 3</strong>
-            <div class="sparring-opponent-energy" role="progressbar" aria-label="Énergie de l’adversaire" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-opponent-energy-bar"></span><b aria-hidden="true">⚡</b></div>
+            <div class="sparring-player-energy" role="progressbar" aria-label="Énergie du boxeur" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-player-energy-bar"></span><b aria-hidden="true"><i id="sparring-player-energy-label">Toi</i><output id="sparring-player-energy-value">100 %</output></b></div>
+            <div class="sparring-round-status"><strong id="sparring-round-hud">ROUND 1 / 3</strong><small id="sparring-exchange-hud">Briefing</small></div>
+            <div class="sparring-opponent-energy" role="progressbar" aria-label="Énergie de l’adversaire" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-opponent-energy-bar"></span><b aria-hidden="true"><i id="sparring-opponent-energy-label">Adversaire</i><output id="sparring-opponent-energy-value">100 %</output></b></div>
           </div>
           <div id="sparring-perception-hud" class="sparring-perception-hud" role="img" aria-label="Le round semble partagé, lecture très incertaine">
             <div class="sparring-perception-track"></div>
@@ -341,6 +353,18 @@
             <div class="sparring-perception-needle"></div>
           </div>
         </div>
+
+        <details class="fight-mobile-details">
+          <summary><span>Détails du round</span><strong id="fight-mobile-details-summary">Distance extérieure · centre</strong></summary>
+          <div class="fight-mobile-details-grid">
+            <div><span>Lecture</span><strong id="fight-mobile-reading">Round partagé</strong></div>
+            <div><span>Initiative</span><strong id="fight-mobile-momentum">Équilibrée</strong></div>
+            <div><span>Distance</span><strong id="fight-mobile-distance">Extérieur</strong></div>
+            <div><span>Position</span><strong id="fight-mobile-position">Centre du ring</strong></div>
+            <div><span>Lucidité</span><strong id="fight-mobile-composure">Calme</strong></div>
+            <div><span>État</span><strong id="fight-mobile-damage">Tête et corps intacts</strong></div>
+          </div>
+        </details>
 
         <div class="ring-scoreboard">
           <div class="corner player-corner">
@@ -380,7 +404,8 @@
         <div id="fight-round-track" class="fight-round-track" aria-label="Progression des rounds"></div>
         <section id="fight-round-dynamic" class="fight-round-dynamic" aria-live="polite" aria-label="Dynamique récente du round"></section>
         <div id="fight-instruction" class="fight-instruction" aria-live="polite"><p>Écoute le coach avant le premier échange.</p></div>
-        <div class="fight-decision-area">
+        <div class="fight-decision-area" aria-live="polite">
+          <div id="fight-decision-heading" class="fight-decision-heading" hidden><span>Ta décision</span><strong>Choisis une intention</strong></div>
           <div id="fight-choices" class="fight-choices"></div>
         </div>
         <details class="fight-log-disclosure" open>

@@ -412,6 +412,17 @@
     border-radius: 15px 15px 0 0;
   }
 
+  .v2-location-sheet.v2-location-sheet-week {
+    overflow: hidden;
+  }
+
+  .v2-location-sheet.v2-location-sheet-week > .v2-week-plan,
+  .v2-location-sheet.v2-location-sheet-week > .v2-week-summary {
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+  }
+
   .v2-week-plan-items li {
     grid-template-columns: 1fr;
   }
@@ -433,8 +444,9 @@
     bottom: 0;
     z-index: 2;
     display: grid;
-    padding: 10px 0 calc(4px + env(safe-area-inset-bottom));
-    background: linear-gradient(transparent, #141716 22%);
+    padding: 12px 0 calc(4px + env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(255, 255, 255, .13);
+    background: #141716;
   }
 
   .v2-week-summary-changes {

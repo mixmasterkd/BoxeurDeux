@@ -20,10 +20,10 @@ function activeContext(overrides = {}) {
     },
     v2WorkPlan: { planned: true, cost: 30 },
     v2JobOffers: [
-      { id: "convenience", title: "Commis de dépanneur", wage: 75, schedule: "Horaire souple" },
-      { id: "courier", title: "Coursier local", wage: 100, schedule: "Horaire variable" },
-      { id: "office", title: "Employé de bureau", wage: 120, schedule: "Bureau · longues heures" },
-      { id: "warehouse", title: "Manutention de nuit", wage: 130, schedule: "Horaire exigeant" },
+      { id: "convenience", title: "Commis de dépanneur", wage: 75, schedule: "Horaire souple", interviewWeeks: 1, energy: -14, fatigue: 10, weekCapacityCost: 15, detail: "Facile à concilier." },
+      { id: "courier", title: "Coursier local", wage: 100, schedule: "Horaire variable", interviewWeeks: 2, energy: -20, fatigue: 16, weekCapacityCost: 22, detail: "Plus de kilomètres." },
+      { id: "office", title: "Employé de bureau", wage: 120, schedule: "Bureau · longues heures", interviewWeeks: 2, energy: -14, fatigue: 7, weekCapacityCost: 30, detail: "Longues journées." },
+      { id: "warehouse", title: "Manutention de nuit", wage: 130, schedule: "Horaire exigeant", interviewWeeks: 3, energy: -27, fatigue: 23, weekCapacityCost: 30, detail: "Lourde dépense physique." },
     ],
     ...overrides,
   };
@@ -57,6 +57,37 @@ test("affiche le babillard quand aucun emploi n’est actif", () => {
   assert.match(html, /Ton premier emploi est requis/);
   assert.equal((html.match(/data-v2-work-zone="employment"/g) || []).length, 4);
   assert.doesNotMatch(html, /emploi-bureau-v2-desktop/);
+});
+
+test("permet de postuler directement sur le babillard après un emploi perdu", () => {
+  const html = work.render(activeContext({
+    v2Job: null,
+    introJobRequired: false,
+    jobsHeldCount: 1,
+    jobApplication: null,
+  }));
+
+  assert.match(html, /Choisis directement ton prochain emploi/);
+  assert.equal((html.match(/data-select-job=/g) || []).length, 4);
+  assert.doesNotMatch(html, /data-v2-work-zone="employment"/);
+  assert.match(html, /3 semaines d’attente/);
+  assert.match(html, /-27 énergie · \+23 fatigue · 30 capacité/);
+  assert.match(html, /Lourde dépense physique/);
+});
+
+test("identifie la candidature en cours tout en laissant les autres offres disponibles", () => {
+  const html = work.render(activeContext({
+    v2Job: null,
+    introJobRequired: false,
+    jobsHeldCount: 1,
+    jobApplication: { jobId: "warehouse", progress: 1, requiredWeeks: 3 },
+    v2JobApplicationLabel: "Manutention de nuit",
+  }));
+
+  assert.match(html, /data-select-job="warehouse" disabled aria-disabled="true"/);
+  assert.match(html, /Candidature en cours · 1\/3/);
+  assert.match(html, /data-select-job="convenience"/);
+  assert.doesNotMatch(html, /data-select-job="convenience" disabled/);
 });
 
 test("garde la bascule hebdomadaire dans le menu Horaire", () => {
