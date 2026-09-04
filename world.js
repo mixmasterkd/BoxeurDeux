@@ -109,6 +109,13 @@
       return { title: "Bâtir tes bases", detail: `${progress} entraînement${progress > 1 ? "s" : ""} complété${progress > 1 ? "s" : ""}. ${partner.firstName} t’évalue à la semaine 6; le passage amateur suivra automatiquement.`, locationId: "boxing-gym" };
     }
     if (career.careerStatus !== "amateur") return null;
+    if (career.careerFightGate?.status === "ready") {
+      return {
+        title: career.careerFightGate.kind === "tournament" ? "Tournoi prêt" : "Combat prêt",
+        detail: "La semaine est terminée. Tous les lieux sont fermés jusqu’au rendez-vous à l’aréna.",
+        locationId: "arena",
+      };
+    }
     if (career.activeTournament) return { title: "Tournoi en cours", detail: "La pesée, le prochain combat et la récupération se gèrent à l’aréna.", locationId: "arena" };
     if (career.scheduledFight) return { title: "Préparer le prochain combat", detail: `Combat prévu à la semaine ${career.scheduledFight.week}.`, locationId: "arena" };
     return { title: "Choisir la prochaine occasion", detail: "Consulte les galas et tournois annoncés sans remplir ton horaire trop loin d’avance.", locationId: "arena" };
@@ -264,6 +271,9 @@
   }
 
   function nextAppointment(career) {
+    if (career.careerFightGate?.status === "ready") {
+      return career.careerFightGate.kind === "tournament" ? "Tournoi prêt · à l’aréna" : "Combat prêt · à l’aréna";
+    }
     if (career.activeTournament) return "Tournoi actif · prochaine étape à l’aréna";
     if (career.scheduledFight) return `Combat · semaine ${career.scheduledFight.week}`;
     const appointment = nextScheduledAppointment(career);
@@ -283,17 +293,35 @@
       if (career.jobApplication) return "Candidature en cours";
       return "Facultatif";
     }
-    if (location.id === "arena") return career.scheduledFight || career.activeTournament ? "Rendez-vous actif" : career.careerStatus === "recreational" ? "Verrouillé · amateur requis" : "Événements disponibles";
+    if (location.id === "arena") {
+      if (career.careerStatus === "recreational") return "Verrouillé · amateur requis";
+      if (career.careerFightGate?.status === "ready") {
+        return career.careerFightGate.kind === "tournament" ? "Tournoi prêt" : "Combat prêt";
+      }
+      if (career.activeTournament) return career.activeTournament.status === "completed" ? "Tournoi terminé" : "Tournoi en cours";
+      if (career.scheduledFight && !career.scheduledFight.isPracticeSparring && !career.scheduledFight.isRecreationalSparring && !career.scheduledFight.isDeveloperBout) {
+        return `Combat · semaine ${career.scheduledFight.week}`;
+      }
+      const tournamentBooking = Array.isArray(career.bookings)
+        ? career.bookings.find(booking => booking?.event?.kind === "tournament" && !["cancelled", "withdrawn", "completed"].includes(booking.status))
+        : null;
+      return tournamentBooking ? `Tournoi · semaine ${tournamentBooking.event.careerWeek}` : "Aucun combat réservé";
+    }
     return "Toujours accessible";
   }
 
   function locationAccess(locationInput, career = {}) {
     const locationId = typeof locationInput === "string" ? locationInput : locationInput?.id;
-    const locked = career.careerStatus === "recreational"
+    const recreationalLock = career.careerStatus === "recreational"
       && ["strength-gym", "arena"].includes(locationId);
+    const fightGateLock = career.careerFightGate?.status === "ready"
+      && ["home", "boxing-gym", "strength-gym", "work"].includes(locationId);
+    const locked = recreationalLock || fightGateLock;
     return {
       locked,
-      reason: locked ? "Disponible après le passage amateur." : "",
+      reason: recreationalLock
+        ? "Disponible après le passage amateur."
+        : fightGateLock ? "Ta semaine est terminée. Règle maintenant le combat à l’aréna." : "",
     };
   }
 

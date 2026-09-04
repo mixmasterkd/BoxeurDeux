@@ -286,6 +286,14 @@ test("rend l’emploi facultatif après un premier poste et n’invente aucun qu
   assert.equal(world.locationAccess("arena", baseCareer()).locked, true);
   assert.equal(world.locationAccess("home", baseCareer()).locked, false);
   assert.equal(world.locationAccess("strength-gym", baseCareer({ careerStatus: "amateur" })).locked, false);
+  const fightGateCareer = baseCareer({ careerStatus: "amateur", careerFightGate: { status: "ready", kind: "gala" } });
+  for (const locationId of ["home", "boxing-gym", "strength-gym", "work"]) {
+    assert.deepEqual(world.locationAccess(locationId, fightGateCareer), {
+      locked: true,
+      reason: "Ta semaine est terminée. Règle maintenant le combat à l’aréna.",
+    });
+  }
+  assert.equal(world.locationAccess("arena", fightGateCareer).locked, false);
 });
 
 test("oriente le début amateur puis retire le tutoriel après le premier résultat officiel", () => {
@@ -384,6 +392,25 @@ test("rend une fiche de lieu accessible et refuse une destination inconnue", () 
   assert.match(arena, /data-career-open-calendar>Ouvrir le calendrier/);
   assert.doesNotMatch(arena, /sera branché|prochaine étape de la carrière/i);
   assert.equal(world.renderLocation("does-not-exist", career), "");
+});
+
+test("résume sur la carte le prochain usage réel de l’aréna", () => {
+  const arena = world.LOCATIONS.find(location => location.id === "arena");
+
+  assert.equal(world.locationStatus(arena, baseCareer()), "Verrouillé · amateur requis");
+  assert.equal(world.locationStatus(arena, baseCareer({ careerStatus: "amateur" })), "Aucun combat réservé");
+  assert.equal(world.locationStatus(arena, baseCareer({ careerStatus: "amateur", careerFightGate: { status: "ready", kind: "gala" } })), "Combat prêt");
+  assert.equal(world.locationStatus(arena, baseCareer({ careerStatus: "amateur", careerFightGate: { status: "ready", kind: "tournament" } })), "Tournoi prêt");
+  assert.equal(world.locationStatus(arena, baseCareer({ careerStatus: "amateur", scheduledFight: { week: 8 } })), "Combat · semaine 8");
+  assert.equal(world.locationStatus(arena, baseCareer({ careerStatus: "amateur", scheduledFight: { week: 8, isPracticeSparring: true } })), "Aucun combat réservé");
+  assert.equal(world.locationStatus(arena, baseCareer({
+    careerStatus: "amateur",
+    bookings: [{ status: "registered", event: { kind: "tournament", careerWeek: 11 } }],
+  })), "Tournoi · semaine 11");
+  assert.equal(world.locationStatus(arena, baseCareer({
+    careerStatus: "amateur",
+    activeTournament: { status: "active" },
+  })), "Tournoi en cours");
 });
 
 test("masque les fonctions de travail incomplètes", () => {

@@ -1790,7 +1790,7 @@ function renderFights() {
     const isFightWeek = state.week >= state.scheduledFight.week;
     const eventName = state.scheduledFight.tournamentId ? state.scheduledFight.event?.name || tournamentDefs.find(item => item.id === state.scheduledFight.tournamentId)?.name || "Tournoi amateur" : "Combat local";
     const withdrawLabel = state.scheduledFight.tournamentId ? "Abandonner le tournoi" : "Se désister";
-    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé · ${eventName}</p><strong>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</strong><p>${isFightWeek ? "Le combat est arrivé. Vérifie ton énergie et ta préparation avant d’entrer dans le ring." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? `<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">${withdrawLabel}</button><button id="start-fight" class="primary-button" type="button">Préparation terminée · combattre</button></div>` : ""}</div>`;
+    scheduled.innerHTML = `<div class="fight-notice"><div><p class="eyebrow">Prochain combat programmé · ${eventName}</p><strong>${escapeHTML(opponent.name)} « ${escapeHTML(opponent.nickname)} »</strong><p>${isFightWeek ? "Le combat est arrivé. Joue ta semaine normalement; l’accès au ring s’ouvrira ensuite à l’aréna." : `Prévu pour la semaine ${state.scheduledFight.week}. Continue ta préparation.`}</p></div>${isFightWeek ? `<div class="fight-notice-actions"><button id="withdraw-fight" class="secondary-button withdraw-button" type="button">${withdrawLabel}</button><button data-career-go-arena class="primary-button" type="button">Aller à l’aréna</button></div>` : ""}</div>`;
   } else {
     scheduled.innerHTML = "";
   }
@@ -1928,7 +1928,7 @@ function renderFights() {
     const tournamentName = active.name || tournament?.name || "Tournoi extérieur";
     const remaining = Math.max(0, active.startWeek - state.week);
     const progress = Math.round(((TOURNAMENT_PREP_WEEKS - remaining) / TOURNAMENT_PREP_WEEKS) * 100);
-    activeTournamentContainer.innerHTML = active.status === "completed" ? `<div class="tournament-countdown ready"><div><p class="eyebrow">Parcours terminé</p><strong>${escapeHTML(active.summary)}</strong></div><button class="secondary-button" type="button" data-open-tournament>Voir le tableau final</button></div>` : remaining > 0 ? `<div class="tournament-countdown"><div><p class="eyebrow">Inscription confirmée · ${escapeHTML(tournamentName)}</p><strong>Début dans ${remaining} semaine${remaining > 1 ? "s" : ""}</strong><p>Semaine ${active.startWeek} · ${tournament?.participants || active.opponents?.length || 8} participants · ${tournament?.rounds || active.opponents?.length || 3} combats à gagner</p><div class="countdown-meter"><span style="width:${progress}%"></span></div></div><button class="secondary-button" type="button" data-open-tournament>Voir le tableau</button></div>` : `<div class="tournament-countdown ready"><div><p class="eyebrow">Le tournoi commence</p><strong>${escapeHTML(tournamentName)}</strong><p>${tournament?.participants || active.opponents?.length || 8} participants · prochain tour : ${roundName(tournament?.rounds || active.opponents?.length || 3, active.currentRound)}</p></div><button class="primary-button" type="button" data-open-tournament>Ouvrir le tableau</button></div>`;
+    activeTournamentContainer.innerHTML = active.status === "completed" ? `<div class="tournament-countdown ready"><div><p class="eyebrow">Parcours terminé</p><strong>${escapeHTML(active.summary)}</strong></div><button class="secondary-button" type="button" data-open-tournament>Voir le tableau final</button></div>` : remaining > 0 ? `<div class="tournament-countdown"><div><p class="eyebrow">Inscription confirmée · ${escapeHTML(tournamentName)}</p><strong>Début dans ${remaining} semaine${remaining > 1 ? "s" : ""}</strong><p>Semaine ${active.startWeek} · ${tournament?.participants || active.opponents?.length || 8} participants · ${tournament?.rounds || active.opponents?.length || 3} combats à gagner</p><div class="countdown-meter"><span style="width:${progress}%"></span></div></div><button class="secondary-button" type="button" data-open-tournament>Voir le tableau</button></div>` : `<div class="tournament-countdown ready"><div><p class="eyebrow">Le tournoi commence</p><strong>${escapeHTML(tournamentName)}</strong><p>${tournament?.participants || active.opponents?.length || 8} participants · prochain tour : ${roundName(tournament?.rounds || active.opponents?.length || 3, active.currentRound)}</p></div><button class="primary-button" type="button" data-career-go-arena>Aller à l’aréna</button></div>`;
   } else {
     activeTournamentContainer.innerHTML = "";
   }
@@ -2186,6 +2186,7 @@ function createCareerPreviewCapsule() {
     weeklySummaries: [],
     weekLedgers: {},
     settledWeeks: [],
+    fightGate: null,
     career: createCareerRuntimeCareer(),
   };
   return capsule;
@@ -2251,6 +2252,7 @@ function normalizeCareerPreviewRuntime(capsule) {
   if (!runtime.weekLedgers || typeof runtime.weekLedgers !== "object" || Array.isArray(runtime.weekLedgers)) runtime.weekLedgers = {};
   if (!Array.isArray(runtime.settledWeeks)) runtime.settledWeeks = [];
   runtime.settledWeeks = [...new Set(runtime.settledWeeks.map(value => safeNumber(value, 0, 1, 99999)).filter(Boolean))].slice(-104);
+  runtime.fightGate = normalizeCareerFightGate(runtime.fightGate);
   const defaults = createCareerRuntimeCareer();
   const suppliedCareer = runtime.career && typeof runtime.career === "object" ? runtime.career : {};
   let normalizedSupplementState = window.BoxeurSupplements
@@ -2717,6 +2719,7 @@ function careerCareerView() {
     recreationalTrainingWeeks: safeNumber(runtime.trainingSessions, state.recreationalTrainingWeeks, 0, 999),
     careerClock: cloneData(timeState.clock),
     careerAppointments: window.BoxeurTime ? window.BoxeurTime.getAgenda(timeState) : [],
+    careerFightGate: runtime.fightGate ? cloneData(runtime.fightGate) : null,
     careerDateLabel: currentDate ? formatCareerDate(currentDate) : "Date inconnue",
     careerPreparation: careerPreparationView(timeState),
     careerOnboarding: onboarding?.state || null,
@@ -2884,6 +2887,138 @@ function careerGymContext() {
     },
     sparring: sparringPlanState,
   };
+}
+
+function careerArenaContext() {
+  const capsule = ensureCareerPreviewCapsule();
+  const career = careerCareerView();
+  const fightGate = capsule ? careerFightGate(capsule) : null;
+  const currentWeek = Number(career.week || state.week || 1);
+  const preparation = capsule?.timeState ? careerPreparationView(capsule.timeState) : window.BoxeurWorld?.preparation?.(career);
+  const officialFight = state.scheduledFight
+    && !state.scheduledFight.isPracticeSparring
+    && !state.scheduledFight.isRecreationalSparring
+    && !state.scheduledFight.isDeveloperBout
+      ? state.scheduledFight
+      : null;
+  const activeTournament = state.activeTournament && typeof state.activeTournament === "object" ? state.activeTournament : null;
+  const tournamentBooking = activeBookings()
+    .filter(booking => booking.event?.kind === "tournament")
+    .sort((left, right) => Number(left.event?.careerWeek || 99999) - Number(right.event?.careerWeek || 99999))[0] || null;
+
+  const venueLabel = event => [event?.venue?.name, event?.venue?.city, event?.venue?.region].filter(Boolean).join(" · ") || "Aréna de quartier";
+  const dateLabel = event => event?.startDate ? formatCareerDate(event.startDate, { long: true }) : "Date à confirmer";
+  let arenaEvent = null;
+
+  if (activeTournament) {
+    const booking = activeBookings().find(item => item.id === activeTournament.bookingId) || tournamentBooking;
+    const event = booking?.event || state.calendar?.events?.find(item => item.id === activeTournament.eventId) || null;
+    const totalRounds = activeTournament.opponents?.length || tournamentDefs.find(item => item.id === activeTournament.id)?.rounds || 3;
+    const currentRound = safeNumber(activeTournament.currentRound, 0, 0, Math.max(0, totalRounds - 1));
+    const tournamentFight = officialFight?.tournamentId === activeTournament.id ? officialFight : null;
+    arenaEvent = {
+      kind: "tournament",
+      state: activeTournament.status === "completed"
+        ? "completed"
+        : fightGate?.status === "ready" ? (activeTournament.currentRound > 0 ? "active" : "ready")
+          : currentWeek >= Number(activeTournament.startWeek) ? "due" : "future",
+      name: activeTournament.name || event?.name || "Tournoi amateur",
+      week: activeTournament.startWeek,
+      dateLabel: dateLabel(event),
+      venue: venueLabel(event),
+      roundLabel: roundName(totalRounds, currentRound),
+      remaining: Math.max(0, totalRounds - currentRound),
+      opponent: tournamentFight?.opponent || activeTournament.opponents?.[currentRound] || null,
+    };
+  } else {
+    const galaCandidate = officialFight ? {
+      kind: "gala",
+      state: fightGate?.status === "ready" && fightGate.kind === "gala"
+        ? "ready"
+        : currentWeek >= Number(officialFight.week) ? "due" : "future",
+      name: officialFight.event?.name || "Gala amateur",
+      week: officialFight.week,
+      dateLabel: dateLabel(officialFight.event),
+      venue: venueLabel(officialFight.event),
+      opponent: officialFight.opponent || null,
+    } : null;
+    const tournamentCandidate = tournamentBooking ? {
+      kind: "tournament",
+      state: fightGate?.status === "ready" && fightGate.kind === "tournament"
+        ? "ready"
+        : currentWeek >= Number(tournamentBooking.event?.careerWeek) ? "due" : "future",
+      name: tournamentBooking.event?.name || "Tournoi amateur",
+      week: tournamentBooking.event?.careerWeek,
+      dateLabel: dateLabel(tournamentBooking.event),
+      venue: venueLabel(tournamentBooking.event),
+      opponent: null,
+    } : null;
+    arenaEvent = [galaCandidate, tournamentCandidate]
+      .filter(Boolean)
+      .sort((left, right) => Number(left.week || 99999) - Number(right.week || 99999))[0] || null;
+  }
+
+  return {
+    profile: state.profile,
+    careerStatusLabel: state.careerStatus === "professional" ? "Professionnel" : state.careerStatus === "amateur" ? "Amateur" : "Récréatif",
+    clock: {
+      ...(capsule?.timeState?.clock || career.careerClock || {}),
+      week: currentWeek,
+      dateLabel: career.careerDateLabel,
+    },
+    condition: {
+      preparationLabel: preparation?.label || "Correcte",
+      preparationDetail: preparation?.detail || "Garde un œil sur ton énergie avant le prochain combat.",
+      preparationTone: preparation?.tone || "steady",
+      energy: capsule?.timeState?.condition?.energy ?? career.energy,
+      fatigue: capsule?.timeState?.condition?.fatigue ?? career.fatigue,
+    },
+    event: arenaEvent,
+  };
+}
+
+function openCareerArenaFromCalendar() {
+  closeCalendarDialog();
+  renderCareerWorldPreview(true);
+  openCareerLocation("arena");
+}
+
+function handleCareerArenaAction() {
+  const capsule = ensureCareerPreviewCapsule();
+  const gate = capsule ? careerFightGate(capsule) : null;
+  const dueEvent = careerOfficialEventDue(careerCareerView());
+  if (!gate) {
+    if (dueEvent) {
+      openCareerWeekPlan();
+      showToast("Confirme d’abord ta semaine; le combat s’ouvrira ensuite ici.");
+      return;
+    }
+    openCalendarDialog();
+    return;
+  }
+  if (gate.kind === "tournament") {
+    const active = ensureDueTournamentActive();
+    if (!active) {
+      showToast("Le tournoi réservé n’est plus disponible.");
+      return;
+    }
+    closeCareerLocation();
+    openTournamentBoard();
+    return;
+  }
+  const scheduled = state.scheduledFight;
+  const sameEvent = !gate.eventId || [scheduled?.eventId, scheduled?.id].includes(gate.eventId);
+  if (!scheduled
+    || scheduled.isPracticeSparring
+    || scheduled.isRecreationalSparring
+    || scheduled.isDeveloperBout
+    || Number(scheduled.week) > Number(state.week)
+    || !sameEvent) {
+    showToast("Le combat réservé n’est plus disponible.");
+    return;
+  }
+  closeCareerLocation();
+  startFight();
 }
 
 function careerReservedBoxingGymBudget(career = careerCareerView()) {
@@ -3249,7 +3384,8 @@ function openCareerLocation(locationId) {
   const isStrengthGym = locationId === "strength-gym" && window.BoxeurStrengthView;
   const isHome = locationId === "home" && window.BoxeurHomeView;
   const isWork = locationId === "work" && window.BoxeurWorkView;
-  sheet.classList.toggle("career-location-sheet-full", Boolean(isBoxingGym || isStrengthGym || isHome || isWork));
+  const isArena = locationId === "arena" && window.BoxeurArenaView;
+  sheet.classList.toggle("career-location-sheet-full", Boolean(isBoxingGym || isStrengthGym || isHome || isWork || isArena));
   sheet.classList.toggle("career-location-sheet-strength", Boolean(isStrengthGym));
   sheet.innerHTML = isBoxingGym
     ? window.BoxeurGymView.render(careerGymContext())
@@ -3259,6 +3395,8 @@ function openCareerLocation(locationId) {
         ? window.BoxeurHomeView.render(careerHomeContext())
         : isWork
           ? window.BoxeurWorkView.render(careerWorkLocationContext())
+          : isArena
+            ? window.BoxeurArenaView.render(careerArenaContext())
         : window.BoxeurWorld.renderLocation(locationId, locationId === "work" ? careerWorkLocationContext() : career);
   if (["boxing-gym", "home", "work"].includes(locationId) && window.BoxeurWorld?.renderLocationGuide) {
     const guide = window.BoxeurWorld.renderLocationGuide(career, locationId);
@@ -3271,7 +3409,7 @@ function openCareerLocation(locationId) {
           : sheet.querySelector(".career-location-card");
     if (guide && guideTarget) guideTarget.insertAdjacentHTML("afterbegin", guide);
   }
-  activateCareerLocationSheet(sheet, "[data-career-leave-gym], [data-career-leave-strength-gym], [data-career-leave-home], [data-career-leave-work], [data-career-close-location], button");
+  activateCareerLocationSheet(sheet, "[data-career-leave-gym], [data-career-leave-strength-gym], [data-career-leave-home], [data-career-leave-work], [data-career-leave-arena], [data-career-close-location], button");
 }
 
 function openCareerFighter() {
@@ -3462,6 +3600,127 @@ function careerSigned(value, suffix = " %") {
 
 function careerWeekStartSlot(timeState) {
   return (timeState.clock.week - 1) * window.BoxeurTime.PERIODS_PER_WEEK;
+}
+
+const CAREER_FIGHT_APPOINTMENT_PREFIX = "career-official-fight";
+
+function normalizeCareerFightGate(input) {
+  if (!input || typeof input !== "object" || input.status !== "ready") return null;
+  const week = safeNumber(input.week, 0, 1, 99999);
+  const appointmentId = safeText(input.appointmentId, "", 180);
+  if (!week || !appointmentId) return null;
+  return {
+    schemaVersion: 1,
+    status: "ready",
+    week,
+    kind: input.kind === "tournament" ? "tournament" : "gala",
+    eventId: safeText(input.eventId, "", 180) || null,
+    bookingId: safeText(input.bookingId, "", 180) || null,
+    appointmentId,
+    title: safeText(input.title, input.kind === "tournament" ? "Tournoi amateur" : "Combat amateur", 180),
+    summary: input.summary && typeof input.summary === "object" ? cloneData(input.summary) : null,
+    plannerEntries: Array.isArray(input.plannerEntries) ? cloneData(input.plannerEntries) : [],
+    startingCondition: input.startingCondition && typeof input.startingCondition === "object"
+      ? cloneData(input.startingCondition)
+      : null,
+    completionEvents: Array.isArray(input.completionEvents) ? cloneData(input.completionEvents) : [],
+  };
+}
+
+function careerFightGate(capsule = ensureCareerPreviewCapsule()) {
+  if (!capsule) return null;
+  return normalizeCareerPreviewRuntime(capsule).fightGate;
+}
+
+function careerFightGateReady(capsule = ensureCareerPreviewCapsule()) {
+  return careerFightGate(capsule)?.status === "ready";
+}
+
+function isCareerFightAppointment(appointment) {
+  return Boolean(appointment && (
+    String(appointment.id || "").startsWith(`${CAREER_FIGHT_APPOINTMENT_PREFIX}:`)
+      || appointment.metadata?.careerFightGate === true
+  ));
+}
+
+function careerOfficialEventDue(career = null) {
+  if (state.careerStatus !== "amateur") return null;
+  const currentWeek = Number(career?.week || careerCapsule?.timeState?.clock?.week || state.week || 1);
+  const activeTournament = state.activeTournament;
+  if (activeTournament && activeTournament.status !== "completed" && Number(activeTournament.startWeek) <= currentWeek) {
+    return {
+      kind: "tournament",
+      eventId: activeTournament.eventId || activeTournament.id,
+      bookingId: activeTournament.bookingId || null,
+      title: activeTournament.name || tournamentDefs.find(item => item.id === activeTournament.id)?.name || "Tournoi amateur",
+    };
+  }
+  const tournamentBooking = dueTournamentBooking();
+  if (tournamentBooking) {
+    return {
+      kind: "tournament",
+      eventId: tournamentBooking.eventId || tournamentBooking.event?.id,
+      bookingId: tournamentBooking.id,
+      title: tournamentBooking.event?.name || "Tournoi amateur",
+    };
+  }
+  const scheduled = state.scheduledFight;
+  if (!scheduled
+    || scheduled.isPracticeSparring
+    || scheduled.isRecreationalSparring
+    || scheduled.isDeveloperBout
+    || Number(scheduled.week) > currentWeek) return null;
+  return {
+    kind: scheduled.tournamentId ? "tournament" : "gala",
+    eventId: scheduled.eventId || scheduled.id,
+    bookingId: scheduled.bookingId || null,
+    title: scheduled.event?.name || (scheduled.tournamentId ? "Tournoi amateur" : "Combat amateur"),
+  };
+}
+
+function ensureCareerFightAppointment(capsule, officialEvent) {
+  if (!capsule?.timeState || !officialEvent || !window.BoxeurTime) return null;
+  const week = capsule.timeState.clock.week;
+  const eventKey = safeIdentifier(officialEvent.eventId || officialEvent.bookingId || officialEvent.kind, officialEvent.kind);
+  const appointmentId = `${CAREER_FIGHT_APPOINTMENT_PREFIX}:${week}:${eventKey}`;
+  const existing = capsule.timeState.appointments.find(appointment => appointment.id === appointmentId);
+  if (existing) return existing;
+  const weekStart = careerWeekStartSlot(capsule.timeState);
+  const lastPeriod = weekStart + window.BoxeurTime.PERIODS_PER_WEEK - 1;
+  const earliest = Math.max(weekStart, capsule.timeState.clock.absoluteSlot);
+  const appointmentInput = startSlot => ({
+    id: appointmentId,
+    title: officialEvent.title,
+    kind: officialEvent.kind === "tournament" ? "tournament" : "fight",
+    location: "arena",
+    startSlot,
+    duration: 1,
+    activity: {
+      id: appointmentId,
+      label: officialEvent.title,
+      category: "official-fight",
+      duration: 1,
+      energyCost: 0,
+      energyGain: 0,
+      fatigueGain: 0,
+      fatigueRelief: 0,
+      stimulus: { technique: 0, power: 0, cardio: 0, defense: 0 },
+    },
+    metadata: {
+      important: true,
+      careerFightGate: true,
+      eventKind: officialEvent.kind,
+      eventId: officialEvent.eventId,
+      bookingId: officialEvent.bookingId,
+    },
+  });
+  for (let startSlot = lastPeriod; startSlot >= earliest; startSlot -= 1) {
+    const availability = window.BoxeurTime.canScheduleAppointment(capsule.timeState, appointmentInput(startSlot));
+    if (!availability.ok) continue;
+    capsule.timeState = window.BoxeurTime.scheduleAppointment(capsule.timeState, appointmentInput(startSlot));
+    return capsule.timeState.appointments.find(appointment => appointment.id === appointmentId) || null;
+  }
+  throw new Error("Aucune période libre ne reste pour le combat à l’aréna cette semaine.");
 }
 
 function careerDayStartSlot(timeState, absoluteSlot = timeState?.clock?.absoluteSlot) {
@@ -4429,14 +4688,14 @@ function careerWeekQuickBlockReason(career = careerCareerView()) {
   if (onboarding && !onboarding.gates.closeWeek.allowed) return onboarding.gates.closeWeek.reason;
   if (career.introJobRequired && !career.jobId) return "Choisis d’abord ton emploi de départ dans le lieu Emploi.";
   if (career.initialGymRequired && career.gymWeeks <= 0) return "Inscris-toi d’abord au GYM de boxe. Ton budget de départ couvre le premier mois.";
-  if (state.scheduledFight && state.scheduledFight.week <= career.week) return "Un combat est arrivé : règle ce rendez-vous avant de terminer la semaine.";
-  if (state.activeTournament && state.activeTournament.status !== "completed" && state.activeTournament.startWeek <= career.week) return "Le tournoi est en cours : les décisions se prennent maintenant à l’aréna.";
+  if (career.careerFightGate?.status === "ready") return "La semaine est terminée : rends-toi maintenant à l’aréna pour régler le combat.";
   const capsule = ensureCareerPreviewCapsule();
   const weekEnd = capsule?.timeState ? careerWeekStartSlot(capsule.timeState) + window.BoxeurTime.PERIODS_PER_WEEK : 0;
   const importantAppointment = capsule?.timeState?.appointments?.find(appointment => (
     Number(appointment.startSlot) >= Number(capsule.timeState.clock.absoluteSlot)
       && Number(appointment.startSlot) < weekEnd
       && window.BoxeurWeek?.isImportantAppointment(appointment)
+      && !isCareerFightAppointment(appointment)
   ));
   if (importantAppointment) return `${importantAppointment.title || "Un rendez-vous"} doit être réglé avant de confirmer toute la semaine.`;
   return "";
@@ -4809,6 +5068,96 @@ function applyCareerRecoveryConsequence(result, runtime, plannerEntries, previou
   return event;
 }
 
+function syncCareerFightGateProgressToCapsule(capsule = careerCapsule) {
+  const gate = capsule ? careerFightGate(capsule) : null;
+  if (!capsule?.timeState || !gate) return false;
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  capsule.timeState.condition.energy = safeNumber(state.energy, capsule.timeState.condition.energy, 0, 100, false);
+  capsule.timeState.condition.fatigue = safeNumber(state.fatigue, capsule.timeState.condition.fatigue, 0, 100, false);
+  runtime.career.money = safeNumber(state.money, runtime.career.money, 0, 9999999);
+  runtime.career.experience = safeNumber(state.experience, runtime.career.experience, 0, 99999999);
+  return true;
+}
+
+function finalizeCareerFightGate() {
+  const capsule = careerCapsule || ensureCareerPreviewCapsule();
+  const gate = capsule ? careerFightGate(capsule) : null;
+  if (!capsule?.timeState || !gate || !window.BoxeurTime) return false;
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  syncCareerFightGateProgressToCapsule(capsule);
+  const beforeFinalization = cloneData(capsule);
+  const beforeFinalPeriod = cloneData(capsule.timeState);
+  try {
+    const appointment = capsule.timeState.appointments.find(item => item.id === gate.appointmentId);
+    if (!appointment) throw new Error("Le rendez-vous de l’aréna est introuvable dans la sauvegarde.");
+    if (appointment.startSlot > capsule.timeState.clock.absoluteSlot) {
+      capsule.timeState = window.BoxeurTime.advanceToNextAppointment(capsule.timeState);
+    }
+    capsule.timeState = window.BoxeurTime.attendAppointment(capsule.timeState, gate.appointmentId);
+
+    const summary = gate.summary ? cloneData(gate.summary) : {
+      schemaVersion: window.BoxeurWeek?.SCHEMA_VERSION || 1,
+      mode: runtime.weekMode || "quick",
+      from: { ...beforeFinalPeriod.clock, week: gate.week },
+      actions: [],
+      warnings: [],
+      counts: { training: 0, work: 0, recovery: 0, freePeriods: 0, appointments: 0 },
+      money: { before: runtime.career.money, earned: 0, after: runtime.career.money },
+      statGains: {},
+      statXpGains: {},
+      stimulusDelta: {},
+      xpAward: 0,
+      wear: 0,
+      maximumSingleActionInjuryRiskPercent: 0,
+      nightRecoveries: 0,
+    };
+    const startCondition = gate.startingCondition || beforeFinalPeriod.condition;
+    summary.status = "week-complete";
+    summary.to = cloneData(capsule.timeState.clock);
+    summary.elapsedPeriods = capsule.timeState.clock.absoluteSlot - Number(summary.from?.absoluteSlot || careerWeekStartSlot(beforeFinalPeriod));
+    summary.conditionDelta = {
+      energy: Number(capsule.timeState.condition.energy) - Number(startCondition.energy || 0),
+      fatigue: Number(capsule.timeState.condition.fatigue) - Number(startCondition.fatigue || 0),
+    };
+    summary.money ||= { before: runtime.career.money, earned: 0, after: runtime.career.money };
+    summary.money.after = runtime.career.money;
+    summary.money.earned = runtime.career.money - Number(summary.money.before || 0);
+    summary.counts ||= { training: 0, work: 0, recovery: 0, freePeriods: 0, appointments: 0 };
+    summary.counts.appointments = Number(summary.counts.appointments || 0) + 1;
+    summary.nightRecoveries = Number(summary.nightRecoveries || 0)
+      + (capsule.timeState.clock.week > beforeFinalPeriod.clock.week ? 1 : 0);
+    summary.stoppedBeforeAppointment = null;
+
+    const result = {
+      status: "week-complete",
+      timeState: capsule.timeState,
+      state: capsule.timeState,
+      finances: { money: runtime.career.money },
+      summary,
+    };
+    const completionEvents = [...gate.completionEvents, ...careerWeeklyCompletionEvents(result, runtime, gate.week)];
+    const recoveryEvent = applyCareerRecoveryConsequence(result, runtime, gate.plannerEntries, gate.week);
+    if (recoveryEvent) completionEvents.unshift(recoveryEvent);
+    capsule.timeState = result.timeState;
+    const summaryIndex = runtime.weeklySummaries.findIndex(item => Number(item?.from?.week) === gate.week);
+    if (summaryIndex >= 0) runtime.weeklySummaries[summaryIndex] = cloneData(result.summary);
+    else runtime.weeklySummaries.unshift(cloneData(result.summary));
+    runtime.weeklySummaries = runtime.weeklySummaries.slice(0, 30);
+    runtime.fightGate = null;
+    state.supplementWeek = capsule.timeState.clock.week;
+    state.supplementsUsed = [];
+    if (state.preFightTrainingWeek === gate.week) state.preFightTrainingWeek = 0;
+    persistCareerPreviewCapsule();
+    return true;
+  } catch (error) {
+    careerCapsule = beforeFinalization;
+    persistCareerPreviewCapsule();
+    console.error("[Boxeur Deux] Fin de semaine de combat impossible :", error);
+    showToast("Le combat est enregistré, mais la semaine n’a pas pu avancer. Recharge la carrière pour réessayer.");
+    return false;
+  }
+}
+
 function careerWeekSummaryView(result, completionEvents = [], options = {}) {
   const grossWages = result.summary.actions
     .filter(record => record.kind === "work")
@@ -4850,13 +5199,19 @@ function careerWeekSummaryView(result, completionEvents = [], options = {}) {
   return {
     weekFrom: result.summary.from.week,
     weekTo: result.summary.to.week,
-    title: result.status === "week-complete" ? `Semaine ${result.summary.to.week}${dateLabel ? ` · ${dateLabel}` : ""}` : "Une décision t’attend",
-    summary: result.status === "week-complete"
+    title: options.fightGate === true
+      ? `Semaine ${result.summary.from.week} terminée · combat prêt`
+      : result.status === "week-complete" ? `Semaine ${result.summary.to.week}${dateLabel ? ` · ${dateLabel}` : ""}` : "Une décision t’attend",
+    summary: options.fightGate === true
+      ? "Tes activités et ton travail sont enregistrés. La semaine avancera après le combat à l’aréna."
+      : result.status === "week-complete"
       ? "Voici les valeurs avant et après la semaine, ainsi que les effets réellement appliqués."
       : "Le temps s’est arrêté avant une étape qui ne doit pas être décidée automatiquement.",
     changes,
     events,
-    ...(options.firstGuidedWeek === true ? {
+    ...(options.fightGate === true ? {
+      actionLabel: "Continuer vers l’aréna",
+    } : options.firstGuidedWeek === true ? {
       guide: {
         title: "Comment lire ton premier bilan",
         detail: "Énergie et fatigue montrent le coût réel de ton programme. L’XP ciblée assimilée indique ce que ton boxeur a retenu de ses entraînements.",
@@ -5034,13 +5389,16 @@ function careerPlannerExecutionPrimitive(entry, capsule, sideEffects) {
     });
   }
   if (entry.activityId === "rest") {
+    const restDuration = careerOfficialEventDue(careerCareerView())
+      ? Math.max(1, window.BoxeurTime.PERIODS_PER_DAY - 1)
+      : window.BoxeurTime.PERIODS_PER_DAY;
     return careerPlannerGenericActivity(entry, entry.label, {
       energyCost: entry.energyCost,
       energyGain: entry.energyGain,
       fatigueGain: Math.max(0, entry.fatigueDelta),
       fatigueRelief: Math.max(0, -entry.fatigueDelta),
       stimulus: { technique: 0, power: 0, cardio: 0, defense: 0 },
-    }, { engineId: "home_planned_rest", category: "recovery", duration: window.BoxeurTime.PERIODS_PER_DAY });
+    }, { engineId: "home_planned_rest", category: "recovery", duration: restDuration });
   }
   if (entry.activityId === "meal") {
     const activity = CAREER_HOME_ACTIVITIES.meal;
@@ -5093,7 +5451,9 @@ function careerPlannerExecutionSlots(entries, capsule) {
   const weekStart = careerWeekStartSlot(capsule.timeState);
   const weekEnd = weekStart + window.BoxeurTime.PERIODS_PER_WEEK;
   const now = capsule.timeState.clock.absoluteSlot;
-  const occupied = [];
+  const occupied = (capsule.timeState.appointments || [])
+    .filter(appointment => Number(appointment.endSlot) > now && Number(appointment.startSlot) < weekEnd)
+    .map(appointment => ({ start: Number(appointment.startSlot), end: Number(appointment.endSlot) }));
   const historicalPhysicalDays = new Set((capsule.timeState.history || []).filter(careerIsPrimaryPhysicalEvent).filter(event => (
     Number(event.fromSlot) >= weekStart && Number(event.fromSlot) < weekEnd
   )).map(event => Math.floor((Number(event.fromSlot) - weekStart) / window.BoxeurTime.PERIODS_PER_DAY)));
@@ -5105,13 +5465,27 @@ function careerPlannerExecutionSlots(entries, capsule) {
     const requestedDay = safeNumber(plannerEntry.dayIndex, 0, 0, 6);
     let start = Math.max(now, weekStart + requestedDay * window.BoxeurTime.PERIODS_PER_DAY + preferredPeriod);
     let found = null;
-    for (let candidate = start; candidate + duration <= weekEnd; candidate += 1) {
+    const candidateAllowed = candidate => {
       const day = Math.floor((candidate - weekStart) / window.BoxeurTime.PERIODS_PER_DAY);
       const period = (candidate - weekStart) % window.BoxeurTime.PERIODS_PER_DAY;
-      if (plannerEntry.physical && (period !== 2 || historicalPhysicalDays.has(day))) continue;
-      if (overlaps(candidate, duration)) continue;
+      if (candidate < now || candidate + duration > weekEnd) return false;
+      if (plannerEntry.physical && (period !== 2 || historicalPhysicalDays.has(day))) return false;
+      return !overlaps(candidate, duration);
+    };
+    for (let candidate = start; candidate + duration <= weekEnd; candidate += 1) {
+      if (!candidateAllowed(candidate)) continue;
       found = candidate;
       break;
+    }
+    // Un rendez-vous de combat placé le dimanche soir peut repousser une
+    // activité choisie ce jour-là. On cherche alors le même moment dans les
+    // jours précédents plutôt que de supprimer silencieusement l’activité.
+    if (found == null) {
+      for (let candidate = start - window.BoxeurTime.PERIODS_PER_DAY; candidate >= now; candidate -= window.BoxeurTime.PERIODS_PER_DAY) {
+        if (!candidateAllowed(candidate)) continue;
+        found = candidate;
+        break;
+      }
     }
     if (found == null) throw new Error(`${plannerEntry.label} ne tient plus dans la semaine actuelle.`);
     reserve(found, duration);
@@ -5187,6 +5561,8 @@ function runCareerAutomaticWeek() {
   const beforeCapsule = cloneData(capsule);
   const beforeCareerState = cloneData(state);
   try {
+    const officialEvent = careerOfficialEventDue(careerCareerView());
+    const fightAppointment = officialEvent ? ensureCareerFightAppointment(capsule, officialEvent) : null;
     const confirmed = window.BoxeurWeekPlanner.confirmPlan(plannerState, {
       transactionId: `${careerPlannerWeekKey(capsule)}:revision-${plannerState.revision}`,
       expectedRevision: plannerState.revision,
@@ -5200,7 +5576,12 @@ function runCareerAutomaticWeek() {
       plan: execution.plan,
       recovery: { energyThreshold: 42, fatigueThreshold: 62 },
     });
-    if (result.status !== "week-complete") {
+    const stoppedForFight = Boolean(
+      fightAppointment
+      && result.status === "appointment"
+      && result.summary.stoppedBeforeAppointment?.id === fightAppointment.id
+    );
+    if (result.status !== "week-complete" && !stoppedForFight) {
       const reason = result.summary.warnings.at(-1) || "La semaine s’est arrêtée avant sa confirmation complète.";
       throw new Error(reason);
     }
@@ -5255,10 +5636,25 @@ function runCareerAutomaticWeek() {
       beforeCapsule.timeState.condition,
       previousWeek,
     );
-    const completionEvents = careerWeeklyCompletionEvents(result, runtime, previousWeek);
+    const completionEvents = stoppedForFight ? [] : careerWeeklyCompletionEvents(result, runtime, previousWeek);
     if (workloadEvent) completionEvents.unshift(workloadEvent);
-    const recoveryEvent = applyCareerRecoveryConsequence(result, runtime, execution.plannerEntries, previousWeek);
+    const recoveryEvent = stoppedForFight
+      ? null
+      : applyCareerRecoveryConsequence(result, runtime, execution.plannerEntries, previousWeek);
     if (recoveryEvent) completionEvents.unshift(recoveryEvent);
+    runtime.fightGate = stoppedForFight ? normalizeCareerFightGate({
+      status: "ready",
+      week: previousWeek,
+      kind: officialEvent.kind,
+      eventId: officialEvent.eventId,
+      bookingId: officialEvent.bookingId,
+      appointmentId: fightAppointment.id,
+      title: officialEvent.title,
+      summary: result.summary,
+      plannerEntries: execution.plannerEntries,
+      startingCondition: beforeCapsule.timeState.condition,
+      completionEvents,
+    }) : null;
     runtime.weekMode = confirmed.commit.mode === "quick" ? "quick" : "detailed";
     runtime.weeklySummaries.unshift(cloneData(result.summary));
     runtime.weeklySummaries = runtime.weeklySummaries.slice(0, 30);
@@ -5270,7 +5666,10 @@ function runCareerAutomaticWeek() {
     if (!sheet) return;
     sheet.dataset.originLocation = "week";
     sheet.classList.remove("career-location-sheet-full");
-    sheet.innerHTML = window.BoxeurWeekView.renderSummary(careerWeekSummaryView(result, completionEvents, { firstGuidedWeek }));
+    sheet.innerHTML = window.BoxeurWeekView.renderSummary(careerWeekSummaryView(result, completionEvents, {
+      firstGuidedWeek,
+      fightGate: stoppedForFight,
+    }));
     activateCareerLocationSheet(sheet, "[data-career-week-summary-close]");
   } catch (error) {
     careerCapsule = beforeCapsule;
@@ -6076,6 +6475,7 @@ async function startFight() {
   if (!state.scheduledFight.travelApplied) {
     applyChanges({ energy: state.scheduledFight.travelEffects?.energy || 0, fatigue: state.scheduledFight.travelEffects?.fatigue || 0 });
     state.scheduledFight.travelApplied = true;
+    if (syncCareerFightGateProgressToCapsule()) persistCareerPreviewCapsule();
   }
   const isRecreationalSparring = Boolean(state.scheduledFight.isRecreationalSparring);
   const isPracticeSparring = Boolean(state.scheduledFight.isPracticeSparring);
@@ -6206,6 +6606,7 @@ function withdrawFight() {
   if (tournamentId) restoreDeferredGalaAfterTournamentBout();
   const booking = state.bookings.find(item => item.id === bookingId);
   if (booking) booking.status = "withdrawn";
+  if (!tournamentId && careerFightGateReady(careerCapsule)) finalizeCareerFightGate();
   render();
   showToast("Combat annulé");
 }
@@ -6477,6 +6878,12 @@ function renderTournamentBoard() {
 
 function openTournamentBoard() {
   if (!state.activeTournament) return;
+  if (state.activeTournament.status !== "completed"
+    && state.week >= state.activeTournament.startWeek
+    && !careerFightGateReady(careerCapsule)) {
+    showToast("Confirme d’abord ta semaine; le tournoi s’ouvrira ensuite à l’aréna.");
+    return;
+  }
   if (maybeOpenTournamentMedalDialog()) return;
   renderTournamentBoard();
   const dialog = document.querySelector("#tournament-dialog");
@@ -6486,6 +6893,19 @@ function openTournamentBoard() {
 function closeTournamentBoard() {
   document.querySelector("#tournament-dialog").close();
   if (state.activeTournament?.status === "completed") {
+    if (careerFightGateReady(careerCapsule)) {
+      const completedTournament = state.activeTournament;
+      state.activeTournament = null;
+      if (!finalizeCareerFightGate()) {
+        state.activeTournament = completedTournament;
+        render();
+        return;
+      }
+      render();
+      showToast("Tournoi terminé · nouvelle semaine");
+      if (state.jobLossNotice || state.levelAnnouncementPending) setTimeout(showCareerAlertOrContinue, 0);
+      return;
+    }
     const events = [state.activeTournament.summary];
     settleJobAttendance(false, events, state.week, true);
     state.activeTournament = null;
@@ -6518,6 +6938,7 @@ function applyTournamentRecovery(choiceId) {
     active.competition = BoxeurTournament.applyInterBoutChoice(competition, choiceId, { recoveryId, targetZone: choice.targetZone });
     state.currentWeightKg = Math.round((state.currentWeightKg + tournamentRecoveryWeightDelta(choiceId)) * 10) / 10;
     syncTournamentConditionToCareer();
+    if (syncCareerFightGateProgressToCapsule()) persistCareerPreviewCapsule();
     state.journal.unshift({ week: state.week, text: `${tournamentDefs.find(item => item.id === active.id)?.name} · nuit ${active.competition.day - 1} : ${choice.title}. Poids prévu ${state.currentWeightKg.toFixed(1)} kg.` });
     renderTournamentBoard();
     persistCareer();
@@ -6531,6 +6952,9 @@ function applyTournamentRecovery(choiceId) {
 function startTournamentRound() {
   const active = state.activeTournament;
   if (!active || active.status === "completed" || state.week < active.startWeek || scheduledFightBlocksTournament()) return;
+  if (state.week >= active.startWeek && !careerFightGateReady(careerCapsule)) {
+    return showToast("Confirme d’abord ta semaine avant de commencer le tournoi.");
+  }
   active.status = "active";
   const opponent = active.opponents[active.currentRound];
   if (!opponent) {
@@ -7484,12 +7908,17 @@ function finishFight() {
     if (isRecreationalSparring) completeAmateurCareerAfterSparring();
   }
   else state.scheduledFight = null;
+  const gatedOfficialFight = !isNonRecordSparring && !isDeveloperBout && careerFightGateReady(careerCapsule);
   if (meta.tournamentId && !isDeveloperBout) {
     restoreDeferredGalaAfterTournamentBout();
+    if (gatedOfficialFight && syncCareerFightGateProgressToCapsule()) persistCareerPreviewCapsule();
   } else if (!isCareerSparring && !isDeveloperBout) {
-    const weekTransitionEvents = [];
-    settleJobAttendance(false, weekTransitionEvents, state.week);
-    endWeek(weekTransitionEvents);
+    if (gatedOfficialFight) finalizeCareerFightGate();
+    else {
+      const weekTransitionEvents = [];
+      settleJobAttendance(false, weekTransitionEvents, state.week);
+      endWeek(weekTransitionEvents);
+    }
     if (isRecreationalSparring) completeAmateurCareerAfterSparring();
   }
   if (!isCareerSparring && !isDeveloperBout) persistCareer();
@@ -7750,6 +8179,11 @@ document.querySelector("#career-world")?.addEventListener("click", event => {
     return;
   }
   if (event.target.closest("[data-career-week-summary-close]")) {
+    if (careerFightGateReady()) {
+      closeCareerLocation();
+      setTimeout(() => openCareerLocation("arena"), 0);
+      return;
+    }
     closeCareerLocation();
     setTimeout(showCareerAlertOrContinue, 0);
     return;
@@ -7762,7 +8196,7 @@ document.querySelector("#career-world")?.addEventListener("click", event => {
     closeCareerLocation();
     return;
   }
-  if (event.target.closest("[data-career-close-location], [data-career-leave-gym], [data-career-leave-strength-gym], [data-career-leave-home], [data-career-leave-work]")) {
+  if (event.target.closest("[data-career-close-location], [data-career-leave-gym], [data-career-leave-strength-gym], [data-career-leave-home], [data-career-leave-work], [data-career-leave-arena]")) {
     closeCareerLocation();
     revealPendingCareerLevelAlert();
     return;
@@ -7989,6 +8423,10 @@ document.querySelector("#career-world")?.addEventListener("click", event => {
     openCalendarDialog();
     return;
   }
+  if (event.target.closest("[data-career-arena-action]")) {
+    handleCareerArenaAction();
+    return;
+  }
   const gymZone = event.target.closest("[data-career-gym-zone]");
   if (gymZone) {
     if (gymZone.dataset.careerGymZone === "reception") openCareerMembershipMenu();
@@ -8102,6 +8540,7 @@ document.querySelector("#tournaments").addEventListener("click", event => {
 });
 
 document.querySelector("#active-tournament").addEventListener("click", event => {
+  if (event.target.closest("[data-career-go-arena]")) return openCareerArenaFromCalendar();
   if (event.target.closest("[data-open-tournament]")) openTournamentBoard();
 });
 
@@ -8174,6 +8613,7 @@ document.querySelector("#calendar-dialog")?.addEventListener("cancel", event => 
 
 document.querySelector("#scheduled-fight").addEventListener("click", event => {
   if (event.target.closest("#start-fight")) startFight();
+  if (event.target.closest("[data-career-go-arena]")) openCareerArenaFromCalendar();
   if (event.target.closest("#withdraw-fight")) withdrawFight();
 });
 
