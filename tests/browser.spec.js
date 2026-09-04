@@ -1622,6 +1622,32 @@ test("offre un supplément puis un cours privé selon la rotation des niveaux", 
   await page.locator('[data-career-nav="fighter"]').click();
   await expect(page.locator(".career-fighter-identity")).toContainText("Cours privé offert");
   await expect(page.locator(".career-fighter-identity")).toContainText("1 bon");
+  await page.locator('.career-location-sheet [data-career-nav="map"]').click();
+  const moneyBeforeFreeLesson = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")).previewRuntime.career.money);
+  await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).first().click();
+  await page.locator('[data-career-gym-zone="coach"]').click();
+  await page.locator("[data-career-boxing-trainer]").click();
+  await expect(page.locator(".career-trainer-credit-banner")).toContainText("1 séance privée gratuite");
+  await expect(page.locator(".career-trainer-credit-banner")).toContainText("appliqué automatiquement");
+  const freeClubLesson = page.locator('.career-trainer-offer:has([data-career-trainer-start="boxing-club"])');
+  await expect(freeClubLesson).toContainText("120 $ 0 $ · séance unique");
+  await expect(freeClubLesson).toContainText("cette séance est offerte");
+  await page.locator('[data-career-trainer-start="boxing-club"]').click();
+  await expect(page.locator("#trainer-session-dialog")).toContainText("bon appliqué");
+  await page.locator('[data-career-trainer-confirm="boxing-club"]').click();
+  const privateSupplementChoice = page.locator("#session-supplement-dialog");
+  await expect(privateSupplementChoice).toBeVisible();
+  await expect(privateSupplementChoice).toContainText("Séance privée · Olivier Martel");
+  await expect(privateSupplementChoice).toContainText("Boisson sportive ×1");
+  await expect(privateSupplementChoice).not.toContainText("undefined");
+  await privateSupplementChoice.locator('[data-career-session-supplement="sports-drink"]').click();
+  await expect(privateSupplementChoice).toBeHidden();
+  const afterFreeLesson = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")).previewRuntime.career);
+  expect(afterFreeLesson.money).toBe(moneyBeforeFreeLesson);
+  expect(afterFreeLesson.privateLessonCredits).toBe(0);
+  expect(afterFreeLesson.trainerState.activeProgram.sessionsTotal).toBe(1);
+  const privateEntry = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")).previewRuntime.weekPlanner.entries.find(entry => entry.activityId === "private-training"));
+  expect(privateEntry.supplementId).toBe("sports-drink");
 });
 
 test("augmente la capacité au niveau 5 sans réserver automatiquement le repos", async ({ page }) => {
@@ -3514,23 +3540,13 @@ test("reconstruit la capsule de carrière depuis une carrière importée avant s
   expect(afterImport.main.state.vacationBankWeeks).toBe(1);
   expect(afterImport.main.state.initialJobLockedUntilWeek).toBe(9);
   expect(afterImport.main.state.privateProgram).toBeNull();
-  expect(afterImport.main.state.trainerState.activeProgram).toMatchObject({
-    trainerId: "club",
-    target: "technique",
-    sessionsCompleted: 2,
-    sessionsTotal: 4,
-  });
+  expect(afterImport.main.state.trainerState.activeProgram).toBeNull();
   expect(afterImport.capsule.previewRuntime.career.experience).toBe(220);
   expect(afterImport.capsule.previewRuntime.career.jobTenureWeeks).toBe(6);
   expect(afterImport.capsule.previewRuntime.career.jobWagesEarned).toBe(575);
   expect(afterImport.capsule.previewRuntime.career.vacationBankWeeks).toBe(1);
   expect(afterImport.capsule.previewRuntime.career.initialJobLockedUntilWeek).toBe(9);
-  expect(afterImport.capsule.previewRuntime.career.trainerState.activeProgram).toMatchObject({
-    trainerId: "club",
-    target: "technique",
-    sessionsCompleted: 2,
-    sessionsTotal: 4,
-  });
+  expect(afterImport.capsule.previewRuntime.career.trainerState.activeProgram).toBeNull();
   expect(afterImport.capsule.previewRuntime.trainingSessions).toBe(4);
 });
 
@@ -3612,24 +3628,113 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   await expect(trainerPanel).toContainText("Entraîneurs privés");
   await expect(page.locator('[data-career-trainer-target="power"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("[data-career-trainer-start]")).toHaveCount(3);
-  await page.locator('[data-career-trainer-start="club"]').click();
-  await expect(page.locator(".career-trainer-active")).toContainText("Mélanie Côté");
-  await expect(page.locator(".career-trainer-active")).toContainText("0/4 séances complétées");
+  await expect(trainerPanel).toContainText("Kim Nguyen");
+  await expect(trainerPanel).toContainText("Darnell Brooks");
+  await expect(trainerPanel).toContainText("Valérie Fortin");
+  await expect(trainerPanel).not.toContainText(/Olivier Martel|Maude Lavoie|Hector Vargas|\/[4-9] séances/);
+  const clubTrainer = page.locator('.career-trainer-offer:has([data-career-trainer-start="strength-club"])');
+  await expect(clubTrainer).toContainText("120 $ · séance unique");
+  await expect(clubTrainer).toContainText("−12 capacité hebdomadaire");
+  await expect(page.locator('[data-career-trainer-start="strength-club"]')).toHaveText("Voir et réserver cette séance");
+  const beforeTrainerReservation = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  await page.locator('[data-career-trainer-start="strength-club"]').click();
+  const trainerDialog = page.locator("#trainer-session-dialog");
+  await expect(trainerDialog).toBeVisible();
+  await expect(trainerDialog).toContainText("Confirmer avec Kim Nguyen");
+  await expect(trainerDialog).toContainText("2505 $ → 2385 $");
+  await expect(trainerDialog).toContainText("28 → 16");
+  await expect(trainerDialog).toContainText("12 de capacité hebdomadaire seront réservés");
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileTrainerFit = await trainerDialog.evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(mobileTrainerFit.scrollWidth).toBeLessThanOrEqual(mobileTrainerFit.clientWidth + 1);
+  expect(mobileTrainerFit.documentWidth).toBeLessThanOrEqual(mobileTrainerFit.viewportWidth + 1);
+  const mobileTrainerButton = await page.locator('[data-career-trainer-confirm="strength-club"]').boundingBox();
+  expect(mobileTrainerButton?.height).toBeGreaterThanOrEqual(44);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator("[data-career-trainer-confirmation-cancel]").last().click();
+  let trainerReservation = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(trainerReservation.previewRuntime.career.money).toBe(beforeTrainerReservation.previewRuntime.career.money);
+  expect(trainerReservation.previewRuntime.career.trainerState.activeProgram).toBeNull();
+  expect(trainerReservation.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "private-training")).toBe(false);
+  await page.locator('[data-career-trainer-start="strength-club"]').click();
+  await page.locator('[data-career-trainer-confirm="strength-club"]').click();
+  await expect(page.locator(".career-trainer-active")).toContainText("Kim Nguyen");
+  await expect(page.locator(".career-trainer-active")).toContainText("Séance privée réservée");
+  await expect(page.locator(".career-trainer-active")).toContainText("Puissance · une seule séance");
+  await expect(page.locator("[data-career-location-remove]")).toContainText("rembourser 120 $");
+  await page.locator("[data-career-location-remove]").click();
+  await expect(strengthView).toBeVisible();
+  await page.locator("[data-career-strength-trainer]").click();
+  await expect(page.locator('[data-career-trainer-start="strength-club"]')).toBeVisible();
+  trainerReservation = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(trainerReservation.previewRuntime.career.money).toBe(2505);
+  expect(trainerReservation.previewRuntime.career.trainerState.activeProgram).toBeNull();
+  await page.locator('[data-career-trainer-start="strength-club"]').click();
+  await page.locator('[data-career-trainer-confirm="strength-club"]').click();
   await page.locator("[data-career-trainer-close]").click();
-  await expect(page.locator(".career-strength-membership-summary", { hasText: "Mélanie Côté" })).toBeVisible();
+  await expect(page.locator(".career-strength-membership-summary", { hasText: "Kim Nguyen" })).toBeVisible();
 
   await page.locator("[data-career-strength-shop]").click();
   const supplementShop = page.locator(".career-supplement-shop");
   await expect(supplementShop).toBeVisible();
   await expect(supplementShop).toContainText("Boutique de suppléments");
+  await expect(supplementShop).toContainText("Choisis, vérifie, confirme");
+  await expect(supplementShop).toContainText("L’achat n’utilise pas le produit");
   const proteinBar = page.locator('[data-career-supplement-buy="protein-bar"]');
   await expect(proteinBar).toBeEnabled();
+  const beforePurchase = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
   await proteinBar.click();
-  await expect(page.locator('[data-career-supplement-buy="protein-bar"]')).toContainText("inventaire ×1");
+  const purchaseDialog = page.locator("#supplement-purchase-dialog");
+  await expect(purchaseDialog).toBeVisible();
+  await expect(purchaseDialog).toContainText("Confirmer l’achat");
+  await expect(purchaseDialog).toContainText("Barre protéinée");
+  await expect(purchaseDialog).toContainText("Réduit très légèrement le coût d'énergie");
+  await expect(purchaseDialog).toContainText("2385 $ → 2375 $");
+  await expect(purchaseDialog).toContainText("×0 → ×1");
+  await page.locator("[data-career-supplement-purchase-cancel]").last().click();
+  await expect(purchaseDialog).toBeHidden();
+  let purchaseState = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(purchaseState.previewRuntime.career.money).toBe(beforePurchase.previewRuntime.career.money);
+  expect(purchaseState.previewRuntime.career.supplementState.inventory["protein-bar"] || 0).toBe(0);
+
+  await proteinBar.click();
+  await expect(purchaseDialog).toBeVisible();
+  await page.locator('[data-career-supplement-purchase-confirm="protein-bar"]').click();
+  await expect(purchaseDialog).toBeHidden();
+  await expect(page.locator('[data-career-supplement-buy="protein-bar"]')).toContainText("possédé ×1");
   await page.locator('[data-career-supplement-buy="protein-bar"]').click();
-  await expect(page.locator('[data-career-supplement-buy="protein-bar"]')).toContainText("inventaire ×2");
+  await page.locator('[data-career-supplement-purchase-confirm="protein-bar"]').click();
+  await expect(page.locator('[data-career-supplement-buy="protein-bar"]')).toContainText("possédé ×2");
+  purchaseState = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(purchaseState.previewRuntime.career.money).toBe(2365);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(".career-strength-shop-scene img")).toHaveJSProperty("naturalWidth", 941);
+  await expect(proteinBar).toContainText("10 $");
+  await expect(proteinBar).toContainText("possédé ×2");
+  await proteinBar.click();
+  await expect(purchaseDialog).toBeVisible();
+  await expect(purchaseDialog).toContainText("2365 $ → 2355 $");
+  await expect(purchaseDialog).toContainText("×2 → ×3");
+  const mobilePurchaseFit = await purchaseDialog.evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(mobilePurchaseFit.scrollWidth).toBeLessThanOrEqual(mobilePurchaseFit.clientWidth + 1);
+  expect(mobilePurchaseFit.documentWidth).toBeLessThanOrEqual(mobilePurchaseFit.viewportWidth + 1);
+  const mobilePurchaseButton = await page.locator('[data-career-supplement-purchase-confirm="protein-bar"]').boundingBox();
+  expect(mobilePurchaseButton?.height).toBeGreaterThanOrEqual(44);
+  await page.locator("[data-career-supplement-purchase-cancel]").last().click();
+  await expect(purchaseDialog).toBeHidden();
+  purchaseState = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(purchaseState.previewRuntime.career.money).toBe(2365);
+  expect(purchaseState.previewRuntime.career.supplementState.inventory["protein-bar"]).toBe(2);
   const mobileShopFit = await page.locator(".career-strength-shop").evaluate(element => ({
     scrollWidth: element.scrollWidth,
     clientWidth: element.clientWidth,
@@ -3655,24 +3760,47 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   await expect(page.locator("[data-career-strength-confirm]")).toBeEnabled();
   const beforeStrengthDraft = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
   await page.locator("[data-career-strength-confirm]").click();
+  const directSupplementChoice = page.locator("#session-supplement-dialog");
+  await expect(directSupplementChoice).toBeVisible();
+  await expect(directSupplementChoice).toContainText("Séance de musculation personnalisée");
+  await expect(directSupplementChoice).toContainText("Barre protéinée ×2");
+  await expect(directSupplementChoice).not.toContainText("undefined");
+  const strengthBeforeDirectSupplement = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")).previewRuntime.weekPlanner.entries.find(entry => entry.activityId === "strength-custom"));
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileSupplementChoiceFit = await directSupplementChoice.evaluate(element => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(mobileSupplementChoiceFit.scrollWidth).toBeLessThanOrEqual(mobileSupplementChoiceFit.clientWidth + 1);
+  expect(mobileSupplementChoiceFit.documentWidth).toBeLessThanOrEqual(mobileSupplementChoiceFit.viewportWidth + 1);
+  const mobileSupplementChoiceButton = await directSupplementChoice.locator('[data-career-session-supplement="protein-bar"]').boundingBox();
+  expect(mobileSupplementChoiceButton?.height).toBeGreaterThanOrEqual(44);
+  await directSupplementChoice.locator('[data-career-session-supplement="protein-bar"]').click();
+  await expect(directSupplementChoice).toBeHidden();
+  await page.setViewportSize({ width: 1440, height: 900 });
   await expect(strengthView).toBeVisible();
+  await expect(strengthView).toContainText("Supplément : Barre protéinée");
   let plannedServices = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
   expect(plannedServices.timeState).toEqual(beforeStrengthDraft.timeState);
-  expect(plannedServices.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "strength-custom")).toBe(true);
+  const strengthAfterDirectSupplement = plannedServices.previewRuntime.weekPlanner.entries.find(entry => entry.activityId === "strength-custom");
+  expect(strengthAfterDirectSupplement.capacityCost).toBe(strengthBeforeDirectSupplement.capacityCost - 1);
+  expect(strengthAfterDirectSupplement.supplementId).toBe("protein-bar");
   expect(plannedServices.previewRuntime.career.supplementState.inventory["protein-bar"]).toBe(2);
 
   await page.locator("[data-career-strength-trainer]").click();
-  await expect(page.locator(".career-trainer-active")).toContainText("0/4 séances complétées");
-  await expect(page.locator("[data-career-trainer-session]")).toBeEnabled();
-  await page.locator("[data-career-trainer-session]").click();
-  await expect(strengthView).toBeVisible();
+  await expect(page.locator(".career-trainer-active")).toContainText("Séance privée réservée");
+  await expect(page.locator(".career-trainer-active")).toContainText("est ajoutée à ta semaine");
   plannedServices = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
   expect(plannedServices.timeState).toEqual(beforeStrengthDraft.timeState);
   expect(plannedServices.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "private-training")).toBe(true);
   expect(plannedServices.previewRuntime.career.trainerState.activeProgram.sessionsCompleted).toBe(0);
-  expect(plannedServices.previewRuntime.career.money).toBe(2425);
+  expect(plannedServices.previewRuntime.career.trainerState.activeProgram.sessionsTotal).toBe(1);
+  expect(plannedServices.previewRuntime.career.money).toBe(2365);
+  await page.locator("[data-career-trainer-close]").click();
   await page.locator("[data-career-leave-strength-gym]").click();
-  await expect(page.locator(".career-now-money")).toContainText("2425 $");
+  await expect(page.locator(".career-now-money")).toContainText("2365 $");
   const moneyColor = await page.locator(".career-now-money").evaluate(element => getComputedStyle(element).color);
   const moneyChannels = (moneyColor.match(/\d+/g) || []).map(Number);
   expect(moneyChannels).toHaveLength(3);
@@ -3684,18 +3812,18 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   await expect(inventoryView).toBeVisible();
   await expect(inventoryView).toContainText("Barre protéinée");
   await expect(inventoryView).toContainText("×2");
-  await expect(inventoryView).toContainText("Le coût sera recalculé");
-  const strengthEntryBeforeSupplement = plannedServices.previewRuntime.weekPlanner.entries.find(entry => entry.activityId === "strength-custom");
+  await expect(inventoryView).toContainText("Réservé cette semaine");
+  await expect(inventoryView).toContainText("Associé à : Séance de musculation personnalisée");
   await page.locator('[data-career-inventory-item="protein-bar"]').click();
   const supplementReservation = page.locator(".career-supplement-picker");
   await expect(supplementReservation).toBeVisible();
   await expect(supplementReservation).toContainText(/recalculé à partir du même effet/i);
   const strengthReservation = supplementReservation.locator(".career-supplement-card", { hasText: "Séance de musculation personnalisée" });
-  await strengthReservation.locator("[data-career-plan-supplement-entry]").click();
-  await expect(inventoryView).toContainText("Réservé cette semaine");
+  await expect(strengthReservation.locator("[data-career-plan-supplement-entry]")).toContainText("Garder cette séance");
+  await page.locator("[data-career-inventory-reserve-close]").click();
   const afterReservation = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
   const strengthEntryAfterSupplement = afterReservation.previewRuntime.weekPlanner.entries.find(entry => entry.activityId === "strength-custom");
-  expect(strengthEntryAfterSupplement.capacityCost).toBe(strengthEntryBeforeSupplement.capacityCost - 1);
+  expect(strengthEntryAfterSupplement.capacityCost).toBe(strengthBeforeDirectSupplement.capacityCost - 1);
   expect(strengthEntryAfterSupplement.supplementId).toBe("protein-bar");
   expect(afterReservation.previewRuntime.career.supplementState.inventory["protein-bar"]).toBe(2);
   expect(afterReservation.timeState).toEqual(beforeStrengthDraft.timeState);
@@ -3703,9 +3831,10 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
 
   const fighterView = page.locator(".career-fighter-view");
   await expect(fighterView).toBeVisible();
-  await expect(page.locator(".career-fighter-identity dd.money")).toContainText("2425 $");
-  await expect(page.locator(".career-fighter-private-program")).toContainText("Mélanie Côté");
-  await expect(page.locator(".career-fighter-private-program")).toContainText("0/4 séances");
+  await expect(page.locator(".career-fighter-identity dd.money")).toContainText("2365 $");
+  await expect(page.locator(".career-fighter-private-program")).toContainText("Kim Nguyen");
+  await expect(page.locator(".career-fighter-private-program")).toContainText("Séance réservée");
+  await expect(page.locator(".career-fighter-private-program")).toContainText("déjà ajoutée à la semaine");
   await expect(page.locator(".career-fighter-supplements")).toHaveCount(0);
   await expect(page.locator('.career-fighter-stat [role="progressbar"]')).toHaveCount(4);
   await expect(page.locator(".career-fighter-level-progress [role=progressbar]")).toBeVisible();
@@ -3745,9 +3874,9 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
     overflow: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - window.innerWidth,
   }));
   expect(afterConfirmation.main.state.week).toBe(2);
-  expect(afterConfirmation.main.state.money).toBe(2525);
-  expect(afterConfirmation.main.state.trainerState.activeProgram.trainerId).toBe("club");
-  expect(afterConfirmation.main.state.trainerState.activeProgram.sessionsCompleted).toBe(1);
+  expect(afterConfirmation.main.state.money).toBe(2465);
+  expect(afterConfirmation.main.state.trainerState.activeProgram).toBeNull();
+  expect(afterConfirmation.main.state.trainerState.completedPrograms).toHaveLength(1);
   expect(afterConfirmation.main.state.supplementState.inventory["protein-bar"]).toBe(1);
   expect(afterConfirmation.main.state.supplementState.weeklyUsage.count).toBe(1);
   expect(afterConfirmation.capsule.previewRuntime.career.strengthGymWeeks).toBe(3);
@@ -3760,6 +3889,73 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   await expect(page.locator(".career-inventory-view")).toContainText("Barre protéinée");
   await expect(page.locator(".career-inventory-view")).toContainText("×1");
   await page.locator('.career-location-sheet [data-career-nav="fighter"]').click();
-  await expect(page.locator(".career-fighter-private-program")).toContainText("1/4 séances");
+  await expect(page.locator(".career-fighter-private-program")).toHaveCount(0);
+  await expect(page.locator(".career-fighter-private")).toContainText("Aucune séance privée en attente");
   await expect(page.locator(".career-fighter-supplements")).toHaveCount(0);
+});
+
+test("bloque clairement une séance privée sans argent ou sans capacité hebdomadaire", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    money: 119,
+    gymWeeks: 2,
+    strengthGymWeeks: 2,
+  }));
+  await page.getByRole("button", { name: /Entrer : Gym de musculation/ }).first().click();
+  await page.locator("[data-career-strength-trainer]").click();
+  const poorClubTrainer = page.locator('.career-trainer-offer:has([data-career-trainer-start="strength-club"])');
+  await expect(poorClubTrainer).toContainText("120 $ · séance unique");
+  await expect(poorClubTrainer).toContainText("Il manque 1 $ pour cette séance");
+  await expect(page.locator('[data-career-trainer-start="strength-club"]')).toBeDisabled();
+  await expect(page.locator("#trainer-session-dialog")).toBeHidden();
+
+  await openStoredCareer(page, amateurSnapshot({
+    money: 1000,
+    energy: 92,
+    fatigue: 5,
+    gymWeeks: 2,
+    strengthGymWeeks: 2,
+    jobId: "office",
+    jobsHeldCount: 1,
+  }));
+  await page.getByRole("button", { name: /Entrer : Gym de musculation/ }).first().click();
+  await page.locator('[data-career-strength-zone="program"]').click();
+  await page.locator('[data-career-strength-activity="dynamic_warmup"]').first().click();
+  await page.locator('[data-career-strength-activity="upper_back_guard"]').first().click();
+  await page.locator('[data-career-strength-activity="mobility_cooldown"]').first().click();
+  await expect(page.locator("[data-career-strength-confirm]")).toBeEnabled();
+  await page.locator("[data-career-strength-confirm]").click();
+  await page.locator("[data-career-strength-trainer]").click();
+  const fullWeekClubTrainer = page.locator('.career-trainer-offer:has([data-career-trainer-start="strength-club"])');
+  await expect(fullWeekClubTrainer).toContainText("Il faut 12 de capacité hebdomadaire pour cette séance");
+  await expect(page.locator('[data-career-trainer-start="strength-club"]')).toBeDisabled();
+  await expect(page.locator("#trainer-session-dialog")).toBeHidden();
+
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(saved.previewRuntime.career.money).toBe(1000);
+  expect(saved.previewRuntime.career.trainerState.activeProgram).toBeNull();
+  expect(saved.previewRuntime.weekPlanner.entries.some(entry => entry.activityId === "private-training")).toBe(false);
+});
+
+test("explique un achat de supplément impossible sans ouvrir la confirmation", async ({ page }) => {
+  const original = amateurSnapshot({
+    careerStatus: "amateur",
+    money: 5,
+    gymWeeks: 2,
+    strengthGymWeeks: 2,
+    combatStats: { technique: 38, power: 38, cardio: 38, defense: 38 },
+  });
+  await openStoredCareer(page, original);
+
+  await page.getByRole("button", { name: /Entrer : Gym de musculation/ }).first().click();
+  await page.locator("[data-career-strength-shop]").click();
+  const proteinBar = page.locator('[data-career-supplement-buy="protein-bar"]');
+  await expect(proteinBar).toBeDisabled();
+  await expect(proteinBar).toContainText("10 $");
+  await expect(proteinBar).toContainText("possédé ×0");
+  await expect(proteinBar).toContainText("Il manque 5 $ pour cet achat");
+  await expect(page.locator("#supplement-purchase-dialog")).toBeHidden();
+
+  const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(persisted.previewRuntime.career.money).toBe(5);
+  expect(persisted.previewRuntime.career.supplementState.inventory["protein-bar"] || 0).toBe(0);
 });

@@ -279,11 +279,12 @@ test("échappe le bilan de séance sans inventer ses effets", () => {
 test("affiche les activités du GYM planifiées avec un retrait direct", () => {
   const html = gymView.render(baseContext({
     coach: { planned: true },
-    weekPlan: { entries: [{ id: "boxing-1", label: "Travail aux mitaines", cost: 9, removable: true }] },
+    weekPlan: { entries: [{ id: "boxing-1", label: "Travail aux mitaines", supplementLabel: "Boisson sportive", cost: 9, removable: true }] },
   }));
 
   assert.match(html, /Programme de la semaine/);
   assert.match(html, /career-place-week-plan/);
+  assert.match(html, /Supplément : Boisson sportive/);
   assert.match(html, /data-career-location-remove="boxing-1"/);
   assert.match(gymView.renderMenu("coach", baseContext({ coach: { planned: true } })), /data-career-coach-session aria-pressed="true"[^>]*>Retirer de ma semaine/);
 });

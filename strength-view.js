@@ -142,11 +142,11 @@
         reason: String(trainer.reason || ""),
         active: trainer.active === true,
         name: trainer.name || "Aucun préparateur choisi",
-        programLabel: trainer.programLabel || "Programme physique personnalisé",
+        programLabel: trainer.programLabel || "Séance physique personnalisée",
         detail: trainer.detail || "Un préparateur privé produit davantage d’XP ciblée; il ne donne jamais un point de statistique instantané.",
         sessionsCompleted: wholeNumber(trainer.sessionsCompleted, 0, 0, 999),
         sessionsTotal: wholeNumber(trainer.sessionsTotal, 0, 0, 999),
-        actionLabel: trainer.actionLabel || (trainer.active === true ? "Voir mon programme" : "Choisir un préparateur"),
+        actionLabel: trainer.actionLabel || (trainer.active === true ? "Voir ma séance privée" : "Choisir une séance privée"),
       },
       shop: {
         available: shop.available !== false,
@@ -168,6 +168,7 @@
         entries: Array.isArray(weekPlan.entries) ? weekPlan.entries.slice(0, 12).map((entry, index) => ({
           id: String(entry?.id || `strength-entry-${index + 1}`),
           label: String(entry?.label || "Séance de musculation"),
+          supplementLabel: String(entry?.supplementLabel || ""),
           cost: wholeNumber(entry?.cost, 0, 0, 100),
           removable: entry?.removable !== false,
         })) : [],
@@ -327,7 +328,7 @@
     const interactive = options.interactive !== false;
     const id = options.id || "career-strength-week-plan-title";
     const entries = context.weekPlan.entries.length
-      ? `<ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}</small></span>${interactive && entry.removable ? `<button type="button" class="secondary-button" data-career-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>${entry.removable ? "Planifiée" : "Déjà faite"}</em>`}</li>`).join("")}</ul>`
+      ? `<ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}${entry.supplementLabel ? ` · Supplément : ${escapeHTML(entry.supplementLabel)}` : ""}</small></span>${interactive && entry.removable ? `<button type="button" class="secondary-button" data-career-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>${entry.removable ? "Planifiée" : "Déjà faite"}</em>`}</li>`).join("")}</ul>`
       : `<p class="career-strength-plan-empty">Aucune séance de musculation n’est encore placée cette semaine.</p>`;
     return `<section class="career-strength-week-plan${interactive ? "" : " compact"}" aria-labelledby="${id}"><div><p class="eyebrow">Cette semaine</p><h3 id="${id}">Séances de musculation</h3></div>${entries}</section>`;
   }
@@ -414,12 +415,34 @@
       const safeId = domToken(id, "product");
       const reasonId = `career-supplement-${safeId}-reason`;
       const disabled = available ? "" : ` disabled aria-disabled="true" aria-describedby="${reasonId}"`;
-      return `<button type="button" class="career-supplement-hotspot product-${safeId}${available ? "" : " locked"}" data-career-supplement-buy="${escapeHTML(id)}"${disabled}><span aria-hidden="true">${available ? "+" : "🔒"}</span><strong>${escapeHTML(product?.label || "Supplément")}</strong><small>${wholeNumber(product?.price, 0, 0, 9999)} $ · inventaire ×${wholeNumber(product?.quantity, 0, 0, 99)}</small>${available ? "" : `<em id="${reasonId}">${escapeHTML(product?.reason || "Indisponible")}</em>`}</button>`;
+      const label = String(product?.label || "Supplément");
+      const price = wholeNumber(product?.price, 0, 0, 9999);
+      const quantity = wholeNumber(product?.quantity, 0, 0, 99);
+      const accessibleLabel = available
+        ? `Voir l’achat de ${label}. Prix ${price} $. Possédé : ${quantity}.`
+        : `${label} indisponible. ${product?.reason || "Achat indisponible"}`;
+      return `<button type="button" class="career-supplement-hotspot product-${safeId}${available ? "" : " locked"}" data-career-supplement-buy="${escapeHTML(id)}" aria-label="${escapeHTML(accessibleLabel)}"${disabled}><span aria-hidden="true">${available ? "$" : "🔒"}</span><strong>${escapeHTML(label)}</strong><small><b>${price} $</b> · possédé ×${quantity}</small>${available ? "" : `<em id="${reasonId}">${escapeHTML(product?.reason || "Indisponible")}</em>`}</button>`;
     }).join("");
-    const inventory = products.map(product => `<li><span>${escapeHTML(product?.label || "Supplément")}</span><strong>×${wholeNumber(product?.quantity, 0, 0, 99)}</strong></li>`).join("");
+    const inventory = products.map(product => `<li><span><b>${escapeHTML(product?.label || "Supplément")}</b><small>${wholeNumber(product?.price, 0, 0, 9999)} $ l’unité</small></span><strong>Possédé ×${wholeNumber(product?.quantity, 0, 0, 99)}</strong></li>`).join("");
     return `<section class="career-strength-shop career-place-view career-supplement-shop" aria-labelledby="career-supplement-shop-title"><header class="career-place-header"><div><p class="eyebrow">Gym de musculation</p><h2 id="career-supplement-shop-title">Boutique de suppléments</h2><p class="career-place-meta">Solde disponible · ${balance} $</p></div><button type="button" class="secondary-button" data-career-supplement-shop-close>Retour au gym</button></header>
-      <div class="career-strength-shop-layout career-place-layout"><main class="career-strength-shop-scene career-place-scene"><h3 class="sr-only">Produits disponibles dans la boutique</h3><picture><source media="(max-width: 640px)" srcset="${SCENES.shop.mobile}"><img src="${SCENES.shop.desktop}" alt="Boutique chaleureuse avec boissons sportives, protéines, pré-entraînement et barres protéinées."></picture><div class="career-supplement-hotspots">${productMarkup}</div></main><aside class="career-strength-shop-dashboard career-place-dashboard"><section class="career-place-card"><p class="eyebrow">Règles</p><h3>Prépare ta prochaine séance</h3><p>Un produit s’utilise avant une seule séance. Maximum de deux utilisations par semaine et jamais deux fois le même produit.</p></section><section class="career-place-card"><p class="eyebrow">Inventaire</p><h3>Dans ton sac</h3><ul class="career-strength-shop-inventory">${inventory}</ul></section></aside></div>
+      <div class="career-strength-shop-layout career-place-layout"><main class="career-strength-shop-scene career-place-scene"><h3 class="sr-only">Produits disponibles dans la boutique</h3><picture><source media="(max-width: 640px)" srcset="${SCENES.shop.mobile}"><img src="${SCENES.shop.desktop}" alt="Boutique chaleureuse avec boissons sportives, protéines, pré-entraînement et barres protéinées."></picture><div class="career-supplement-hotspots">${productMarkup}</div></main><aside class="career-strength-shop-dashboard career-place-dashboard"><section class="career-place-card career-strength-shop-guide"><p class="eyebrow">Comment acheter</p><h3>Choisis, vérifie, confirme</h3><ol><li>Sélectionne un produit dans le décor.</li><li>Vérifie son effet, son prix et ton nouveau solde.</li><li>Confirme pour l’ajouter à ton inventaire.</li></ol><p><strong>L’achat n’utilise pas le produit.</strong> Tu le réserveras ensuite à une séance depuis l’Inventaire.</p></section><section class="career-place-card"><p class="eyebrow">Règles d’utilisation</p><h3>Prépare ta prochaine séance</h3><p>Un produit s’utilise avant une seule séance. Maximum de deux utilisations par semaine et jamais deux fois le même produit.</p></section><section class="career-place-card"><p class="eyebrow">Inventaire</p><h3>Dans ton sac</h3><ul class="career-strength-shop-inventory">${inventory}</ul></section></aside></div>
     </section>`;
+  }
+
+  function renderPurchaseConfirmation(rawContext) {
+    const raw = rawContext && typeof rawContext === "object" ? rawContext : {};
+    const product = raw.product && typeof raw.product === "object" ? raw.product : {};
+    const id = String(product.id || "");
+    const label = String(product.label || "Supplément");
+    const benefit = String(product.benefit || "Effet appliqué à la séance choisie depuis l’inventaire.");
+    const compromise = String(product.compromise || "Une seule utilisation de ce produit est permise par semaine.");
+    const price = wholeNumber(product.price, 0, 0, 9999);
+    const quantity = wholeNumber(raw.quantity ?? product.quantity, 0, 0, 99);
+    const balance = wholeNumber(raw.balance, 0, 0, 9999999);
+    const available = raw.available !== false && balance >= price;
+    const reason = String(raw.reason || (balance < price ? `Il manque ${price - balance} $.` : "Cet achat n’est pas disponible."));
+    const disabled = available ? "" : " disabled aria-disabled=\"true\" aria-describedby=\"career-supplement-purchase-reason\"";
+    return `<div class="service-card career-supplement-purchase-confirmation"><div class="service-heading"><div><p class="eyebrow">Boutique de suppléments</p><h2 id="career-supplement-purchase-title">Confirmer l’achat</h2></div><button type="button" class="dialog-close" data-career-supplement-purchase-cancel aria-label="Fermer">×</button></div><p class="service-lead">Vérifie la transaction avant d’acheter <strong>${escapeHTML(label)}</strong>.</p><section class="career-supplement-purchase-product" aria-labelledby="career-supplement-purchase-product-title"><span aria-hidden="true">$</span><div><p class="eyebrow">Produit sélectionné</p><h3 id="career-supplement-purchase-product-title">${escapeHTML(label)}</h3><p>${escapeHTML(benefit)}</p><small><strong>À savoir :</strong> ${escapeHTML(compromise)}</small></div></section><dl class="career-supplement-purchase-summary"><div><dt>Prix</dt><dd>${price} $</dd></div><div><dt>Solde</dt><dd>${balance} $ → ${Math.max(0, balance - price)} $</dd></div><div><dt>Inventaire</dt><dd>×${quantity} → ×${quantity + 1}</dd></div></dl><p class="career-supplement-purchase-note"><strong>Le produit sera seulement ajouté à ton inventaire.</strong> Il ne sera ni utilisé ni réservé automatiquement.</p>${available ? "" : `<p id="career-supplement-purchase-reason" class="form-error">${escapeHTML(reason)}</p>`}<div class="service-actions"><button type="button" class="secondary-button" data-career-supplement-purchase-cancel>Annuler</button><button type="button" class="primary-button" data-career-supplement-purchase-confirm="${escapeHTML(id)}"${disabled}>Acheter pour ${price} $</button></div></div>`;
   }
 
   function renderResult(rawResult) {
@@ -452,6 +475,7 @@
     render,
     renderMenu,
     renderShop,
+    renderPurchaseConfirmation,
     renderResult,
   });
 });

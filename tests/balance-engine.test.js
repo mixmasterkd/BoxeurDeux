@@ -127,13 +127,13 @@ test("les méthodes d'entraînement offrent des spécialités distinctes sans op
     "machine_conditioning",
     "mobility_cooldown",
   ]).totals;
-  const offers = trainers.listOffers({ statValue: 40 });
+  const offers = trainers.listOffers({ statValue: 40, location: "boxing-gym" });
 
   assert.ok(boxingPower.stimulus.power > boxingPower.stimulus.cardio);
   assert.ok(strengthPower.stimulus.power > strengthPower.stimulus.cardio);
   assert.ok(strengthCardio.stimulus.cardio > strengthCardio.stimulus.power);
   assert.ok(boxingCardio.energyCost < strengthCardio.energyCost, "le gym de musculation paie son meilleur cardio par une charge accrue");
-  assert.deepEqual(offers.map(offer => offer.cost), [60, 120, 220]);
+  assert.deepEqual(offers.map(offer => offer.cost), [120, 200, 320]);
   assert.ok(offers[0].estimatedTargetedXpPerSession < offers[1].estimatedTargetedXpPerSession);
   assert.ok(offers[1].estimatedTargetedXpPerSession < offers[2].estimatedTargetedXpPerSession);
 });

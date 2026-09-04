@@ -25,11 +25,11 @@ function baseContext(overrides = {}) {
     selectedActivities: ["dynamic_warmup", "lower_body_strength"],
     trainer: {
       active: true,
-      name: "Mélanie Tremblay",
-      programLabel: "Programme puissance",
-      detail: "Progression graduelle vers la prochaine jauge.",
-      sessionsCompleted: 2,
-      sessionsTotal: 5,
+      name: "Kim Nguyen",
+      programLabel: "Séance privée de puissance",
+      detail: "Une seule séance réservée pour la semaine.",
+      sessionsCompleted: 0,
+      sessionsTotal: 1,
     },
     shop: {
       itemCount: 2,
@@ -37,7 +37,7 @@ function baseContext(overrides = {}) {
     },
     weekCapacity: { total: 55, used: 12, remaining: 43 },
     weekPlan: {
-      entries: [{ id: "strength-1", label: "Cours de CrossFit", cost: 11, removable: true }],
+      entries: [{ id: "strength-1", label: "Cours de CrossFit", supplementLabel: "Barre protéinée", cost: 11, removable: true }],
     },
     quick: { available: true, planned: false, plannedCount: 0 },
     ...overrides,
@@ -46,10 +46,10 @@ function baseContext(overrides = {}) {
 
 function productFixtures() {
   return [
-    { id: "protein-bar", label: "Barre protéinée", price: 10, quantity: 2, available: true },
-    { id: "sports-drink", label: "Boisson sportive", price: 14, quantity: 1, available: true },
-    { id: "protein-shake", label: "Shake protéiné", price: 20, quantity: 0, available: true },
-    { id: "preworkout", label: "Pré-entraînement", price: 28, quantity: 3, available: false, reason: "Inventaire plein." },
+    { id: "protein-bar", label: "Barre protéinée", benefit: "Réduit la fatigue.", compromise: "Effet léger.", price: 10, quantity: 2, available: true },
+    { id: "sports-drink", label: "Boisson sportive", benefit: "Réduit le coût d’énergie.", compromise: "Usage unique.", price: 14, quantity: 1, available: true },
+    { id: "protein-shake", label: "Shake protéiné", benefit: "Aide la récupération.", compromise: "Plus cher.", price: 20, quantity: 0, available: true },
+    { id: "preworkout", label: "Pré-entraînement", benefit: "Soutient l’intensité.", compromise: "Augmente la fatigue.", price: 28, quantity: 3, available: false, reason: "Inventaire plein." },
   ];
 }
 
@@ -78,6 +78,7 @@ test("expose l'API de scène, de menus et de boutique en CommonJS et dans le nav
   assert.equal(typeof strengthView.render, "function");
   assert.equal(typeof strengthView.renderMenu, "function");
   assert.equal(typeof strengthView.renderShop, "function");
+  assert.equal(typeof strengthView.renderPurchaseConfirmation, "function");
   assert.equal(typeof strengthView.renderResult, "function");
 });
 
@@ -107,8 +108,9 @@ test("garde le tableau de bord principal informatif et sans commandes cachées",
   assert.match(dashboard, /Énergie <strong>82 %<\/strong>/);
   assert.match(dashboard, /Fatigue <strong>18 %<\/strong>/);
   assert.match(dashboard, /Cours de CrossFit/);
+  assert.match(dashboard, /Supplément : Barre protéinée/);
   assert.match(dashboard, /<em>Planifiée<\/em>/);
-  assert.match(dashboard, /Mélanie Tremblay/);
+  assert.match(dashboard, /Kim Nguyen/);
   assert.match(dashboard, /2 en inventaire/);
   assert.doesNotMatch(dashboard, /<button\b/);
   assert.doesNotMatch(dashboard, /data-career-location-remove/);
@@ -263,8 +265,33 @@ test("rend la boutique comme décor responsive avec exactement quatre bulles de 
   assert.match(buttonFor(html, "data-career-supplement-buy", "preworkout"), /\sdisabled(?:\s|>)/);
   assert.match(html, /Inventaire plein/);
   assert.match(html, /Solde disponible · 512 \$/);
+  assert.match(html, /Choisis, vérifie, confirme/);
+  assert.match(html, /L’achat n’utilise pas le produit/);
+  assert.match(html, /Possédé ×2/);
+  assert.match(html, /10 \$ l’unité/);
   assert.match(html, /Maximum de deux utilisations par semaine/);
   assert.match(html, /data-career-supplement-shop-close/);
+});
+
+test("détaille le produit et les conséquences financières avant de confirmer l’achat", () => {
+  const product = productFixtures()[0];
+  const html = strengthView.renderPurchaseConfirmation({
+    product,
+    balance: 512,
+    quantity: 2,
+    available: true,
+  });
+
+  assert.match(html, /Confirmer l’achat/);
+  assert.match(html, /Barre protéinée/);
+  assert.match(html, /Réduit la fatigue/);
+  assert.match(html, /Effet léger/);
+  assert.match(html, /512 \$ → 502 \$/);
+  assert.match(html, /×2 → ×3/);
+  assert.match(html, /ne sera ni utilisé ni réservé automatiquement/);
+  assert.match(html, /data-career-supplement-purchase-cancel/);
+  assert.match(html, /data-career-supplement-purchase-confirm="protein-bar"/);
+  assert.match(html, /Acheter pour 10 \$/);
 });
 
 test("échappe les données externes de la scène, des menus et de la boutique", () => {
@@ -286,8 +313,13 @@ test("échappe les données externes de la scène, des menus et de la boutique",
     balance: 500,
     products: [{ id: attack, label: attack, price: 10, quantity: 0, available: false, reason: attack }],
   });
+  const confirmation = strengthView.renderPurchaseConfirmation({
+    product: { id: attack, label: attack, benefit: attack, compromise: attack, price: 10 },
+    balance: 500,
+    quantity: 0,
+  });
 
-  for (const html of [scene, reception, shop]) {
+  for (const html of [scene, reception, shop, confirmation]) {
     assert.doesNotMatch(html, /<img src=x/);
     assert.doesNotMatch(html, /onerror="boom\(\)"/);
     assert.match(html, /&lt;img src=x onerror=&quot;boom\(\)&quot;&gt;/);

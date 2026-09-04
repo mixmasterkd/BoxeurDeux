@@ -120,7 +120,7 @@ test("normalise le plan sans le modifier et marque clairement les choix déjà p
 
 test("reconnaît les activityId produits par le planificateur hebdomadaire", () => {
   const plan = homeView.normalizePlan({
-    entries: [{ id: "plan-week-2-3", activityId: "home-quick", label: "Entraînement maison rapide", cost: 12 }],
+    entries: [{ id: "plan-week-2-3", activityId: "home-quick", label: "Entraînement maison rapide", supplementLabel: "Shake protéiné", cost: 12 }],
   });
 
   assert.deepEqual(plan.homeActionIds, ["home-quick"]);
@@ -128,9 +128,11 @@ test("reconnaît les activityId produits par le planificateur hebdomadaire", () 
     id: "plan-week-2-3",
     actionId: "home-quick",
     label: "Entraînement maison rapide",
+    supplementLabel: "Shake protéiné",
     cost: 12,
     removable: true,
   }]);
+  assert.match(homeView.render(baseContext({ careerStatus: "amateur", plan })), /Supplément : Shake protéiné/);
 });
 
 test("un programme complet bloque les nouveaux choix, mais pas un choix à retirer", () => {

@@ -76,7 +76,7 @@ test("borne la représentation visuelle sans remplacer l’affichage XP cumulati
   assert.equal(fighterView.normalizeContext(context({ experience: -4 })).levelProgress.progress, 0);
 });
 
-test("présente un programme privé actif sans promettre de gain instantané", () => {
+test("masque entièrement un ancien forfait privé multi-séances", () => {
   const html = fighterView.render(context({
     privateTrainerProgram: {
       trainerLabel: "Nadia Bouchard",
@@ -87,12 +87,27 @@ test("présente un programme privé actif sans promettre de gain instantané", (
     },
   }));
 
-  assert.match(html, /Programme privé/);
-  assert.match(html, /Nadia Bouchard/);
-  assert.match(html, /Cible : Défense/);
-  assert.match(html, /2\/4 séances/);
-  assert.match(html, /aria-valuenow="50"/);
-  assert.match(html, /18 XP ciblée créée par le programme/);
+  assert.match(html, /Séance privée/);
+  assert.match(html, /Aucune séance privée en attente/);
+  assert.doesNotMatch(html, /Nadia Bouchard|2\/4|ancien forfait/);
+});
+
+test("présente une seule séance privée achetée sans fausse progression de forfait", () => {
+  const html = fighterView.render(context({
+    privateTrainerProgram: {
+      trainerLabel: "Kim Nguyen",
+      target: "power",
+      sessionsCompleted: 0,
+      sessionsTotal: 1,
+    },
+  }));
+
+  assert.match(html, /Séance privée/);
+  assert.match(html, /Kim Nguyen/);
+  assert.match(html, /Cible : Puissance/);
+  assert.match(html, /Séance réservée/);
+  assert.match(html, /déjà ajoutée à la semaine/);
+  assert.doesNotMatch(html, /0\/1 séances|role="progressbar" aria-label="Progression/);
 });
 
 test("affiche les bons de cours privé reçus lors des montées de niveau", () => {
@@ -140,12 +155,12 @@ test("le CSS recentre le panneau et rend la fiche elle-même défilable sur mobi
   assert.match(css, /\.career-fighter-save button[\s\S]*?min-height:\s*44px/);
 });
 
-test("le statut récréatif masque le bilan et conserve le programme privé séparé", () => {
+test("le statut récréatif masque le bilan et conserve la séance privée séparée", () => {
   const html = fighterView.render(context({
     careerStatus: "recreational",
   }));
   assert.match(html, /Bilan amateur à venir/);
-  assert.match(html, /Aucun programme privé actif/);
+  assert.match(html, /Aucune séance privée en attente/);
   assert.doesNotMatch(html, /2 V · 1 D/);
   assert.doesNotMatch(html, /Bilan de tournoi/);
 });

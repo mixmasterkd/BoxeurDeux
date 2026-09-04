@@ -102,8 +102,8 @@
         available: privateTrainer.available === true,
         active: privateTrainer.active === true,
         name: privateTrainer.name || "Entraîneur privé",
-        detail: privateTrainer.detail || "Programme ciblé en technique ou en défense.",
-        actionLabel: privateTrainer.actionLabel || "Choisir un entraîneur privé",
+        detail: privateTrainer.detail || "Séance ciblée en technique ou en défense.",
+        actionLabel: privateTrainer.actionLabel || "Choisir une séance privée",
       },
       membership: {
         active: membership.active === true,
@@ -134,6 +134,7 @@
         entries: Array.isArray(weekPlan.entries) ? weekPlan.entries.slice(0, 12).map((entry, index) => ({
           id: String(entry?.id || `gym-entry-${index + 1}`),
           label: String(entry?.label || "Activité du GYM"),
+          supplementLabel: String(entry?.supplementLabel || ""),
           cost: wholeNumber(entry?.cost, 0, 0, 100),
           removable: entry?.removable !== false,
         })) : [],
@@ -249,7 +250,7 @@
 
   function renderWeekPlan(context) {
     const entries = context.weekPlan.entries.length
-      ? `<ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-career-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
+      ? `<ul>${context.weekPlan.entries.map(entry => `<li><span><strong>${escapeHTML(entry.label)}</strong><small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}${entry.supplementLabel ? ` · Supplément : ${escapeHTML(entry.supplementLabel)}` : ""}</small></span>${entry.removable ? `<button type="button" class="secondary-button" data-career-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
       : `<p class="career-place-plan-empty">Aucune activité du GYM n’est encore planifiée.</p>`;
     return `<section class="career-gym-week-plan career-place-week-plan${context.weekCapacity.remaining <= 0 ? " full" : ""}" aria-labelledby="career-gym-week-plan-title" aria-live="polite">
       <div class="career-place-week-plan-heading"><div><p class="eyebrow">Planification</p><h3 id="career-gym-week-plan-title">Programme de la semaine</h3></div><strong>${context.weekCapacity.remaining} / ${context.weekCapacity.total}</strong></div>

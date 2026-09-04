@@ -664,9 +664,31 @@
 .career-strength-shop-dashboard p { margin: 0; }
 .career-strength-shop-dashboard h3 { margin-top: 3px; font: 800 1.2rem/1 "Barlow Condensed", sans-serif; text-transform: uppercase; }
 .career-strength-shop-dashboard p:not(.eyebrow) { margin-top: 8px; color: var(--strength-muted); font-size: .68rem; line-height: 1.45; }
+.career-strength-shop-guide ol { display: grid; gap: 5px; margin: 9px 0 0; padding-left: 20px; color: #e6e2d9; font-size: .67rem; line-height: 1.4; }
+.career-strength-shop-guide strong { color: #ffe7a9; }
 .career-strength-shop-inventory { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
-.career-strength-shop-inventory li { display: flex; justify-content: space-between; gap: 8px; padding: 7px 8px; border-radius: 8px; background: rgba(255, 255, 255, .05); font-size: .67rem; }
+.career-strength-shop-inventory li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border-radius: 8px; background: rgba(255, 255, 255, .05); font-size: .67rem; }
+.career-strength-shop-inventory li > span { display: grid; gap: 2px; }
+.career-strength-shop-inventory li b { color: #f2eee5; }
+.career-strength-shop-inventory li small { color: var(--strength-muted); font-size: .57rem; }
 .career-strength-shop-inventory strong { color: #c7f1d5; }
+
+.supplement-purchase-dialog { width: min(580px, calc(100% - 24px)); }
+.career-supplement-purchase-confirmation { border-top-color: var(--gold, #ddb65e); }
+.career-supplement-purchase-confirmation h3,
+.career-supplement-purchase-confirmation p { margin-top: 0; }
+.career-supplement-purchase-product { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 13px; margin: 16px 0; padding: 14px; border: 1px solid rgba(221, 182, 94, .3); border-radius: 12px; background: rgba(221, 182, 94, .08); }
+.career-supplement-purchase-product > span { display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid rgba(255, 231, 169, .55); border-radius: 50%; color: #ffe7a9; background: rgba(0, 0, 0, .22); font: 900 1.2rem/1 "Barlow Condensed", sans-serif; }
+.career-supplement-purchase-product h3 { margin: 3px 0 7px; font: 800 1.35rem/1 "Barlow Condensed", sans-serif; text-transform: uppercase; }
+.career-supplement-purchase-product p { color: #e2ded5; font-size: .74rem; line-height: 1.45; }
+.career-supplement-purchase-product small { display: block; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, .1); color: #c5c1b8; font-size: .65rem; line-height: 1.4; }
+.career-supplement-purchase-product small strong { color: #ffd6a0; }
+.career-supplement-purchase-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.career-supplement-purchase-summary > div { min-width: 0; padding: 10px; border: 1px solid rgba(255, 255, 255, .11); border-radius: 9px; background: rgba(255, 255, 255, .045); }
+.career-supplement-purchase-summary dt { color: #aaa79f; font-size: .57rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.career-supplement-purchase-summary dd { margin: 5px 0 0; color: #f5f1e8; font: 800 1rem/1.1 "Barlow Condensed", sans-serif; overflow-wrap: anywhere; }
+.career-supplement-purchase-note { margin: 13px 0 18px; padding: 10px 11px; border-left: 3px solid var(--strength-green, #85c99b); color: #cfcbc2; background: rgba(133, 201, 155, .08); font-size: .69rem; line-height: 1.45; }
+.career-supplement-purchase-note strong { color: #d8f4e1; }
 
 /* Bilan conservé pour les flux existants. */
 .career-strength-result {
@@ -749,9 +771,9 @@
   .career-supplement-hotspot > span { width: 31px; height: 31px; }
   .career-strength-hotspot > strong,
   .career-supplement-hotspot > strong { font-size: .67rem; }
-  .career-strength-hotspot > small,
-  .career-supplement-hotspot > small,
-  .career-supplement-hotspot > em { display: none; }
+  .career-strength-hotspot > small { display: none; }
+  .career-supplement-hotspot > small { display: block; color: rgba(255, 255, 255, .88); font-size: .49rem; line-height: 1.15; }
+  .career-supplement-hotspot > em { display: block; font-size: .48rem; line-height: 1.1; }
 
   .career-strength-hotspot.zone-crossfit { left: 4%; top: 12%; }
   .career-strength-hotspot.zone-program { right: 4%; left: auto; top: 33%; }
@@ -837,6 +859,10 @@
   .career-strength-week-plan li { align-items: stretch; flex-wrap: wrap; }
   .career-strength-week-plan button { width: 100%; }
   .career-strength-result > div:last-child { position: sticky; bottom: 0; display: grid; padding-top: 10px; background: #151916; }
+  .supplement-purchase-dialog { width: calc(100% - 16px); }
+  .career-supplement-purchase-product { grid-template-columns: 42px minmax(0, 1fr); padding: 11px; }
+  .career-supplement-purchase-product > span { width: 42px; height: 42px; }
+  .career-supplement-purchase-summary { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

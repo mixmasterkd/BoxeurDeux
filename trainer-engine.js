@@ -13,7 +13,7 @@
   /*
    * Pure private-trainer contract.
    *
-   * - This engine owns only the persistent private program and its receipts.
+   * - This engine owns only the persistent private booking and its receipts.
    * - Money, energy and fatigue stay authoritative in the career/time engines;
    *   transitions return explicit deltas for those engines to apply once.
    * - Skill work is delegated to BoxeurProgression as pending stimulus. A
@@ -24,6 +24,7 @@
   const STATE_KIND = "boxeur-private-trainer";
   const LEGACY_STATE_KINDS = Object.freeze(["boxeur-v2-private-trainer"]);
   const STAT_KEYS = Object.freeze(["technique", "power", "cardio", "defense"]);
+  const TRAINER_LOCATIONS = Object.freeze(["boxing-gym", "strength-gym"]);
   const RECEIPT_LIMIT = 128;
 
   function deepFreeze(value) {
@@ -35,33 +36,78 @@
 
   const TRAINERS = deepFreeze([
     {
-      id: "club",
-      label: "Mélanie Côté",
-      tierLabel: "Entraîneuse du club",
-      sessions: 4,
-      cost: 60,
+      id: "boxing-club",
+      location: "boxing-gym",
+      targets: ["technique", "defense"],
+      label: "Olivier Martel",
+      tierLabel: "Entraîneur du club",
+      sessions: 1,
+      cost: 120,
       baseStimulus: 6,
       quality: 25,
       energyCost: 14,
       fatigue: 8,
     },
     {
-      id: "specialist",
-      label: "Jean-Paul Morin",
+      id: "boxing-specialist",
+      location: "boxing-gym",
+      targets: ["technique", "defense"],
+      label: "Maude Lavoie",
       tierLabel: "Spécialiste technique",
-      sessions: 4,
-      cost: 120,
+      sessions: 1,
+      cost: 200,
       baseStimulus: 7.5,
       quality: 65,
       energyCost: 16,
       fatigue: 10,
     },
     {
-      id: "elite",
-      label: "Nadia Bouchard",
-      tierLabel: "Entraîneuse élite",
-      sessions: 4,
-      cost: 220,
+      id: "boxing-elite",
+      location: "boxing-gym",
+      targets: ["technique", "defense"],
+      label: "Hector Vargas",
+      tierLabel: "Entraîneur élite",
+      sessions: 1,
+      cost: 320,
+      baseStimulus: 9,
+      quality: 100,
+      energyCost: 18,
+      fatigue: 12,
+    },
+    {
+      id: "strength-club",
+      location: "strength-gym",
+      targets: ["power", "cardio"],
+      label: "Kim Nguyen",
+      tierLabel: "Préparatrice du club",
+      sessions: 1,
+      cost: 120,
+      baseStimulus: 6,
+      quality: 25,
+      energyCost: 14,
+      fatigue: 8,
+    },
+    {
+      id: "strength-specialist",
+      location: "strength-gym",
+      targets: ["power", "cardio"],
+      label: "Darnell Brooks",
+      tierLabel: "Spécialiste physique",
+      sessions: 1,
+      cost: 200,
+      baseStimulus: 7.5,
+      quality: 65,
+      energyCost: 16,
+      fatigue: 10,
+    },
+    {
+      id: "strength-elite",
+      location: "strength-gym",
+      targets: ["power", "cardio"],
+      label: "Valérie Fortin",
+      tierLabel: "Préparatrice élite",
+      sessions: 1,
+      cost: 320,
       baseStimulus: 9,
       quality: 100,
       energyCost: 18,
@@ -124,8 +170,9 @@
     if (!source || typeof source !== "object") return null;
     const trainer = getTrainer(source.trainerId || source.coachId);
     if (!trainer) return null;
-    const target = STAT_KEYS.includes(source.target) ? source.target : "technique";
+    const target = trainer.targets.includes(source.target) ? source.target : trainer.targets[0];
     const sessionsTotal = Math.round(clamp(source.sessionsTotal == null ? trainer.sessions : source.sessionsTotal, 1, 99));
+    if (sessionsTotal !== 1) return null;
     const sessionsCompleted = Math.round(clamp(source.sessionsCompleted, 0, sessionsTotal));
     if (sessionsCompleted >= sessionsTotal) return null;
     const pendingTargetedXp = Math.round(clamp(source.pendingTargetedXp, 0, 99999));
@@ -141,6 +188,7 @@
       pendingTargetedXp,
       startedWeek: source.startedWeek == null ? null : String(source.startedWeek),
       costPaid: Math.round(clamp(source.costPaid == null ? trainer.cost : source.costPaid, 0, 999999)),
+      freeSessionsUsed: Math.round(clamp(source.freeSessionsUsed, 0, 1)),
     };
   }
 
@@ -194,7 +242,8 @@
 
   function listOffers(options = {}) {
     const statValue = options.statValue == null ? 40 : options.statValue;
-    return TRAINERS.map(trainer => {
+    const location = TRAINER_LOCATIONS.includes(options.location) ? options.location : null;
+    return TRAINERS.filter(trainer => !location || trainer.location === location).map(trainer => {
       const targetedXp = estimateGaugePoints(trainer.id, statValue, options);
       return {
         ...clone(trainer),
@@ -208,17 +257,20 @@
     assertState(state);
     const next = createState(state);
     if (next.activeProgram) {
-      throw trainerError("ACTIVE_PROGRAM_EXISTS", "Termine ton programme privé actuel avant d'en commencer un autre.");
+      throw trainerError("ACTIVE_PROGRAM_EXISTS", "Termine ta séance privée actuelle avant d'en acheter une autre.");
     }
     const trainer = getTrainer(String(input.trainerId || ""));
     if (!trainer) throw trainerError("UNKNOWN_TRAINER", `Entraîneur inconnu : ${input.trainerId || "aucun"}.`);
     const target = assertTarget(input.target);
+    if (!trainer.targets.includes(target)) {
+      throw trainerError("TRAINER_TARGET_UNAVAILABLE", `${trainer.label} ne travaille pas cette qualité dans ce gym.`);
+    }
     const freeSessions = Math.round(clamp(options.freeSessions, 0, trainer.sessions));
     const discount = Math.round(trainer.cost / trainer.sessions * freeSessions);
     const price = Math.max(0, trainer.cost - discount);
     const balance = clamp(options.balance, 0, Number.MAX_SAFE_INTEGER);
     if (balance < price) {
-      throw trainerError("INSUFFICIENT_FUNDS", `Il manque ${price - balance} $ pour ce programme.`, {
+      throw trainerError("INSUFFICIENT_FUNDS", `Il manque ${price - balance} $ pour cette séance.`, {
         cost: price,
         regularCost: trainer.cost,
         discount,
@@ -229,7 +281,7 @@
     const programId = normalizeId(input.programId)
       || `${trainer.id}:${target}:${startedWeek == null ? "untracked" : startedWeek}:${next.sessionReceipts.length + next.completedPrograms.length}`;
     if (next.completedPrograms.includes(programId)) {
-      throw trainerError("PROGRAM_ALREADY_COMPLETED", "Ce programme privé a déjà été complété.");
+      throw trainerError("PROGRAM_ALREADY_COMPLETED", "Cette séance privée a déjà été complétée.");
     }
     next.activeProgram = {
       id: programId,
@@ -241,13 +293,14 @@
       pendingTargetedXp: 0,
       startedWeek,
       costPaid: price,
+      freeSessionsUsed: freeSessions,
     };
     return {
       state: next,
       result: {
         program: clone(next.activeProgram),
         trainer: clone(trainer),
-        moneyDelta: -price,
+        moneyDelta: price > 0 ? -price : 0,
         remainingBalance: balance - price,
         regularCost: trainer.cost,
         discount,
@@ -275,11 +328,15 @@
   function completeSession(state, progressionState, input = {}, options = {}) {
     assertState(state);
     const next = createState(state);
+    const requestedSourceId = normalizeId(input.sourceId);
+    if (requestedSourceId && next.sessionReceipts.includes(requestedSourceId)) {
+      return duplicateSessionOutcome(next, progressionState, requestedSourceId);
+    }
     const program = next.activeProgram;
-    if (!program) throw trainerError("NO_ACTIVE_PROGRAM", "Aucun programme privé n'est actif.");
+    if (!program) throw trainerError("NO_ACTIVE_PROGRAM", "Aucune séance privée n'est active.");
     const trainer = getTrainer(program.trainerId);
     const defaultReceipt = `${program.id}:session-${program.sessionsCompleted + 1}`;
-    const sourceId = normalizeId(input.sourceId) || defaultReceipt;
+    const sourceId = requestedSourceId || defaultReceipt;
     if (next.sessionReceipts.includes(sourceId)) {
       return duplicateSessionOutcome(next, progressionState, sourceId);
     }
@@ -345,7 +402,12 @@
     next.activeProgram = null;
     return {
       state: next,
-      result: { cancelled: true, refund: 0, program: cancelled },
+      result: {
+        cancelled: true,
+        refund: cancelled.costPaid,
+        freeSessionsReturned: cancelled.freeSessionsUsed,
+        program: cancelled,
+      },
     };
   }
 
@@ -370,6 +432,7 @@
     STATE_KIND,
     LEGACY_STATE_KINDS,
     STAT_KEYS,
+    TRAINER_LOCATIONS,
     TRAINERS,
     createState,
     getTrainer,

@@ -186,6 +186,7 @@
         id: safeText(supplied.id, `home-${id}-${index + 1}`, 120),
         actionId: id,
         label: safeText(supplied.label, ACTION_BY_ID[id].label, 120),
+        supplementLabel: safeText(supplied.supplementLabel, "", 80),
         cost: wholeNumber(supplied.cost, 0, 0, 100),
         removable: supplied.removable !== false,
       });
@@ -370,7 +371,7 @@
   function renderWeekPlan(context) {
     const capacity = context.weekCapacity;
     const planned = context.plan.entries.length
-      ? `<ul class="career-home-planned-list" aria-label="Choix de la maison déjà planifiés">${context.plan.entries.map(entry => `<li><span>${escapeHTML(entry.label)}<small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}</small></span>${entry.removable ? `<button type="button" data-career-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
+      ? `<ul class="career-home-planned-list" aria-label="Choix de la maison déjà planifiés">${context.plan.entries.map(entry => `<li><span>${escapeHTML(entry.label)}<small>${entry.cost > 0 ? `−${entry.cost} capacité` : "Aucun coût de capacité"}${entry.supplementLabel ? ` · Supplément : ${escapeHTML(entry.supplementLabel)}` : ""}</small></span>${entry.removable ? `<button type="button" data-career-location-remove="${escapeHTML(entry.id)}">Retirer</button>` : `<em>Déjà joué</em>`}</li>`).join("")}</ul>`
       : `<p class="career-home-plan-empty">Aucun choix de la maison n’est encore planifié.</p>`;
     const status = capacity.full ? "Capacité de semaine épuisée" : `${capacity.remaining} de capacité hebdomadaire encore disponible`;
     const meterMax = Math.max(1, capacity.allowed);

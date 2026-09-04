@@ -91,6 +91,7 @@
       1,
       99,
     ));
+    if (sessionsTotal !== 1) return null;
     const sessionsCompleted = Math.round(boundedNumber(rawProgram.sessionsCompleted, 0, 0, sessionsTotal));
     return {
       trainerLabel: rawProgram.trainerLabel || rawProgram.coachLabel || "Entraîneur privé",
@@ -188,17 +189,11 @@
   function renderPrivateProgram(context) {
     const program = context.privateProgram;
     if (!program) {
-      return `<p class="career-fighter-empty">Aucun programme privé actif.<br><small>Les entraîneurs privés font progresser une qualité graduellement; ils n’accordent jamais un point complet instantanément.</small></p>`;
+      return `<p class="career-fighter-empty">Aucune séance privée en attente.<br><small>Chaque achat couvre une séance ciblée; son XP doit ensuite être assimilée par la récupération.</small></p>`;
     }
-    const pending = program.pendingTargetedXp > 0
-      ? `<small>${program.pendingTargetedXp} XP ciblée créée par le programme</small>`
-      : `<small>Les gains seront assimilés avec la récupération.</small>`;
-    return `<article class="career-fighter-private-program">
-      <div><span><strong>${escapeHTML(program.trainerLabel)}</strong><small>Cible : ${escapeHTML(program.targetLabel)}</small></span><b>${program.sessionsCompleted}/${program.sessionsTotal} séances</b></div>
-      <div class="career-fighter-progress" role="progressbar" aria-label="Progression du programme privé avec ${escapeHTML(program.trainerLabel)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${program.progress}">
-        <span style="width:${program.progress}%"></span>
-      </div>
-      ${pending}
+    return `<article class="career-fighter-private-program single-session">
+      <div><span><strong>${escapeHTML(program.trainerLabel)}</strong><small>Cible : ${escapeHTML(program.targetLabel)}</small></span><b>Séance réservée</b></div>
+      <small>Cette séance unique est déjà ajoutée à la semaine et créera son XP ciblée lors de l’exécution.</small>
     </article>`;
   }
 
@@ -262,7 +257,7 @@
           </section>
           ${renderMedalPalmares(context)}
           <section class="career-fighter-private" aria-labelledby="career-fighter-private-title">
-            <div class="career-fighter-section-heading"><div><p class="eyebrow">Développement ciblé</p><h3 id="career-fighter-private-title">Programme privé</h3></div><p>Un entraîneur plus expérimenté coûte davantage, mais produit plus d’XP ciblée vers la qualité choisie.</p></div>
+            <div class="career-fighter-section-heading"><div><p class="eyebrow">Développement ciblé</p><h3 id="career-fighter-private-title">Séance privée</h3></div><p>Chaque achat couvre une séance. Un entraîneur plus expérimenté coûte davantage, mais produit plus d’XP ciblée vers la qualité choisie.</p></div>
             ${renderPrivateProgram(context)}
           </section>
           <section class="career-fighter-save" aria-labelledby="career-fighter-save-title">

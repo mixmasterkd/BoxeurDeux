@@ -171,21 +171,6 @@ const tournamentNamesFemale = [
 ];
 const tournamentStyles = ["Pression", "Boxeur mobile", "Contre-attaquant", "Puncheur", "Défensif", "Complet"];
 
-// Catalogue minimal utilisé uniquement pour convertir les anciens programmes
-// privés vers le système d'entraîneur actuel.
-const LEGACY_PRIVATE_COACHES = Object.freeze([
-  { id: "renard", name: "Luc Renard", targets: ["technique", "defense"], price: 100, sessions: 4, reward: 1 },
-  { id: "morin", name: "Étienne Morin", targets: ["technique"], price: 125, sessions: 4, reward: 1 },
-  { id: "clarke", name: "Malik Clarke", targets: ["defense"], price: 130, sessions: 4, reward: 1 },
-  { id: "diaz", name: "Sofia Diaz", targets: ["technique", "defense"], price: 175, sessions: 5, reward: 2 },
-  { id: "petrov", name: "Aleksandar Petrov", targets: ["technique", "defense"], price: 310, sessions: 6, reward: 3 },
-  { id: "okoro", name: "Emmanuel Okoro", targets: ["power", "cardio"], price: 110, sessions: 4, reward: 1 },
-  { id: "silva", name: "Mateo Silva", targets: ["power"], price: 135, sessions: 4, reward: 1 },
-  { id: "kim", name: "Noah Kim", targets: ["cardio"], price: 135, sessions: 4, reward: 1 },
-  { id: "tremblay", name: "Mélanie Tremblay", targets: ["power", "cardio"], price: 185, sessions: 5, reward: 2 },
-  { id: "dubois", name: "Victor Dubois", targets: ["power", "cardio"], price: 325, sessions: 6, reward: 3 },
-]);
-
 const jobs = CAREER_BALANCE.JOBS;
 
 const REMY_TANK = Object.freeze({
@@ -588,14 +573,6 @@ function normalizeCareerState(source) {
     normalized.supplementWeek = normalized.week;
     normalized.supplementsUsed = [];
   }
-  const coach = LEGACY_PRIVATE_COACHES.find(item => item.id === source.privateProgram?.coachId);
-  const target = source.privateProgram?.target;
-  const legacyPrivateProgram = coach && coach.targets.includes(target) ? {
-    coachId: coach.id,
-    target,
-    sessionsCompleted: safeNumber(source.privateProgram.sessionsCompleted, 0, 0, Math.max(0, coach.sessions - 1)),
-    firstSessionPaid: Boolean(source.privateProgram.firstSessionPaid),
-  } : null;
   normalized.privateProgram = null;
   normalized.supplementState = window.BoxeurSupplements
     ? window.BoxeurSupplements.createState(source.supplementState || source, { weekKey: normalized.week })
@@ -603,25 +580,6 @@ function normalizeCareerState(source) {
   normalized.trainerState = window.BoxeurTrainer
     ? window.BoxeurTrainer.createState(source.trainerState || {})
     : source.trainerState && typeof source.trainerState === "object" ? cloneData(source.trainerState) : null;
-  if (window.BoxeurTrainer && legacyPrivateProgram && !normalized.trainerState.activeProgram) {
-    const trainerId = coach.reward >= 3 ? "elite" : coach.reward >= 2 ? "specialist" : "club";
-    normalized.trainerState = window.BoxeurTrainer.createState({
-      ...normalized.trainerState,
-      activeProgram: {
-        id: `legacy:${coach.id}:${target}`,
-        trainerId,
-        target,
-        sessionsTotal: coach.sessions,
-        sessionsCompleted: legacyPrivateProgram.sessionsCompleted,
-        startedWeek: normalized.week,
-        costPaid: legacyPrivateProgram.firstSessionPaid ? coach.price : 0,
-      },
-    });
-    normalized.journal.unshift({
-      week: normalized.week,
-      text: `Programme privé de ${coach.name} transféré vers le système d’entraîneur actuel sans frais supplémentaires.`,
-    });
-  }
   try {
     normalized.weekPlannerState = window.BoxeurWeekPlanner && source.weekPlannerState?.kind === window.BoxeurWeekPlanner.STATE_KIND
       ? window.BoxeurWeekPlanner.restorePlanner(source.weekPlannerState)
@@ -687,7 +645,7 @@ function grantLevelReward(level) {
       level,
       type: "private-lesson",
       title: "Un cours privé offert",
-      detail: "Le bon réduira automatiquement le prix de ton prochain programme privé d’une séance.",
+      detail: "Le bon couvrira automatiquement ta prochaine séance privée.",
     };
   }
   state.money = Math.max(0, safeNumber(state.money, 0, 0, 9999999) + 50);
@@ -2875,9 +2833,9 @@ function careerGymContext() {
       active: Boolean(boxingTrainerProgram),
       name: boxingTrainerProgram?.trainerLabel || "Entraîneur privé",
       detail: boxingTrainerProgram
-        ? `${boxingTrainerProgram.sessionsCompleted}/${boxingTrainerProgram.sessionsTotal} séances · ${combatLabels[boxingTrainerProgram.target]}`
-        : "Programme ciblé en technique ou en défense, payé pour quatre séances.",
-      actionLabel: boxingTrainerProgram ? "Continuer le programme privé" : "Choisir un entraîneur privé",
+        ? `Séance réservée · ${combatLabels[boxingTrainerProgram.target]}`
+        : "Une séance ciblée en technique ou en défense, payée à l’unité.",
+      actionLabel: boxingTrainerProgram ? "Voir ma séance réservée" : "Choisir une séance privée",
     },
     membership: {
       active: career.gymWeeks > 0,
@@ -3099,13 +3057,13 @@ function careerStrengthContext() {
       reason: trainerAccess.reason,
       active: Boolean(strengthProgram),
       name: strengthProgram?.trainerLabel || "Aucun préparateur choisi",
-      programLabel: strengthProgram ? `${combatLabels[strengthProgram.target]} · programme privé` : "Programme physique personnalisé",
+      programLabel: strengthProgram ? `${combatLabels[strengthProgram.target]} · séance privée` : "Séance physique personnalisée",
       detail: strengthProgram
-        ? `${strengthProgram.sessionsCompleted}/${strengthProgram.sessionsTotal} séances complétées. Les gains sont fractionnaires et doivent être assimilés.`
-        : "Choisis un préparateur pour cibler graduellement la puissance ou le cardio.",
+        ? "Une séance réservée dans la semaine. Son XP ciblée devra ensuite être assimilée."
+        : "Choisis une séance privée pour cibler la puissance ou le cardio.",
       sessionsCompleted: strengthProgram?.sessionsCompleted || 0,
       sessionsTotal: strengthProgram?.sessionsTotal || 0,
-      actionLabel: strengthProgram ? "Continuer mon programme" : "Choisir un préparateur",
+      actionLabel: strengthProgram ? "Voir ma séance réservée" : "Choisir une séance privée",
     },
     shop: {
       available: shopAvailable,
@@ -3530,6 +3488,123 @@ function openCareerSupplementReservation(productId) {
   activateCareerLocationSheet(sheet, "[data-career-plan-supplement-entry], [data-career-inventory-reserve-close]");
 }
 
+function careerSessionSupplementOptions(entryId) {
+  const capsule = ensureCareerPreviewCapsule();
+  const plannerState = capsule ? ensureCareerWeekPlanner(capsule) : null;
+  const entry = plannerState?.entries.find(item => item.id === entryId);
+  if (!capsule || !plannerState || !entry?.physical || entry.activityId === "sparring" || entry.metadata?.completed) {
+    return { entry: null, options: [], remainingUses: 0 };
+  }
+  const preview = window.BoxeurWeekPlanner.previewPlan(plannerState);
+  const reservations = preview.supplements.reservations || [];
+  const options = window.BoxeurSupplements.inventoryList(careerSupplementState(capsule)).map(product => {
+    const reservedElsewhere = reservations.find(reservation => (
+      reservation.productId === product.id && reservation.entryId !== entry.id
+    ));
+    if (reservedElsewhere) {
+      const otherEntry = plannerState.entries.find(item => item.id === reservedElsewhere.entryId);
+      return {
+        ...product,
+        available: false,
+        reason: `Déjà associé à ${otherEntry?.label || "une autre séance"}.`,
+        capacityAfter: entry.capacityCost,
+        capacityRelief: 0,
+      };
+    }
+    if (preview.supplements.remainingUses <= 0) {
+      return {
+        ...product,
+        available: false,
+        reason: `La limite de ${window.BoxeurSupplements.MAX_WEEKLY_USES} produits par semaine est atteinte.`,
+        capacityAfter: entry.capacityCost,
+        capacityRelief: 0,
+      };
+    }
+    if (safeNumber(preview.supplements.inventoryAvailable?.[product.id], 0, 0, 99) <= 0) {
+      return {
+        ...product,
+        available: false,
+        reason: "Toutes les unités possédées sont déjà réservées.",
+        capacityAfter: entry.capacityCost,
+        capacityRelief: 0,
+      };
+    }
+    try {
+      const quoted = careerPlannerReserveSupplementOnState(plannerState, entry.id, product.id);
+      const adjustedEntry = quoted.state.entries.find(item => item.id === entry.id);
+      return {
+        ...product,
+        available: true,
+        reason: "",
+        capacityAfter: adjustedEntry?.capacityCost ?? entry.capacityCost,
+        capacityRelief: Math.max(0, entry.capacityCost - (adjustedEntry?.capacityCost ?? entry.capacityCost)),
+      };
+    } catch (error) {
+      return {
+        ...product,
+        available: false,
+        reason: error.message || "Ce produit n’est pas disponible pour cette séance.",
+        capacityAfter: entry.capacityCost,
+        capacityRelief: 0,
+      };
+    }
+  });
+  return { entry, options, remainingUses: preview.supplements.remainingUses };
+}
+
+function openCareerSessionSupplementChoice(entryId, options = {}) {
+  const dialog = document.querySelector("#session-supplement-dialog");
+  const content = document.querySelector("#session-supplement-content");
+  if (!dialog || !content || state.careerStatus === "recreational") return false;
+  const choice = careerSessionSupplementOptions(entryId);
+  const availableProducts = choice.options.filter(product => product.available);
+  if (!choice.entry || !availableProducts.length) return false;
+  const cards = choice.options.map(product => `<article class="career-session-supplement-option${product.available ? "" : " disabled"}">
+    <div><p class="eyebrow">${escapeHTML(window.BoxeurSupplements.CATALOG[product.id]?.category || "supplément")}</p><h3>${escapeHTML(product.label)} <small>×${product.quantity}</small></h3></div>
+    <p>${escapeHTML(product.benefit)}</p>
+    <small>${product.available
+      ? `Capacité de la séance : ${choice.entry.capacityCost} → ${product.capacityAfter}${product.capacityRelief > 0 ? ` · ${product.capacityRelief} libéré` : " · effet sans changement de capacité"}`
+      : escapeHTML(product.reason)}</small>
+    <button type="button" data-career-session-supplement="${escapeHTML(product.id)}"${product.available ? "" : " disabled aria-disabled=\"true\""}>Associer à cette séance</button>
+  </article>`).join("");
+  content.innerHTML = `<div class="service-card career-session-supplement-choice">
+    <div class="service-heading"><div><p class="eyebrow">Choix facultatif</p><h2 id="career-session-supplement-title">Ajouter un supplément?</h2></div><button type="button" class="dialog-close" data-career-session-supplement-close aria-label="Fermer">×</button></div>
+    <p class="service-lead"><strong>${escapeHTML(choice.entry.label)}</strong> est maintenant dans ta semaine. Tu peux lui associer un produit tout de suite ou le faire plus tard depuis l’Inventaire.</p>
+    <div class="career-session-supplement-status"><span>${choice.remainingUses}/${window.BoxeurSupplements.MAX_WEEKLY_USES} utilisations encore disponibles cette semaine</span><span>Le produit sera consommé seulement à la confirmation de la semaine.</span></div>
+    <div class="career-session-supplement-options">${cards}</div>
+    <div class="service-actions"><button type="button" class="secondary-button" data-career-session-supplement-close>Continuer sans supplément</button></div>
+  </div>`;
+  dialog.dataset.entryId = entryId;
+  if (options.reopen) dialog.dataset.reopen = options.reopen;
+  if (options.trainerLocation) dialog.dataset.trainerLocation = options.trainerLocation;
+  dialog.showModal();
+  dialog.querySelector("[data-career-session-supplement]:not([disabled])")?.focus({ preventScroll: true });
+  return true;
+}
+
+function closeCareerSessionSupplementChoice() {
+  const dialog = document.querySelector("#session-supplement-dialog");
+  if (dialog?.open) dialog.close();
+}
+
+function reserveCareerSessionSupplement(entryId, productId, options = {}) {
+  const capsule = ensureCareerPreviewCapsule();
+  if (!capsule) return;
+  try {
+    const outcome = careerPlannerReserveSupplementOnState(ensureCareerWeekPlanner(capsule), entryId, productId);
+    const entry = outcome.state.entries.find(item => item.id === entryId);
+    const product = window.BoxeurSupplements.CATALOG[productId];
+    careerPlannerStore(capsule, outcome.state);
+    closeCareerSessionSupplementChoice();
+    if (options.trainerLocation) renderCareerTrainerMenu(options.trainerLocation);
+    else if (options.reopen) openCareerLocation(options.reopen);
+    const relief = safeNumber(entry?.metadata?.supplementCapacityRelief, 0, 0, 100);
+    showToast(`${product?.label || "Supplément"} associé à ${entry?.label || "la séance"}${relief > 0 ? ` · ${relief} de capacité libéré` : ""}`);
+  } catch (error) {
+    showToast(error.message || "Ce supplément ne peut pas être associé à cette séance.");
+  }
+}
+
 function reserveCareerPlannerSupplement(entryId, productId) {
   const capsule = ensureCareerPreviewCapsule();
   try {
@@ -3879,7 +3954,7 @@ function recordCareerWork(runtime, weekNumber, grossWages, workShifts = 1, paidV
 }
 
 const CAREER_WEEK_CAPACITY_MILESTONE_GAIN = CAREER_BALANCE.WEEK.milestoneGain;
-const CAREER_WEEK_RULESET_VERSION = 11;
+const CAREER_WEEK_RULESET_VERSION = 12;
 const CAREER_CONDITION_CRITICAL_ENERGY = CAREER_BALANCE.WEEK.condition.criticalEnergy;
 const CAREER_CONDITION_CRITICAL_FATIGUE = CAREER_BALANCE.WEEK.condition.criticalFatigue;
 const CAREER_CONDITION_FRAGILE_ENERGY = CAREER_BALANCE.WEEK.condition.fragileEnergy;
@@ -3898,6 +3973,7 @@ const CAREER_DEMANDING_ACTIVITY_IDS = new Set([
 const CAREER_DEMANDING_JOB_IDS = new Set(["courier", "warehouse"]);
 const CAREER_WEEK_ACTIVITY_LIMITS = Object.freeze({
   "group-class": 1,
+  "private-training": 1,
   rest: 2,
   meal: 1,
   sparring: 1,
@@ -4165,6 +4241,34 @@ function careerPlannerHomeAggregate(selectionInput) {
   return { selection: chosen, totals };
 }
 
+function careerPrivateTrainingDefinition(program, trainer) {
+  if (!program || !trainer) throw new Error("Aucune séance privée n’est active.");
+  const location = trainer.location || careerTrainerLocationForTarget(program.target);
+  const familyId = location === "strength-gym" ? "strength" : "boxing";
+  return {
+    id: "private-training",
+    label: `Séance privée · ${trainer.label}`,
+    category: "private-training",
+    location,
+    physical: true,
+    capacityCost: careerPlannerLoadCost(trainer.energyCost, trainer.fatigue),
+    energyCost: trainer.energyCost,
+    fatigueDelta: trainer.fatigue,
+    metadata: {
+      plannerType: "private-training",
+      programId: program.id,
+      trainerId: trainer.id,
+      target: program.target,
+      familyId,
+      programSignature: `${familyId}:private:${trainer.id}:${program.target}`,
+      capacityExtraBase: 0,
+      capacityMinimum: 4,
+      fatigueGain: trainer.fatigue,
+      fatigueRelief: 0,
+    },
+  };
+}
+
 function careerPlannerActivityDefinition(activityId, metadata = {}) {
   const id = String(activityId || "");
   if (["group-class", "boxing-coach", "boxing-custom"].includes(id)) {
@@ -4329,31 +4433,7 @@ function careerPlannerActivityDefinition(activityId, metadata = {}) {
     const runtime = normalizeCareerPreviewRuntime(capsule);
     const program = window.BoxeurTrainer.getPublicState(runtime.career.trainerState).activeProgram;
     const trainer = program ? window.BoxeurTrainer.getTrainer(program.trainerId) : null;
-    if (!program || !trainer) throw new Error("Aucun programme privé n’est actif.");
-    const location = careerTrainerLocationForTarget(program.target);
-    const familyId = location === "strength-gym" ? "strength" : "boxing";
-    return {
-      id,
-      label: `Séance privée · ${trainer.label}`,
-      category: "private-training",
-      location,
-      physical: true,
-      capacityCost: careerPlannerLoadCost(trainer.energyCost, trainer.fatigue),
-      energyCost: trainer.energyCost,
-      fatigueDelta: trainer.fatigue,
-      metadata: {
-        plannerType: id,
-        programId: program.id,
-        trainerId: trainer.id,
-        target: program.target,
-        familyId,
-        programSignature: `${familyId}:private:${trainer.id}:${program.target}`,
-        capacityExtraBase: 0,
-        capacityMinimum: 4,
-        fatigueGain: trainer.fatigue,
-        fatigueRelief: 0,
-      },
-    };
+    return careerPrivateTrainingDefinition(program, trainer);
   }
   if (id === "sparring") {
     return {
@@ -4416,7 +4496,7 @@ function careerPlannerActivityAccess(activityId) {
   }
   if (id === "private-training") {
     const program = runtime.career.trainerState?.activeProgram;
-    if (!program) return { available: false, reason: "Choisis d’abord un programme avec un entraîneur privé." };
+    if (!program) return { available: false, reason: "Achète d’abord une séance avec un entraîneur privé." };
     const physicalProgram = ["power", "cardio"].includes(program.target);
     if (physicalProgram && runtime.career.strengthGymWeeks <= 0) {
       return { available: false, reason: "Un abonnement actif au gym de musculation est requis pour ce préparateur." };
@@ -4505,6 +4585,9 @@ function careerPlannerLocationEntries(plannerState, locationId) {
       id: entry.id,
       activityId: entry.activityId,
       label: entry.metadata?.gainMultiplier < 1 ? `${entry.label} · gains 85 %` : entry.label,
+      supplementLabel: entry.supplementId
+        ? window.BoxeurSupplements.CATALOG[entry.supplementId]?.label || "Supplément"
+        : "",
       cost: entry.capacityCost,
       gainMultiplier: safeNumber(entry.metadata?.gainMultiplier, 1, .5, 1, false),
       removable: !entry.locked && !entry.metadata?.completed && !entry.metadata?.immediate,
@@ -4640,6 +4723,7 @@ function addCareerPlannerActivity(activityId, metadata = {}, options = {}) {
       : "aucun coût de capacité hebdomadaire";
     showToast(`${outcome.result.entry.label} ajouté à la semaine · ${reservationLabel}`);
     if (options.reopen) openCareerLocation(options.reopen);
+    openCareerSessionSupplementChoice(outcome.result.entry.id, { reopen: options.reopen });
     return outcome;
   } catch (error) {
     showToast(error.message || "Cette activité ne peut pas être ajoutée à la semaine.");
@@ -4660,10 +4744,29 @@ function removeCareerPlannerActivity(entryId, options = {}) {
       showToast("Le sparring commencé ne peut pas être retiré : ses 18 points de capacité ont été consommés.");
       return null;
     }
+    const runtime = normalizeCareerPreviewRuntime(capsule);
+    const activePrivateSession = runtime.career.trainerState?.activeProgram;
+    const privateCancellation = entry?.activityId === "private-training"
+      && activePrivateSession?.id === entry.metadata?.programId
+      ? window.BoxeurTrainer.cancelProgram(runtime.career.trainerState)
+      : null;
     const outcome = window.BoxeurWeekPlanner.removeActivity(plannerState, entryId);
     if (entry?.source === "work") outcome.state.workOptedOut = true;
+    if (privateCancellation?.result.cancelled) {
+      runtime.career.trainerState = privateCancellation.state;
+      runtime.career.money += privateCancellation.result.refund;
+      runtime.career.privateLessonCredits = Math.min(
+        99,
+        runtime.career.privateLessonCredits + privateCancellation.result.freeSessionsReturned,
+      );
+    }
     careerPlannerStore(capsule, outcome.state);
-    showToast(`${entry?.label || "Activité"} retiré du programme · énergie remboursée`);
+    const removalMessage = privateCancellation?.result.cancelled
+      ? privateCancellation.result.freeSessionsReturned > 0
+        ? `${entry.label} retirée · bon rendu`
+        : `${entry.label} retirée · ${privateCancellation.result.refund} $ remboursés`
+      : `${entry?.label || "Activité"} retiré du programme · énergie remboursée`;
+    showToast(removalMessage);
     if (options.reopen) openCareerLocation(options.reopen);
     return outcome;
   } catch (error) {
@@ -5543,7 +5646,7 @@ function careerPlannerExecutionPrimitive(entry, capsule, sideEffects) {
   }
   if (entry.activityId === "private-training") {
     const publicProgram = window.BoxeurTrainer.getPublicState(sideEffects.trainerState).activeProgram;
-    if (!publicProgram) throw new Error("Le programme privé planifié n’est plus actif.");
+    if (!publicProgram) throw new Error("La séance privée planifiée n’est plus active.");
     const sourceId = `${careerPlannerWeekKey(capsule)}:${entry.id}`;
     const outcome = window.BoxeurTrainer.completeSession(sideEffects.trainerState, sideEffects.progressionState, {
       sourceId,
@@ -6027,6 +6130,34 @@ function openCareerSupplementShop() {
   activateCareerLocationSheet(sheet, "[data-career-supplement-buy], [data-career-supplement-shop-close]");
 }
 
+function openCareerSupplementPurchaseConfirmation(productId) {
+  const capsule = ensureCareerPreviewCapsule();
+  const dialog = document.querySelector("#supplement-purchase-dialog");
+  const content = document.querySelector("#supplement-purchase-content");
+  const product = window.BoxeurSupplements?.CATALOG?.[productId];
+  if (!capsule || !dialog || !content || !product || !window.BoxeurStrengthView?.renderPurchaseConfirmation) return;
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const supplementState = careerSupplementState(capsule);
+  const quantity = supplementState.inventory[product.id] || 0;
+  const quote = window.BoxeurSupplements.quotePurchase(supplementState, product.id, 1, { money: runtime.career.money });
+  if (!quote.ok) return showToast(quote.reason || "Cet achat n’est pas disponible.");
+  content.innerHTML = window.BoxeurStrengthView.renderPurchaseConfirmation({
+    product,
+    quantity,
+    balance: runtime.career.money,
+    available: quote.ok,
+    reason: quote.reason || "",
+  });
+  dialog.dataset.productId = product.id;
+  dialog.showModal();
+  dialog.querySelector("[data-career-supplement-purchase-confirm]")?.focus({ preventScroll: true });
+}
+
+function closeCareerSupplementPurchaseConfirmation() {
+  const dialog = document.querySelector("#supplement-purchase-dialog");
+  if (dialog?.open) dialog.close();
+}
+
 function purchaseCareerSupplement(productId) {
   const capsule = ensureCareerPreviewCapsule();
   if (!capsule || !window.BoxeurSupplements) return;
@@ -6266,7 +6397,7 @@ function careerTrainerAccess(locationId, program = null) {
   const career = capsule ? normalizeCareerPreviewRuntime(capsule).career : null;
   if (!capsule?.timeState || !career) return { available: false, reason: "Carrière indisponible." };
   if (!["amateur", "professional"].includes(state.careerStatus)) {
-    return { available: false, reason: "Les programmes privés se débloquent après le passage amateur." };
+    return { available: false, reason: "Les séances privées se débloquent après le passage amateur." };
   }
   const membershipActive = locationId === "strength-gym" ? career.strengthGymWeeks > 0 : career.gymWeeks > 0;
   if (!membershipActive) return { available: false, reason: "Un abonnement actif dans ce gym est requis." };
@@ -6274,12 +6405,73 @@ function careerTrainerAccess(locationId, program = null) {
   if (!conditionAccess.available) return conditionAccess;
   if (program && careerTrainerLocationForTarget(program.target) !== locationId) {
     const destination = careerTrainerLocationForTarget(program.target) === "strength-gym" ? "gym de musculation" : "GYM de boxe";
-    return { available: false, reason: `Ce programme se poursuit au ${destination}.` };
+    return { available: false, reason: `Cette séance se déroule au ${destination}.` };
   }
   const trainingWindow = careerNextTrainingWindow(capsule.timeState);
   return trainingWindow.available
     ? { available: true, reason: "", label: trainingWindow.label }
     : { available: false, reason: trainingWindow.reason };
+}
+
+function quoteCareerTrainerSession(trainerId, target, locationId) {
+  const capsule = ensureCareerPreviewCapsule();
+  const trainer = window.BoxeurTrainer?.getTrainer(trainerId);
+  if (!capsule || !trainer) return { available: false, reason: "Cet entraîneur n’est pas disponible." };
+  if (trainer.location !== locationId || !trainer.targets.includes(target)) {
+    return { available: false, reason: "Cet entraîneur ne travaille pas cette qualité dans ce gym." };
+  }
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const access = careerTrainerAccess(locationId);
+  if (!access.available) return { available: false, reason: access.reason };
+  if (runtime.career.trainerState?.activeProgram) {
+    return { available: false, reason: "Une séance privée est déjà réservée dans ta semaine." };
+  }
+  const plannerState = ensureCareerWeekPlanner(capsule);
+  if (careerPlannerEntryCount(plannerState, "private-training") >= CAREER_WEEK_ACTIVITY_LIMITS["private-training"]) {
+    return { available: false, reason: "Une séance privée est déjà prévue cette semaine." };
+  }
+  const freeSessions = runtime.career.privateLessonCredits > 0 ? 1 : 0;
+  try {
+    const trainerOutcome = window.BoxeurTrainer.startProgram(runtime.career.trainerState, {
+      trainerId,
+      target,
+      startedWeek: capsule.timeState.clock.week,
+    }, {
+      balance: runtime.career.money,
+      freeSessions,
+    });
+    const definition = careerPrivateTrainingDefinition(trainerOutcome.result.program, trainerOutcome.result.trainer);
+    const plannerQuote = window.BoxeurWeekPlanner.quoteActivity(plannerState, definition);
+    if (!plannerQuote.ok) return {
+      available: false,
+      reason: plannerQuote.code === "WEEKLY_CAPACITY_EXCEEDED"
+        ? `Il faut ${definition.capacityCost} de capacité hebdomadaire pour cette séance.`
+        : plannerQuote.reason,
+      trainer,
+      definition,
+    };
+    const plannerPreview = window.BoxeurWeekPlanner.previewPlan(plannerState);
+    return {
+      available: true,
+      reason: "",
+      trainer,
+      target,
+      locationId,
+      price: -trainerOutcome.result.moneyDelta,
+      regularCost: trainerOutcome.result.regularCost,
+      freeSessionsUsed: trainerOutcome.result.freeSessionsUsed,
+      balance: runtime.career.money,
+      capacityCost: definition.capacityCost,
+      capacityBefore: plannerPreview.capacity.remaining,
+      capacityAfter: plannerQuote.capacity.remainingAfter,
+      estimatedTargetedXp: window.BoxeurTrainer.estimateGaugePoints(trainer.id, state.combatStats[target] || 40),
+      definition,
+      trainerOutcome,
+      plannerState,
+    };
+  } catch (error) {
+    return { available: false, reason: error.message || "Cette séance privée n’est pas disponible.", trainer };
+  }
 }
 
 function renderCareerTrainerMenu(locationId = "boxing-gym") {
@@ -6290,6 +6482,17 @@ function renderCareerTrainerMenu(locationId = "boxing-gym") {
   const trainerState = runtime.career.trainerState;
   const publicState = window.BoxeurTrainer.getPublicState(trainerState);
   const active = publicState.activeProgram;
+  const lessonCredits = safeNumber(runtime.career.privateLessonCredits, 0, 0, 99);
+  const plannedPrivateSession = active
+    ? ensureCareerWeekPlanner(capsule).entries.find(entry => (
+        !entry.preReserved
+        && entry.activityId === "private-training"
+        && entry.metadata?.programId === active.id
+      )) || null
+    : null;
+  const plannedPrivateSupplement = plannedPrivateSession?.supplementId
+    ? window.BoxeurSupplements.CATALOG[plannedPrivateSession.supplementId]?.label || "Supplément"
+    : "";
   const allowedTargets = locationId === "strength-gym" ? ["power", "cardio"] : ["technique", "defense"];
   if (active) careerTrainerTarget = active.target;
   else if (!allowedTargets.includes(careerTrainerTarget)) careerTrainerTarget = allowedTargets[0];
@@ -6298,41 +6501,44 @@ function renderCareerTrainerMenu(locationId = "boxing-gym") {
   let body = "";
   if (active) {
     const trainer = window.BoxeurTrainer.getTrainer(active.trainerId);
-    const correctLocation = careerTrainerLocationForTarget(active.target);
+    const correctLocation = trainer?.location || careerTrainerLocationForTarget(active.target);
     const otherLocation = correctLocation !== locationId;
     body = `<section class="career-trainer-active" aria-labelledby="career-trainer-active-title">
-      <p class="eyebrow">Programme actif</p><h3 id="career-trainer-active-title">${escapeHTML(active.trainerLabel)}</h3>
-      <p><strong>${escapeHTML(careerTrainerTargetLabel(active.target))}</strong> · ${active.sessionsCompleted}/${active.sessionsTotal} séances complétées</p>
-      <progress max="${active.sessionsTotal}" value="${active.sessionsCompleted}">${active.sessionsCompleted}/${active.sessionsTotal}</progress>
-      <p>${escapeHTML(otherLocation ? access.reason : `Prochaine séance : ${access.label || "créneau à confirmer"}. Chaque cours produit de l’XP ciblée qui doit ensuite être assimilée.`)}</p>
+      <p class="eyebrow">Séance privée réservée</p><h3 id="career-trainer-active-title">${escapeHTML(active.trainerLabel)}</h3>
+      <p><strong>${escapeHTML(careerTrainerTargetLabel(active.target))}</strong> · une seule séance</p>
+      <p>${escapeHTML(otherLocation
+        ? access.reason
+        : plannedPrivateSession
+          ? `Cette séance est ajoutée à ta semaine pour ${plannedPrivateSession.capacityCost} de capacité.${plannedPrivateSupplement ? ` Supplément réservé : ${plannedPrivateSupplement}.` : ""} Elle restera modifiable jusqu’à la confirmation.`
+          : "Cette réservation doit être replacée dans la semaine ou annulée avant de continuer.")}</p>
       ${otherLocation
         ? `<button type="button" class="primary-button" data-career-trainer-go-location="${correctLocation}">Aller au ${correctLocation === "strength-gym" ? "gym de musculation" : "GYM de boxe"}</button>`
-        : `<button type="button" class="primary-button" data-career-trainer-session${access.available ? "" : " disabled aria-disabled=\"true\""}>Ajouter la prochaine séance · −${trainer.energyCost} énergie</button>`}
-      ${!access.available && !otherLocation ? `<small class="career-trainer-reason">${escapeHTML(access.reason)}</small>` : ""}
+        : plannedPrivateSession
+          ? `<button type="button" class="secondary-button" data-career-location-remove="${escapeHTML(plannedPrivateSession.id)}">Retirer et ${active.freeSessionsUsed > 0 ? "rendre le bon" : `rembourser ${active.costPaid} $`}</button>`
+          : `<button type="button" class="secondary-button" data-career-trainer-cancel>Annuler et ${active.freeSessionsUsed > 0 ? "rendre le bon" : `rembourser ${active.costPaid} $`}</button>`}
     </section>`;
   } else {
     const targetButtons = allowedTargets.map(target => `<button type="button" data-career-trainer-target="${target}" aria-pressed="${careerTrainerTarget === target}">${escapeHTML(careerTrainerTargetLabel(target))}</button>`).join("");
     const statValue = Number(careerProgressionSnapshot(capsule)?.stats?.[careerTrainerTarget] || state.combatStats[careerTrainerTarget] || 40);
-    const lessonCredits = safeNumber(runtime.career.privateLessonCredits, 0, 0, 99);
-    const offers = window.BoxeurTrainer.listOffers({ statValue }).map(offer => {
-      const lessonDiscount = lessonCredits > 0 ? Math.round(offer.cost / offer.sessions) : 0;
+    const offers = window.BoxeurTrainer.listOffers({ statValue, location: locationId }).map(offer => {
+      const quote = quoteCareerTrainerSession(offer.id, careerTrainerTarget, locationId);
+      const lessonDiscount = lessonCredits > 0 ? offer.cost : 0;
       const currentCost = offer.cost - lessonDiscount;
-      const insufficient = runtime.career.money < currentCost;
-      const locked = !access.available || insufficient;
-      const reason = !access.available ? access.reason : insufficient ? `Il manque ${currentCost - runtime.career.money} $.` : "";
+      const capacityCost = careerPlannerLoadCost(offer.energyCost, offer.fatigue);
+      const locked = !quote.available;
       return `<article class="career-trainer-offer">
         <div><p class="eyebrow">${escapeHTML(offer.tierLabel)}</p><h3>${escapeHTML(offer.label)}</h3></div>
-        <strong>${lessonDiscount > 0 ? `<s>${offer.cost} $</s> ${currentCost} $` : `${offer.cost} $`} · ${offer.sessions} séances</strong>
-        ${lessonDiscount > 0 ? `<small class="career-trainer-gift">Bon cadeau appliqué · une séance offerte (−${lessonDiscount} $)</small>` : ""}
-        <p>Environ ${Math.round(offer.estimatedTargetedXpPerSession ?? offer.estimatedGaugePointsPerSession)} XP ciblée par séance, avant assimilation.</p>
-        <small>−${offer.energyCost} énergie · +${offer.fatigue} fatigue par séance</small>
-        <button type="button" data-career-trainer-start="${offer.id}"${locked ? " disabled aria-disabled=\"true\"" : ""}>Choisir ${escapeHTML(offer.label)}</button>
-        ${reason ? `<small class="career-trainer-reason">${escapeHTML(reason)}</small>` : ""}
+        <strong>${lessonDiscount > 0 ? `<s>${offer.cost} $</s> ${currentCost} $` : `${offer.cost} $`} · séance unique</strong>
+        ${lessonDiscount > 0 ? `<small class="career-trainer-gift">Bon cadeau appliqué · cette séance est offerte (−${lessonDiscount} $)</small>` : ""}
+        <p>Cette séance créera environ ${Math.round(offer.estimatedTargetedXpPerSession ?? offer.estimatedGaugePointsPerSession)} XP ciblée, avant assimilation.</p>
+        <small>−${capacityCost} capacité hebdomadaire · −${offer.energyCost} énergie · +${offer.fatigue} fatigue</small>
+        <button type="button" data-career-trainer-start="${offer.id}"${locked ? " disabled aria-disabled=\"true\"" : ""}>Voir et réserver cette séance</button>
+        ${quote.reason ? `<small class="career-trainer-reason">${escapeHTML(quote.reason)}</small>` : ""}
       </article>`;
     }).join("");
     body = `<section class="career-trainer-picker" aria-labelledby="career-trainer-picker-title">
       <div><p class="eyebrow">Qualité travaillée</p><h3 id="career-trainer-picker-title">Choisis une cible</h3><div class="career-trainer-targets">${targetButtons}</div></div>
-      <p>Le prix couvre le programme complet. Un entraîneur plus cher crée davantage d’XP ciblée; la récupération reste nécessaire avant tout gain de caractéristique.${lessonCredits > 0 ? ` Tu as ${lessonCredits} bon${lessonCredits > 1 ? "s" : ""} pour un cours offert.` : ""}</p>
+      <p>Chaque achat couvre une seule séance privée dans la semaine en cours. Un entraîneur plus cher crée davantage d’XP ciblée; la récupération reste nécessaire avant tout gain de caractéristique.${lessonCredits > 0 ? ` Tu as ${lessonCredits} bon${lessonCredits > 1 ? "s" : ""} pour un cours offert.` : ""}</p>
       <div class="career-trainer-offers">${offers}</div>
     </section>`;
   }
@@ -6342,52 +6548,79 @@ function renderCareerTrainerMenu(locationId = "boxing-gym") {
   sheet.classList.toggle("career-location-sheet-strength", locationId === "strength-gym");
   sheet.innerHTML = `<section class="career-service-panel career-trainer-panel" aria-labelledby="career-trainer-title">
     <header><div><p class="eyebrow">Service du ${escapeHTML(locationLabel)}</p><h2 id="career-trainer-title">${locationId === "strength-gym" ? "Entraîneurs privés" : "Entraîneur privé"}</h2></div><button type="button" class="secondary-button" data-career-trainer-close>Fermer</button></header>
-    <div class="career-service-balance">Solde disponible <strong>${runtime.career.money} $</strong></div>${body}
+    <div class="career-service-balance">Solde disponible <strong>${runtime.career.money} $</strong></div>
+    ${lessonCredits > 0 ? `<aside class="career-trainer-credit-banner" aria-label="Bon de séance privée disponible"><strong>🎫 ${lessonCredits} séance${lessonCredits > 1 ? "s" : ""} privée${lessonCredits > 1 ? "s" : ""} gratuite${lessonCredits > 1 ? "s" : ""}</strong><span>Un bon sera appliqué automatiquement à la prochaine séance choisie.</span></aside>` : ""}
+    ${body}
   </section>`;
-  activateCareerLocationSheet(sheet, active ? "[data-career-trainer-session], [data-career-trainer-go-location], [data-career-trainer-close]" : `[data-career-trainer-target="${careerTrainerTarget}"]`);
+  activateCareerLocationSheet(sheet, active ? "[data-career-location-remove], [data-career-trainer-cancel], [data-career-trainer-go-location], [data-career-trainer-close]" : `[data-career-trainer-target="${careerTrainerTarget}"]`);
 }
 
 function startCareerTrainerProgram(trainerId) {
   const capsule = ensureCareerPreviewCapsule();
   const sheet = document.querySelector("#career-world .career-location-sheet");
   const locationId = sheet?.dataset.trainerLocation || careerTrainerLocationForTarget(careerTrainerTarget);
-  if (!capsule || !window.BoxeurTrainer) return;
-  const runtime = normalizeCareerPreviewRuntime(capsule);
-  const access = careerTrainerAccess(locationId);
-  if (!access.available) return showToast(access.reason);
-  try {
-    const outcome = window.BoxeurTrainer.startProgram(runtime.career.trainerState, {
-      trainerId,
-      target: careerTrainerTarget,
-      startedWeek: capsule.timeState.clock.week,
-    }, {
-      balance: runtime.career.money,
-      freeSessions: runtime.career.privateLessonCredits > 0 ? 1 : 0,
-    });
-    runtime.career.trainerState = outcome.state;
-    runtime.career.money = outcome.result.remainingBalance;
-    if (outcome.result.freeSessionsUsed > 0) {
-      runtime.career.privateLessonCredits = Math.max(0, runtime.career.privateLessonCredits - outcome.result.freeSessionsUsed);
-    }
-    persistCareerPreviewCapsule();
-    renderCareerWorldPreview(true);
-    renderCareerTrainerMenu(locationId);
-    showToast(`${outcome.result.trainer.label} · programme de ${outcome.result.program.sessionsTotal} séances confirmé`);
-  } catch (error) {
-    showToast(error.message || "Ce programme privé ne peut pas être commencé.");
-  }
+  const dialog = document.querySelector("#trainer-session-dialog");
+  const content = document.querySelector("#trainer-session-content");
+  if (!capsule || !dialog || !content || !window.BoxeurTrainer) return;
+  const quote = quoteCareerTrainerSession(trainerId, careerTrainerTarget, locationId);
+  if (!quote.available) return showToast(quote.reason || "Cette séance privée n’est pas disponible.");
+  const priceLabel = quote.freeSessionsUsed > 0 ? `<s>${quote.regularCost} $</s> 0 $ · bon appliqué` : `${quote.price} $`;
+  content.innerHTML = `<div class="service-card career-trainer-confirmation">
+    <div class="service-heading"><div><p class="eyebrow">Séance privée unique</p><h2 id="career-trainer-confirmation-title">Confirmer avec ${escapeHTML(quote.trainer.label)}</h2></div><button type="button" class="dialog-close" data-career-trainer-confirmation-cancel aria-label="Fermer">×</button></div>
+    <p class="service-lead">Le paiement et l’ajout à la semaine seront effectués ensemble.</p>
+    <section class="career-trainer-confirmation-session"><p class="eyebrow">${escapeHTML(quote.trainer.tierLabel)}</p><h3>${escapeHTML(careerTrainerTargetLabel(quote.target))}</h3><p>Une seule séance · environ <strong>${quote.estimatedTargetedXp} XP ciblée</strong> avant assimilation.</p><small>−${quote.trainer.energyCost} énergie · +${quote.trainer.fatigue} fatigue</small></section>
+    <dl class="career-trainer-confirmation-summary"><div><dt>Prix</dt><dd>${priceLabel}</dd></div><div><dt>Solde</dt><dd>${quote.balance} $ → ${quote.balance - quote.price} $</dd></div><div><dt>Capacité semaine</dt><dd>${quote.capacityBefore} → ${quote.capacityAfter}</dd></div></dl>
+    <p class="career-trainer-confirmation-note"><strong>${quote.capacityCost} de capacité hebdomadaire seront réservés.</strong> Retirer la séance avant de confirmer la semaine rendra le paiement ou le bon.</p>
+    <div class="service-actions"><button type="button" class="secondary-button" data-career-trainer-confirmation-cancel>Annuler</button><button type="button" class="primary-button" data-career-trainer-confirm="${escapeHTML(trainerId)}">Payer et ajouter à ma semaine</button></div>
+  </div>`;
+  dialog.dataset.target = careerTrainerTarget;
+  dialog.dataset.location = locationId;
+  dialog.showModal();
+  dialog.querySelector("[data-career-trainer-confirm]")?.focus({ preventScroll: true });
 }
 
-function runCareerTrainerSession() {
+function closeCareerTrainerConfirmation() {
+  const dialog = document.querySelector("#trainer-session-dialog");
+  if (dialog?.open) dialog.close();
+}
+
+function confirmCareerTrainerSession(trainerId, target, locationId) {
   const capsule = ensureCareerPreviewCapsule();
   if (!capsule?.timeState || !window.BoxeurTrainer) return;
   const runtime = normalizeCareerPreviewRuntime(capsule);
-  const publicProgram = window.BoxeurTrainer.getPublicState(runtime.career.trainerState).activeProgram;
-  if (!publicProgram) return showToast("Aucun programme privé n’est actif.");
-  const locationId = careerTrainerLocationForTarget(publicProgram.target);
-  const access = careerTrainerAccess(locationId, publicProgram);
-  if (!access.available) return showToast(access.reason);
-  addCareerPlannerActivity("private-training", {}, { reopen: locationId });
+  const quote = quoteCareerTrainerSession(trainerId, target, locationId);
+  if (!quote.available) return showToast(quote.reason || "Cette séance privée n’est plus disponible.");
+  try {
+    const added = window.BoxeurWeekPlanner.addActivity(quote.plannerState, quote.definition, { source: "manual" });
+    runtime.career.trainerState = quote.trainerOutcome.state;
+    runtime.career.money = quote.trainerOutcome.result.remainingBalance;
+    if (quote.freeSessionsUsed > 0) {
+      runtime.career.privateLessonCredits = Math.max(0, runtime.career.privateLessonCredits - quote.freeSessionsUsed);
+    }
+    closeCareerTrainerConfirmation();
+    careerPlannerStore(capsule, added.state);
+    renderCareerTrainerMenu(locationId);
+    showToast(`${quote.trainer.label} · séance privée ajoutée · −${quote.capacityCost} de capacité`);
+    openCareerSessionSupplementChoice(added.result.entry.id, { trainerLocation: locationId });
+  } catch (error) {
+    showToast(error.message || "Cette séance privée ne peut pas être ajoutée.");
+  }
+}
+
+function cancelCareerTrainerBooking(locationId = "boxing-gym") {
+  const capsule = ensureCareerPreviewCapsule();
+  if (!capsule || !window.BoxeurTrainer) return;
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const cancelled = window.BoxeurTrainer.cancelProgram(runtime.career.trainerState);
+  if (!cancelled.result.cancelled) return;
+  runtime.career.trainerState = cancelled.state;
+  runtime.career.money += cancelled.result.refund;
+  runtime.career.privateLessonCredits = Math.min(99, runtime.career.privateLessonCredits + cancelled.result.freeSessionsReturned);
+  runtime.weekPlannerSignature = null;
+  persistCareerPreviewCapsule();
+  renderCareerWorldPreview(true);
+  renderCareerTrainerMenu(locationId);
+  showToast(cancelled.result.freeSessionsReturned > 0 ? "Séance retirée · bon rendu" : `Séance retirée · ${cancelled.result.refund} $ remboursés`);
 }
 
 async function runCareerTechnicalSparring(options = {}) {
@@ -8489,7 +8722,7 @@ document.querySelector("#career-world")?.addEventListener("click", event => {
   }
   const supplementBuy = event.target.closest("[data-career-supplement-buy]");
   if (supplementBuy) {
-    purchaseCareerSupplement(supplementBuy.dataset.careerSupplementBuy);
+    openCareerSupplementPurchaseConfirmation(supplementBuy.dataset.careerSupplementBuy);
     return;
   }
   if (event.target.closest("[data-career-supplement-shop-close]")) {
@@ -8515,8 +8748,8 @@ document.querySelector("#career-world")?.addEventListener("click", event => {
     startCareerTrainerProgram(trainerStart.dataset.careerTrainerStart);
     return;
   }
-  if (event.target.closest("[data-career-trainer-session]")) {
-    runCareerTrainerSession();
+  if (event.target.closest("[data-career-trainer-cancel]")) {
+    cancelCareerTrainerBooking(event.currentTarget.querySelector(".career-location-sheet")?.dataset.trainerLocation || "boxing-gym");
     return;
   }
   const trainerDestination = event.target.closest("[data-career-trainer-go-location]");
@@ -8780,6 +9013,64 @@ document.querySelector("#membership-options").addEventListener("click", event =>
 });
 document.querySelector("#membership-dialog-close").addEventListener("click", () => closeOptionalDialog("membership-dialog"));
 document.querySelector("#membership-dialog-cancel").addEventListener("click", () => closeOptionalDialog("membership-dialog"));
+document.querySelector("#supplement-purchase-dialog")?.addEventListener("click", event => {
+  if (event.target.closest("[data-career-supplement-purchase-cancel]")) {
+    closeCareerSupplementPurchaseConfirmation();
+    return;
+  }
+  const confirm = event.target.closest("[data-career-supplement-purchase-confirm]");
+  if (!confirm) return;
+  const productId = confirm.dataset.careerSupplementPurchaseConfirm;
+  closeCareerSupplementPurchaseConfirmation();
+  purchaseCareerSupplement(productId);
+});
+document.querySelector("#supplement-purchase-dialog")?.addEventListener("close", event => {
+  delete event.currentTarget.dataset.productId;
+  const content = document.querySelector("#supplement-purchase-content");
+  if (content) content.replaceChildren();
+});
+document.querySelector("#session-supplement-dialog")?.addEventListener("click", event => {
+  if (event.target.closest("[data-career-session-supplement-close]")) {
+    closeCareerSessionSupplementChoice();
+    return;
+  }
+  const choice = event.target.closest("[data-career-session-supplement]");
+  if (!choice) return;
+  reserveCareerSessionSupplement(
+    event.currentTarget.dataset.entryId,
+    choice.dataset.careerSessionSupplement,
+    {
+      reopen: event.currentTarget.dataset.reopen,
+      trainerLocation: event.currentTarget.dataset.trainerLocation,
+    },
+  );
+});
+document.querySelector("#session-supplement-dialog")?.addEventListener("close", event => {
+  delete event.currentTarget.dataset.entryId;
+  delete event.currentTarget.dataset.reopen;
+  delete event.currentTarget.dataset.trainerLocation;
+  const content = document.querySelector("#session-supplement-content");
+  if (content) content.replaceChildren();
+});
+document.querySelector("#trainer-session-dialog")?.addEventListener("click", event => {
+  if (event.target.closest("[data-career-trainer-confirmation-cancel]")) {
+    closeCareerTrainerConfirmation();
+    return;
+  }
+  const confirm = event.target.closest("[data-career-trainer-confirm]");
+  if (!confirm) return;
+  confirmCareerTrainerSession(
+    confirm.dataset.careerTrainerConfirm,
+    event.currentTarget.dataset.target,
+    event.currentTarget.dataset.location,
+  );
+});
+document.querySelector("#trainer-session-dialog")?.addEventListener("close", event => {
+  delete event.currentTarget.dataset.target;
+  delete event.currentTarget.dataset.location;
+  const content = document.querySelector("#trainer-session-content");
+  if (content) content.replaceChildren();
+});
 document.querySelector("#membership-dialog")?.addEventListener("cancel", event => {
   if (event.currentTarget.dataset.mandatory === "true") {
     event.preventDefault();
