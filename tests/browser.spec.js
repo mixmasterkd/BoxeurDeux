@@ -2648,6 +2648,84 @@ test("retire Prochaine étape après le premier résultat amateur sur ordinateur
   expect(fit.document).toBeLessThanOrEqual(fit.viewport + 1);
 });
 
+test("navigue gratuitement entre le quartier et le Centre-ville après le premier résultat amateur", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openStoredCareer(page, amateurSnapshot({
+    week: 7,
+    jobId: "convenience",
+    gymWeeks: 4,
+    amateurRecord: { wins: 0, losses: 0, draws: 0 },
+  }));
+
+  await expect(page.locator('.career-district-switch [data-career-district="downtown"]')).toBeDisabled();
+  await expect(page.locator('.career-district-switch [data-career-district="downtown"]')).toHaveAccessibleName(/premier combat amateur officiel/i);
+  await expect(page.getByText(/Métro/)).toHaveCount(0);
+
+  await openStoredCareer(page, amateurSnapshot({
+    week: 8,
+    jobId: "convenience",
+    gymWeeks: 4,
+    money: 740,
+    energy: 71,
+    fatigue: 18,
+    amateurRecord: { wins: 0, losses: 1, draws: 0 },
+  }));
+
+  const storageBeforeDistrictChange = await page.evaluate(() => ({
+    career: localStorage.getItem("boxeur-deux-career"),
+    runtime: localStorage.getItem("boxeur-deux-career-runtime"),
+  }));
+  await expect(page.locator('.career-district-switch [data-career-district="downtown"]')).toBeEnabled();
+  await page.locator('.career-district-switch [data-career-district="downtown"]').click();
+
+  await expect(page.locator('.career-map-panel[data-career-district-view="downtown"]')).toBeVisible();
+  await expect(page.locator('.career-district-switch [data-career-district="downtown"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".career-downtown-canvas > picture > img")).toHaveJSProperty("complete", true);
+  await expect.poll(() => page.locator(".career-downtown-canvas > picture > img").evaluate(image => image.currentSrc)).toContain("carte-centre-ville-desktop.jpg");
+  await expect(page.locator(".career-downtown-hotspot")).toHaveCount(4);
+  for (const locationId of ["leisure-center", "media-studio", "federation", "airport"]) {
+    await expect(page.locator(`[data-career-downtown-location="${locationId}"]`)).toBeDisabled();
+  }
+  await expect(page.locator('[data-career-downtown-location="leisure-center"]')).toHaveAccessibleName(/prépare encore ses activités/i);
+  await expect(page.locator('[data-career-downtown-location="airport"]')).toHaveAccessibleName(/statut professionnel/i);
+  const desktopDowntownMap = await page.locator(".career-downtown-canvas").boundingBox();
+  expect(desktopDowntownMap.width / desktopDowntownMap.height).toBeGreaterThan(1.6);
+  await expect(page.locator(".career-world-nav")).toBeVisible();
+  await expect(page.locator(".career-now-time")).toContainText("740 $");
+
+  const storageAfterDistrictChange = await page.evaluate(() => ({
+    career: localStorage.getItem("boxeur-deux-career"),
+    runtime: localStorage.getItem("boxeur-deux-career-runtime"),
+  }));
+  expect(storageAfterDistrictChange).toEqual(storageBeforeDistrictChange);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.locator(".career-downtown-canvas > picture > img").evaluate(image => image.currentSrc)).toContain("carte-centre-ville-mobile.jpg");
+  const mobileFit = await page.evaluate(() => ({
+    document: document.documentElement.scrollWidth,
+    viewport: innerWidth,
+  }));
+  expect(mobileFit.document).toBeLessThanOrEqual(mobileFit.viewport + 1);
+  const mobileDowntownMap = await page.locator(".career-downtown-canvas").boundingBox();
+  expect(mobileDowntownMap.height / mobileDowntownMap.width).toBeGreaterThan(0.98);
+  expect(mobileDowntownMap.height / mobileDowntownMap.width).toBeLessThan(1.02);
+  for (const button of await page.locator(".career-district-switch button, .career-downtown-hotspot").all()) {
+    const box = await button.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(44);
+  }
+
+  await page.locator('.career-district-switch [data-career-district="neighborhood"]').click();
+  await expect(page.locator('.career-map-panel[data-career-district-view="neighborhood"]')).toBeVisible();
+  await expect(page.locator(".career-map-hotspot")).toHaveCount(5);
+
+  await page.locator('.career-district-switch [data-career-district="downtown"]').click();
+  await expect(page.locator('.career-map-panel[data-career-district-view="downtown"]')).toBeVisible();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+  await expect(page.locator('.career-map-panel[data-career-district-view="neighborhood"]')).toBeVisible();
+  await expect(page.locator(".career-map-hotspot")).toHaveCount(5);
+});
+
 test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde compatible", async ({ page }) => {
   test.setTimeout(75_000);
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
@@ -2809,6 +2887,8 @@ test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde 
     const box = await button.boundingBox();
     expect(box && box.height).toBeGreaterThanOrEqual(44);
   }
+  await page.mouse.move(0, 0);
+  await expect.poll(() => page.locator(".career-gym-hotspot").first().evaluate(element => getComputedStyle(element).backgroundColor)).toBe("rgba(12, 15, 13, 0.28)");
   const mobileGymHotspotAppearance = await page.locator(".career-gym-hotspot").first().evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     borderStyle: getComputedStyle(element).borderStyle,
@@ -2849,6 +2929,8 @@ test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde 
   }
   const runningHotspot = page.locator('[data-career-home-zone="running"]');
   await expect(runningHotspot).toHaveAttribute("data-career-home-menu", "running");
+  await page.mouse.move(0, 0);
+  await expect.poll(() => runningHotspot.evaluate(element => getComputedStyle(element).backgroundColor)).toBe("rgba(12, 15, 13, 0.28)");
   const mobileHotspotAppearance = await runningHotspot.evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     borderStyle: getComputedStyle(element).borderStyle,

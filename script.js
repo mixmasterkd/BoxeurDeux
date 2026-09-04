@@ -2071,7 +2071,9 @@ function renderCareerWorldPreview(hasFighter = Boolean(state.profile)) {
   if (!root) return;
   root.hidden = !active;
   if (active) {
-    root.innerHTML = window.BoxeurWorld.render(careerCareerView());
+    const career = careerCareerView();
+    careerMapDistrict = window.BoxeurWorld.normalizeDistrict?.(careerMapDistrict, career) || "neighborhood";
+    root.innerHTML = window.BoxeurWorld.render(career, { district: careerMapDistrict });
     const panel = root.querySelector(".career-now-panel");
     if (panel && window.BoxeurWeekView && window.BoxeurWeek) {
       const anchorCard = panel.querySelector(".career-objective-card") || panel.querySelector(".career-now-time");
@@ -3263,6 +3265,21 @@ function careerFighterContext() {
 }
 
 let careerLocationReturnFocus = null;
+let careerMapDistrict = "neighborhood";
+
+function navigateCareerDistrict(districtId) {
+  const career = careerCareerView();
+  const normalized = ["neighborhood", "downtown"].includes(districtId) ? districtId : "neighborhood";
+  const access = window.BoxeurWorld?.districtAccess?.(normalized, career);
+  if (access?.locked) {
+    showToast(access.reason || "Cette carte n’est pas encore accessible.");
+    return;
+  }
+  if (normalized === careerMapDistrict) return;
+  careerMapDistrict = normalized;
+  renderCareerWorldPreview(true);
+  document.querySelector(`#career-world [data-career-district="${normalized}"]`)?.focus({ preventScroll: true });
+}
 
 function setCareerPrimaryNavigationView(navigation, viewId) {
   if (!navigation) return;
@@ -8521,6 +8538,11 @@ document.querySelector("#career-world")?.addEventListener("click", event => {
     const reasonId = disabledControl.getAttribute("aria-describedby");
     const reason = reasonId ? document.getElementById(reasonId)?.textContent?.trim() : "";
     showToast(reason || "Cette option n’est pas disponible maintenant.");
+    return;
+  }
+  const district = event.target.closest("[data-career-district]");
+  if (district) {
+    navigateCareerDistrict(district.dataset.careerDistrict);
     return;
   }
   const destination = event.target.closest("[data-career-location]");

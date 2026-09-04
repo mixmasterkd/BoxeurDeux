@@ -21,6 +21,18 @@
     Object.freeze({ id: "inventory", label: "Inventaire" }),
   ]);
 
+  const DISTRICTS = Object.freeze([
+    Object.freeze({ id: "neighborhood", label: "Quartier" }),
+    Object.freeze({ id: "downtown", label: "Centre-ville" }),
+  ]);
+
+  const DOWNTOWN_LOCATIONS = Object.freeze([
+    Object.freeze({ id: "leisure-center", label: "Centre de loisirs", icon: "L" }),
+    Object.freeze({ id: "media-studio", label: "Studio média", icon: "S" }),
+    Object.freeze({ id: "federation", label: "Fédération", icon: "F" }),
+    Object.freeze({ id: "airport", label: "Aéroport", icon: "✈" }),
+  ]);
+
   function escapeHTML(value) {
     return String(value == null ? "" : value)
       .replaceAll("&", "&amp;")
@@ -92,6 +104,47 @@
       : {};
     return [record.wins, record.losses, record.draws]
       .reduce((total, value) => total + Math.max(0, Number(value) || 0), 0) > 0;
+  }
+
+  function districtAccess(districtInput, career = {}) {
+    const districtId = typeof districtInput === "string" ? districtInput : districtInput?.id;
+    if (districtId !== "downtown") return { locked: false, reason: "" };
+    if (career.careerFightGate?.status === "ready") {
+      return {
+        locked: true,
+        reason: "Ta semaine est terminée. Règle maintenant le combat à l’aréna.",
+      };
+    }
+    const unlocked = career.careerStatus === "professional"
+      || (career.careerStatus === "amateur" && hasOfficialAmateurResult(career));
+    return {
+      locked: !unlocked,
+      reason: unlocked ? "" : "Disponible après ton premier combat amateur officiel.",
+    };
+  }
+
+  function normalizeDistrict(districtInput, career = {}) {
+    const requested = DISTRICTS.some(district => district.id === districtInput) ? districtInput : "neighborhood";
+    return districtAccess(requested, career).locked ? "neighborhood" : requested;
+  }
+
+  function downtownLocationAccess(locationInput, career = {}) {
+    const locationId = typeof locationInput === "string" ? locationInput : locationInput?.id;
+    if (locationId === "leisure-center") {
+      return { locked: true, status: "Ouverture prochaine", reason: "Le Centre de loisirs prépare encore ses activités." };
+    }
+    if (locationId === "media-studio") {
+      return { locked: true, status: "Bientôt disponible", reason: "Le Studio média n’accepte pas encore de rendez-vous." };
+    }
+    if (locationId === "federation") {
+      return { locked: true, status: "Bientôt disponible", reason: "Les services de la Fédération ouvriront prochainement." };
+    }
+    if (locationId === "airport") {
+      return career.careerStatus === "professional"
+        ? { locked: true, status: "Camps à venir", reason: "Les camps professionnels seront annoncés prochainement." }
+        : { locked: true, status: "Professionnel requis", reason: "Disponible au statut professionnel." };
+    }
+    return { locked: true, status: "Indisponible", reason: "Ce lieu n’est pas disponible." };
   }
 
   function objective(career) {
@@ -391,15 +444,22 @@
     return `<nav class="career-world-nav" data-career-primary-navigation data-career-navigation-view="${active}" aria-label="Navigation principale de la carrière">${buttons}</nav>`;
   }
 
-  function render(career) {
-    const prep = preparation(career);
-    const currentObjective = objective(career);
-    const firstName = career.profile?.firstName || "Boxeur";
-    const clockLabel = career.careerClock?.dayLabel && career.careerClock?.periodLabel
-      ? `${career.careerClock.dayLabel} · ${String(career.careerClock.periodLabel).toLocaleLowerCase("fr-CA")}`
-      : "Lundi · matin";
-    const dateLabel = `${clockLabel} · ${career.careerDateLabel || "date à confirmer"}`;
-    const moneyLabel = `${Math.round(Number(career.money) || 0)} $`;
+  function renderDistrictNavigation(activeDistrict, career) {
+    const buttons = DISTRICTS.map(district => {
+      const selected = district.id === activeDistrict;
+      const access = districtAccess(district.id, career);
+      const accessAttributes = access.locked
+        ? ` disabled aria-disabled="true" title="${escapeHTML(access.reason)}"`
+        : "";
+      const accessibleLabel = access.locked
+        ? `${district.label} verrouillé. ${access.reason}`
+        : `Afficher la carte : ${district.label}`;
+      return `<button${selected ? ' class="active" aria-pressed="true"' : ' aria-pressed="false"'} type="button" data-career-district="${district.id}" aria-label="${escapeHTML(accessibleLabel)}"${accessAttributes}>${escapeHTML(district.label)}</button>`;
+    }).join("");
+    return `<nav class="career-district-switch" aria-label="Choisir une carte">${buttons}</nav>`;
+  }
+
+  function renderNeighborhoodMap(career, firstName) {
     const hotspots = LOCATIONS.map(location => {
       const status = escapeHTML(locationStatus(location, career));
       const access = locationAccess(location, career);
@@ -411,16 +471,51 @@
         : `Entrer : ${location.label}. ${locationStatus(location, career)}`;
       return `<button class="career-map-hotspot" type="button" data-career-location="${location.id}" aria-label="${escapeHTML(accessibleLabel)}"${accessAttributes}><span aria-hidden="true">${access.locked ? "🔒" : location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${status}</small></button>`;
     }).join("");
+    return `<section class="career-map-panel" data-career-district-view="neighborhood" aria-label="Carte du quartier de carrière de ${escapeHTML(firstName)}">
+      <div class="career-map-heading">
+        <div><p class="eyebrow">Carte de carrière</p><h2>Quartier</h2></div>
+        ${renderDistrictNavigation("neighborhood", career)}
+      </div>
+      ${developerTestBanner(career)}
+      <div class="career-map-canvas">
+        <picture><source media="(max-width: 640px)" srcset="assets/carte-quartier-v2-mobile.jpg"><img src="assets/carte-quartier-v2-desktop.jpg" width="1440" height="810" alt="Carte illustrée du quartier avec la maison, les deux gyms, le lieu de travail et l’aréna" /></picture>
+        <div class="career-map-hotspots">${hotspots}</div>
+      </div>
+    </section>`;
+  }
+
+  function renderDowntownMap(career, firstName) {
+    const hotspots = DOWNTOWN_LOCATIONS.map(location => {
+      const access = downtownLocationAccess(location, career);
+      const accessibleLabel = `Accès verrouillé : ${location.label}. ${access.reason}`;
+      return `<button class="career-map-hotspot career-downtown-hotspot" type="button" data-career-downtown-location="${location.id}" data-career-locked="true" aria-label="${escapeHTML(accessibleLabel)}" disabled aria-disabled="true" title="${escapeHTML(access.reason)}"><span aria-hidden="true">${location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${escapeHTML(access.status)}</small></button>`;
+    }).join("");
+    return `<section class="career-map-panel career-downtown-panel" data-career-district-view="downtown" aria-label="Carte du Centre-ville de ${escapeHTML(firstName)}">
+      <div class="career-map-heading">
+        <div><p class="eyebrow">Carte de carrière</p><h2>Centre-ville</h2></div>
+        ${renderDistrictNavigation("downtown", career)}
+      </div>
+      ${developerTestBanner(career)}
+      <div class="career-map-canvas career-downtown-canvas">
+        <picture><source media="(max-width: 640px)" srcset="assets/carte-centre-ville-mobile.jpg"><img src="assets/carte-centre-ville-desktop.jpg" width="1440" height="810" alt="Carte illustrée du Centre-ville avec le Centre de loisirs, le Studio média, la Fédération et l’aéroport" /></picture>
+        <div class="career-map-hotspots">${hotspots}</div>
+      </div>
+    </section>`;
+  }
+
+  function render(career, options = {}) {
+    const prep = preparation(career);
+    const currentObjective = objective(career);
+    const firstName = career.profile?.firstName || "Boxeur";
+    const district = normalizeDistrict(options.district, career);
+    const clockLabel = career.careerClock?.dayLabel && career.careerClock?.periodLabel
+      ? `${career.careerClock.dayLabel} · ${String(career.careerClock.periodLabel).toLocaleLowerCase("fr-CA")}`
+      : "Lundi · matin";
+    const dateLabel = `${clockLabel} · ${career.careerDateLabel || "date à confirmer"}`;
+    const moneyLabel = `${Math.round(Number(career.money) || 0)} $`;
     return `<div class="career-world-layout">
       <div class="career-map-stack">
-        <section class="career-map-panel" aria-label="Carte du quartier de carrière de ${escapeHTML(firstName)}">
-          <div class="career-map-heading"><p class="eyebrow">Quartier de carrière</p></div>
-          ${developerTestBanner(career)}
-          <div class="career-map-canvas">
-            <picture><source media="(max-width: 640px)" srcset="assets/carte-quartier-v2-mobile.jpg"><img src="assets/carte-quartier-v2-desktop.jpg" width="1440" height="810" alt="Carte illustrée du quartier avec la maison, les deux gyms, le lieu de travail et l’aréna" /></picture>
-            <div class="career-map-hotspots">${hotspots}</div>
-          </div>
-        </section>
+        ${district === "downtown" ? renderDowntownMap(career, firstName) : renderNeighborhoodMap(career, firstName)}
         ${renderNavigation("map")}
       </div>
       <div class="career-side-stack">
@@ -450,5 +545,5 @@
     return `<div class="career-location-card" data-location="${location.id}"><div><p class="eyebrow">${objectiveHere ? "Destination recommandée" : "Lieu du quartier"}</p><h2>${escapeHTML(location.label)}</h2><p>${escapeHTML(location.detail)}</p></div><div class="career-location-status"><span>État du lieu</span><strong>${escapeHTML(locationStatus(location, career))}</strong></div>${workContent}${previewNote ? `<p class="career-location-preview-note">${previewNote}</p>` : ""}${actions}<button class="secondary-button" type="button" data-career-close-location>Retour à la carte</button></div>`;
   }
 
-  return Object.freeze({ LOCATIONS, PRIMARY_NAVIGATION, preparation, onboardingObjective, objective, renderNavigation, renderObjectiveCard, renderLocationGuide, isFirstJobRequired, nextAppointment, locationStatus, locationAccess, render, renderLocation });
+  return Object.freeze({ LOCATIONS, PRIMARY_NAVIGATION, DISTRICTS, DOWNTOWN_LOCATIONS, preparation, onboardingObjective, objective, renderNavigation, renderObjectiveCard, renderLocationGuide, isFirstJobRequired, nextAppointment, locationStatus, locationAccess, districtAccess, normalizeDistrict, downtownLocationAccess, render, renderLocation });
 });

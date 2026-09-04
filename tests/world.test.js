@@ -327,7 +327,7 @@ test("oriente le début amateur puis retire le tutoriel après le premier résul
   assert.equal(world.objective({ ...amateur, careerStatus: "professional" }), null);
 });
 
-test("rend les cinq destinations et les deux compositions illustrées avec de vrais boutons", () => {
+test("rend les cinq destinations du quartier et la navigation vers le Centre-ville", () => {
   const html = world.render(baseCareer());
 
   assert.equal(world.LOCATIONS.length, 5);
@@ -345,14 +345,92 @@ test("rend les cinq destinations et les deux compositions illustrées avec de vr
   assert.match(html, /class="active" aria-current="page" type="button" data-career-nav="map"/);
   assert.match(html, /data-career-nav="calendar">Calendrier/);
   assert.match(html, /<section class="career-location-sheet" role="dialog" aria-modal="true" aria-label="Lieu du quartier" tabindex="-1" hidden>/);
-  assert.equal((html.match(/<button\b/g) || []).length, 11);
-  assert.equal((html.match(/<button\b[^>]*\btype="button"/g) || []).length, 11);
+  assert.equal((html.match(/<button\b/g) || []).length, 13);
+  assert.equal((html.match(/<button\b[^>]*\btype="button"/g) || []).length, 13);
   assert.equal((html.match(/class="career-map-hotspot"/g) || []).length, 5);
+  assert.match(html, /data-career-district-view="neighborhood"/);
+  assert.match(html, /aria-label="Choisir une carte"/);
+  assert.match(html, /data-career-district="neighborhood"/);
+  assert.match(html, /data-career-district="downtown"[^>]+disabled aria-disabled="true"/);
+  assert.match(html, /Disponible après ton premier combat amateur officiel/);
+  assert.doesNotMatch(html, /Métro/);
   assert.equal((html.match(/data-career-locked="true"/g) || []).length, 2);
   assert.match(html, /data-career-location="strength-gym"[^>]+disabled aria-disabled="true"/);
   assert.match(html, /data-career-location="arena"[^>]+disabled aria-disabled="true"/);
   assert.match(html, /Accès verrouillé : Gym de musculation\. Disponible après le passage amateur\./);
   assert.match(html, /Accès verrouillé : Aréna\. Disponible après le passage amateur\./);
+});
+
+test("déverrouille le Centre-ville après un résultat amateur et le referme pendant le verrou de combat", () => {
+  const beginner = baseCareer({ careerStatus: "amateur" });
+  assert.deepEqual(world.districtAccess("downtown", beginner), {
+    locked: true,
+    reason: "Disponible après ton premier combat amateur officiel.",
+  });
+  assert.equal(world.normalizeDistrict("downtown", beginner), "neighborhood");
+
+  for (const amateurRecord of [
+    { wins: 1, losses: 0, draws: 0 },
+    { wins: 0, losses: 1, draws: 0 },
+    { wins: 0, losses: 0, draws: 1 },
+  ]) {
+    const experienced = { ...beginner, amateurRecord };
+    assert.equal(world.districtAccess("downtown", experienced).locked, false);
+    assert.equal(world.normalizeDistrict("downtown", experienced), "downtown");
+  }
+
+  assert.equal(world.districtAccess("downtown", { ...beginner, careerStatus: "professional" }).locked, false);
+  const fightGate = {
+    ...beginner,
+    amateurRecord: { wins: 1, losses: 0, draws: 0 },
+    careerFightGate: { status: "ready", kind: "gala" },
+  };
+  assert.deepEqual(world.districtAccess("downtown", fightGate), {
+    locked: true,
+    reason: "Ta semaine est terminée. Règle maintenant le combat à l’aréna.",
+  });
+  assert.equal(world.normalizeDistrict("downtown", fightGate), "neighborhood");
+});
+
+test("intègre les deux cartes du Centre-ville avec quatre lieux verrouillés et expliqués", () => {
+  const career = baseCareer({
+    careerStatus: "amateur",
+    amateurRecord: { wins: 0, losses: 1, draws: 0 },
+  });
+  const html = world.render(career, { district: "downtown" });
+
+  assert.match(html, /data-career-district-view="downtown"/);
+  assert.match(html, /srcset="assets\/carte-centre-ville-mobile\.jpg"/);
+  assert.match(html, /src="assets\/carte-centre-ville-desktop\.jpg"/);
+  assert.match(html, /Carte illustrée du Centre-ville avec le Centre de loisirs, le Studio média, la Fédération et l’aéroport/);
+  assert.doesNotMatch(html, /Métro/);
+  assert.equal(world.DOWNTOWN_LOCATIONS.length, 4);
+  assert.equal((html.match(/class="career-map-hotspot career-downtown-hotspot"/g) || []).length, 4);
+  assert.equal((html.match(/data-career-downtown-location=/g) || []).length, 4);
+  assert.equal((html.match(/data-career-locked="true"/g) || []).length, 4);
+  assert.equal((html.match(/disabled aria-disabled="true"/g) || []).length, 4);
+  assert.equal((html.match(/data-career-location=/g) || []).length, 0);
+  assert.doesNotMatch(html, /carte-quartier-v2-(?:mobile|desktop)\.jpg/);
+  assert.doesNotMatch(html, /career-downtown-placeholder|Visuel de la carte à venir/);
+  assert.match(html, /Accès verrouillé : Centre de loisirs\. Le Centre de loisirs prépare encore ses activités\./);
+  assert.match(html, /Accès verrouillé : Studio média\. Le Studio média n’accepte pas encore de rendez-vous\./);
+  assert.match(html, /Accès verrouillé : Fédération\. Les services de la Fédération ouvriront prochainement\./);
+  assert.match(html, /Accès verrouillé : Aéroport\. Disponible au statut professionnel\./);
+  assert.match(html, /data-career-primary-navigation/);
+  assert.match(html, /class="career-side-stack"/);
+});
+
+test("conserve l’aéroport verrouillé mais adapte son explication au statut professionnel", () => {
+  assert.deepEqual(world.downtownLocationAccess("airport", baseCareer({ careerStatus: "amateur" })), {
+    locked: true,
+    status: "Professionnel requis",
+    reason: "Disponible au statut professionnel.",
+  });
+  assert.deepEqual(world.downtownLocationAccess("airport", baseCareer({ careerStatus: "professional" })), {
+    locked: true,
+    status: "Camps à venir",
+    reason: "Les camps professionnels seront annoncés prochainement.",
+  });
 });
 
 test("rend les quatre états du menu principal avec une seule vue active", () => {

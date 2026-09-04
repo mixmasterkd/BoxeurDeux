@@ -107,11 +107,76 @@ body.career-preview #career-world[hidden] {
 .career-map-heading {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 14px;
   min-width: 0;
   padding: 1px 2px 9px;
 }
 
+.career-map-heading > div:first-child {
+  min-width: 0;
+}
+
+.career-map-heading .eyebrow {
+  margin: 0;
+}
+
+.career-map-heading h2 {
+  margin: 3px 0 0;
+  color: #f5f1e8;
+  font: 800 clamp(1.35rem, 2.2vw, 1.85rem)/1 "Barlow Condensed", sans-serif;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+
+.career-district-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 0 1 330px;
+  gap: 4px;
+  min-width: 250px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 11px;
+  background: rgba(9, 12, 11, .76);
+}
+
+.career-district-switch button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #bbb9b3;
+  background: transparent;
+  cursor: pointer;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .035em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.career-district-switch button:hover,
+.career-district-switch button.active {
+  border-color: rgba(255, 255, 255, .15);
+  color: #fff;
+  background: rgba(255, 255, 255, .09);
+}
+
+.career-district-switch button.active {
+  box-shadow: inset 0 -3px 0 var(--gold);
+}
+
+.career-district-switch button:disabled {
+  color: #777a76;
+  cursor: not-allowed;
+}
+
 .career-map-hotspot:focus-visible,
+.career-district-switch button:focus-visible,
 .career-world-nav button:focus-visible,
 .career-appointment-card button:focus-visible,
 .career-test-mode-banner button:focus-visible,
@@ -353,6 +418,31 @@ body.career-preview #career-world[hidden] {
 .career-map-hotspot[data-career-location="arena"] {
   left: 75%;
   top: 70%;
+}
+
+.career-downtown-hotspot[data-career-downtown-location="media-studio"] {
+  left: 21%;
+  top: 29%;
+}
+
+.career-downtown-hotspot[data-career-downtown-location="leisure-center"] {
+  left: 28%;
+  top: 68%;
+  width: clamp(158px, 18vw, 205px);
+}
+
+.career-downtown-hotspot[data-career-downtown-location="leisure-center"] strong {
+  white-space: normal;
+}
+
+.career-downtown-hotspot[data-career-downtown-location="federation"] {
+  left: 68%;
+  top: 58%;
+}
+
+.career-downtown-hotspot[data-career-downtown-location="airport"] {
+  left: 82%;
+  top: 22%;
 }
 
 .career-now-panel {
@@ -944,6 +1034,11 @@ body.career-preview #career-world[hidden] {
     padding: 11px;
   }
 
+  .career-district-switch {
+    flex-basis: 280px;
+    min-width: 220px;
+  }
+
   .career-test-mode-banner {
     align-items: stretch;
     flex-direction: column;
@@ -1006,12 +1101,31 @@ body.career-preview #career-world[hidden] {
   }
 
   .career-map-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
     padding: 1px 3px 7px;
   }
 
   .career-map-heading .eyebrow {
     margin-bottom: 3px;
     font-size: .56rem;
+  }
+
+  .career-map-heading h2 {
+    font-size: 1.35rem;
+  }
+
+  .career-district-switch {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .career-district-switch button {
+    min-height: 44px;
+    padding-inline: 6px;
+    font-size: .62rem;
   }
 
   .career-map-canvas {
@@ -1073,6 +1187,27 @@ body.career-preview #career-world[hidden] {
   .career-map-hotspot[data-career-location="arena"] {
     left: 54%;
     top: 84%;
+  }
+
+  .career-downtown-hotspot[data-career-downtown-location="airport"] {
+    left: 68%;
+    top: 14%;
+  }
+
+  .career-downtown-hotspot[data-career-downtown-location="media-studio"] {
+    left: 27%;
+    top: 31%;
+  }
+
+  .career-downtown-hotspot[data-career-downtown-location="federation"] {
+    left: 72%;
+    top: 50%;
+  }
+
+  .career-downtown-hotspot[data-career-downtown-location="leisure-center"] {
+    left: 30%;
+    top: 72%;
+    width: min(146px, 42%);
   }
 
   .career-now-panel {
