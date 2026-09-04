@@ -2740,8 +2740,15 @@ function careerWorkLocationContext() {
   const capsule = ensureCareerPreviewCapsule();
   const plannerState = capsule ? ensureCareerWeekPlanner(capsule) : null;
   const workEntry = plannerState?.entries?.find(entry => entry.source === "work") || null;
+  const paidVacationPlanned = workEntry?.metadata?.paidVacation === true;
   const job = jobs.find(item => item.id === career.jobId) || null;
   const workAccess = capsule && job ? careerPlannerWorkAccess(capsule, job) : { available: false, reason: "" };
+  const vacationBankWeeks = safeNumber(career.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS);
+  const vacationTenureWeeks = safeNumber(career.jobTenureWeeks, 0, 0, 99999);
+  const vacationEarnedAtTenure = safeNumber(career.jobVacationEarnedAtTenure, 0, 0, 99999);
+  const nextVacationAtTenure = vacationEarnedAtTenure
+    ? vacationEarnedAtTenure + PAID_VACATION_INTERVAL_WEEKS
+    : FIRST_PAID_VACATION_WEEKS;
   return {
     ...career,
     careerJobOffers: jobs.map(job => ({
@@ -2757,11 +2764,25 @@ function careerWorkLocationContext() {
     })),
     careerJobApplicationLabel: jobs.find(job => job.id === career.jobApplication?.jobId)?.title || "",
     careerWorkPlan: {
-      planned: Boolean(workEntry),
-      available: Boolean(workEntry || workAccess.available),
-      reason: workEntry ? "" : (plannerState?.workBlockedReason || workAccess.reason || ""),
+      planned: Boolean(workEntry && !paidVacationPlanned),
+      available: Boolean((workEntry && !paidVacationPlanned) || workAccess.available),
+      reason: workEntry && !paidVacationPlanned ? "" : (plannerState?.workBlockedReason || workAccess.reason || ""),
       entryId: workEntry?.id || null,
       cost: safeNumber(workEntry?.capacityCost, careerPlannerWorkCost(career.careerJob), 0, 100),
+    },
+    careerVacation: {
+      bankWeeks: vacationBankWeeks,
+      maxBankWeeks: MAX_PAID_VACATION_WEEKS,
+      tenureWeeks: vacationTenureWeeks,
+      nextAtTenure: nextVacationAtTenure,
+      nextInWeeks: vacationBankWeeks >= MAX_PAID_VACATION_WEEKS
+        ? null
+        : Math.max(0, nextVacationAtTenure - vacationTenureWeeks),
+      firstAtWeeks: FIRST_PAID_VACATION_WEEKS,
+      intervalWeeks: PAID_VACATION_INTERVAL_WEEKS,
+      planned: paidVacationPlanned,
+      available: Boolean(job && vacationBankWeeks > 0),
+      weeklyPay: job?.wage || 0,
     },
   };
 }
@@ -3842,21 +3863,23 @@ function careerWeekLedger(runtime, weekNumber) {
   runtime.weekLedgers[key] = {
     grossWages: safeNumber(supplied.grossWages, 0, 0, 99999999),
     workShifts: safeNumber(supplied.workShifts, 0, 0, 99),
+    paidVacationWeeks: safeNumber(supplied.paidVacationWeeks, 0, 0, 1),
   };
   return runtime.weekLedgers[key];
 }
 
-function recordCareerWork(runtime, weekNumber, grossWages, workShifts = 1) {
+function recordCareerWork(runtime, weekNumber, grossWages, workShifts = 1, paidVacationWeeks = 0) {
   const ledger = careerWeekLedger(runtime, weekNumber);
   const pay = safeNumber(grossWages, 0, 0, 99999999);
   const shifts = safeNumber(workShifts, 0, 0, 99);
   ledger.grossWages += pay;
   ledger.workShifts += shifts;
+  ledger.paidVacationWeeks += safeNumber(paidVacationWeeks, 0, 0, 1);
   return ledger;
 }
 
 const CAREER_WEEK_CAPACITY_MILESTONE_GAIN = CAREER_BALANCE.WEEK.milestoneGain;
-const CAREER_WEEK_RULESET_VERSION = 10;
+const CAREER_WEEK_RULESET_VERSION = 11;
 const CAREER_CONDITION_CRITICAL_ENERGY = CAREER_BALANCE.WEEK.condition.criticalEnergy;
 const CAREER_CONDITION_CRITICAL_FATIGUE = CAREER_BALANCE.WEEK.condition.criticalFatigue;
 const CAREER_CONDITION_FRAGILE_ENERGY = CAREER_BALANCE.WEEK.condition.fragileEnergy;
@@ -4013,12 +4036,55 @@ function careerPlannerSupplementConfig(capsule) {
   };
 }
 
-function careerPlannerBaseConfig(capsule = ensureCareerPreviewCapsule()) {
+function careerPlannerBaseConfig(capsule = ensureCareerPreviewCapsule(), options = {}) {
   const runtime = normalizeCareerPreviewRuntime(capsule);
   const career = careerCareerView();
   const job = jobs.find(item => item.id === runtime.career.jobId) || null;
   const capacityTotal = careerPlannerCapacityTotal();
   const workAccess = job ? careerPlannerWorkAccess(capsule, job, capacityTotal) : { available: false, reason: "" };
+  const paidVacationPlanned = options.paidVacationPlanned === true
+    && Boolean(job)
+    && safeNumber(runtime.career.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS) > 0;
+  const work = paidVacationPlanned ? {
+    id: job.id,
+    title: "Vacances payées",
+    active: true,
+    weeklyPay: job.wage,
+    capacityCost: 0,
+    energyCost: 0,
+    fatigueGain: 0,
+    shifts: [{
+      day: "friday",
+      locked: false,
+      activity: {
+        id: `paid-vacation:${job.id}`,
+        label: `Vacances payées · ${job.title}`,
+        category: "work",
+        location: "work",
+        physical: false,
+        capacityCost: 0,
+        energyCost: 0,
+        energyGain: 0,
+        fatigueDelta: 0,
+        pay: job.wage,
+        recreationalAllowed: true,
+        metadata: { jobId: job.id, paidVacation: true },
+      },
+    }],
+    locked: false,
+  } : job && workAccess.available ? {
+    id: job.id,
+    title: job.title,
+    active: true,
+    weeklyPay: job.wage,
+    capacityCost: careerPlannerWorkCost(job),
+    energyCost: Math.max(0, -Number(job.energy || 0)),
+    fatigueGain: Math.max(0, Number(job.fatigue || 0)),
+    // Une entrée représente toute la semaine de travail; elle est réglée le
+    // vendredi pour que les choix du camp influencent réellement la fatigue.
+    shifts: [{ day: "friday", locked: false }],
+    locked: false,
+  } : null;
   return {
     weekKey: careerPlannerWeekKey(capsule),
     careerStatus: state.careerStatus,
@@ -4027,20 +4093,8 @@ function careerPlannerBaseConfig(capsule = ensureCareerPreviewCapsule()) {
       unavailable: careerPlannerUnavailableCapacity(capsule, career, job, capacityTotal),
     },
     condition: cloneData(capsule.timeState.condition),
-    work: job && workAccess.available ? {
-      id: job.id,
-      title: job.title,
-      active: true,
-      weeklyPay: job.wage,
-      capacityCost: careerPlannerWorkCost(job),
-      energyCost: Math.max(0, -Number(job.energy || 0)),
-      fatigueGain: Math.max(0, Number(job.fatigue || 0)),
-      // Une entrée représente toute la semaine de travail; elle est réglée le
-      // vendredi pour que les choix du camp influencent réellement la fatigue.
-      shifts: [{ day: "friday", locked: false }],
-      locked: false,
-    } : null,
-    workBlockedReason: job && !workAccess.available ? workAccess.reason : "",
+    work,
+    workBlockedReason: job && !paidVacationPlanned && !workAccess.available ? workAccess.reason : "",
     supplements: careerPlannerSupplementConfig(capsule),
     limits: {
       recreationalPhysicalActivities: 2,
@@ -4067,6 +4121,7 @@ function careerPlannerSignature(capsule = ensureCareerPreviewCapsule()) {
     Math.round(capsule.timeState.condition.fatigue),
     runtimeCareerTrainingRhythm(runtime.career),
     runtime.career.recoveryConsequence || null,
+    runtime.career.vacationBankWeeks,
     supplementState?.inventory || {},
     supplementState?.weeklyUsage || {},
     runtime.career.trainerState?.activeProgram || null,
@@ -4385,11 +4440,13 @@ function careerPlannerActivityAccess(activityId) {
 }
 
 function careerPlannerRebuild(capsule, previous) {
-  const baseConfig = careerPlannerBaseConfig(capsule);
-  const workOptedOut = previous?.workOptedOut === true;
+  const paidVacationPlanned = previous?.paidVacationPlanned === true;
+  const baseConfig = careerPlannerBaseConfig(capsule, { paidVacationPlanned });
+  const workOptedOut = previous?.workOptedOut === true && !paidVacationPlanned;
   if (workOptedOut) baseConfig.work = null;
   let rebuilt = window.BoxeurWeekPlanner.createPlanner(baseConfig);
   rebuilt.workOptedOut = workOptedOut;
+  rebuilt.paidVacationPlanned = paidVacationPlanned && Boolean(baseConfig.work);
   rebuilt.workBlockedReason = workOptedOut ? "" : (baseConfig.workBlockedReason || "");
   const oldEntries = Array.isArray(previous?.entries) ? previous.entries.filter(entry => !entry.preReserved) : [];
   oldEntries.forEach(entry => {
@@ -4596,6 +4653,9 @@ function removeCareerPlannerActivity(entryId, options = {}) {
   try {
     const plannerState = ensureCareerWeekPlanner(capsule);
     const entry = plannerState.entries.find(item => item.id === entryId);
+    if (entry?.metadata?.paidVacation === true) {
+      return setCareerPlannerPaidVacation(false, { reopen: options.reopen });
+    }
     if (entry?.metadata?.immediate) {
       showToast("Le sparring commencé ne peut pas être retiré : ses 18 points de capacité ont été consommés.");
       return null;
@@ -4620,6 +4680,9 @@ function setCareerPlannerWorkAttendance(planned) {
   if (!job) return showToast("Choisis d’abord un emploi.");
   const plannerState = ensureCareerWeekPlanner(capsule);
   const workEntry = plannerState.entries.find(entry => entry.source === "work");
+  if (planned && workEntry?.metadata?.paidVacation === true) {
+    return setCareerPlannerPaidVacation(false);
+  }
   if (!planned) {
     if (!workEntry) return null;
     return removeCareerPlannerActivity(workEntry.id, { reopen: "work" });
@@ -4638,6 +4701,53 @@ function setCareerPlannerWorkAttendance(planned) {
     return rebuilt;
   } catch (error) {
     showToast(error.message || "Le travail ne peut pas être ajouté à cette semaine.");
+    return null;
+  }
+}
+
+function setCareerPlannerPaidVacation(planned, options = {}) {
+  const capsule = ensureCareerPreviewCapsule();
+  if (!capsule || !window.BoxeurWeekPlanner) return null;
+  const runtime = normalizeCareerPreviewRuntime(capsule);
+  const job = jobs.find(item => item.id === runtime.career.jobId) || null;
+  if (!job) return showToast("Choisis d’abord un emploi.");
+  const plannerState = ensureCareerWeekPlanner(capsule);
+  const vacationEntry = plannerState.entries.find(entry => entry.source === "work" && entry.metadata?.paidVacation === true);
+  if (planned && vacationEntry) return null;
+  if (!planned && !vacationEntry) return null;
+  if (planned && safeNumber(runtime.career.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS) <= 0) {
+    return showToast("Aucune semaine de vacances payées n’est encore en banque.");
+  }
+  try {
+    if (!planned) {
+      const access = careerPlannerWorkAccess(capsule, job);
+      if (!access.available) throw new Error(`Les vacances restent prévues : ${access.reason}`);
+    }
+    const previous = cloneData(plannerState);
+    previous.paidVacationPlanned = planned;
+    previous.workOptedOut = false;
+    const rebuilt = careerPlannerRebuild(capsule, previous);
+    const expectedManualCount = previous.entries.filter(entry => !entry.preReserved).length;
+    const rebuiltManualCount = rebuilt.entries.filter(entry => !entry.preReserved).length;
+    if (rebuiltManualCount !== expectedManualCount) {
+      throw new Error(planned
+        ? "Les vacances ne peuvent pas être ajoutées sans modifier le programme actuel."
+        : "Les vacances restent prévues : retire d’abord une activité pour pouvoir remettre le travail.");
+    }
+    const rebuiltVacation = rebuilt.entries.find(entry => entry.source === "work" && entry.metadata?.paidVacation === true);
+    const rebuiltWork = rebuilt.entries.find(entry => entry.source === "work" && entry.metadata?.paidVacation !== true);
+    if (planned && !rebuiltVacation) throw new Error("Cette semaine de vacances n’est plus disponible.");
+    if (!planned && !rebuiltWork) throw new Error("Le travail ne peut pas être remis dans cette semaine.");
+    rebuilt.revision = plannerState.revision + 1;
+    careerPlannerStore(capsule, rebuilt);
+    if (options.reopen === "week") openCareerWeekPlan();
+    else openCareerLocation("work");
+    showToast(planned
+      ? `Vacances payées prévues · ${job.wage} $ de paie maintenue`
+      : `${job.title} remis à la semaine · vacances conservées en banque`);
+    return rebuilt;
+  } catch (error) {
+    showToast(error.message || "Les vacances ne peuvent pas être modifiées cette semaine.");
     return null;
   }
 }
@@ -4742,7 +4852,7 @@ function careerWeekViewContext() {
       cost: entry.capacityCost,
       tone: entry.preReserved ? "neutral" : entry.metadata?.completed ? "positive" : entry.energyCost >= 20 ? "warning" : "positive",
       removable: !entry.locked && !entry.metadata?.completed && !entry.metadata?.immediate,
-      kindLabel: labels[entry.category] || "Activité",
+      kindLabel: entry.metadata?.paidVacation === true ? "Vacances" : labels[entry.category] || "Activité",
     };
   });
   const items = activeRecovery ? [{
@@ -4842,6 +4952,22 @@ function accrueCareerPaidVacation(runtime, job, events, week) {
   );
 }
 
+function consumeCareerPaidVacation(runtime, plannerEntries, executedEntryIds, week) {
+  const vacationEntry = plannerEntries.find(entry => (
+    entry.metadata?.paidVacation === true
+    && executedEntryIds.has(entry.id)
+  ));
+  if (!vacationEntry) return null;
+  const career = runtime.career;
+  if (safeNumber(career.vacationBankWeeks, 0, 0, MAX_PAID_VACATION_WEEKS) <= 0) {
+    throw new Error("La semaine de vacances n’est plus disponible; aucun changement n’a été appliqué.");
+  }
+  career.vacationBankWeeks -= 1;
+  const detail = `Vacances payées utilisées : la paie est maintenue, sans travail, fatigue ni absence. Banque restante : ${career.vacationBankWeeks}/${MAX_PAID_VACATION_WEEKS}.`;
+  state.journal.unshift({ week, text: detail });
+  return { label: "Vacances payées", detail, tone: "positive" };
+}
+
 function settleCareerJobAttendance(runtime, worked, events, week, excused = false) {
   const career = runtime.career;
   const job = jobs.find(item => item.id === career.jobId) || null;
@@ -4855,8 +4981,8 @@ function settleCareerJobAttendance(runtime, worked, events, week, excused = fals
       addCareerEmploymentEvent(
         events,
         week,
-        "Présence enregistrée",
-        `${job.title} : tu as travaillé, mais ${career.missedWorkWeeks}/3 absence${career.missedWorkWeeks > 1 ? "s" : ""} injustifiée${career.missedWorkWeeks > 1 ? "s" : ""} demeure${career.missedWorkWeeks > 1 ? "nt" : ""} au dossier.`,
+        ledger.paidVacationWeeks > 0 ? "Vacances enregistrées" : "Présence enregistrée",
+        `${job.title} : ${ledger.paidVacationWeeks > 0 ? "tes vacances protègent ton emploi" : "tu as travaillé"}, mais ${career.missedWorkWeeks}/3 absence${career.missedWorkWeeks > 1 ? "s" : ""} injustifiée${career.missedWorkWeeks > 1 ? "s" : ""} demeure${career.missedWorkWeeks > 1 ? "nt" : ""} au dossier.`,
         "neutral",
       );
     }
@@ -4989,7 +5115,10 @@ function careerWeeklyCompletionEvents(result, runtime, previousWeek) {
 function applyCareerUnrecoveredWorkload(result, plannerEntries, startingCondition, previousWeek) {
   const entries = Array.isArray(plannerEntries) ? plannerEntries : [];
   if (entries.some(entry => entry.activityId === "rest")) return null;
-  const demandingEntries = entries.filter(entry => entry.preReserved || entry.physical === true);
+  const demandingEntries = entries.filter(entry => (
+    (entry.preReserved && entry.metadata?.paidVacation !== true)
+    || entry.physical === true
+  ));
   if (!demandingEntries.length) return null;
 
   const capacityLoad = demandingEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry.capacityCost || 0)), 0);
@@ -5294,22 +5423,24 @@ function careerPlannerExecutionPrimitive(entry, capsule, sideEffects) {
   if (entry.preReserved) {
     const job = jobs.find(item => item.id === runtime.career.jobId);
     if (!job) throw new Error("L’emploi réservé n’existe plus.");
+    const paidVacation = entry.metadata?.paidVacation === true;
     return {
       kind: "work",
-      plannerActivityId: "work",
+      plannerActivityId: paidVacation ? "paid-vacation" : "work",
       plannerEntryId: entry.id,
       pay: job.wage,
       activity: {
-        id: `work:${job.id}`,
-        label: `Travail · ${job.title}`,
+        id: paidVacation ? `paid-vacation:${job.id}` : `work:${job.id}`,
+        label: paidVacation ? `Vacances payées · ${job.title}` : `Travail · ${job.title}`,
         category: "work",
         duration: 2,
-        energyCost: Math.max(0, -Number(job.energy || 0)),
+        energyCost: paidVacation ? 0 : Math.max(0, -Number(job.energy || 0)),
         energyGain: 0,
-        fatigueGain: Math.max(0, Number(job.fatigue || 0)),
+        fatigueGain: paidVacation ? 0 : Math.max(0, Number(job.fatigue || 0)),
         fatigueRelief: 0,
         stimulus: { technique: 0, power: 0, cardio: 0, defense: 0 },
       },
+      paidVacation,
     };
   }
   if (["group-class", "boxing-coach", "boxing-custom"].includes(entry.activityId)) {
@@ -5620,8 +5751,15 @@ function runCareerAutomaticWeek() {
       const grossWages = result.summary.actions
         .filter(record => record.kind === "work")
         .reduce((sum, record) => sum + Math.max(0, Number(record.moneyDelta || 0)), 0);
-      recordCareerWork(runtime, previousWeek, grossWages, result.summary.counts.work);
+      const paidVacationWeeks = result.summary.actions.filter(record => record.primitive?.paidVacation === true).length;
+      recordCareerWork(runtime, previousWeek, grossWages, result.summary.counts.work, paidVacationWeeks);
     }
+    const paidVacationEvent = consumeCareerPaidVacation(
+      runtime,
+      execution.plannerEntries,
+      executedEntryIds,
+      previousWeek,
+    );
     if (state.careerStatus === "recreational" && result.summary.counts.training > 0) runtime.trainingSessions += 1;
     const boxingDone = result.summary.actions.some(record => {
       const plannerActivityId = record.primitive?.plannerActivityId;
@@ -5637,6 +5775,7 @@ function runCareerAutomaticWeek() {
       previousWeek,
     );
     const completionEvents = stoppedForFight ? [] : careerWeeklyCompletionEvents(result, runtime, previousWeek);
+    if (paidVacationEvent) completionEvents.unshift(paidVacationEvent);
     if (workloadEvent) completionEvents.unshift(workloadEvent);
     const recoveryEvent = stoppedForFight
       ? null
@@ -8252,6 +8391,11 @@ document.querySelector("#career-world")?.addEventListener("click", event => {
   const workToggle = event.target.closest("[data-career-toggle-work]");
   if (workToggle) {
     setCareerPlannerWorkAttendance(workToggle.getAttribute("aria-pressed") !== "true");
+    return;
+  }
+  const vacationToggle = event.target.closest("[data-career-toggle-vacation]");
+  if (vacationToggle) {
+    setCareerPlannerPaidVacation(vacationToggle.getAttribute("aria-pressed") !== "true");
     return;
   }
   const workZone = event.target.closest("[data-career-work-zone]");

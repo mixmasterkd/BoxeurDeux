@@ -879,9 +879,19 @@ test("affiche le lieu Emploi selon le poste sans modifier sa mécanique", async 
 
   const hotspotStyle = await workView.locator('[data-career-work-zone="schedule"]').evaluate(element => {
     const style = getComputedStyle(element);
-    return { background: style.backgroundColor, border: style.borderTopStyle };
+    return {
+      background: style.backgroundColor,
+      border: style.borderTopStyle,
+      opacity: style.opacity,
+      markerContent: getComputedStyle(element, "::after").content,
+    };
   });
-  expect(hotspotStyle).toEqual({ background: "rgba(12, 15, 13, 0.56)", border: "dashed" });
+  expect(hotspotStyle).toEqual({
+    background: "rgba(12, 15, 13, 0.28)",
+    border: "dashed",
+    opacity: "0.7",
+    markerContent: "none",
+  });
 
   await page.locator('[data-career-work-zone="schedule"]').click();
   await expect(page.locator(".career-work-menu")).toContainText("Horaire de la semaine");
@@ -1405,6 +1415,14 @@ test("crédite les vacances payées après huit semaines dans le même emploi", 
     initialGymRequired: false,
   }));
 
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await expect(page.locator(".career-work-vacation-card")).toContainText("0/3 semaines en banque");
+  await expect(page.locator(".career-work-vacation-card")).toContainText("Prochaine semaine après 1 semaine travaillée");
+  await page.locator('[data-career-work-zone="schedule"]').click();
+  await expect(page.locator(".career-work-vacation-summary")).toContainText("première semaine est acquise après 8 semaines travaillées");
+  await page.locator("[data-career-work-menu-close]").click();
+  await page.locator("[data-career-leave-work]").click();
+
   await confirmWeekFromLauncher(page);
   await expect(page.locator(".career-week-summary")).toBeVisible();
   await expect(page.locator(".career-week-summary")).toContainText("Vacances acquises");
@@ -1413,6 +1431,76 @@ test("crédite les vacances payées après huit semaines dans le même emploi", 
   expect(saved.jobVacationEarnedAtTenure).toBe(8);
   expect(saved.vacationBankWeeks).toBe(1);
   expect(saved.missedWorkWeeks).toBe(0);
+});
+
+test("une semaine de vacances remplace le travail sans coût ni pénalité et reste annulable avant confirmation", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    week: 2,
+    money: 250,
+    energy: 72,
+    fatigue: 18,
+    gymWeeks: 4,
+    jobId: "courier",
+    jobTenureWeeks: 8,
+    jobVacationEarnedAtTenure: 8,
+    vacationBankWeeks: 1,
+    jobWagesEarned: 800,
+    initialGymRequired: false,
+  }));
+
+  const launcher = page.locator(".career-week-launcher");
+  const capacityWithWork = Number(await launcher.locator("progress").getAttribute("value"));
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await page.locator('[data-career-work-zone="schedule"]').click();
+  await expect(page.locator("[data-career-toggle-vacation]")).toContainText("Prendre une semaine de vacances");
+  await page.locator("[data-career-toggle-vacation]").click();
+  await expect(page.locator(".career-work-vacation-card")).toContainText("Prévues cette semaine · 100 $ de paie maintenue");
+  const capacityOnVacation = Number(await launcher.locator("progress").getAttribute("value"));
+  expect(capacityOnVacation).toBeGreaterThan(capacityWithWork);
+
+  let saved = await page.evaluate(() => ({
+    main: JSON.parse(localStorage.getItem("boxeur-deux-career")),
+    capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")),
+  }));
+  expect(saved.main.state.vacationBankWeeks).toBe(1);
+  expect(saved.capsule.previewRuntime.weekPlanner.paidVacationPlanned).toBe(true);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+  await page.getByRole("button", { name: /Entrer : Emploi/ }).click();
+  await expect(page.locator(".career-work-vacation-card")).toContainText("Prévues cette semaine");
+  await page.locator('[data-career-work-zone="schedule"]').click();
+  await expect(page.locator(".career-work-menu")).toContainText("sans coût d’énergie, de fatigue ou de capacité et sans absence");
+  await page.locator("[data-career-toggle-vacation]").click();
+  expect(Number(await launcher.locator("progress").getAttribute("value"))).toBe(capacityWithWork);
+  saved = await page.evaluate(() => ({
+    main: JSON.parse(localStorage.getItem("boxeur-deux-career")),
+    capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")),
+  }));
+  expect(saved.main.state.vacationBankWeeks).toBe(1);
+  expect(saved.capsule.previewRuntime.weekPlanner.paidVacationPlanned).toBe(false);
+
+  await page.locator('[data-career-work-zone="schedule"]').click();
+  await page.locator("[data-career-toggle-vacation]").click();
+  await page.locator("[data-career-leave-work]").click();
+  await confirmWeekFromLauncher(page);
+  await expect(page.locator(".career-week-summary")).toContainText("Vacances payées utilisées");
+  await expect(page.locator(".career-week-summary")).toContainText("Paie brute");
+  await expect(page.locator(".career-week-summary")).toContainText("+100 $");
+
+  saved = await page.evaluate(() => ({
+    main: JSON.parse(localStorage.getItem("boxeur-deux-career")),
+    capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")),
+  }));
+  expect(saved.main.state.money).toBe(350);
+  expect(saved.main.state.vacationBankWeeks).toBe(0);
+  expect(saved.main.state.missedWorkWeeks).toBe(0);
+  expect(saved.main.state.jobTenureWeeks).toBe(9);
+  expect(saved.main.state.jobWagesEarned).toBe(900);
+  expect(saved.capsule.previewRuntime.weekLedgers["2"].paidVacationWeeks).toBe(1);
+  const vacationAction = saved.capsule.previewRuntime.weeklySummaries[0].actions
+    .find(record => record.primitive?.plannerActivityId === "paid-vacation");
+  expect(vacationAction.primitive.activity.energyCost).toBe(0);
+  expect(vacationAction.primitive.activity.fatigueGain).toBe(0);
 });
 
 test("verse l’indemnité de vacances de 4 % lors d’un congédiement avec une banque active", async ({ page }) => {
@@ -2603,9 +2691,13 @@ test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde 
   const desktopGymHotspotAppearance = await page.locator(".career-gym-hotspot").first().evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     borderStyle: getComputedStyle(element).borderStyle,
+    opacity: getComputedStyle(element).opacity,
+    markerContent: getComputedStyle(element, "::after").content,
   }));
-  expect(desktopGymHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.56)");
+  expect(desktopGymHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.28)");
   expect(desktopGymHotspotAppearance.borderStyle).toBe("dashed");
+  expect(desktopGymHotspotAppearance.opacity).toBe("0.7");
+  expect(desktopGymHotspotAppearance.markerContent).toBe("none");
   await page.locator('[data-career-gym-zone="ring"]').click();
   await expect(page.locator('[data-career-sparring-state="available"]')).toContainText("Activité distincte");
   await expect(page.locator('[data-career-sparring-activity="cta"]')).toBeEnabled();
@@ -2636,9 +2728,13 @@ test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde 
   const desktopHomeHotspotAppearance = await page.locator('.career-home-hotspot:not(:disabled):not([aria-disabled="true"])').first().evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     borderStyle: getComputedStyle(element).borderStyle,
+    opacity: getComputedStyle(element).opacity,
+    markerContent: getComputedStyle(element, "::after").content,
   }));
-  expect(desktopHomeHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.56)");
+  expect(desktopHomeHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.28)");
   expect(desktopHomeHotspotAppearance.borderStyle).toBe("dashed");
+  expect(desktopHomeHotspotAppearance.opacity).toBe("0.7");
+  expect(desktopHomeHotspotAppearance.markerContent).toBe("none");
   await page.keyboard.press("Escape");
 
   await page.locator('[data-career-nav="inventory"]').click();
@@ -2690,9 +2786,13 @@ test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde 
   const mobileGymHotspotAppearance = await page.locator(".career-gym-hotspot").first().evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     borderStyle: getComputedStyle(element).borderStyle,
+    opacity: getComputedStyle(element).opacity,
+    markerContent: getComputedStyle(element, "::after").content,
   }));
-  expect(mobileGymHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.56)");
+  expect(mobileGymHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.28)");
   expect(mobileGymHotspotAppearance.borderStyle).toBe("dashed");
+  expect(mobileGymHotspotAppearance.opacity).toBe("0.7");
+  expect(mobileGymHotspotAppearance.markerContent).toBe("none");
   await page.locator('[data-career-gym-zone="coach"]').click();
   await page.locator("[data-career-coach-session]").scrollIntoViewIfNeeded();
   const mobileCoachButton = await page.locator("[data-career-coach-session]").boundingBox();
@@ -2707,7 +2807,7 @@ test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde 
   await page.getByRole("button", { name: /Entrer : Maison/ }).click();
   await expect(page.locator(".career-home-view")).toBeVisible();
   await expect(page.locator("[data-career-home-zone]")).toHaveCount(4);
-  await expect(page.locator(".career-home-hotspot")).toHaveCount(3);
+  await expect(page.locator(".career-home-hotspot")).toHaveCount(4);
   await expect.poll(() => page.locator(".career-home-scene > picture > img").evaluate(image => image.currentSrc)).toContain("maison-v2-mobile.jpg");
   const mobileHomeScene = await page.locator(".career-home-scene").boundingBox();
   expect(mobileHomeScene.height / mobileHomeScene.width).toBeGreaterThan(0.98);
@@ -2726,9 +2826,13 @@ test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde 
   const mobileHotspotAppearance = await runningHotspot.evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     borderStyle: getComputedStyle(element).borderStyle,
+    opacity: getComputedStyle(element).opacity,
+    markerContent: getComputedStyle(element, "::after").content,
   }));
-  expect(mobileHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.56)");
+  expect(mobileHotspotAppearance.background).toBe("rgba(12, 15, 13, 0.28)");
   expect(mobileHotspotAppearance.borderStyle).toBe("dashed");
+  expect(mobileHotspotAppearance.opacity).toBe("0.7");
+  expect(mobileHotspotAppearance.markerContent).toBe("none");
   const mobileRunningBox = await runningHotspot.boundingBox();
   const mobileRunningX = (mobileRunningBox.x + mobileRunningBox.width / 2 - mobileHomeScene.x) / mobileHomeScene.width;
   const mobileRunningY = (mobileRunningBox.y + mobileRunningBox.height / 2 - mobileHomeScene.y) / mobileHomeScene.height;

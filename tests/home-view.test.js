@@ -64,15 +64,13 @@ test("conserve les deux illustrations et les quatre hotspots interactifs", () =>
   assert.match(html, /Appartement illustré avec cuisine, salon, chambre et espace d’entraînement au sous-sol/);
 });
 
-test("propose seulement le frigo comme prototype visuel pour ouvrir la cuisine", () => {
+test("présente la cuisine avec le même bouton standard que les autres zones", () => {
   const html = homeView.render(baseContext());
 
-  assert.match(html, /career-home-fridge-prototype/);
-  assert.match(html, /career-home-fridge-button[^>]+data-career-home-zone="kitchen"[^>]+data-career-home-menu="kitchen"/);
-  assert.match(html, /career-home-fridge-image-desktop[^>]+assets\/maison-v2-desktop\.jpg/);
-  assert.match(html, /career-home-fridge-image-mobile[^>]+assets\/maison-v2-mobile\.jpg/);
-  assert.match(html, /career-home-fridge-title[^>]*>Cuisine<\/span>/);
-  assert.doesNotMatch(html, /career-home-hotspot-kitchen/);
+  assert.match(html, /career-home-hotspot-wrap career-home-hotspot-kitchen/);
+  assert.match(html, /career-home-hotspot[^>]+data-career-home-zone="kitchen"[^>]+data-career-home-menu="kitchen"/);
+  assert.match(html, /<strong>Cuisine<\/strong><small>Voir les repas de récupération<\/small>/);
+  assert.doesNotMatch(html, /career-home-fridge-(?:prototype|button|frame|image|title)/);
 });
 
 test("affiche le repère de semaine, les jauges et le conseil avant de planifier", () => {
@@ -305,4 +303,6 @@ test("la CSS conserve le scroll mobile, les cibles tactiles et les états sans d
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.career-home-view\s*\{[^}]*width:\s*100%[^}]*min-height:\s*100dvh/s);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.career-home-action > button\s*\{[^}]*min-height:\s*48px[^}]*rgba\([^)]*, \.8\)/s);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.doesNotMatch(css, /\.career-home-hotspot::after\s*\{/);
+  assert.doesNotMatch(css, /\.career-home-fridge-/);
 });

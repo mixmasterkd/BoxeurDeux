@@ -19,6 +19,15 @@ function activeContext(overrides = {}) {
       detail: "Une paie solide avec de longues journées.",
     },
     careerWorkPlan: { planned: true, cost: 30 },
+    careerVacation: {
+      bankWeeks: 0,
+      maxBankWeeks: 3,
+      tenureWeeks: 3,
+      nextAtTenure: 8,
+      nextInWeeks: 5,
+      firstAtWeeks: 8,
+      intervalWeeks: 12,
+    },
     careerJobOffers: [
       { id: "convenience", title: "Commis de dépanneur", wage: 75, schedule: "Horaire souple", interviewWeeks: 1, energy: -14, fatigue: 10, weekCapacityCost: 15, detail: "Facile à concilier." },
       { id: "courier", title: "Coursier local", wage: 100, schedule: "Horaire variable", interviewWeeks: 2, energy: -20, fatigue: 16, weekCapacityCost: 22, detail: "Plus de kilomètres." },
@@ -42,6 +51,8 @@ test("rend un environnement adapté à l’emploi actif avec les zones de travai
   assert.match(html, /data-career-leave-work>Retour à la carte/);
   assert.match(html, /120 \$/);
   assert.match(html, /30 capacité/);
+  assert.match(html, /0\/3 semaines en banque/);
+  assert.match(html, /Prochaine semaine après 5 semaines travaillées/);
 });
 
 test("affiche le babillard quand aucun emploi n’est actif", () => {
@@ -97,6 +108,78 @@ test("garde la bascule hebdomadaire dans le menu Horaire", () => {
   assert.match(html, /aucune paie/);
   assert.match(html, /data-career-toggle-work aria-pressed="false">Ajouter le travail à ma semaine/);
   assert.match(html, /data-career-work-menu-close>Retour à l’emploi/);
+  assert.match(html, /career-work-vacation-summary/);
+  assert.match(html, /première semaine est acquise après 8 semaines travaillées/);
+});
+
+test("rend immédiatement lisibles une semaine de vacances acquise et une banque pleine", () => {
+  const available = work.render(activeContext({
+    careerVacation: {
+      bankWeeks: 1,
+      maxBankWeeks: 3,
+      tenureWeeks: 8,
+      nextAtTenure: 20,
+      nextInWeeks: 12,
+      firstAtWeeks: 8,
+      intervalWeeks: 12,
+    },
+  }));
+  const full = work.render(activeContext({
+    careerVacation: {
+      bankWeeks: 3,
+      maxBankWeeks: 3,
+      tenureWeeks: 32,
+      nextAtTenure: 44,
+      nextInWeeks: null,
+      firstAtWeeks: 8,
+      intervalWeeks: 12,
+    },
+  }));
+
+  assert.match(available, /1\/3 semaine en banque/);
+  assert.match(available, /Prochaine semaine après 12 semaines travaillées/);
+  assert.equal((available.match(/class="filled"/g) || []).length, 1);
+  assert.match(full, /3\/3 semaines en banque/);
+  assert.match(full, /Banque complète/);
+  assert.equal((full.match(/class="filled"/g) || []).length, 3);
+});
+
+test("permet de prévoir puis d’annuler une semaine de vacances depuis l’horaire", () => {
+  const available = work.renderMenu("schedule", activeContext({
+    careerVacation: {
+      bankWeeks: 1,
+      maxBankWeeks: 3,
+      tenureWeeks: 8,
+      nextAtTenure: 20,
+      nextInWeeks: 12,
+      firstAtWeeks: 8,
+      intervalWeeks: 12,
+      planned: false,
+      available: true,
+      weeklyPay: 120,
+    },
+  }));
+  const planned = work.renderMenu("schedule", activeContext({
+    careerWorkPlan: { planned: false, available: true, cost: 0 },
+    careerVacation: {
+      bankWeeks: 1,
+      maxBankWeeks: 3,
+      tenureWeeks: 8,
+      nextAtTenure: 20,
+      nextInWeeks: 12,
+      firstAtWeeks: 8,
+      intervalWeeks: 12,
+      planned: true,
+      available: true,
+      weeklyPay: 120,
+    },
+  }));
+
+  assert.match(available, /data-career-toggle-vacation aria-pressed="false">Prendre une semaine de vacances/);
+  assert.match(planned, /Prévues cette semaine · 120 \$ de paie maintenue/);
+  assert.match(planned, /sans coût d’énergie, de fatigue ou de capacité et sans absence/);
+  assert.match(planned, /data-career-toggle-vacation aria-pressed="true">Annuler mes vacances et remettre le travail/);
+  assert.doesNotMatch(planned, /data-career-toggle-work/);
 });
 
 test("présente les absences injustifiées comme un compteur cumulatif chez l’employeur", () => {

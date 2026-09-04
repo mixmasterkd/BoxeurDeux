@@ -79,6 +79,7 @@
     const rawJob = raw.careerJob && typeof raw.careerJob === "object" ? raw.careerJob : null;
     const rawApplication = raw.jobApplication && typeof raw.jobApplication === "object" ? raw.jobApplication : null;
     const rawPlan = raw.careerWorkPlan && typeof raw.careerWorkPlan === "object" ? raw.careerWorkPlan : {};
+    const rawVacation = raw.careerVacation && typeof raw.careerVacation === "object" ? raw.careerVacation : {};
     const offers = Array.isArray(raw.careerJobOffers) && raw.careerJobOffers.length
       ? raw.careerJobOffers.slice(0, 4).map(normalizeOffer)
       : DEFAULT_OFFERS;
@@ -116,18 +117,70 @@
         reason: safeText(rawPlan.reason, "", 260),
         cost: wholeNumber(rawPlan.cost, 0, 0, 100),
       },
+      vacation: {
+        bankWeeks: wholeNumber(rawVacation.bankWeeks ?? raw.vacationBankWeeks, 0, 0, 3),
+        maxBankWeeks: wholeNumber(rawVacation.maxBankWeeks, 3, 1, 12),
+        tenureWeeks: wholeNumber(rawVacation.tenureWeeks ?? raw.jobTenureWeeks, 0, 0, 99999),
+        nextAtTenure: wholeNumber(rawVacation.nextAtTenure, 8, 1, 99999),
+        nextInWeeks: rawVacation.nextInWeeks == null
+          ? null
+          : wholeNumber(rawVacation.nextInWeeks, 0, 0, 99999),
+        firstAtWeeks: wholeNumber(rawVacation.firstAtWeeks, 8, 1, 99999),
+        intervalWeeks: wholeNumber(rawVacation.intervalWeeks, 12, 1, 99999),
+        planned: rawVacation.planned === true,
+        available: rawVacation.available === true,
+        weeklyPay: wholeNumber(rawVacation.weeklyPay, job?.wage || 0, 0, 999999),
+      },
       missedWorkWeeks: wholeNumber(raw.missedWorkWeeks, 0, 0, 2),
       firstJobRequired: raw.introJobRequired === true && wholeNumber(raw.jobsHeldCount, 0, 0, 999) === 0 && !job,
     };
   }
 
+  function vacationCopy(vacation) {
+    const full = vacation.bankWeeks >= vacation.maxBankWeeks;
+    const bankLabel = `${vacation.bankWeeks}/${vacation.maxBankWeeks} semaine${vacation.bankWeeks === 1 ? "" : "s"} en banque`;
+    if (full) {
+      return {
+        bankLabel,
+        nextLabel: "Banque complète",
+        detail: `La banque est au maximum. Elle peut contenir jusqu’à ${vacation.maxBankWeeks} semaines payées.`,
+      };
+    }
+    const remaining = vacation.nextInWeeks == null
+      ? Math.max(0, vacation.nextAtTenure - vacation.tenureWeeks)
+      : vacation.nextInWeeks;
+    const nextLabel = remaining <= 0
+      ? "Crédit à la prochaine semaine travaillée"
+      : remaining === 1
+        ? "Prochaine semaine après 1 semaine travaillée"
+        : `Prochaine semaine après ${remaining} semaines travaillées`;
+    return {
+      bankLabel,
+      nextLabel,
+      detail: `La première semaine est acquise après ${vacation.firstAtWeeks} semaines travaillées chez le même employeur, puis une autre toutes les ${vacation.intervalWeeks} semaines.`,
+    };
+  }
+
+  function renderVacationStatus(context, compact = false) {
+    const copy = vacationCopy(context.vacation);
+    const pips = Array.from({ length: context.vacation.maxBankWeeks }, (_, index) => `<span${index < context.vacation.bankWeeks ? ' class="filled"' : ""} aria-hidden="true"></span>`).join("");
+    const tag = compact ? "div" : "section";
+    const cardClass = compact ? "career-work-vacation-summary" : "career-work-vacation-card career-place-card";
+    const planned = context.vacation.planned
+      ? `<em class="career-work-vacation-planned">Prévues cette semaine · ${context.vacation.weeklyPay} $ de paie maintenue</em>`
+      : "";
+    return `<${tag} class="${cardClass}"><span>Vacances payées</span><strong>${escapeHTML(copy.bankLabel)}</strong>${planned}<div class="career-work-vacation-meter" role="img" aria-label="${escapeHTML(copy.bankLabel)}">${pips}</div><p><b>${escapeHTML(copy.nextLabel)}.</b> ${escapeHTML(copy.detail)}</p></${tag}>`;
+  }
+
   function renderWorkZones(context) {
     if (!context.job) return "";
-    const scheduleDetail = context.plan.planned
-      ? `Travail prévu · −${context.plan.cost} capacité`
-      : context.plan.available
-        ? "Réintégrer le travail à la semaine"
-        : `Travail indisponible · ${context.plan.reason}`;
+    const scheduleDetail = context.vacation.planned
+      ? `Vacances prévues · ${context.vacation.weeklyPay} $ maintenus`
+      : context.plan.planned
+        ? `Travail prévu · −${context.plan.cost} capacité`
+        : context.plan.available
+          ? "Réintégrer le travail à la semaine"
+          : `Travail indisponible · ${context.plan.reason}`;
     const applicationDetail = context.application
       ? `Candidature : ${context.application.progress}/${context.application.requiredWeeks}`
       : "Voir mon emploi et les offres";
@@ -176,7 +229,7 @@
     const attendance = context.missedWorkWeeks
       ? `<p class="career-work-attendance-warning"><strong>${context.missedWorkWeeks}/3 absence${context.missedWorkWeeks > 1 ? "s" : ""} injustifiée${context.missedWorkWeeks > 1 ? "s" : ""} cumulée${context.missedWorkWeeks > 1 ? "s" : ""}.</strong> Elles restent au dossier chez cet employeur; la troisième entraîne le congédiement.</p>`
       : "";
-    return `<section class="career-work-status-card career-place-card"><span>Emploi actuel</span><strong>${escapeHTML(context.job.title)}</strong><dl><div><dt>Paie hebdomadaire</dt><dd>${context.job.wage} $</dd></div><div><dt>Horaire</dt><dd>${escapeHTML(context.job.schedule)}</dd></div></dl><p>${escapeHTML(context.job.detail)}</p>${attendance}</section>`;
+    return `<section class="career-work-status-card career-place-card"><span>Emploi actuel</span><strong>${escapeHTML(context.job.title)}</strong><dl><div><dt>Paie hebdomadaire</dt><dd>${context.job.wage} $</dd></div><div><dt>Horaire</dt><dd>${escapeHTML(context.job.schedule)}</dd></div></dl><p>${escapeHTML(context.job.detail)}</p>${attendance}</section>${renderVacationStatus(context)}`;
   }
 
   function render(rawContext) {
@@ -192,15 +245,20 @@
 
   function renderScheduleMenu(context) {
     if (!context.job) return "";
-    const status = context.plan.planned
-      ? `Le travail est prévu cette semaine et réserve ${context.plan.cost} points de capacité. Tu peux le retirer avant la confirmation.`
-      : context.plan.available
-        ? "Tu as retiré le travail de cette semaine : la capacité est libérée, mais tu ne recevras aucune paie et cette semaine comptera comme une absence."
-        : context.plan.reason || "Ton état actuel ne permet pas d’assurer le travail cette semaine.";
+    const status = context.vacation.planned
+      ? `Les vacances remplacent le travail cette semaine. La paie de ${context.vacation.weeklyPay} $ est maintenue, sans coût d’énergie, de fatigue ou de capacité et sans absence.`
+      : context.plan.planned
+        ? `Le travail est prévu cette semaine et réserve ${context.plan.cost} points de capacité. Tu peux le retirer avant la confirmation.`
+        : context.plan.available
+          ? "Tu as retiré le travail de cette semaine : la capacité est libérée, mais tu ne recevras aucune paie et cette semaine comptera comme une absence."
+          : context.plan.reason || "Ton état actuel ne permet pas d’assurer le travail cette semaine.";
     const buttonLabel = context.plan.planned
       ? "Retirer le travail de ma semaine"
       : context.plan.available ? "Ajouter le travail à ma semaine" : "Travail indisponible cette semaine";
-    return `<section class="career-work-menu" aria-labelledby="career-work-menu-title"><header><div><p class="eyebrow">${escapeHTML(context.job.title)}</p><h2 id="career-work-menu-title">Horaire de la semaine</h2></div><button type="button" class="secondary-button" data-career-work-menu-close>Retour à l’emploi</button></header><div class="career-work-menu-card"><p><strong>Le salaire affiché est hebdomadaire.</strong> ${escapeHTML(status)}</p><button type="button" class="${context.plan.planned ? "secondary-button" : "primary-button"}" data-career-toggle-work aria-pressed="${context.plan.planned}"${!context.plan.planned && !context.plan.available ? " disabled aria-disabled=\"true\"" : ""}>${buttonLabel}</button></div></section>`;
+    const scheduleAction = context.vacation.planned
+      ? `<button type="button" class="secondary-button career-work-vacation-action" data-career-toggle-vacation aria-pressed="true">Annuler mes vacances et remettre le travail</button>`
+      : `<button type="button" class="${context.plan.planned ? "secondary-button" : "primary-button"}" data-career-toggle-work aria-pressed="${context.plan.planned}"${!context.plan.planned && !context.plan.available ? " disabled aria-disabled=\"true\"" : ""}>${buttonLabel}</button><button type="button" class="secondary-button career-work-vacation-action" data-career-toggle-vacation aria-pressed="false"${!context.vacation.available ? " disabled aria-disabled=\"true\"" : ""}>${context.vacation.available ? "Prendre une semaine de vacances" : "Aucune semaine de vacances en banque"}</button>`;
+    return `<section class="career-work-menu" aria-labelledby="career-work-menu-title"><header><div><p class="eyebrow">${escapeHTML(context.job.title)}</p><h2 id="career-work-menu-title">Horaire de la semaine</h2></div><button type="button" class="secondary-button" data-career-work-menu-close>Retour à l’emploi</button></header><div class="career-work-menu-card"><p><strong>Le salaire affiché est hebdomadaire.</strong> ${escapeHTML(status)}</p>${renderVacationStatus(context, true)}${scheduleAction}</div></section>`;
   }
 
   function renderJobMenu(context) {

@@ -184,29 +184,17 @@
   min-height: 48px;
   padding: 7px 10px;
   overflow: visible;
-  border: 1px dashed rgba(255, 255, 255, .72);
-  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, .62);
+  border-radius: 12px;
   color: #fff;
-  background: rgba(12, 15, 13, .56);
-  box-shadow: 0 7px 22px rgba(0, 0, 0, .48);
+  background: rgba(12, 15, 13, .28);
+  box-shadow: 0 7px 22px rgba(0, 0, 0, .38);
+  opacity: .7;
   cursor: pointer;
   text-align: left;
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease, transform .16s ease;
-}
-
-.career-home-hotspot::after {
-  position: absolute;
-  top: calc(100% + 1px);
-  left: 50%;
-  width: 2px;
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .78);
-  box-shadow: 0 8px 0 3px var(--gold, #ddb65e);
-  content: "";
-  transform: translateX(-50%);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  transition: opacity .16s ease, border-color .16s ease, background-color .16s ease, box-shadow .16s ease, transform .16s ease;
 }
 
 .career-home-hotspot strong,
@@ -232,6 +220,7 @@
 }
 
 .career-home-hotspot:not(:disabled):not([aria-disabled="true"]):hover {
+  opacity: 1;
   border-color: #ffe7a9;
   background: rgba(20, 24, 21, .97);
   box-shadow: 0 9px 28px rgba(0, 0, 0, .58), 0 0 0 3px rgba(221, 182, 94, .2);
@@ -240,12 +229,17 @@
 
 .career-home-hotspot:disabled,
 .career-home-hotspot[aria-disabled="true"] {
-  opacity: .72;
-  border-style: dashed;
-  background: rgba(28, 28, 25, .86);
+  opacity: .7;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, .28);
+  color: #dedbd3;
+  background: rgba(10, 12, 11, .72);
+  filter: saturate(.35);
+  cursor: not-allowed;
 }
 
 .career-home-hotspot-wrap.planned .career-home-hotspot {
+  opacity: 1;
   border-width: 2px;
   border-color: #9de0aa;
   background: rgba(24, 62, 38, .93);
@@ -260,93 +254,6 @@
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-}
-
-/* Prototype : seul le frigo de la cuisine devient une image soulevée. */
-.career-home-fridge-prototype {
-  position: absolute;
-  top: 20%;
-  left: 9%;
-  z-index: 3;
-  width: 13%;
-  height: 22%;
-  pointer-events: auto;
-}
-
-.career-home-fridge-button {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 1px solid rgba(255, 245, 217, .45);
-  border-radius: 8px 8px 5px 5px;
-  background: rgba(12, 15, 13, .45);
-  box-shadow: 0 9px 20px rgba(0, 0, 0, .48), 0 0 0 2px rgba(221, 182, 94, .12);
-  cursor: pointer;
-  transform: rotate(-.35deg);
-  transition: box-shadow .16s ease, transform .16s ease;
-}
-
-.career-home-fridge-frame {
-  position: absolute;
-  inset: 0;
-  display: block;
-  overflow: hidden;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.career-home-fridge-image {
-  position: absolute;
-  display: block;
-  max-width: none;
-  max-height: none;
-  pointer-events: none;
-}
-
-.career-home-fridge-image-desktop {
-  top: -90.909%;
-  left: -69.231%;
-  width: 769.231%;
-  height: auto;
-}
-
-.career-home-fridge-image-mobile {
-  display: none;
-}
-
-.career-home-fridge-title {
-  position: absolute;
-  bottom: -27px;
-  left: 50%;
-  z-index: 1;
-  min-width: max-content;
-  padding: 5px 9px;
-  border: 1px dashed rgba(255, 255, 255, .76);
-  border-radius: 999px;
-  color: #fff;
-  background: rgba(12, 15, 13, .86);
-  box-shadow: 0 5px 14px rgba(0, 0, 0, .38);
-  font: 800 .66rem/1 "Barlow Condensed", sans-serif;
-  letter-spacing: .06em;
-  opacity: 0;
-  pointer-events: none;
-  text-transform: uppercase;
-  transform: translate(-50%, 6px);
-  transition: opacity .16s ease, transform .16s ease;
-}
-
-.career-home-fridge-button:hover,
-.career-home-fridge-button:focus-visible {
-  box-shadow: 0 15px 27px rgba(0, 0, 0, .62), 0 0 0 3px rgba(221, 182, 94, .32);
-  transform: translateY(-6px) rotate(-.7deg) scale(1.035);
-}
-
-.career-home-fridge-button:hover .career-home-fridge-title,
-.career-home-fridge-button:focus-visible .career-home-fridge-title {
-  opacity: 1;
-  transform: translate(-50%, 0);
 }
 
 /* Repères de la composition paysage 1672 × 941. */
@@ -829,31 +736,6 @@
     width: min(36vw, 142px);
   }
 
-  .career-home-fridge-prototype {
-    top: 52.5%;
-    left: 11%;
-    width: 12%;
-    height: 19.5%;
-  }
-
-  .career-home-fridge-image-desktop {
-    display: none;
-  }
-
-  .career-home-fridge-image-mobile {
-    top: -269.231%;
-    left: -91.667%;
-    display: block;
-    width: 833.333%;
-    height: auto;
-  }
-
-  .career-home-fridge-title {
-    bottom: -24px;
-    padding: 4px 8px;
-    font-size: .6rem;
-  }
-
   .career-home-hotspot {
     min-height: 46px;
     padding: 6px 8px;
@@ -874,29 +756,25 @@
   .career-home-hotspot-running { left: 25%; top: 52%; }
 
   .career-home-hotspot {
-    border-color: rgba(255, 255, 255, .72);
+    border-color: rgba(255, 255, 255, .62);
     border-style: dashed;
-    border-radius: 999px;
-    background: rgba(12, 15, 13, .56);
-    box-shadow: 0 5px 16px rgba(0, 0, 0, .34);
-    -webkit-backdrop-filter: blur(3px);
-    backdrop-filter: blur(3px);
+    border-radius: 10px;
+    background: rgba(12, 15, 13, .28);
+    box-shadow: 0 7px 22px rgba(0, 0, 0, .38);
+    -webkit-backdrop-filter: blur(7px);
+    backdrop-filter: blur(7px);
     text-shadow: 0 2px 5px rgba(0, 0, 0, .9);
-  }
-
-  .career-home-hotspot::after {
-    display: none;
   }
 
   .career-home-hotspot:disabled,
   .career-home-hotspot[aria-disabled="true"] {
-    background: rgba(12, 15, 13, .56);
+    background: rgba(10, 12, 11, .72);
   }
 
   .career-home-hotspot:not(:disabled):not([aria-disabled="true"]):hover {
-    border-color: rgba(255, 231, 169, .8);
-    background: rgba(20, 24, 21, .68);
-    box-shadow: 0 0 0 3px rgba(221, 182, 94, .2);
+    border-color: #ffe7a9;
+    background: rgba(20, 24, 21, .97);
+    box-shadow: 0 9px 28px rgba(0, 0, 0, .48), 0 0 0 3px rgba(221, 182, 94, .2);
     transform: none;
   }
 

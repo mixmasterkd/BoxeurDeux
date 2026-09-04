@@ -357,6 +357,8 @@ Les vacances :
 - peuvent être choisies par le joueur;
 - sont payées au départ ou au congédiement selon l'indemnité prévue.
 
+Le lieu Emploi et son menu Horaire affichent en permanence la banque sur trois semaines ainsi que le nombre de semaines travaillées restant avant le prochain crédit. La première semaine est acquise après huit semaines travaillées chez le même employeur, puis une nouvelle semaine toutes les douze semaines. Une semaine en banque peut remplacer le travail depuis le menu Horaire : elle conserve la paie et l’ancienneté, libère toute la capacité et toute la charge physique du travail, ne crée aucune absence, et n’est débitée qu’à la confirmation de la semaine. Tant que la semaine n’est pas confirmée, le joueur peut annuler ce choix et remettre le travail sans consommer ses vacances.
+
 Une semaine de vacances peut servir à récupérer ou à faire un camp intensif. Dans le second cas, la paie est conservée, mais la fatigue d'entraînement s'applique normalement.
 
 ### 5.3 Mini-jeux facultatifs — hors périmètre actuel
