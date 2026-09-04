@@ -765,6 +765,49 @@ test("termine la semaine de combat avant d’ouvrir l’aréna, protège le trav
   expect(saved.previewRuntime.fightGate.status).toBe("ready");
 });
 
+test("permet le désistement depuis le calendrier après le verrou de l’aréna et libère la semaine sans absence", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({
+    week: 1,
+    gymWeeks: 8,
+    jobId: "convenience",
+    jobsHeldCount: 1,
+    missedWorkWeeks: 1,
+    jobTenureWeeks: 3,
+    jobWagesEarned: 225,
+    money: 500,
+  }));
+  await bookCurrentGala(page);
+  await page.locator("#scheduled-fight [data-career-go-arena]").click();
+  await page.locator(".career-arena-dashboard [data-career-arena-action]").click();
+  await page.locator(".career-week-plan [data-career-week-confirm]").click();
+  await page.locator("[data-career-week-summary-close]").click();
+  await page.locator("[data-career-leave-arena]").click();
+  await page.locator('[data-career-nav="calendar"]').click();
+  await expect(page.locator("#withdraw-fight")).toBeVisible();
+  page.once("dialog", dialog => dialog.accept());
+  await page.locator("#withdraw-fight").click();
+
+  let saved = await page.evaluate(() => ({
+    main: JSON.parse(localStorage.getItem("boxeur-deux-career")).state,
+    capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")),
+  }));
+  expect(saved.main.week).toBe(2);
+  expect(saved.main.scheduledFight).toBeNull();
+  expect(saved.main.missedWorkWeeks).toBe(1);
+  expect(saved.main.jobTenureWeeks).toBe(4);
+  expect(saved.main.jobWagesEarned).toBe(300);
+  expect(saved.main.bookings.some(booking => booking.status === "withdrawn")).toBe(true);
+  expect(saved.capsule.previewRuntime.fightGate).toBeNull();
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+  await expect(page.locator('.career-map-hotspot[data-career-location="work"]')).toBeEnabled();
+  await expect(page.locator('.career-map-hotspot[data-career-location="arena"]')).toHaveAccessibleName(/Aucun combat réservé/);
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state);
+  expect(saved.week).toBe(2);
+  expect(saved.scheduledFight).toBeNull();
+});
+
 test("explique et verrouille le GYM avant l’inscription", async ({ page }) => {
   await page.route("https://fonts.googleapis.com/**", route => route.abort());
   await page.route("https://fonts.gstatic.com/**", route => route.abort());
