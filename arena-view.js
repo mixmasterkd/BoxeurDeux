@@ -1,9 +1,9 @@
 (function attachBoxeurArenaView(root, factory) {
   "use strict";
-  const api = factory();
+  const api = factory(typeof module === "object" && module.exports ? require("./gala-risk.js") : root.BoxeurGalaRisk);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.BoxeurArenaView = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function createBoxeurArenaViewApi() {
+})(typeof globalThis !== "undefined" ? globalThis : this, function createBoxeurArenaViewApi(galaRisk) {
   "use strict";
 
   const SCENES = Object.freeze({
@@ -56,6 +56,12 @@
       roundLabel: safeText(rawEvent.roundLabel, "", 80),
       remaining: wholeNumber(rawEvent.remaining, 0, 0, 99),
       opponent: normalizeOpponent(rawEvent.opponent),
+      galaRisk: rawEvent.kind !== "tournament" && rawEvent.galaRisk ? { id: rawEvent.galaRisk.id } : null,
+      travelEffects: rawEvent.kind !== "tournament" ? {
+        energy: Number.isFinite(rawEvent.travelEffects?.energy) ? rawEvent.travelEffects.energy : 0,
+        fatigue: Number.isFinite(rawEvent.travelEffects?.fatigue) ? rawEvent.travelEffects.fatigue : 0,
+      } : null,
+      travelApplied: rawEvent.travelApplied === true,
     };
   }
 
@@ -159,8 +165,10 @@
 
   function renderEventDetails(event) {
     if (!event) return "";
+    const advice = event.galaRisk ? galaRisk.renderAssessment(event.galaRisk)
+      + galaRisk.renderTravel(event.travelEffects, event.travelApplied) : "";
     const opponent = event.opponent
-      ? `<section class="career-arena-opponent" aria-label="Prochain adversaire"><span>Adversaire</span><strong>${escapeHTML(event.opponent.name)}${event.opponent.nickname ? ` « ${escapeHTML(event.opponent.nickname)} »` : ""}</strong><small>${escapeHTML(event.opponent.style)} · ${escapeHTML(event.opponent.record)}</small></section>`
+      ? `<section class="career-arena-opponent" aria-label="Prochain adversaire"><span>Adversaire</span><strong>${escapeHTML(event.opponent.name)}${event.opponent.nickname ? ` « ${escapeHTML(event.opponent.nickname)} »` : ""}</strong><small>${escapeHTML(event.opponent.style)} · ${escapeHTML(event.opponent.record)}</small>${advice}</section>`
       : `<p class="career-arena-opponent-pending">${event.kind === "tournament" ? "Le prochain adversaire sera confirmé dans le tableau du tournoi." : "L’adversaire sera confirmé dans le calendrier."}</p>`;
     return `<dl class="career-arena-event-meta"><div><dt>Semaine</dt><dd>${event.week}</dd></div><div><dt>Date</dt><dd>${escapeHTML(event.dateLabel)}</dd></div><div><dt>Lieu</dt><dd>${escapeHTML(event.venue)}</dd></div>${event.roundLabel ? `<div><dt>Étape</dt><dd>${escapeHTML(event.roundLabel)}</dd></div>` : ""}</dl>${opponent}`;
   }
@@ -169,6 +177,8 @@
     const context = normalizeContext(rawContext);
     const presentation = eventPresentation(context.event);
     const eventDetails = renderEventDetails(context.event);
+    const hasGalaAdvice = Boolean(context.event?.galaRisk);
+    const warning = hasGalaAdvice ? galaRisk.conditionWarning(context.condition) : "";
     return `<div class="career-arena-view career-place-view" data-career-arena-state="${presentation.state}">
       <header class="career-arena-header career-place-header">
         <div><p class="eyebrow">Aréna du quartier</p><h2 id="career-arena-title">Soirée de boxe</h2><p class="career-place-meta">${escapeHTML(context.careerStatusLabel)} · Semaine ${context.clock.week} · ${escapeHTML(context.clock.dayLabel)} · ${escapeHTML(context.clock.dateLabel)}</p></div>
@@ -186,8 +196,9 @@
             ${eventDetails}<button type="button" class="primary-button" data-career-arena-action>${escapeHTML(presentation.actionLabel)}</button>
           </section>
           <section class="career-arena-condition career-place-condition ${context.condition.preparationTone}" aria-label="État de préparation actuel">
-            <span>État de préparation</span><strong>${escapeHTML(context.condition.preparationLabel)}</strong><p>${escapeHTML(context.condition.preparationDetail)}</p>
+            <span>${hasGalaAdvice ? "Préparation actuelle" : "État de préparation"}</span><strong>${escapeHTML(context.condition.preparationLabel)}</strong><p>${escapeHTML(context.condition.preparationDetail)}</p>
             <div class="career-arena-meters"><label>Énergie <meter min="0" max="100" value="${context.condition.energy}">${context.condition.energy} %</meter><b>${context.condition.energy} %</b></label><label>Fatigue <meter min="0" max="100" value="${context.condition.fatigue}">${context.condition.fatigue} %</meter><b>${context.condition.fatigue} %</b></label></div>
+            ${warning ? `<p class="gala-condition-warning">${warning}</p>` : ""}${hasGalaAdvice ? `<p>${galaRisk.EXPLANATION}</p>` : ""}${hasGalaAdvice && context.event.state === "future" ? `<p>${galaRisk.FUTURE}</p>` : ""}
           </section>
           <section class="career-arena-role career-place-card"><p class="eyebrow">Fonction du lieu</p><h3>Réserver au calendrier, combattre à l’aréna</h3><p>Le calendrier présente les occasions et les inscriptions. L’aréna rassemble ensuite le rendez-vous, l’adversaire et l’accès au combat.</p></section>
         </aside>

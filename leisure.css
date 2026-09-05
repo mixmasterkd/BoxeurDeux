@@ -1,0 +1,195 @@
+/* Centre de loisirs : aperçu visuel des sorties du Centre-ville. */
+
+.career-leisure-view {
+  --career-leisure-border: rgba(255, 255, 255, .16);
+  --career-leisure-surface: rgba(19, 18, 16, .97);
+  --career-leisure-muted: #c9c2b7;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(221, 182, 94, .14), transparent 34rem),
+    radial-gradient(circle at 82% 0%, rgba(111, 60, 139, .11), transparent 30rem),
+    #0d0c0b;
+}
+
+.career-leisure-view .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.career-leisure-view button { min-height: 44px; }
+.career-leisure-view button:focus-visible { outline: 3px solid #ffe7a9; outline-offset: 3px; }
+
+.career-leisure-scene {
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 16 / 9;
+  background: #17110d;
+}
+
+.career-leisure-scene::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(4, 3, 2, .03) 52%, rgba(4, 3, 2, .26)),
+    linear-gradient(90deg, rgba(4, 3, 2, .2), transparent 20%, transparent 80%, rgba(4, 3, 2, .18));
+  content: "";
+  pointer-events: none;
+}
+
+.career-leisure-scene picture,
+.career-leisure-scene img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.career-leisure-scene picture { position: absolute; inset: 0; }
+.career-leisure-scene img { object-fit: cover; object-position: center; }
+
+.career-leisure-hotspots {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.career-leisure-hotspot {
+  position: absolute;
+  display: grid;
+  align-content: center;
+  width: clamp(124px, 13vw, 172px);
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, .42);
+  border-radius: 12px;
+  color: #f3eee5;
+  background: rgba(13, 12, 10, .74);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .42);
+  opacity: .9;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: left;
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  transition: opacity .16s ease, border-color .16s ease, background-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.career-leisure-hotspot strong,
+.career-leisure-hotspot small,
+.career-leisure-hotspot > span { display: block; min-width: 0; overflow-wrap: anywhere; }
+.career-leisure-hotspot strong { font: 800 .86rem/1.05 "Barlow Condensed", sans-serif; letter-spacing: .035em; text-transform: uppercase; }
+.career-leisure-hotspot small { margin-top: 3px; color: #d1cbc1; font-size: .56rem; line-height: 1.12; }
+.career-leisure-hotspot > span { margin-top: 5px; color: var(--gold, #ddb65e); font-size: .5rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.career-leisure-hotspot:hover { z-index: 3; border-color: #ffe7a9; background: rgba(20, 18, 15, .96); box-shadow: 0 9px 28px rgba(0, 0, 0, .56), 0 0 0 3px rgba(221, 182, 94, .18); opacity: 1; transform: translate(-50%, calc(-50% - 3px)); }
+.career-leisure-hotspot.planned { border-color: rgba(108, 183, 137, .86); background: rgba(21, 45, 33, .9); box-shadow: 0 8px 26px rgba(34, 125, 74, .22); }
+.career-leisure-hotspot.planned > span { color: #99dfb4; }
+
+.career-leisure-hotspot-bowling { left: 25%; top: 30%; }
+.career-leisure-hotspot-cinema { left: 79%; top: 27%; }
+.career-leisure-hotspot-arcade { left: 20%; top: 62%; }
+.career-leisure-hotspot-karting { left: 78%; top: 58%; }
+
+.career-leisure-dashboard { gap: 12px; }
+.career-leisure-dashboard .career-place-card { border-color: var(--career-leisure-border); background: var(--career-leisure-surface); }
+.career-leisure-dashboard h3 { margin: 4px 0 0; font: 800 1.2rem/1.02 "Barlow Condensed", sans-serif; text-transform: uppercase; }
+.career-leisure-dashboard p:not(.eyebrow) { margin: 9px 0 0; color: var(--career-leisure-muted); font-size: .69rem; line-height: 1.5; }
+.career-leisure-welcome { border-left: 3px solid var(--gold, #ddb65e); }
+.career-leisure-status { display: grid; gap: 5px; border-left: 3px solid #9a7a45; }
+.career-leisure-status > span { color: #9f9a91; font-size: .55rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.career-leisure-status > strong { color: #f4f0e7; font: 800 1.35rem/1 "Barlow Condensed", sans-serif; text-transform: uppercase; }
+.career-leisure-planned > button { width: 100%; margin-top: 12px; }
+
+.career-leisure-menu {
+  align-self: center;
+  justify-self: center;
+  width: min(840px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: clamp(18px, 3vw, 32px);
+  overflow-y: auto;
+  border: 1px solid var(--career-leisure-border);
+  border-radius: 18px;
+  color: #f4f0e7;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(221, 182, 94, .13), transparent 25rem),
+    rgba(13, 12, 11, .99);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .58);
+}
+
+.career-leisure-menu > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.career-leisure-menu > header h2 { margin: 3px 0 0; font-size: clamp(1.9rem, 5vw, 3rem); line-height: .95; }
+.career-leisure-menu > header > button { flex: 0 0 auto; }
+.career-leisure-menu-lead { max-width: 660px; margin: 22px 0 0; color: var(--career-leisure-muted); line-height: 1.55; }
+
+.career-leisure-quote {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 22px 0 0;
+}
+
+.career-leisure-quote > div { min-width: 0; padding: 15px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; background: rgba(255, 255, 255, .035); }
+.career-leisure-quote dt,
+.career-leisure-effect > span { color: #9f9a91; font-size: .56rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.career-leisure-quote dd { margin: 5px 0 0; color: #fff; font: 800 1.5rem/1 "Barlow Condensed", sans-serif; }
+.career-leisure-quote small { display: block; margin-top: 5px; color: var(--career-leisure-muted); font-size: .58rem; line-height: 1.3; }
+.career-leisure-effect { display: grid; gap: 6px; margin-top: 14px; padding: 16px; border: 1px solid rgba(108, 183, 137, .3); border-left: 3px solid var(--green, #6cb789); border-radius: 12px; background: rgba(108, 183, 137, .07); }
+.career-leisure-effect strong { color: #a6e3bc; font: 800 1.45rem/1 "Barlow Condensed", sans-serif; text-transform: uppercase; }
+.career-leisure-effect p { margin: 0; color: var(--career-leisure-muted); font-size: .7rem; line-height: 1.45; }
+.career-leisure-replacement,
+.career-leisure-unavailable { margin: 14px 0 0; padding: 11px 13px; border-left: 3px solid var(--gold, #ddb65e); border-radius: 7px; background: rgba(221, 182, 94, .07); color: #ddd6c8; font-size: .68rem; line-height: 1.45; }
+.career-leisure-unavailable { border-left-color: var(--red, #e3513d); background: rgba(227, 81, 61, .08); }
+.career-leisure-menu > footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.career-leisure-menu button { min-height: 44px; }
+
+@media (max-width: 980px) {
+  .career-leisure-layout { grid-template-columns: minmax(0, 1fr); }
+  .career-leisure-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .career-location-sheet:has(.career-leisure-view) { padding: 0; background: #0d0c0b; }
+  .career-leisure-view { width: 100%; height: 100dvh; max-height: 100dvh; padding: max(9px, env(safe-area-inset-top)) 8px max(82px, env(safe-area-inset-bottom)); border-left: 0; box-shadow: none; }
+  .career-leisure-header { position: sticky; top: calc(0px - max(9px, env(safe-area-inset-top))); z-index: 6; gap: 8px; margin: calc(0px - max(9px, env(safe-area-inset-top))) -8px 8px; padding: max(9px, env(safe-area-inset-top)) 8px 8px; border-bottom: 1px solid var(--career-leisure-border); background: rgba(13, 12, 11, .94); -webkit-backdrop-filter: blur(11px); backdrop-filter: blur(11px); }
+  .career-leisure-header .eyebrow { margin-bottom: 2px; font-size: .52rem; }
+  .career-leisure-header h2 { max-width: 57vw; font-size: clamp(1.18rem, 5.8vw, 1.55rem); }
+  .career-leisure-header .career-place-meta { max-width: 56vw; }
+  .career-leisure-header > button { max-width: 116px; padding: 7px 9px; font-size: .6rem; line-height: 1.18; }
+  .career-leisure-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .career-leisure-scene { justify-self: center; width: min(100%, 560px); aspect-ratio: 1 / 1; border-radius: 12px; }
+  .career-leisure-hotspot { width: min(37%, 148px); min-height: 48px; padding: 6px 7px; text-align: center; }
+  .career-leisure-hotspot strong { font-size: .7rem; }
+  .career-leisure-hotspot small { display: none; }
+  .career-leisure-hotspot > span { margin-top: 3px; font-size: .44rem; }
+  .career-leisure-hotspot-bowling { left: 24%; top: 29%; }
+  .career-leisure-hotspot-cinema { left: 76%; top: 29%; }
+  .career-leisure-hotspot-arcade { left: 23%; top: 71%; }
+  .career-leisure-hotspot-karting { left: 77%; top: 71%; }
+  .career-leisure-dashboard { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .career-leisure-menu { align-self: stretch; width: 100%; max-height: 100dvh; padding: max(16px, env(safe-area-inset-top)) 12px max(24px, env(safe-area-inset-bottom)); border: 0; border-radius: 0; }
+  .career-leisure-menu > header { gap: 8px; }
+  .career-leisure-menu > header h2 { font-size: 1.75rem; }
+  .career-leisure-menu > header > button { max-width: 110px; padding-inline: 9px; }
+  .career-leisure-menu-lead { margin-top: 18px; font-size: .8rem; }
+  .career-leisure-quote { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+  .career-leisure-quote > div { padding: 12px; }
+  .career-leisure-menu > footer { position: sticky; bottom: calc(0px - max(24px, env(safe-area-inset-bottom))); z-index: 2; margin: 18px -12px calc(0px - max(24px, env(safe-area-inset-bottom))); padding: 10px 12px max(12px, env(safe-area-inset-bottom)); background: rgba(13, 12, 11, .96); }
+  .career-leisure-menu > footer > button { flex: 1 1 0; }
+}
+
+@media (max-width: 370px) {
+  .career-leisure-hotspot { width: 38%; padding-inline: 5px; }
+  .career-leisure-hotspot strong { font-size: .65rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .career-leisure-hotspot { transition: none; }
+}

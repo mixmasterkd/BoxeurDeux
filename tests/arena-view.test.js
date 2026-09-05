@@ -93,3 +93,23 @@ test("échappe toutes les données de sauvegarde affichées", () => {
   assert.doesNotMatch(html, /onerror="boom\(\)"/);
   assert.match(html, /&lt;img src=x onerror=&quot;boom\(\)&quot;&gt;/);
 });
+
+test("sépare le conseil de gala, la préparation et les effets de déplacement", () => {
+  const event = { kind: "gala", state: "future", name: "Gala", week: 7,
+    opponent: { name: "Caron", style: "Puncheur" }, galaRisk: { id: "challenging", index: 3.238 },
+    travelEffects: { energy: -6, fatigue: 4 }, travelApplied: false };
+  const context = baseContext({ event, condition: { energy: 30, fatigue: 70, preparationLabel: "Fragile" } });
+  const before = JSON.stringify(context);
+  const html = arenaView.render(context);
+  assert.match(html, /Gros défi/);
+  assert.match(html, /Préparation actuelle/);
+  assert.match(html, /plus difficile/);
+  assert.match(html, /Déplacement à venir/);
+  assert.match(html, /Ta préparation peut encore changer/);
+  assert.doesNotMatch(html, /3\.238/);
+  assert.equal((html.match(/aria-label="État de préparation actuel"/g) || []).length, 1);
+  assert.equal(JSON.stringify(context), before);
+  assert.doesNotMatch(arenaView.render(baseContext({ event: { ...event, travelApplied: true } })), /Déplacement à venir/);
+  const tournament = arenaView.render(baseContext({ event: { ...event, kind: "tournament" } }));
+  assert.doesNotMatch(tournament, /data-gala-risk|Déplacement à venir|Comparaison des caractéristiques|plus difficile/);
+});

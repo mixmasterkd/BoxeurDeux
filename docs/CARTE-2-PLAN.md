@@ -8,10 +8,10 @@
 | 2-B | Navigation entre les deux cartes | Validée |
 | 2-C | Composition et prompts visuels de la carte | Validée |
 | 2-D | Génération des cartes ordinateur et mobile | Validée |
-| 2-E | Intégration de la carte et de ses verrouillages | Implémentée, à valider |
-| 2-F | Intérieur du centre de loisirs | En attente de GO |
-| 2-G | Mécanique des sorties | En attente de GO |
-| 2-H | Autres lieux, un à la fois | En attente de GO |
+| 2-E | Intégration de la carte et de ses verrouillages | Validée |
+| 2-F | Intérieur du centre de loisirs | Validée |
+| 2-G | Mécanique des sorties | Validée |
+| 2-H | Autres lieux, un à la fois | Studio média implémenté; bassin BE-C raccordé et vérifié; interface Fédération BE-D en attente de GO |
 | 2-I | Aéroport et camps professionnels | Différé |
 | 2-J | Validation et équilibrage | En attente |
 
@@ -89,20 +89,112 @@ Une sortie :
 - ne donne jamais directement de statistique, d'XP de boxe ou d'avantage de combat;
 - produit un résultat visible **Détendu**, expliqué par ses effets réels d'énergie et de fatigue plutôt que par une nouvelle jauge cachée.
 
-Les valeurs exactes seront fixées à l'étape 2-G. L'enveloppe de départ recommandée est de 5 à 8 points de capacité et de 20 à 60 $, avec un effet toujours inférieur au repos de 10 points.
+Les valeurs retenues à l'étape 2-G sont :
+
+| Sortie | Prix | Capacité | Énergie | Fatigue |
+| --- | ---: | ---: | ---: | ---: |
+| Arcade | 20 $ | 5 | +2 | −3 |
+| Cinéma | 25 $ | 5 | +4 | −5 |
+| Quilles | 30 $ | 6 | +3 | −4 |
+| Karting | 60 $ | 8 | +2 | −3 |
+
+Ces effets demeurent volontairement très inférieurs à une journée de repos (+18 énergie et −12 fatigue pour 10 points de capacité). Ils ne donnent ni XP, ni statistique, ni avantage de combat. Le résultat **Détendu** est inscrit dans le bilan avec les variations réellement appliquées.
 
 ### 2. Studio média
 
 Lieu de réputation, sans progression physique : entrevues locales, photos, balados et apparitions publiques. Consulter les possibilités est gratuit; accepter une apparition utilise une petite quantité de capacité et peut augmenter la réputation. Ce lieu prépare les commanditaires professionnels sans créer de revenu automatique au lancement.
 
+Le Studio média est le premier lieu traité à l’étape 2-H. Une seule apparition peut être planifiée par semaine; elle peut être remplacée ou retirée avant la confirmation. Elle ne donne ni argent, ni XP, ni énergie, ni récupération, ni statistique de combat. Son gain de réputation est appliqué une seule fois lorsque la semaine est vécue.
+
+| Apparition | Déverrouillage | Capacité | Réputation |
+| --- | ---: | ---: | ---: |
+| Entrevue locale | Accès au Studio | 4 | +1 |
+| Séance photo | 10 réputation | 5 | +2 |
+| Balado sportif | 20 réputation | 6 | +2 |
+| Apparition publique | 35 réputation | 8 | +3 |
+
+Ces valeurs gardent l’entrevue accessible dans une semaine chargée et réservent la meilleure visibilité à une apparition plus coûteuse en temps. Toutes les zones restent visibles et ouvrent leur fiche; un verrou indique le seuil requis et la réputation actuelle, sans condition cachée. Le Studio devient inutile à 100 de réputation et explique alors clairement le verrouillage. La Fédération est désormais raccordée au bassin évolutif, comme décrit dans la section suivante.
+
 ### 3. Fédération / promoteur
 
 Lieu administratif branché sur les systèmes existants :
 
-- au statut amateur, il présente la Fédération, le classement et l'admissibilité aux événements;
-- au statut professionnel, son identité devient celle d'un bureau de promoteur et de contrats.
+- au statut amateur, il présente la Fédération, le dossier de compétition et l'admissibilité aux événements;
+- au statut professionnel, son identité pourra devenir celle d'un bureau de promoteur et de contrats lorsque cette carrière sera conçue.
 
-Consulter ce lieu ne coûte aucune capacité. Les inscriptions continuent d'utiliser le calendrier et le moteur de tournoi actuels; aucun second système d'événements n'est créé.
+Consulter ce lieu ne coûte aucune capacité. Les inscriptions continuent d'utiliser le calendrier et le moteur de tournoi actuels; aucun second système d'inscriptions ou de calendrier jouable n'est créé.
+
+#### Conception retenue pour la Fédération amateur
+
+La Fédération est un lieu de **consultation** et d'orientation, sans classement amateur. La conception a été étendue à un bassin de dix adversaires locaux persistants : leurs rencontres et leur progression sont calculées à la clôture des semaines jouées, indépendamment de la consultation du site.
+
+Les règles proposées, les plafonds, les protections des sauvegardes et les étapes BE-A à BE-E sont détaillés dans [BASSIN-EVOLUTIF-PLAN.md](BASSIN-EVOLUTIF-PLAN.md). Cette extension remplace la proposition initiale d'annuaire statique. Le moteur BE-B, son raccordement BE-C et l’interface BE-D sont implémentés. La validation BE-E conserve les règles de progression, mais recommande de revoir les indications de risque des galas avant de déclarer l’équilibrage entièrement validé. Voir le [rapport d’intégration BE-C](BASSIN-EVOLUTIF-BE-C-RAPPORT.md), le [rapport de Fédération BE-D](BASSIN-EVOLUTIF-BE-D-RAPPORT.md) et le [rapport de validation BE-E](BASSIN-EVOLUTIF-BE-E-RAPPORT.md). Les illustrations restent une génération distincte en attente de GO; l’habillage HTML/CSS de BE-D permet déjà la consultation.
+
+Suite à BE-E et au GO dédié, la [correction des indications de risque des galas](BASSIN-EVOLUTIF-RISQUE-CONCEPTION.md) est implémentée : conseil sportif qualitatif, préparation distincte et aucune modification des mécaniques. Le [rapport de validation](GALAS-RISQUE-RAPPORT.md) consigne 34 fichiers techniques et 75 scénarios navigateur réussis. Les essais du joueur peuvent maintenant porter sur la clarté de ces conseils.
+
+Son accueil présente quatre accès clairs :
+
+1. **Mon dossier amateur** : catégorie, bilan victoires-défaites-nulles, nombre de combats, réputation et médailles;
+2. **Parcours des tournois** : état des six compétitions, conditions exactes, fenêtre encore ouverte ou manquée et prochaine occasion pertinente;
+3. **Site de la Fédération** : annuaire des boxeurs affiliés de la même division sexuelle et de la même catégorie de poids;
+4. **Ouvrir le calendrier** : unique passage vers les inscriptions, les coûts, les dates et les choix d'adversaire.
+
+La page d'accueil met aussi en évidence :
+
+- le prochain tournoi auquel le boxeur est réellement admissible;
+- sa semaine, sa date limite et une estimation des frais lorsque ces données sont disponibles;
+- toute inscription déjà confirmée;
+- un avertissement si la fenêtre des Gants de bronze ou d'argent risque de se fermer.
+
+Les états d'admissibilité proviennent exclusivement du moteur du calendrier et de ses événements réels. L'ancien catalogue de tournois ne devient pas une deuxième source de vérité.
+
+#### Site de la Fédération et fiches affiliées
+
+L'annuaire réutilise les dix profils locaux du sexe correspondant au personnage et leur attribue sa catégorie de poids. Il ne simule pas les autres catégories. Les adversaires créés uniquement pour un tableau de tournoi restent dans ce tableau et ne sont pas annoncés d'avance comme des affiliés locaux permanents.
+
+La liste contient dix identités stables dont les fiches et bilans évoluent. Chaque fiche montre :
+
+- nom et surnom;
+- catégorie de poids du personnage;
+- style de boxe;
+- profil public qualitatif associé au style;
+- statut **Affilié**, et préparation contre le joueur lorsqu'un combat est réservé;
+- bilan victoires-défaites-nulles;
+- historique des rencontres suivies, avec les noms des autres affiliés cliquables;
+- confrontations avec le joueur lorsqu'elles existent.
+
+Les statistiques numériques de combat, les plafonds et les probabilités demeurent cachés sur le site. Les descriptions de style restent qualitatives. Le calendrier et le ring utilisent les mêmes fiches persistantes; un gala sélectionne un adversaire approprié sans recalculer ses caractéristiques selon celles du joueur.
+
+Le bilan initial des profils reste identifié comme antérieur au début du suivi. Le site ne lui invente pas d'anciennes rencontres. Les nouveaux résultats sont enregistrés une seule fois et apparaissent sur les deux fiches concernées.
+
+Il n'y a pas, dans cette version :
+
+- de classement numérique;
+- de simulation des autres catégories ou des bassins de tournoi;
+- de calendrier futur complet publié pour chaque affilié;
+- de changement de catégorie, blessure ou retraite simulée;
+- de bouton pour provoquer directement un affilié;
+- de connexion à Supabase.
+
+Un historique structuré relie les nouvelles rencontres au joueur et aux affiliés. Le journal actuel contient du texte, mais ne doit pas être interprété comme une base de données fiable ni servir à reconstruire les combats d'avant le suivi.
+
+#### Navigation et présentation
+
+Le bouton **Site de la Fédération** ouvre une sous-vue dans le lieu, jamais un nouvel onglet du navigateur. Un retour visible ramène à l'accueil de la Fédération; fermer le lieu ramène au Centre-ville.
+
+Sur ordinateur, l'accueil peut placer le dossier à gauche et le parcours compétitif à droite, avec l'annuaire dans une sous-vue en grille. Sur mobile, les mêmes blocs passent en une seule colonne et les fiches s'ouvrent pleine largeur. Les deux versions possèdent exactement les mêmes renseignements et actions.
+
+L'intérieur illustré doit évoquer un bureau de fédération amateur québécoise crédible : comptoir d'accueil, affiches de compétitions, vitrines de médailles et écran institutionnel. L'image ne doit contenir aucun texte généré important; les titres et boutons restent en HTML.
+
+#### Protections fonctionnelles
+
+- Entrer, consulter une fiche ou ouvrir le calendrier ne coûte ni argent, ni capacité, ni temps.
+- La Fédération devient accessible avec le Centre-ville, après le premier résultat amateur officiel.
+- Le verrou obligatoire de l'Aréna continue de fermer le Centre-ville lorsque le combat doit être réglé.
+- Aucune inscription n'est créée ou annulée depuis la Fédération.
+- Aucune statistique, récompense, réputation ou sauvegarde n'est modifiée par la consultation.
+- Le parcours récréatif demeure inchangé.
+- Le mode professionnel reste informatif tant que les contrats et promoteurs ne sont pas conçus.
 
 ### 4. Aéroport
 

@@ -392,7 +392,7 @@ test("déverrouille le Centre-ville après un résultat amateur et le referme pe
   assert.equal(world.normalizeDistrict("downtown", fightGate), "neighborhood");
 });
 
-test("intègre les deux cartes du Centre-ville avec quatre lieux verrouillés et expliqués", () => {
+test("intègre le Centre-ville avec les loisirs, le Studio média et la Fédération ouverts", () => {
   const career = baseCareer({
     careerStatus: "amateur",
     amateurRecord: { wins: 0, losses: 1, draws: 0 },
@@ -407,17 +407,67 @@ test("intègre les deux cartes du Centre-ville avec quatre lieux verrouillés et
   assert.equal(world.DOWNTOWN_LOCATIONS.length, 4);
   assert.equal((html.match(/class="career-map-hotspot career-downtown-hotspot"/g) || []).length, 4);
   assert.equal((html.match(/data-career-downtown-location=/g) || []).length, 4);
-  assert.equal((html.match(/data-career-locked="true"/g) || []).length, 4);
-  assert.equal((html.match(/disabled aria-disabled="true"/g) || []).length, 4);
-  assert.equal((html.match(/data-career-location=/g) || []).length, 0);
+  assert.equal((html.match(/data-career-locked="true"/g) || []).length, 1);
+  assert.equal((html.match(/disabled aria-disabled="true"/g) || []).length, 1);
+  assert.equal((html.match(/data-career-location=/g) || []).length, 3);
   assert.doesNotMatch(html, /carte-quartier-v2-(?:mobile|desktop)\.jpg/);
   assert.doesNotMatch(html, /career-downtown-placeholder|Visuel de la carte à venir/);
-  assert.match(html, /Accès verrouillé : Centre de loisirs\. Le Centre de loisirs prépare encore ses activités\./);
-  assert.match(html, /Accès verrouillé : Studio média\. Le Studio média n’accepte pas encore de rendez-vous\./);
-  assert.match(html, /Accès verrouillé : Fédération\. Les services de la Fédération ouvriront prochainement\./);
+  assert.match(html, /data-career-downtown-location="leisure-center" data-career-location="leisure-center"/);
+  assert.match(html, /Entrer : Centre de loisirs\. Quilles, arcade, cinéma et karting\./);
+  assert.match(html, /data-career-downtown-location="media-studio" data-career-location="media-studio"/);
+  assert.match(html, /Entrer : Studio média\. Entrevue, séance photo, balado et apparition publique\./);
+  assert.equal((html.match(/<small>Ouvert<\/small>/g) || []).length, 2);
+  assert.match(html, /Entrer : Fédération\. Dossier amateur, parcours des tournois et annuaire des affiliés\./);
   assert.match(html, /Accès verrouillé : Aéroport\. Disponible au statut professionnel\./);
   assert.match(html, /data-career-primary-navigation/);
   assert.match(html, /class="career-side-stack"/);
+});
+
+test("ouvre les lieux actifs seulement lorsque le Centre-ville est accessible", () => {
+  const beginner = baseCareer({
+    careerStatus: "amateur",
+    amateurRecord: { wins: 0, losses: 0, draws: 0 },
+  });
+  const experienced = baseCareer({
+    careerStatus: "amateur",
+    amateurRecord: { wins: 1, losses: 0, draws: 0 },
+  });
+  const fightGate = baseCareer({
+    careerStatus: "amateur",
+    amateurRecord: { wins: 1, losses: 0, draws: 0 },
+    careerFightGate: { status: "ready", kind: "gala" },
+  });
+
+  assert.deepEqual(world.locationAccess("leisure-center", beginner), {
+    locked: true,
+    status: "Centre-ville verrouillé",
+    reason: "Disponible après ton premier combat amateur officiel.",
+  });
+  assert.deepEqual(world.locationAccess("leisure-center", experienced), {
+    locked: false,
+    status: "Ouvert",
+    reason: "",
+  });
+  assert.deepEqual(world.locationAccess("leisure-center", fightGate), {
+    locked: true,
+    status: "Centre-ville verrouillé",
+    reason: "Ta semaine est terminée. Règle maintenant le combat à l’aréna.",
+  });
+  assert.deepEqual(world.locationAccess("media-studio", beginner), {
+    locked: true,
+    status: "Centre-ville verrouillé",
+    reason: "Disponible après ton premier combat amateur officiel.",
+  });
+  assert.deepEqual(world.locationAccess("media-studio", experienced), {
+    locked: false,
+    status: "Ouvert",
+    reason: "",
+  });
+  assert.deepEqual(world.locationAccess("media-studio", fightGate), {
+    locked: true,
+    status: "Centre-ville verrouillé",
+    reason: "Ta semaine est terminée. Règle maintenant le combat à l’aréna.",
+  });
 });
 
 test("conserve l’aéroport verrouillé mais adapte son explication au statut professionnel", () => {

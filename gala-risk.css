@@ -1,0 +1,21 @@
+/* Read-only gala advice, shared by calendar and arena. No tactical-ring styles. */
+.gala-preparation { grid-column: 1 / -1; display: grid; gap: 5px; min-width: 0; padding: 12px; border: 1px solid #596152; border-radius: 8px; background: #171e19; }
+.gala-preparation strong { color: #f0eee8; font-size: .85rem; }
+.gala-preparation span, .gala-preparation p { margin: 0; color: #ced3c9; font-size: .76rem; line-height: 1.45; }
+.gala-risk-label,
+.calendar-opponent-choice .gala-risk-label,
+.career-arena-opponent > .gala-risk-label { display: block; width: fit-content; max-width: 100%; padding: 5px 7px; border: 1px solid currentColor; border-radius: 5px; color: #e8c77f; font-size: .75rem; font-weight: 700; line-height: 1.35; letter-spacing: normal; text-transform: none; white-space: normal; overflow-wrap: anywhere; }
+.gala-risk-label.favorable,
+.calendar-opponent-choice .gala-risk-label.favorable,
+.career-arena-opponent > .gala-risk-label.favorable { color: #9ad8b2; }
+.gala-risk-label.challenging,
+.calendar-opponent-choice .gala-risk-label.challenging,
+.career-arena-opponent > .gala-risk-label.challenging { color: #ffa696; }
+.gala-risk-label.unknown,
+.calendar-opponent-choice .gala-risk-label.unknown,
+.career-arena-opponent > .gala-risk-label.unknown { color: #d0d3ce; }
+.calendar-opponent-choice .gala-cost { display: block; padding-top: 3px; color: #f3e7c6; font-size: .8rem; font-weight: 700; }
+.gala-travel-note,
+.career-arena-opponent > .gala-travel-note { display: block; color: #e8c77f; font-size: .75rem; line-height: 1.4; letter-spacing: normal; text-transform: none; overflow-wrap: anywhere; }
+.gala-preparation .gala-condition-warning,
+.career-arena-condition .gala-condition-warning { color: #ffbd92; font-weight: 600; }

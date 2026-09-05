@@ -1,0 +1,78 @@
+{
+  "week": 105,
+  "simulations": 1800,
+  "rows": [
+    {
+      "opponent": "okafor",
+      "condition": "actual",
+      "assessment": {
+        "id": "favorable",
+        "label": "Avantage sur le papier",
+        "index": -2.2285000000000004
+      },
+      "samples": 300,
+      "wins": 246,
+      "winPercent": 82
+    },
+    {
+      "opponent": "okafor",
+      "condition": "standard",
+      "assessment": {
+        "id": "favorable",
+        "label": "Avantage sur le papier",
+        "index": -2.2285000000000004
+      },
+      "samples": 300,
+      "wins": 248,
+      "winPercent": 82.67
+    },
+    {
+      "opponent": "haddad",
+      "condition": "actual",
+      "assessment": {
+        "id": "demanding",
+        "label": "Combat exigeant",
+        "index": 0.8675000000000003
+      },
+      "samples": 300,
+      "wins": 107,
+      "winPercent": 35.67
+    },
+    {
+      "opponent": "haddad",
+      "condition": "standard",
+      "assessment": {
+        "id": "demanding",
+        "label": "Combat exigeant",
+        "index": 0.8675000000000003
+      },
+      "samples": 300,
+      "wins": 123,
+      "winPercent": 41
+    },
+    {
+      "opponent": "caron",
+      "condition": "actual",
+      "assessment": {
+        "id": "challenging",
+        "label": "Gros défi",
+        "index": 3.238
+      },
+      "samples": 300,
+      "wins": 5,
+      "winPercent": 1.67
+    },
+    {
+      "opponent": "caron",
+      "condition": "standard",
+      "assessment": {
+        "id": "challenging",
+        "label": "Gros défi",
+        "index": 3.238
+      },
+      "samples": 300,
+      "wins": 7,
+      "winPercent": 2.33
+    }
+  ]
+}

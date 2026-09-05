@@ -131,13 +131,22 @@
   function downtownLocationAccess(locationInput, career = {}) {
     const locationId = typeof locationInput === "string" ? locationInput : locationInput?.id;
     if (locationId === "leisure-center") {
-      return { locked: true, status: "Ouverture prochaine", reason: "Le Centre de loisirs prépare encore ses activités." };
+      const downtown = districtAccess("downtown", career);
+      return downtown.locked
+        ? { locked: true, status: "Centre-ville verrouillé", reason: downtown.reason }
+        : { locked: false, status: "Ouvert", reason: "" };
     }
     if (locationId === "media-studio") {
-      return { locked: true, status: "Bientôt disponible", reason: "Le Studio média n’accepte pas encore de rendez-vous." };
+      const downtown = districtAccess("downtown", career);
+      return downtown.locked
+        ? { locked: true, status: "Centre-ville verrouillé", reason: downtown.reason }
+        : { locked: false, status: "Ouvert", reason: "" };
     }
     if (locationId === "federation") {
-      return { locked: true, status: "Bientôt disponible", reason: "Les services de la Fédération ouvriront prochainement." };
+      const downtown = districtAccess("downtown", career);
+      return downtown.locked
+        ? { locked: true, status: "Centre-ville verrouillé", reason: downtown.reason }
+        : { locked: false, status: career.careerStatus === "professional" ? "Information" : "Consultation", reason: "" };
     }
     if (locationId === "airport") {
       return career.careerStatus === "professional"
@@ -365,6 +374,9 @@
 
   function locationAccess(locationInput, career = {}) {
     const locationId = typeof locationInput === "string" ? locationInput : locationInput?.id;
+    if (DOWNTOWN_LOCATIONS.some(location => location.id === locationId)) {
+      return downtownLocationAccess(locationId, career);
+    }
     const recreationalLock = career.careerStatus === "recreational"
       && ["strength-gym", "arena"].includes(locationId);
     const fightGateLock = career.careerFightGate?.status === "ready"
@@ -487,8 +499,21 @@
   function renderDowntownMap(career, firstName) {
     const hotspots = DOWNTOWN_LOCATIONS.map(location => {
       const access = downtownLocationAccess(location, career);
-      const accessibleLabel = `Accès verrouillé : ${location.label}. ${access.reason}`;
-      return `<button class="career-map-hotspot career-downtown-hotspot" type="button" data-career-downtown-location="${location.id}" data-career-locked="true" aria-label="${escapeHTML(accessibleLabel)}" disabled aria-disabled="true" title="${escapeHTML(access.reason)}"><span aria-hidden="true">${location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${escapeHTML(access.status)}</small></button>`;
+      const openDetails = location.id === "leisure-center"
+        ? "Quilles, arcade, cinéma et karting."
+        : location.id === "media-studio"
+          ? "Entrevue, séance photo, balado et apparition publique."
+          : location.id === "federation"
+            ? "Dossier amateur, parcours des tournois et annuaire des affiliés."
+          : access.status;
+      const accessibleLabel = access.locked
+        ? `Accès verrouillé : ${location.label}. ${access.reason}`
+        : `Entrer : ${location.label}. ${openDetails}`;
+      const destination = access.locked ? "" : ` data-career-location="${location.id}"`;
+      const accessAttributes = access.locked
+        ? ` data-career-locked="true" disabled aria-disabled="true" title="${escapeHTML(access.reason)}"`
+        : "";
+      return `<button class="career-map-hotspot career-downtown-hotspot" type="button" data-career-downtown-location="${location.id}"${destination} aria-label="${escapeHTML(accessibleLabel)}"${accessAttributes}><span aria-hidden="true">${location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${escapeHTML(access.status)}</small></button>`;
     }).join("");
     return `<section class="career-map-panel career-downtown-panel" data-career-district-view="downtown" aria-label="Carte du Centre-ville de ${escapeHTML(firstName)}">
       <div class="career-map-heading">

@@ -1,0 +1,1538 @@
+{
+  "samplesPerProbe": 300,
+  "tacticalSimulations": 27600,
+  "desktopMobileIdentical": true,
+  "baselines": [
+    {
+      "policy": "novice",
+      "samples": 300,
+      "wins": 151,
+      "winPercent": 50.33,
+      "interval95": [
+        44.71,
+        55.95
+      ],
+      "stops": 0
+    },
+    {
+      "policy": "coached",
+      "samples": 300,
+      "wins": 149,
+      "winPercent": 49.67,
+      "interval95": [
+        44.05,
+        55.29
+      ],
+      "stops": 0
+    }
+  ],
+  "edges": [
+    {
+      "sex": "male",
+      "offset": 0,
+      "low": 44,
+      "high": 66.78,
+      "offers": [
+        {
+          "name": "Alexis Caron",
+          "risk": "Accessible",
+          "rating": 66.78
+        },
+        {
+          "name": "Yanis Haddad",
+          "risk": "Accessible",
+          "rating": 65.34
+        },
+        {
+          "name": "Minh Nguyen",
+          "risk": "Accessible",
+          "rating": 63.66
+        }
+      ]
+    },
+    {
+      "sex": "male",
+      "offset": 56,
+      "low": 97.61,
+      "high": 99,
+      "offers": [
+        {
+          "name": "Thomas Leclerc",
+          "risk": "Défi risqué",
+          "rating": 97.61
+        },
+        {
+          "name": "Maxime Kramer",
+          "risk": "Défi risqué",
+          "rating": 97.62
+        },
+        {
+          "name": "Darnell Okafor",
+          "risk": "Défi risqué",
+          "rating": 98.12
+        }
+      ]
+    },
+    {
+      "sex": "female",
+      "offset": 0,
+      "low": 44,
+      "high": 66.78,
+      "offers": [
+        {
+          "name": "Maude Caron",
+          "risk": "Accessible",
+          "rating": 66.78
+        },
+        {
+          "name": "Maya Haddad",
+          "risk": "Accessible",
+          "rating": 65.34
+        },
+        {
+          "name": "Linh Nguyen",
+          "risk": "Accessible",
+          "rating": 63.66
+        }
+      ]
+    },
+    {
+      "sex": "female",
+      "offset": 56,
+      "low": 97.61,
+      "high": 99,
+      "offers": [
+        {
+          "name": "Camille Beaulieu",
+          "risk": "Défi risqué",
+          "rating": 97.61
+        },
+        {
+          "name": "Naomi Kim",
+          "risk": "Défi risqué",
+          "rating": 97.62
+        },
+        {
+          "name": "Amara Okafor",
+          "risk": "Défi risqué",
+          "rating": 98.12
+        }
+      ]
+    }
+  ],
+  "campaigns": [
+    {
+      "name": "debutant",
+      "policy": "novice",
+      "played": 13,
+      "won": 10,
+      "distinctOpponents": [
+        "okafor",
+        "leclerc"
+      ],
+      "maximumFatigue": 7,
+      "minimumEnergy": 78,
+      "finalMoney": 7860,
+      "playerFinalAverage": 50,
+      "rosterBytesUTF8": 22404,
+      "saveBytesUTF8": 202626,
+      "automaticFights": 102,
+      "observations": [
+        {
+          "week": 1,
+          "playerAverage": 43,
+          "condition": {
+            "energy": 85,
+            "fatigue": 5
+          },
+          "rosterMinimum": 34,
+          "rosterMaximum": 48,
+          "offers": [
+            {
+              "name": "Darnell Okafor",
+              "rating": 40,
+              "gap": -3,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 250,
+                "winPercent": 83.33,
+                "interval95": [
+                  78.7,
+                  87.12
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 268,
+                "winPercent": 89.33,
+                "interval95": [
+                  85.33,
+                  92.34
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Émile Martel",
+              "rating": 43,
+              "gap": 0,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 109,
+                "winPercent": 36.33,
+                "interval95": [
+                  31.1,
+                  41.92
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 141,
+                "winPercent": 47,
+                "interval95": [
+                  41.43,
+                  52.65
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 45,
+              "gap": 2,
+              "risk": "Défi risqué",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 23,
+                "winPercent": 7.67,
+                "interval95": [
+                  5.16,
+                  11.24
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 35,
+                "winPercent": 11.67,
+                "interval95": [
+                  8.51,
+                  15.79
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        },
+        {
+          "week": 14,
+          "playerAverage": 43.75,
+          "condition": {
+            "energy": 100,
+            "fatigue": 0
+          },
+          "rosterMinimum": 35.56,
+          "rosterMaximum": 49.04,
+          "offers": [
+            {
+              "name": "Darnell Okafor",
+              "rating": 41.56,
+              "gap": -2.44,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 280,
+                "winPercent": 93.33,
+                "interval95": [
+                  89.93,
+                  95.64
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 246,
+                "winPercent": 82,
+                "interval95": [
+                  77.26,
+                  85.93
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Jayden Wilson",
+              "rating": 42.56,
+              "gap": -1.44,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 253,
+                "winPercent": 84.33,
+                "interval95": [
+                  79.79,
+                  88.01
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 193,
+                "winPercent": 64.33,
+                "interval95": [
+                  58.76,
+                  69.54
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 46.04,
+              "gap": 2.04,
+              "risk": "Défi risqué",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 75,
+                "winPercent": 25,
+                "interval95": [
+                  20.44,
+                  30.2
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 32,
+                "winPercent": 10.67,
+                "interval95": [
+                  7.66,
+                  14.67
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        },
+        {
+          "week": 27,
+          "playerAverage": 45.5,
+          "condition": {
+            "energy": 100,
+            "fatigue": 0
+          },
+          "rosterMinimum": 37.12,
+          "rosterMaximum": 50.08,
+          "offers": [
+            {
+              "name": "Darnell Okafor",
+              "rating": 43.12,
+              "gap": -3.01,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 264,
+                "winPercent": 88,
+                "interval95": [
+                  83.83,
+                  91.2
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 241,
+                "winPercent": 80.33,
+                "interval95": [
+                  75.46,
+                  84.44
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Minh Nguyen",
+              "rating": 45.08,
+              "gap": -1.05,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 228,
+                "winPercent": 76,
+                "interval95": [
+                  70.86,
+                  80.48
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 157,
+                "winPercent": 52.33,
+                "interval95": [
+                  46.69,
+                  57.92
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Samuel Bouchard",
+              "rating": 48.08,
+              "gap": 1.95,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 62,
+                "winPercent": 20.67,
+                "interval95": [
+                  16.47,
+                  25.61
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 24,
+                "winPercent": 8,
+                "interval95": [
+                  5.43,
+                  11.63
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        },
+        {
+          "week": 53,
+          "playerAverage": 47,
+          "condition": {
+            "energy": 100,
+            "fatigue": 0
+          },
+          "rosterMinimum": 40.2364,
+          "rosterMaximum": 52.16,
+          "offers": [
+            {
+              "name": "Thomas Leclerc",
+              "rating": 42.24,
+              "gap": -5.76,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 300,
+                "winPercent": 100,
+                "interval95": [
+                  98.74,
+                  100
+                ],
+                "stops": 1
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 298,
+                "winPercent": 99.33,
+                "interval95": [
+                  97.6,
+                  99.82
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Minh Nguyen",
+              "rating": 47.16,
+              "gap": -0.84,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 191,
+                "winPercent": 63.67,
+                "interval95": [
+                  58.08,
+                  68.9
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 122,
+                "winPercent": 40.67,
+                "interval95": [
+                  35.26,
+                  46.31
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Samuel Bouchard",
+              "rating": 50.16,
+              "gap": 2.16,
+              "risk": "Défi risqué",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 35,
+                "winPercent": 11.67,
+                "interval95": [
+                  8.51,
+                  15.79
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 12,
+                "winPercent": 4,
+                "interval95": [
+                  2.3,
+                  6.86
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        },
+        {
+          "week": 105,
+          "playerAverage": 50,
+          "condition": {
+            "energy": 88,
+            "fatigue": 7
+          },
+          "rosterMinimum": 43.2281,
+          "rosterMaximum": 55.68,
+          "offers": [
+            {
+              "name": "Thomas Leclerc",
+              "rating": 45.16,
+              "gap": -6.34,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 298,
+                "winPercent": 99.33,
+                "interval95": [
+                  97.6,
+                  99.82
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 299,
+                "winPercent": 99.67,
+                "interval95": [
+                  98.14,
+                  99.94
+                ],
+                "stops": 1
+              }
+            },
+            {
+              "name": "Jayden Wilson",
+              "rating": 50.68,
+              "gap": -0.82,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 74,
+                "winPercent": 24.67,
+                "interval95": [
+                  20.13,
+                  29.84
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 97,
+                "winPercent": 32.33,
+                "interval95": [
+                  27.29,
+                  37.82
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 53.32,
+              "gap": 1.82,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 4,
+                "winPercent": 1.33,
+                "interval95": [
+                  0.52,
+                  3.38
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 8,
+                "winPercent": 2.67,
+                "interval95": [
+                  1.36,
+                  5.17
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "regulier",
+      "policy": "coached",
+      "played": 26,
+      "won": 24,
+      "distinctOpponents": [
+        "okafor",
+        "wilson",
+        "martel",
+        "nguyen"
+      ],
+      "maximumFatigue": 6,
+      "minimumEnergy": 78,
+      "finalMoney": 5360,
+      "playerFinalAverage": 52.75,
+      "rosterBytesUTF8": 24955,
+      "saveBytesUTF8": 225336,
+      "automaticFights": 100,
+      "observations": [
+        {
+          "week": 1,
+          "playerAverage": 43,
+          "condition": {
+            "energy": 85,
+            "fatigue": 5
+          },
+          "rosterMinimum": 34,
+          "rosterMaximum": 48,
+          "offers": [
+            {
+              "name": "Darnell Okafor",
+              "rating": 40,
+              "gap": -3,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 249,
+                "winPercent": 83,
+                "interval95": [
+                  78.34,
+                  86.83
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 255,
+                "winPercent": 85,
+                "interval95": [
+                  80.52,
+                  88.6
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Émile Martel",
+              "rating": 43,
+              "gap": 0,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 101,
+                "winPercent": 33.67,
+                "interval95": [
+                  28.56,
+                  39.19
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 118,
+                "winPercent": 39.33,
+                "interval95": [
+                  33.97,
+                  44.96
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 45,
+              "gap": 2,
+              "risk": "Défi risqué",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 21,
+                "winPercent": 7,
+                "interval95": [
+                  4.62,
+                  10.46
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 38,
+                "winPercent": 12.67,
+                "interval95": [
+                  9.37,
+                  16.91
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        },
+        {
+          "week": 14,
+          "playerAverage": 45.25,
+          "condition": {
+            "energy": 100,
+            "fatigue": 0
+          },
+          "rosterMinimum": 35.56,
+          "rosterMaximum": 49.04,
+          "offers": [
+            {
+              "name": "Darnell Okafor",
+              "rating": 41.56,
+              "gap": -4.31,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 299,
+                "winPercent": 99.67,
+                "interval95": [
+                  98.14,
+                  99.94
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 285,
+                "winPercent": 95,
+                "interval95": [
+                  91.92,
+                  96.95
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Émile Martel",
+              "rating": 44.56,
+              "gap": -1.31,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 238,
+                "winPercent": 79.33,
+                "interval95": [
+                  74.39,
+                  83.53
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 171,
+                "winPercent": 57,
+                "interval95": [
+                  51.34,
+                  62.48
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Samuel Bouchard",
+              "rating": 47.04,
+              "gap": 1.17,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 103,
+                "winPercent": 34.33,
+                "interval95": [
+                  29.19,
+                  39.87
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 48,
+                "winPercent": 16,
+                "interval95": [
+                  12.29,
+                  20.57
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        },
+        {
+          "week": 27,
+          "playerAverage": 46.75,
+          "condition": {
+            "energy": 100,
+            "fatigue": 0
+          },
+          "rosterMinimum": 37.12,
+          "rosterMaximum": 50.08,
+          "offers": [
+            {
+              "name": "Jayden Wilson",
+              "rating": 44.12,
+              "gap": -3.71,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 291,
+                "winPercent": 97,
+                "interval95": [
+                  94.4,
+                  98.41
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 264,
+                "winPercent": 88,
+                "interval95": [
+                  83.83,
+                  91.2
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 47.08,
+              "gap": -0.75,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 183,
+                "winPercent": 61,
+                "interval95": [
+                  55.37,
+                  66.35
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 129,
+                "winPercent": 43,
+                "interval95": [
+                  37.52,
+                  48.66
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Alexis Caron",
+              "rating": 50.08,
+              "gap": 2.25,
+              "risk": "Défi risqué",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 19,
+                "winPercent": 6.33,
+                "interval95": [
+                  4.09,
+                  9.68
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 2,
+                "winPercent": 0.67,
+                "interval95": [
+                  0.18,
+                  2.4
+                ],
+                "stops": 1
+              }
+            }
+          ]
+        },
+        {
+          "week": 53,
+          "playerAverage": 49,
+          "condition": {
+            "energy": 86,
+            "fatigue": 3
+          },
+          "rosterMinimum": 40.2364,
+          "rosterMaximum": 52.16,
+          "offers": [
+            {
+              "name": "Jayden Wilson",
+              "rating": 46.52,
+              "gap": -3.98,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 246,
+                "winPercent": 82,
+                "interval95": [
+                  77.26,
+                  85.93
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 256,
+                "winPercent": 85.33,
+                "interval95": [
+                  80.88,
+                  88.89
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 49.16,
+              "gap": -1.34,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 115,
+                "winPercent": 38.33,
+                "interval95": [
+                  33.01,
+                  43.95
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 118,
+                "winPercent": 39.33,
+                "interval95": [
+                  33.97,
+                  44.96
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Alexis Caron",
+              "rating": 52.16,
+              "gap": 1.66,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 5,
+                "winPercent": 1.67,
+                "interval95": [
+                  0.71,
+                  3.84
+                ],
+                "stops": 2
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 10,
+                "winPercent": 3.33,
+                "interval95": [
+                  1.82,
+                  6.03
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        },
+        {
+          "week": 105,
+          "playerAverage": 52.75,
+          "condition": {
+            "energy": 86,
+            "fatigue": 3
+          },
+          "rosterMinimum": 43.2281,
+          "rosterMaximum": 55.68,
+          "offers": [
+            {
+              "name": "Darnell Okafor",
+              "rating": 50,
+              "gap": -4.25,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 237,
+                "winPercent": 79,
+                "interval95": [
+                  74.04,
+                  83.23
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 244,
+                "winPercent": 81.33,
+                "interval95": [
+                  76.54,
+                  85.34
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 53.32,
+              "gap": -0.93,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 82,
+                "winPercent": 27.33,
+                "interval95": [
+                  22.6,
+                  32.64
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 93,
+                "winPercent": 31,
+                "interval95": [
+                  26.03,
+                  36.45
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Alexis Caron",
+              "rating": 55.68,
+              "gap": 1.43,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 9,
+                "winPercent": 3,
+                "interval95": [
+                  1.59,
+                  5.6
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 12,
+                "winPercent": 4,
+                "interval95": [
+                  2.3,
+                  6.86
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "avance-migre",
+      "policy": "coached",
+      "played": 26,
+      "won": 26,
+      "distinctOpponents": [
+        "okafor",
+        "wilson",
+        "nguyen",
+        "martel",
+        "gagnon",
+        "haddad"
+      ],
+      "maximumFatigue": 4,
+      "minimumEnergy": 88,
+      "finalMoney": 6140,
+      "playerFinalAverage": 79.75,
+      "rosterBytesUTF8": 25175,
+      "saveBytesUTF8": 225418,
+      "automaticFights": 101,
+      "observations": [
+        {
+          "week": 1,
+          "playerAverage": 70,
+          "condition": {
+            "energy": 85,
+            "fatigue": 5
+          },
+          "rosterMinimum": 61.8,
+          "rosterMaximum": 75.8,
+          "offers": [
+            {
+              "name": "Darnell Okafor",
+              "rating": 67.8,
+              "gap": -3,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 198,
+                "winPercent": 66,
+                "interval95": [
+                  60.47,
+                  71.13
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 217,
+                "winPercent": 72.33,
+                "interval95": [
+                  67.01,
+                  77.09
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Émile Martel",
+              "rating": 70.8,
+              "gap": 0,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 56,
+                "winPercent": 18.67,
+                "interval95": [
+                  14.66,
+                  23.46
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 84,
+                "winPercent": 28,
+                "interval95": [
+                  23.22,
+                  33.33
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 72.8,
+              "gap": 2,
+              "risk": "Défi risqué",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 5,
+                "winPercent": 1.67,
+                "interval95": [
+                  0.71,
+                  3.84
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 17,
+                "winPercent": 5.67,
+                "interval95": [
+                  3.57,
+                  8.89
+                ],
+                "stops": 1
+              }
+            }
+          ]
+        },
+        {
+          "week": 14,
+          "playerAverage": 72.25,
+          "condition": {
+            "energy": 100,
+            "fatigue": 0
+          },
+          "rosterMinimum": 62.32,
+          "rosterMaximum": 76.06,
+          "offers": [
+            {
+              "name": "Minh Nguyen",
+              "rating": 70.06,
+              "gap": -3.61,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 283,
+                "winPercent": 94.33,
+                "interval95": [
+                  91.11,
+                  96.43
+                ],
+                "stops": 2
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 247,
+                "winPercent": 82.33,
+                "interval95": [
+                  77.62,
+                  86.23
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 73.06,
+              "gap": -0.61,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 149,
+                "winPercent": 49.67,
+                "interval95": [
+                  44.05,
+                  55.29
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 95,
+                "winPercent": 31.67,
+                "interval95": [
+                  26.66,
+                  37.13
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Alexis Caron",
+              "rating": 76.06,
+              "gap": 2.39,
+              "risk": "Défi risqué",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 8,
+                "winPercent": 2.67,
+                "interval95": [
+                  1.36,
+                  5.17
+                ],
+                "stops": 2
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 0,
+                "winPercent": 0,
+                "interval95": [
+                  0,
+                  1.26
+                ],
+                "stops": 12
+              }
+            }
+          ]
+        },
+        {
+          "week": 27,
+          "playerAverage": 73.75,
+          "condition": {
+            "energy": 100,
+            "fatigue": 0
+          },
+          "rosterMinimum": 62.84,
+          "rosterMaximum": 76.32,
+          "offers": [
+            {
+              "name": "Émile Martel",
+              "rating": 71.32,
+              "gap": -3.93,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 275,
+                "winPercent": 91.67,
+                "interval95": [
+                  87.99,
+                  94.29
+                ],
+                "stops": 2
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 239,
+                "winPercent": 79.67,
+                "interval95": [
+                  74.75,
+                  83.83
+                ],
+                "stops": 1
+              }
+            },
+            {
+              "name": "Samuel Bouchard",
+              "rating": 74.32,
+              "gap": -0.93,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 158,
+                "winPercent": 52.67,
+                "interval95": [
+                  47.02,
+                  58.25
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 103,
+                "winPercent": 34.33,
+                "interval95": [
+                  29.19,
+                  39.87
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Alexis Caron",
+              "rating": 76.32,
+              "gap": 1.07,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 34,
+                "winPercent": 11.33,
+                "interval95": [
+                  8.22,
+                  15.42
+                ],
+                "stops": 2
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 7,
+                "winPercent": 2.33,
+                "interval95": [
+                  1.13,
+                  4.74
+                ],
+                "stops": 10
+              }
+            }
+          ]
+        },
+        {
+          "week": 53,
+          "playerAverage": 76,
+          "condition": {
+            "energy": 96,
+            "fatigue": 1
+          },
+          "rosterMinimum": 63.879999999999995,
+          "rosterMaximum": 76.84,
+          "offers": [
+            {
+              "name": "Yanis Haddad",
+              "rating": 73.84,
+              "gap": -3.66,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 268,
+                "winPercent": 89.33,
+                "interval95": [
+                  85.33,
+                  92.34
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 236,
+                "winPercent": 78.67,
+                "interval95": [
+                  73.68,
+                  82.92
+                ],
+                "stops": 0
+              }
+            },
+            {
+              "name": "Alexis Caron",
+              "rating": 76.84,
+              "gap": -0.66,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 107,
+                "winPercent": 35.67,
+                "interval95": [
+                  30.46,
+                  41.24
+                ],
+                "stops": 1
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 66,
+                "winPercent": 22,
+                "interval95": [
+                  17.68,
+                  27.03
+                ],
+                "stops": 2
+              }
+            },
+            {
+              "name": "Samuel Bouchard",
+              "rating": 74.84,
+              "gap": -2.66,
+              "risk": "Combat serré",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 224,
+                "winPercent": 74.67,
+                "interval95": [
+                  69.45,
+                  79.26
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 183,
+                "winPercent": 61,
+                "interval95": [
+                  55.37,
+                  66.35
+                ],
+                "stops": 0
+              }
+            }
+          ]
+        },
+        {
+          "week": 105,
+          "playerAverage": 79.75,
+          "condition": {
+            "energy": 100,
+            "fatigue": 0
+          },
+          "rosterMinimum": 65.48,
+          "rosterMaximum": 77.88,
+          "offers": [
+            {
+              "name": "Alexis Caron",
+              "rating": 77.88,
+              "gap": -3.37,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 259,
+                "winPercent": 86.33,
+                "interval95": [
+                  81.98,
+                  89.76
+                ],
+                "stops": 0
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 208,
+                "winPercent": 69.33,
+                "interval95": [
+                  63.9,
+                  74.28
+                ],
+                "stops": 2
+              }
+            },
+            {
+              "name": "Samuel Bouchard",
+              "rating": 75.88,
+              "gap": -5.37,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 299,
+                "winPercent": 99.67,
+                "interval95": [
+                  98.14,
+                  99.94
+                ],
+                "stops": 11
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 287,
+                "winPercent": 95.67,
+                "interval95": [
+                  92.73,
+                  97.45
+                ],
+                "stops": 3
+              }
+            },
+            {
+              "name": "Yanis Haddad",
+              "rating": 74.88,
+              "gap": -6.37,
+              "risk": "Accessible",
+              "actualCondition": {
+                "samples": 300,
+                "wins": 300,
+                "winPercent": 100,
+                "interval95": [
+                  98.74,
+                  100
+                ],
+                "stops": 26
+              },
+              "standardCondition90Energy5Fatigue": {
+                "samples": 300,
+                "wins": 293,
+                "winPercent": 97.67,
+                "interval95": [
+                  95.26,
+                  98.87
+                ],
+                "stops": 7
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

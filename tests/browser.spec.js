@@ -80,6 +80,120 @@ async function openStoredCareer(page, snapshot) {
   await expect(page.locator("#career-world")).toBeVisible();
 }
 
+for (const viewport of [{ width: 1366, height: 900 }, { width: 390, height: 844 }, { width: 320, height: 740 }]) {
+  test(`Risque galas : offres, prix et conseil réservé cohérents à ${viewport.width} px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await openStoredCareer(page, amateurSnapshot({ money: 2000, gymWeeks: 8, jobId: "convenience" }));
+    await page.locator("[data-career-open-calendar]").first().click();
+    const expected = await page.evaluate(() => {
+      const event = state.calendar.events.find(event => event.kind === "gala" && event.careerWeek === 3);
+      const offers = BoxeurRosterCareer.galaOffers(state.rosterState, event, playerCombatStrength())
+        .map((offer, slot) => ({ ...offer, slot })).sort((a, b) => opponentDifficulty(a) - opponentDifficulty(b) || a.slot - b.slot);
+      const player = galaRiskPlayerContext();
+      return { eventId: event.id, money: state.money, offers: offers.map(offer => ({ id: offer.rosterFighterId, slot: offer.slot,
+        stats: offer.stats, risk: BoxeurGalaRisk.assess(player.stats, offer.stats, offer.style).id })),
+        quote: BoxeurCalendar.quoteEventCost(event, BoxeurCalendar.travelOptionsForEvent(event)[0]?.id || "none").total };
+    });
+    await expect(page.locator(".gala-preparation")).toHaveCount(1);
+    await expect(page.locator(".gala-preparation")).toContainText("Préparation actuelle");
+    await expect(page.locator(".gala-preparation")).toContainText("Ta préparation peut encore changer");
+    const choices = page.locator(`[data-book-gala="${expected.eventId}"]`);
+    const week = page.locator(".calendar-week-group").filter({ has: choices.first() });
+    await week.locator(":scope > summary").click();
+    const article = choices.first().locator("xpath=ancestor::article[1]");
+    await article.locator(".calendar-opponent-alternatives > summary").click();
+    expect(await choices.evaluateAll(elements => elements.map(el => ({ id: el.dataset.rosterFighter, slot: Number(el.dataset.slot),
+      risk: el.querySelector("[data-gala-risk]").dataset.galaRisk })))).toEqual(expected.offers.map(({ stats, ...offer }) => offer));
+    for (const choice of await choices.all()) {
+      await expect(choice).not.toContainText(/Combat serré|difficulté \d|Recommandé par le coach/);
+      await expect(choice.locator(".gala-cost")).toHaveText(expected.quote ? `${expected.quote} $` : "Gratuit");
+    }
+    await choices.first().scrollIntoViewIfNeeded();
+    const geometry = await article.evaluate(element => [element, ...element.querySelectorAll("button, [data-gala-risk], .gala-cost")]
+      .map(node => ({ tag: node.className, overflow: node.scrollWidth - node.clientWidth,
+        clipped: node.scrollHeight - node.clientHeight })));
+    expect(geometry.every(item => item.overflow <= 1 && item.clipped <= 1), JSON.stringify(geometry)).toBe(true);
+    await page.screenshot({ path: `/tmp/gala-risk-calendar-${viewport.width}.png` });
+    // Same selection/booking handler, including keyboard activation.
+    await choices.first().focus();
+    await page.keyboard.press("Enter");
+    const reserved = await page.evaluate(() => JSON.parse(JSON.stringify(state.scheduledFight)));
+    expect(reserved.opponent.rosterFighterId).toBe(expected.offers[0].id);
+    expect(reserved.opponent.stats).toEqual(expected.offers[0].stats);
+    expect(await page.evaluate(() => state.money)).toBe(expected.money - expected.quote);
+    await expect(page.locator("#scheduled-fight [data-gala-risk]")).toHaveAttribute("data-gala-risk", expected.offers[0].risk);
+    if (reserved.travelEffects.energy || reserved.travelEffects.fatigue) {
+      expect(reserved.travelApplied).toBe(false);
+      await expect(page.locator("#scheduled-fight .gala-travel-note")).toContainText("non encore appliqués");
+    }
+    await page.locator('#calendar-dialog [data-career-nav="map"]').click();
+    await page.locator('.career-map-hotspot[data-career-location="arena"]').click();
+    await expect(page.locator(".career-arena-view [data-gala-risk]")).toHaveAttribute("data-gala-risk", expected.offers[0].risk);
+    await expect(page.locator(".career-arena-condition")).toHaveCount(1);
+    await expect(page.locator(".career-arena-condition")).toContainText("Préparation actuelle");
+    if (reserved.travelEffects.energy || reserved.travelEffects.fatigue) {
+      await expect(page.locator(".career-arena-opponent .gala-travel-note")).toContainText("non encore appliqués");
+    }
+    expect(await page.locator(".career-arena-view").evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    await page.locator(".career-arena-opponent").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `/tmp/gala-risk-arena-${viewport.width}.png` });
+    expect(await page.evaluate(() => JSON.parse(JSON.stringify(state.scheduledFight)))).toEqual(reserved);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("#resume-load").click();
+    expect(await page.evaluate(() => JSON.parse(JSON.stringify(state.scheduledFight)))).toEqual(reserved);
+    expect(errors).toEqual([]);
+  });
+}
+
+test("Risque galas : lecture pure, plan non confirmé et ancienne réservation Caron", async ({ page }) => {
+  const opponent = { id: "legacy-risk-caron", name: "Alexis Caron", nickname: "La Masse", style: "Puncheur",
+    record: "18 V · 10 D", rating: 55.68, difficulty: 56, risk: "Combat serré",
+    stats: { technique: 55.43, power: 59.43, cardio: 54.43, defense: 53.43 } };
+  await openStoredCareer(page, amateurSnapshot({ money: 2000, gymWeeks: 8, jobId: "convenience", energy: 30, fatigue: 70,
+    combatStats: { technique: 53, power: 53, cardio: 53, defense: 52 },
+    scheduledFight: { id: "legacy-risk", opponent, week: 3, tournamentId: null, fightSeed: "risk-legacy-do-not-consume",
+      travelApplied: true, travelEffects: { energy: -6, fatigue: 4 } } }));
+  await page.locator("[data-career-open-calendar]").first().click();
+  await expect(page.locator("#scheduled-fight [data-gala-risk]")).toHaveText("Gros défi");
+  await expect(page.locator(".gala-preparation .gala-condition-warning")).toContainText("plus difficile");
+  await expect(page.locator("#scheduled-fight .gala-travel-note")).toHaveCount(0);
+  const purity = await page.evaluate(() => {
+    const capture = () => JSON.stringify({ state, careerCapsule, storage: { ...localStorage } });
+    const before = capture();
+    const start = performance.now();
+    for (let i = 0; i < 100; i++) {
+      const player = galaRiskPlayerContext();
+      BoxeurGalaRisk.renderAssessment(BoxeurGalaRisk.assess(player.stats, state.scheduledFight.opponent.stats, state.scheduledFight.opponent.style));
+      BoxeurGalaRisk.renderPreparation(player.preparation, true);
+      BoxeurGalaRisk.renderTravel(state.scheduledFight.travelEffects, state.scheduledFight.travelApplied);
+    }
+    const milliseconds = performance.now() - start;
+    return { unchanged: capture() === before, milliseconds,
+      reserved: JSON.parse(JSON.stringify(state.scheduledFight)) };
+  });
+  expect(purity.unchanged).toBe(true);
+  expect(purity.reserved.opponent.risk).toBe("Combat serré"); // Compatibility snapshot untouched, ignored by UI.
+  expect(purity.reserved.fightSeed).toBe("risk-legacy-do-not-consume");
+  expect(purity.reserved.travelApplied).toBe(true);
+  console.log("Risque : 100 lectures/rendus purs", purity.milliseconds, "ms");
+  await page.locator('#calendar-dialog [data-career-nav="map"]').click();
+  await page.locator('.career-map-hotspot[data-career-location="arena"]').click();
+  await expect(page.locator(".career-arena-opponent [data-gala-risk]")).toHaveText("Gros défi");
+  await expect(page.locator(".career-arena-condition .gala-condition-warning")).toBeVisible();
+  await expect(page.locator(".career-arena-opponent .gala-travel-note")).toHaveCount(0);
+  await page.locator("[data-career-leave-arena]").click();
+  const pending = await page.evaluate(() => {
+    const before = galaRiskPlayerContext();
+    applyCareerQuickWeekPlan();
+    return { before, after: galaRiskPlayerContext(), entries: ensureCareerWeekPlanner().entries.length };
+  });
+  expect(pending.entries).toBeGreaterThan(0);
+  expect(pending.after).toEqual(pending.before);
+  expect(await page.evaluate(() => JSON.parse(JSON.stringify(state.scheduledFight)))).toEqual(purity.reserved);
+});
+
 async function createCareer(page, options = {}) {
   const sex = options.sex === "female" ? "female" : "male";
   const firstName = options.firstName || (sex === "female" ? "Jade" : "Alex");
@@ -744,6 +858,9 @@ test("termine la semaine de combat avant d’ouvrir l’aréna, protège le trav
     capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")),
   }));
   expect(saved.main.state.week).toBe(1);
+  expect(saved.main.state.rosterState.lastProcessedWeek).toBe(0);
+  expect(saved.main.state.rosterState.matches).toEqual([]);
+  expect(saved.main.state.rosterState.reservations).toHaveLength(1);
   expect(saved.main.state.missedWorkWeeks).toBe(1);
   expect(saved.capsule.previewRuntime.fightGate).toMatchObject({ status: "ready", week: 1, kind: "gala" });
   expect(saved.capsule.previewRuntime.weekLedgers["1"].workShifts).toBe(1);
@@ -796,6 +913,9 @@ test("permet le désistement depuis le calendrier après le verrou de l’aréna
   expect(saved.main.missedWorkWeeks).toBe(1);
   expect(saved.main.jobTenureWeeks).toBe(4);
   expect(saved.main.jobWagesEarned).toBe(300);
+  expect(saved.main.rosterState.lastProcessedWeek).toBe(1);
+  expect(saved.main.rosterState.reservations).toEqual([]);
+  expect(saved.main.rosterState.matches.filter(match => match.source === "player")).toEqual([]);
   expect(saved.main.bookings.some(booking => booking.status === "withdrawn")).toBe(true);
   expect(saved.capsule.previewRuntime.fightGate).toBeNull();
 
@@ -1750,7 +1870,10 @@ test("réserve un gala et joue un combat tactique complet avant de révéler les
     strengthGymWeeks: 4,
   }));
   await bookCurrentGala(page);
+  const reservedRosterOpponent = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state.scheduledFight.opponent);
   await startTacticalFight(page);
+  const ringRosterStats = await page.evaluate(() => fightState.fighters.opponent.stats);
+  expect(ringRosterStats).toEqual(reservedRosterOpponent.stats);
   await expect(page.locator(".sparring-combat-hud")).toBeHidden();
 
   const viewport = page.viewportSize();
@@ -1789,6 +1912,17 @@ test("réserve un gala et joue un combat tactique complet avant de révéler les
   expect(persistedBeforeClosingResult.state.jobWagesEarned).toBe(300);
   expect(persistedBeforeClosingResult.state.gymWeeks).toBe(7);
   expect(persistedBeforeClosingResult.state.strengthGymWeeks).toBe(3);
+  const rosterResult = persistedBeforeClosingResult.state.rosterState;
+  expect(rosterResult.lastProcessedWeek).toBe(1);
+  expect(rosterResult.reservations).toEqual([]);
+  const playerMatches = rosterResult.matches.filter(match => match.source === "player");
+  expect(playerMatches).toHaveLength(1);
+  expect(playerMatches[0].fighterIds).toEqual(["player", reservedRosterOpponent.rosterFighterId]);
+  const affiliated = rosterResult.fighters.find(fighter => fighter.id === reservedRosterOpponent.rosterFighterId);
+  expect(affiliated.record.losses - affiliated.initialRecord.losses).toBe(persistedBeforeClosingResult.state.amateurRecord.wins);
+  expect(affiliated.record.wins - affiliated.initialRecord.wins).toBe(persistedBeforeClosingResult.state.amateurRecord.losses);
+  await page.evaluate(() => finishFight());
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state.rosterState)).toEqual(rosterResult);
 
   await page.locator("#fight-instruction button.primary-button").click();
   const snapshot = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")));
@@ -1840,7 +1974,7 @@ test("reste utilisable à 390 × 844 px sans débordement et avec des actions ta
   const coachPick = page.locator(".calendar-event.recommended");
   await expect(coachPick).toHaveCount(1);
   await expect(coachPick).toBeVisible();
-  await expect(coachPick.locator(".calendar-opponent-primary")).toContainText("Recommandé par le coach");
+  await expect(coachPick.locator(".calendar-opponent-primary")).toContainText("Repère du coach");
   const alternateOpponents = coachPick.locator(".calendar-opponent-alternatives");
   await expect(alternateOpponents).toBeVisible();
   await expect(alternateOpponents.locator("[data-book-gala]").first()).toBeHidden();
@@ -2237,7 +2371,7 @@ test("utilise seulement des adversaires et portraits féminins dans les combats 
     profile: { sex: "female", firstName: "Jade", weightClass: "W57", portraitId: 2 },
   }));
   const audit = await page.evaluate(() => {
-    const local = opponentPool();
+    const local = state.rosterState.fighters;
     const tournament = generateTournamentOpponents(tournamentDefs.find(item => item.id === "bronze"));
     configureRingImages();
     return {
@@ -2357,6 +2491,7 @@ test("joue le sparring interactif de Rémy puis passe automatiquement amateur av
   expect(storedAfterSparring.state.recreationalSparringStatus).toBe("completed");
   expect(storedAfterSparring.state.careerStatus).toBe("amateur");
   expect(storedAfterSparring.state.week).toBe(1);
+  expect(storedAfterSparring.state.rosterState).toMatchObject({ startWeek: 1, lastProcessedWeek: 0, initialLevelOffset: 0, matches: [] });
   expect(storedAfterSparring.state.amateurPromotionPending).toBe(true);
   await expect(page.locator("#fight-instruction")).toContainText("activé automatiquement");
   await page.locator("#fight-instruction button.primary-button", { hasText: "Voir mon passage amateur" }).click();
@@ -2449,6 +2584,8 @@ test("joue le sparring interactif de Rémy puis passe automatiquement amateur av
     capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")),
   }));
   expect(afterPractice.career.state.week).toBe(2);
+  expect(afterPractice.career.state.rosterState.lastProcessedWeek).toBe(1);
+  expect(afterPractice.career.state.rosterState.matches.every(match => match.source === "simulation")).toBe(true);
 });
 
 test("promeut aussi automatiquement après le sparring lancé depuis le calendrier", async ({ page }) => {
@@ -2519,8 +2656,12 @@ test("bloque le sparring amateur pendant un combat, exige 18 énergie et préser
   await expect(lowCapacityRing).toHaveAccessibleName(/Énergie insuffisante|capacité hebdomadaire restante est insuffisante|état physique est critique/i);
 
   const futureFight = officialFight(3);
+  futureFight.id = "leclerc";
+  futureFight.opponent.id = "leclerc";
   await openStoredCareer(page, amateurSnapshot({ gymWeeks: 4, scheduledFight: futureFight }));
   const storedFutureFightBeforeSparring = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state.scheduledFight);
+  const rosterBeforePractice = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state.rosterState);
+  expect(rosterBeforePractice.reservations).toHaveLength(1);
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   const futureFightRing = page.locator('[data-career-gym-zone="ring"]');
   await expect(futureFightRing).toBeEnabled();
@@ -2533,6 +2674,7 @@ test("bloque le sparring amateur pendant un combat, exige 18 énergie et préser
   expect(stored.state.scheduledFight.id).toBe(storedFutureFightBeforeSparring.id);
   expect(stored.state.scheduledFight.opponent.name).toBe(storedFutureFightBeforeSparring.opponent.name);
   expect(stored.state.scheduledFight.week).toBe(3);
+  expect(stored.state.rosterState).toEqual(rosterBeforePractice);
 });
 
 test("conserve le menu principal entre Carte, Calendrier, Boxeur et Inventaire", async ({ page }) => {
@@ -2683,15 +2825,31 @@ test("navigue gratuitement entre le quartier et le Centre-ville après le premie
   await expect(page.locator(".career-downtown-canvas > picture > img")).toHaveJSProperty("complete", true);
   await expect.poll(() => page.locator(".career-downtown-canvas > picture > img").evaluate(image => image.currentSrc)).toContain("carte-centre-ville-desktop.jpg");
   await expect(page.locator(".career-downtown-hotspot")).toHaveCount(4);
-  for (const locationId of ["leisure-center", "media-studio", "federation", "airport"]) {
-    await expect(page.locator(`[data-career-downtown-location="${locationId}"]`)).toBeDisabled();
-  }
-  await expect(page.locator('[data-career-downtown-location="leisure-center"]')).toHaveAccessibleName(/prépare encore ses activités/i);
+  await expect(page.locator('[data-career-downtown-location="leisure-center"]')).toBeEnabled();
+  await expect(page.locator('[data-career-downtown-location="media-studio"]')).toBeEnabled();
+  await expect(page.locator('[data-career-downtown-location="federation"]')).toBeEnabled();
+  await expect(page.locator('[data-career-downtown-location="airport"]')).toBeDisabled();
+  await expect(page.locator('[data-career-downtown-location="leisure-center"]')).toHaveAccessibleName(/entrer.*quilles, arcade, cinéma et karting/i);
+  await expect(page.locator('[data-career-downtown-location="media-studio"]')).toHaveAccessibleName(/entrer.*entrevue, séance photo, balado et apparition publique/i);
   await expect(page.locator('[data-career-downtown-location="airport"]')).toHaveAccessibleName(/statut professionnel/i);
   const desktopDowntownMap = await page.locator(".career-downtown-canvas").boundingBox();
   expect(desktopDowntownMap.width / desktopDowntownMap.height).toBeGreaterThan(1.6);
   await expect(page.locator(".career-world-nav")).toBeVisible();
   await expect(page.locator(".career-now-time")).toContainText("740 $");
+
+  await page.locator('[data-career-downtown-location="leisure-center"]').click();
+  await expect(page.locator(".career-leisure-view")).toBeVisible();
+  await expect(page.locator(".career-leisure-scene > picture > img")).toHaveJSProperty("complete", true);
+  await expect.poll(() => page.locator(".career-leisure-scene > picture > img").evaluate(image => image.currentSrc)).toContain("centre-loisirs-desktop.jpg");
+  await expect(page.locator("[data-career-leisure-activity]")).toHaveCount(4);
+  for (const activity of await page.locator("[data-career-leisure-activity]").all()) await expect(activity).toBeEnabled();
+  await expect(page.locator('[data-career-leisure-activity="bowling"]')).toContainText("30 $ · 6 capacité");
+  await expect(page.locator(".career-leisure-status")).toContainText("Le prix sera payé seulement lorsque tu confirmeras");
+  await expect(page.locator(".career-world-layout")).toHaveJSProperty("inert", true);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".career-location-sheet")).toBeHidden();
+  await expect(page.locator('.career-map-panel[data-career-district-view="downtown"]')).toBeVisible();
+  await expect(page.locator('[data-career-downtown-location="leisure-center"]')).toBeFocused();
 
   const storageAfterDistrictChange = await page.evaluate(() => ({
     career: localStorage.getItem("boxeur-deux-career"),
@@ -2714,6 +2872,28 @@ test("navigue gratuitement entre le quartier et le Centre-ville après le premie
     expect(box && box.height).toBeGreaterThanOrEqual(44);
   }
 
+  await page.locator('[data-career-downtown-location="leisure-center"]').click();
+  await expect.poll(() => page.locator(".career-leisure-scene > picture > img").evaluate(image => image.currentSrc)).toContain("centre-loisirs-mobile.jpg");
+  const mobileLeisureScene = await page.locator(".career-leisure-scene").boundingBox();
+  expect(mobileLeisureScene.height / mobileLeisureScene.width).toBeGreaterThan(0.98);
+  expect(mobileLeisureScene.height / mobileLeisureScene.width).toBeLessThan(1.02);
+  for (const activity of await page.locator("[data-career-leisure-activity]").all()) {
+    const box = await activity.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.locator('[data-career-leisure-activity="cinema"]').click();
+  await expect(page.locator(".career-leisure-quote")).toBeVisible();
+  const mobileLeisureMenuFit = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: innerWidth }));
+  expect(mobileLeisureMenuFit.document).toBeLessThanOrEqual(mobileLeisureMenuFit.viewport + 1);
+  for (const button of await page.locator(".career-leisure-menu footer button").all()) {
+    const box = await button.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.locator("[data-career-leisure-menu-close]").first().click();
+  await page.locator("[data-career-leave-leisure]").click();
+  await expect(page.locator(".career-location-sheet")).toBeHidden();
+  await expect(page.locator('.career-map-panel[data-career-district-view="downtown"]')).toBeVisible();
+
   await page.locator('.career-district-switch [data-career-district="neighborhood"]').click();
   await expect(page.locator('.career-map-panel[data-career-district-view="neighborhood"]')).toBeVisible();
   await expect(page.locator(".career-map-hotspot")).toHaveCount(5);
@@ -2724,6 +2904,166 @@ test("navigue gratuitement entre le quartier et le Centre-ville après le premie
   await page.locator("#resume-load").click();
   await expect(page.locator('.career-map-panel[data-career-district-view="neighborhood"]')).toBeVisible();
   await expect(page.locator(".career-map-hotspot")).toHaveCount(5);
+});
+
+test("planifie, remplace, retire puis applique une seule sortie sans XP ni débit anticipé", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openStoredCareer(page, amateurSnapshot({
+    week: 9,
+    jobId: null,
+    money: 50,
+    energy: 70,
+    fatigue: 30,
+    amateurRecord: { wins: 1, losses: 0, draws: 0 },
+    combatStats: { technique: 35, power: 34, cardio: 33, defense: 32 },
+  }));
+
+  await page.locator('[data-career-district="downtown"]').click();
+  await page.locator('[data-career-downtown-location="leisure-center"]').click();
+  await page.locator('[data-career-leisure-activity="cinema"]').click();
+  const cinemaSheet = page.locator(".career-leisure-menu");
+  await expect(cinemaSheet).toContainText("25 $");
+  await expect(cinemaSheet).toContainText("−5");
+  await expect(cinemaSheet).toContainText("+4");
+  await expect(cinemaSheet).toContainText("Aucune XP et aucun bonus de statistique");
+  await page.locator('[data-career-leisure-confirm="cinema"]').click();
+
+  await expect(page.locator(".career-leisure-planned")).toContainText("Cinéma");
+  await expect(page.locator('[data-career-leisure-activity="cinema"]')).toContainText("Planifiée");
+  let saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(saved.previewRuntime.career.money).toBe(50);
+  expect(saved.previewRuntime.weekPlanner.entries.filter(entry => entry.metadata?.familyId === "leisure")).toHaveLength(1);
+  expect(saved.previewRuntime.weekPlanner.entries.find(entry => entry.metadata?.familyId === "leisure").activityId).toBe("leisure:cinema");
+
+  await page.locator('[data-career-leisure-activity="karting"]').click();
+  await expect(page.locator(".career-leisure-menu")).toContainText("Il manque 10 $ pour cette sortie");
+  await expect(page.locator('[data-career-leisure-confirm="karting"]')).toBeDisabled();
+  await page.locator("[data-career-leisure-menu-close]").first().click();
+  await page.locator('[data-career-leisure-activity="bowling"]').click();
+  await expect(page.locator(".career-leisure-menu")).toContainText("remplacera la sortie déjà planifiée");
+  await page.locator('[data-career-leisure-confirm="bowling"]').click();
+
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(saved.previewRuntime.career.money).toBe(50);
+  expect(saved.previewRuntime.weekPlanner.entries.filter(entry => entry.metadata?.familyId === "leisure")).toHaveLength(1);
+  expect(saved.previewRuntime.weekPlanner.entries.find(entry => entry.metadata?.familyId === "leisure").activityId).toBe("leisure:bowling");
+
+  await page.locator('[data-career-leisure-remove]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(saved.previewRuntime.career.money).toBe(50);
+  expect(saved.previewRuntime.weekPlanner.entries.some(entry => entry.metadata?.familyId === "leisure")).toBe(false);
+
+  await page.locator('[data-career-leisure-activity="cinema"]').click();
+  await page.locator('[data-career-leisure-confirm="cinema"]').click();
+  await page.locator('[data-career-leave-leisure]').click();
+  await page.locator('[data-career-week-detailed]').click();
+  await page.locator('[data-career-week-confirm]').click();
+  await expect(page.locator(".career-week-summary")).toContainText("Détendu · Cinéma");
+  await expect(page.locator(".career-week-summary")).toContainText("Dépenses planifiées");
+  await expect(page.locator(".career-week-summary")).toContainText("−25 $");
+  await expect(page.locator(".career-week-summary")).toContainText("XP générale");
+
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(saved.previewRuntime.career.money).toBe(25);
+  const leisureHistory = saved.timeState.history.filter(event => event.activityId === "leisure:cinema");
+  expect(leisureHistory).toHaveLength(1);
+  expect(leisureHistory[0].activityCategory).toBe("leisure");
+  expect(leisureHistory[0].afterImmediate.stimulus).toEqual(leisureHistory[0].before.stimulus);
+  expect(leisureHistory[0].afterImmediate.statXp).toEqual(leisureHistory[0].before.statXp);
+});
+
+test("planifie une apparition média sur mobile et applique seulement la réputation", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openStoredCareer(page, amateurSnapshot({
+    week: 10,
+    jobId: null,
+    money: 200,
+    reputation: 18,
+    energy: 72,
+    fatigue: 24,
+    amateurRecord: { wins: 1, losses: 0, draws: 0 },
+    combatStats: { technique: 35, power: 34, cardio: 33, defense: 32 },
+  }));
+
+  await page.locator('[data-career-district="downtown"]').click();
+  await page.locator('[data-career-downtown-location="media-studio"]').click();
+  await expect(page.locator(".career-media-view")).toBeVisible();
+  await expect.poll(() => page.locator(".career-media-scene > picture > img").evaluate(image => image.currentSrc)).toContain("studio-media-mobile.jpg");
+  await expect(page.locator("[data-career-media-activity]")).toHaveCount(4);
+  const mediaScene = await page.locator(".career-media-scene").boundingBox();
+  expect(mediaScene.height / mediaScene.width).toBeGreaterThan(0.98);
+  expect(mediaScene.height / mediaScene.width).toBeLessThan(1.02);
+  for (const activity of await page.locator("[data-career-media-activity]").all()) {
+    const box = await activity.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(44);
+  }
+
+  await expect(page.locator('[data-career-media-activity="interview"]')).not.toHaveClass(/locked/);
+  await expect(page.locator('[data-career-media-activity="photoshoot"]')).not.toHaveClass(/locked/);
+  await expect(page.locator('[data-career-media-activity="podcast"]')).toHaveClass(/locked/);
+  await expect(page.locator('[data-career-media-activity="appearance"]')).toHaveClass(/locked/);
+  await expect(page.locator('[data-career-media-activity="podcast"]')).toContainText("Débloqué à 20 réputation");
+  await page.locator('[data-career-media-activity="appearance"]').click();
+  await expect(page.locator(".career-media-menu")).toContainText("−8");
+  await expect(page.locator(".career-media-menu")).toContainText("+3");
+  await expect(page.locator(".career-media-menu")).toContainText("Aucun argent, aucune XP");
+  await expect(page.locator(".career-media-menu")).toContainText("35 de réputation requise; ta réputation actuelle est de 18");
+  await expect(page.locator('[data-career-media-confirm="appearance"]')).toBeDisabled();
+  const mobileMenuFit = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: innerWidth }));
+  expect(mobileMenuFit.document).toBeLessThanOrEqual(mobileMenuFit.viewport + 1);
+  for (const button of await page.locator(".career-media-menu footer button").all()) {
+    const box = await button.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.locator("[data-career-media-menu-close]").first().click();
+  await page.locator('[data-career-media-activity="photoshoot"]').click();
+  await page.locator('[data-career-media-confirm="photoshoot"]').click();
+
+  let runtime = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  let career = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")));
+  expect(career.state.reputation).toBe(18);
+  expect(runtime.previewRuntime.weekPlanner.entries.filter(entry => entry.metadata?.familyId === "media")).toHaveLength(1);
+  expect(runtime.previewRuntime.weekPlanner.entries.find(entry => entry.metadata?.familyId === "media").activityId).toBe("media:photoshoot");
+
+  await page.locator('[data-career-media-activity="interview"]').click();
+  await expect(page.locator(".career-media-menu")).toContainText("remplacera l’apparition déjà planifiée");
+  await page.locator('[data-career-media-confirm="interview"]').click();
+  runtime = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  expect(runtime.previewRuntime.weekPlanner.entries.filter(entry => entry.metadata?.familyId === "media")).toHaveLength(1);
+  expect(runtime.previewRuntime.weekPlanner.entries.find(entry => entry.metadata?.familyId === "media").activityId).toBe("media:interview");
+
+  await page.locator("[data-career-media-remove]").click();
+  runtime = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  career = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")));
+  expect(career.state.reputation).toBe(18);
+  expect(runtime.previewRuntime.weekPlanner.entries.some(entry => entry.metadata?.familyId === "media")).toBe(false);
+
+  await page.locator('[data-career-media-activity="photoshoot"]').click();
+  await page.locator('[data-career-media-confirm="photoshoot"]').click();
+  await page.locator("[data-career-leave-media]").click();
+  await page.locator("[data-career-week-detailed]").click();
+  await expect(page.locator(".career-week-plan")).toContainText("+2 réputation à la confirmation");
+  await page.locator("[data-career-week-confirm]").click();
+  await expect(page.locator(".career-week-summary")).toContainText("Visibilité · Séance photo");
+  await expect(page.locator(".career-week-summary")).toContainText("réputation 18 → 20 (+2)");
+
+  runtime = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")));
+  career = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")));
+  expect(career.state.reputation).toBe(20);
+  expect(runtime.previewRuntime.career.money).toBe(200);
+  const mediaHistory = runtime.timeState.history.filter(event => event.activityId === "media:photoshoot");
+  expect(mediaHistory).toHaveLength(1);
+  expect(mediaHistory[0].activityCategory).toBe("media");
+  expect(mediaHistory[0].afterImmediate.condition).toEqual(mediaHistory[0].before.condition);
+  expect(mediaHistory[0].afterImmediate.stimulus).toEqual(mediaHistory[0].before.stimulus);
+  expect(mediaHistory[0].afterImmediate.statXp).toEqual(mediaHistory[0].before.statXp);
+
+  await page.locator("[data-career-week-summary-close]").click();
+  await page.locator('[data-career-district="downtown"]').click();
+  await page.locator('[data-career-downtown-location="media-studio"]').click();
+  await expect(page.locator('[data-career-media-activity="podcast"]')).not.toHaveClass(/locked/);
+  await page.locator('[data-career-media-activity="podcast"]').click();
+  await expect(page.locator('[data-career-media-confirm="podcast"]')).toBeEnabled();
 });
 
 test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde compatible", async ({ page }) => {
@@ -3021,6 +3361,7 @@ test("télécharge depuis l’onglet Boxeur une sauvegarde JSON complète et ré
   expect(exported.export).toMatchObject({ kind: "boxeur-deux-complete-career", version: 2 });
   expect(exported.state.profile).toMatchObject({ firstName: "Éric", lastName: "Export", nickname: "Copie" });
   expect(exported.state.money).toBe(735);
+  expect(exported.state.rosterState.fighters).toHaveLength(10);
   expect(exported.careerCapsule.kind).toBe("boxeur-deux-career-capsule");
   expect(exported.careerCapsule.timeState.statXp.technique).toBe(16);
   await expect(page.locator("#toast")).toContainText("Sauvegarde JSON téléchargée");
@@ -3036,6 +3377,7 @@ test("télécharge depuis l’onglet Boxeur une sauvegarde JSON complète et ré
     localStorage.getItem("boxeur-deux-career-runtime"),
   ).timeState.statXp.technique);
   expect(restoredXp).toBe(16);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state.rosterState)).toEqual(exported.state.rosterState);
 });
 
 test("compose la semaine à la Maison sans appliquer le plan avant sa confirmation", async ({ page }) => {
@@ -3306,10 +3648,14 @@ test("enchaîne pesée, combat à cinq juges et récupération vers le jour suiv
       // Les statistiques du snapshot gardent tout de même ce parcours très stable.
     }
   });
-  await openStoredCareer(page, dueTournamentSnapshot());
+  const tournamentSource = dueTournamentSnapshot();
+  tournamentSource.state.scheduledFight.id = "leclerc";
+  tournamentSource.state.scheduledFight.opponent.id = "leclerc";
+  await openStoredCareer(page, tournamentSource);
 
   const migratedTournament = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state);
   expect(migratedTournament.activeTournament.bookingId).toBeTruthy();
+  expect(migratedTournament.rosterState.reservations).toHaveLength(1);
   expect(migratedTournament.bookings.some(booking => booking.id === migratedTournament.activeTournament.bookingId)).toBe(true);
 
   await enterDueTournamentFromArena(page);
@@ -3372,9 +3718,10 @@ test("enchaîne pesée, combat à cinq juges et récupération vers le jour suiv
   expect(afterRecovery.activeTournament.competition.lastRecoveryId).toBeTruthy();
   expect(afterRecovery.currentWeightKg).toBe(63);
   expect(afterRecovery.amateurRecord.draws).toBe(0);
-  expect(afterRecovery.scheduledFight.id).toBe("future-gala-browser");
+  expect(afterRecovery.scheduledFight.id).toBe("leclerc");
   expect(afterRecovery.scheduledFight.week).toBe(12);
   expect(afterRecovery.activeTournament.deferredScheduledFight).toBeUndefined();
+  expect(afterRecovery.rosterState).toEqual(migratedTournament.rosterState);
 
   await nextTournamentStep.click();
   await expect(page.locator("#tournament-daily-status")).toContainText("Autorisé à boxer aujourd’hui");
@@ -4041,3 +4388,379 @@ test("explique un achat de supplément impossible sans ouvrir la confirmation", 
   expect(persisted.previewRuntime.career.money).toBe(5);
   expect(persisted.previewRuntime.career.supplementState.inventory["protein-bar"] || 0).toBe(0);
 });
+
+for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+  test(`BE-C conserve un gala futur et son bassin pendant deux semaines à ${viewport.width} px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await openStoredCareer(page, amateurSnapshot({ money: 2000, gymWeeks: 8, jobId: "convenience" }));
+    const initial = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state);
+    await page.locator("[data-career-open-calendar]").first().click();
+    const futureEvent = initial.calendar.events.find(event => event.kind === "gala" && event.careerWeek === 3);
+    expect(futureEvent).toBeTruthy();
+    const choice = page.locator(`[data-book-gala="${futureEvent.id}"]`).first();
+    const group = page.locator(".calendar-week-group").filter({ has: choice });
+    if (!await group.evaluate(element => element.open)) await group.locator(".calendar-week-summary").click();
+    const chosenId = await choice.getAttribute("data-roster-fighter");
+    // A stale button cannot silently buy a different opponent or charge the player.
+    await page.evaluate(({ id, slot }) => bookGalaEvent(id, slot, "stale-id"), { id: futureEvent.id, slot: await choice.getAttribute("data-slot") });
+    expect(await page.evaluate(() => state.money)).toBe(initial.money);
+    expect(await page.evaluate(() => state.scheduledFight)).toBeNull();
+    if (!await group.evaluate(element => element.open)) await group.locator(".calendar-week-summary").click();
+    await choice.click();
+    const booked = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state);
+    expect(booked.scheduledFight.opponent.rosterFighterId).toBe(chosenId);
+    expect(booked.rosterState.reservations).toHaveLength(1);
+    const frozenFighter = booked.rosterState.fighters.find(fighter => fighter.id === chosenId);
+    expect(booked.scheduledFight.opponent.stats).toEqual(frozenFighter.stats);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("#resume-load").click();
+    for (let week = 1; week <= 2; week += 1) {
+      await confirmWeekFromLauncher(page);
+      await expect(page.locator(".career-week-summary")).toBeVisible();
+      await page.locator("[data-career-week-summary-close]").click();
+      const current = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state);
+      expect(current.week).toBe(week + 1);
+      expect(current.rosterState.lastProcessedWeek).toBe(week);
+      expect(current.rosterState.fighters.find(fighter => fighter.id === chosenId)).toEqual(frozenFighter);
+      expect(current.scheduledFight).toEqual(booked.scheduledFight);
+      expect(current.amateurRecord).toEqual(initial.amateurRecord);
+      expect(current.rosterState.matches.every(match => !match.fighterIds.includes(chosenId) && !match.fighterIds.includes("player"))).toBe(true);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.locator("#resume-load").click();
+      expect(await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state.rosterState)).toEqual(current.rosterState);
+    }
+    const check = await page.evaluate(() => ({ valid: BoxeurRosterCareer.validateCareer(state),
+      overflow: document.documentElement.scrollWidth > innerWidth + 1 }));
+    expect(check).toEqual({ valid: true, overflow: false });
+    expect(errors).toEqual([]);
+  });
+}
+
+test("BE-C migre un adversaire réservé sans changer sa fiche ni sa graine", async ({ page }) => {
+  const opponent = { id: "leclerc", name: "Thomas Leclerc", nickname: "BETON", style: "Technicien",
+    record: "12 V · 7 D · 1 N", difficulty: 65, rating: 65,
+    stats: { technique: 69.125, power: 61.75, cardio: 65.5, defense: 63.625 }, weightClass: "M65" };
+  const scheduledFight = { id: "leclerc", opponent, week: 23, tournamentId: null,
+    fightSeed: "legacy-frozen-ring-seed", travelApplied: true, travelEffects: { energy: -4, fatigue: 6 } };
+  await openStoredCareer(page, amateurSnapshot({ week: 20, money: 3500, scheduledFight,
+    combatStats: { technique: 75, power: 72, cardio: 71, defense: 74 } }));
+  const first = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state);
+  expect(first.rosterState).toMatchObject({ startWeek: 20, lastProcessedWeek: 19, matches: [] });
+  const storedOpponent = { ...first.scheduledFight.opponent };
+  delete storedOpponent.rosterFighterId;
+  delete storedOpponent.rosterBookingId;
+  expect(storedOpponent).toMatchObject(opponent);
+  expect(first.scheduledFight.fightSeed).toBe(scheduledFight.fightSeed);
+  expect(first.scheduledFight.week).toBe(23);
+  expect(first.money).toBe(3500);
+  const fighter = first.rosterState.fighters.find(item => item.id === "leclerc");
+  expect(fighter.stats).toEqual(opponent.stats);
+  expect(fighter.initialRecord).toEqual({ wins: 12, losses: 7, draws: 1 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+  const restored = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state);
+  expect(restored.rosterState).toEqual(first.rosterState);
+  expect(restored.scheduledFight).toEqual(first.scheduledFight);
+});
+
+test("BE-C refuse une importation incohérente sans remplacer la carrière en cours", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({ money: 777 }));
+  await page.locator('[data-career-nav="fighter"]').click();
+  const original = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")));
+  const invalid = JSON.parse(JSON.stringify(original));
+  invalid.state.rosterState.weightClass = "M75";
+  invalid.state.money = 1;
+  await page.locator("#import-career-file").setInputFiles({ name: "invalid-roster.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(invalid)) });
+  await expect(page.locator("#toast")).toContainText("Fichier de carrière invalide");
+  const actual = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")));
+  expect(actual.state).toEqual(original.state);
+  expect(await page.evaluate(() => state.money)).toBe(777);
+});
+
+function federationSnapshot(sex = "male", weeks = 90) {
+  const roster = require("../roster-engine.js");
+  const fighterId = sex === "female" ? "f-beaulieu" : "leclerc";
+  const weightClass = sex === "female" ? "W57" : "M65";
+  let rosterState = roster.createState({ sex, weightClass, seed: "federation-browser" });
+  for (let week = 1; week <= weeks; week += 1) {
+    if (week === weeks) {
+      rosterState = roster.reserveFighter(rosterState, { fighterId, bookingId: "federation-player", fightWeek: week }).state;
+      rosterState = roster.recordPlayerFight(rosterState, { bookingId: "federation-player", matchId: "federation-player", week, playerResult: "win", method: "decision" }).state;
+    }
+    rosterState = roster.advanceWeek(rosterState, { week, completed: true, careerStatus: "amateur" }).state;
+  }
+  return amateurSnapshot({ week: weeks + 1, money: 2400, gymWeeks: 10,
+    profile: { firstName: "Alex", lastName: "Fédération", sex, weightClass, portraitId: 1, style: "balanced", corner: "blue" },
+    amateurRecord: { wins: 2, losses: 1, draws: 1 }, rosterState,
+    medals: { bronze: { gold: 1 }, "regional-cup": { silver: 2 } } });
+}
+
+for (const viewport of [{ width: 1366, height: 900 }, { width: 390, height: 844 }]) {
+  test(`BE-D Fédération : consultation, résultats et navigation à ${viewport.width} px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const snapshot = federationSnapshot();
+    await openStoredCareer(page, snapshot);
+    await page.locator('[data-career-district="downtown"]').click();
+    const before = await page.evaluate(() => ({ storage: { ...localStorage }, state: JSON.stringify(state), capsule: JSON.stringify(careerCapsule) }));
+    const hotspot = page.locator('[data-career-downtown-location="federation"]');
+    await hotspot.click();
+    const place = page.locator(".career-federation-view");
+    await expect(place).toBeVisible();
+    await expect(place.locator("h2")).toBeFocused();
+    await expect(page.locator(".career-world-layout")).toHaveJSProperty("inert", true);
+    await page.screenshot({ path: `/tmp/boxeur-federation-home-${viewport.width}.png` });
+    await place.getByRole("button", { name: "Site de la Fédération", exact: true }).click();
+    await expect(place.locator("[data-federation-affiliate]")).toHaveCount(10);
+    const last = place.locator("[data-federation-affiliate] [data-federation-fighter]").last();
+    await last.scrollIntoViewIfNeeded();
+    const lastId = await last.getAttribute("data-federation-fighter");
+    const directoryScroll = await place.evaluate(element => element.scrollTop);
+    expect(directoryScroll).toBeGreaterThan(0);
+    await last.click();
+    await place.getByRole("button", { name: "Retour à l’annuaire", exact: true }).click();
+    await expect(place.locator(`[data-federation-fighter="${lastId}"]`)).toBeFocused();
+    expect(await place.evaluate(element => element.scrollTop)).toBeCloseTo(directoryScroll, 0);
+    await place.locator('[data-federation-fighter="leclerc"]').click();
+    await expect(place).toContainText("Bilan avant le suivi");
+    await expect(place.locator('[data-federation-match="player:federation-player"]')).toContainText("Défaite");
+    await expect(place.locator('[data-federation-match="player:federation-player"]')).toContainText("Alex Fédération (toi)");
+    await page.screenshot({ path: `/tmp/boxeur-federation-profile-${viewport.width}.png` });
+    await expect(place.locator('[data-federation-page="10"]')).toBeEnabled();
+    await place.locator('[data-federation-page="10"]').click();
+    await expect(place).toContainText("Page 2 sur");
+    await place.getByRole("button", { name: "Plus récents", exact: true }).click();
+    await place.locator('[data-federation-match="player:federation-player"] [data-federation-fighter="player"]').click();
+    await expect(place).toHaveAttribute("data-federation-current-view", "dossier");
+    await expect(place).toContainText("2 V · 1 D · 1 N");
+    await expect(place).toContainText("Coupe régionale des clubs");
+    await expect(place.locator('[data-federation-match="player:federation-player"]')).toContainText("Victoire");
+    // The same background match opens the opponent's inverse perspective.
+    const match = [...snapshot.state.rosterState.matches].reverse().find(item => item.source === "simulation");
+    await place.locator('.federation-nav [data-federation-view="directory"]').click();
+    await place.locator(`[data-federation-fighter="${match.fighterIds[0]}"]`).click();
+    const row = place.locator(`[data-federation-match="${match.id}"]`);
+    const result = await row.locator(".federation-result").textContent();
+    await row.locator(`[data-federation-fighter="${match.fighterIds[1]}"]`).click();
+    await expect(place.locator(`[data-federation-match="${match.id}"] .federation-result`)).toHaveText(result === "Victoire" ? "Défaite" : "Victoire");
+    await place.locator('.federation-nav [data-federation-view="tournaments"]').click();
+    await expect(place.locator("[data-federation-tournament]")).toHaveCount(6);
+    await expect(place.locator('[data-federation-tournament="bronze"]')).toContainText("Édition terminée");
+    const overflow = await place.evaluate(element => ({ width: element.clientWidth, scroll: element.scrollWidth, page: document.documentElement.scrollWidth, viewport: innerWidth }));
+    expect(overflow.scroll).toBeLessThanOrEqual(overflow.width + 1);
+    expect(overflow.page).toBeLessThanOrEqual(overflow.viewport + 1);
+    await page.keyboard.press("Escape");
+    await expect(place).toBeHidden();
+    await expect(hotspot).toBeFocused();
+    const after = await page.evaluate(() => ({ storage: { ...localStorage }, state: JSON.stringify(state), capsule: JSON.stringify(careerCapsule) }));
+    expect(after).toEqual(before);
+    await hotspot.click();
+    await place.locator("[data-career-open-calendar]").click();
+    await expect(page.locator("#calendar-dialog")).toBeVisible();
+    await expect(page.locator(".career-location-sheet")).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+}
+
+test("BE-D Fédération : affiliées sans passé inventé, accès verrouillé et bureau professionnel", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await openStoredCareer(page, amateurSnapshot({ week: 30, profile: { firstName: "Jade", lastName: "Test", sex: "female", weightClass: "W57" }, amateurRecord: { wins: 0, losses: 1, draws: 0 } }));
+  await page.locator('[data-career-district="downtown"]').click();
+  await page.locator('[data-career-downtown-location="federation"]').click();
+  const place = page.locator(".career-federation-view");
+  await place.locator('.federation-nav [data-federation-view="directory"]').click();
+  await expect(place.locator("[data-federation-affiliate]")).toHaveCount(10);
+  await place.locator('[data-federation-fighter="f-beaulieu"]').click();
+  await expect(place).toContainText("suivis depuis la semaine 30");
+  await expect(place).toContainText("Aucune rencontre suivie pour le moment");
+  await expect(place).toContainText("W57");
+  expect(await place.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await place.locator("[data-career-leave-federation]").click();
+  await expect(page.locator('[data-career-downtown-location="federation"]')).toBeFocused();
+  await openStoredCareer(page, amateurSnapshot());
+  await page.evaluate(() => openCareerLocation("federation"));
+  await expect(place).toHaveCount(0);
+  await expect(page.locator("#toast")).toContainText("premier combat amateur officiel");
+  await openStoredCareer(page, amateurSnapshot({ careerStatus: "professional" }));
+  await page.locator('[data-career-district="downtown"]').click();
+  await page.locator('[data-career-downtown-location="federation"]').click();
+  await expect(place).toContainText("contrats ne sont pas encore disponibles");
+  await expect(place.locator("[data-career-open-calendar], [data-federation-view], [data-federation-fighter]")).toHaveCount(0);
+});
+
+for (const viewport of [{ width: 1366, height: 900 }, { width: 390, height: 844 }]) {
+  for (const profile of [
+    { label: "debutant", mode: "single", policy: "novice", fightEvery: 8, jobId: "courier", stats: 43, money: 220 },
+    { label: "regulier", mode: "quick", policy: "coached", fightEvery: 4, jobId: "convenience", stats: 43, money: 220 },
+    { label: "avance-migre", mode: "quick", policy: "coached", fightEvery: 4, jobId: "convenience", stats: 70, money: 1000 },
+  ]) {
+    test(`BE-E carrière longue ${profile.label} à ${viewport.width} px`, async ({ page }) => {
+      test.setTimeout(180_000);
+      page.setDefaultTimeout(10_000);
+      await page.setViewportSize(viewport);
+      const errors = [];
+      page.on("pageerror", error => errors.push(error.message));
+      const weeks = Number(process.env.BE_E_WEEKS) || 104;
+      const calendar = require("../career-calendar.js");
+      await openStoredCareer(page, amateurSnapshot({
+        profile: { firstName: "Alex", lastName: "Validation", sex: "male", weightClass: "M65", style: "balanced", portraitId: 1, corner: "blue" },
+        combatStats: { technique: profile.stats, power: profile.stats, cardio: profile.stats, defense: profile.stats },
+        energy: 85, fatigue: 5, money: profile.money, jobId: profile.jobId, jobsHeldCount: 1,
+        calendar: calendar.generateCalendar({ epoch: "2026-11-16", seed: "BE-E-calendar", weeks: 16 }),
+        amateurRecord: { wins: profile.stats > 43 ? 12 : 0, losses: profile.stats > 43 ? 4 : 0, draws: 0 },
+      }));
+      await page.addScriptTag({ path: path.join(PROJECT_ROOT, "tests/fixtures/roster-campaign.js") });
+      const result = await page.evaluate(config => BERosterCampaign.run(config), { ...profile, weeks });
+      await fs.writeFile(`/tmp/boxeur-be-e-${profile.label}-${viewport.width}.json`, JSON.stringify(result, null, 2));
+      expect(result.weeks).toHaveLength(weeks);
+      expect(result.fights.length).toBeGreaterThan(0);
+      expect(result.weeks.every(week => week.jobId === profile.jobId && !week.missedWorkWeeks && week.money >= 0)).toBe(true);
+      expect(result.finalRoster.reservations).toHaveLength(0);
+      expect(result.finalRoster.lastProcessedWeek).toBe(weeks);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.locator("#resume-load").click();
+      expect(await page.evaluate(() => state.rosterState)).toEqual(result.finalRoster);
+      await page.locator('[data-career-district="downtown"]').click();
+      await page.locator('[data-career-downtown-location="federation"]').click();
+      await page.getByRole("button", { name: "Site de la Fédération", exact: true }).click();
+      await expect(page.locator("[data-federation-affiliate]")).toHaveCount(10);
+      const fighterId = result.fights.at(-1).opponent;
+      await page.locator(`[data-federation-affiliate="${fighterId}"] [data-federation-fighter]`).click();
+      await expect(page.locator(".career-federation-view")).toContainText("Bilan avant le suivi");
+      const fit = await page.locator(".career-federation-view").evaluate(element => element.scrollWidth <= element.clientWidth + 1);
+      expect(fit).toBe(true);
+      expect(errors).toEqual([]);
+    });
+  }
+}
+
+test("BE-E longue sauvegarde féminine : archives et mesures Chromium avec CPU ralenti", async ({ page }) => {
+  test.setTimeout(90_000);
+  page.setDefaultTimeout(10_000);
+  const roster = require("../roster-engine.js");
+  let rosterState = roster.createState({ sex: "female", weightClass: "W57", seed: "BE-E-performance" });
+  for (let week = 1; week <= 1500; week += 1) rosterState = roster.advanceWeek(rosterState, { week, careerStatus: "amateur", completed: true }).state;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openStoredCareer(page, amateurSnapshot({ week: 1501, gymWeeks: 4, rosterState,
+    profile: { firstName: "Jade", lastName: "Archives", sex: "female", weightClass: "W57", style: "balanced", portraitId: 1, corner: "blue" },
+    amateurRecord: { wins: 1, losses: 0, draws: 0 } }));
+  const cdp = await page.context().newCDPSession(page);
+  const measurements = [];
+  try {
+    for (const rate of [1, 4]) {
+      await cdp.send("Emulation.setCPUThrottlingRate", { rate });
+      const measured = await page.evaluate(() => {
+        const input = JSON.stringify(state.rosterState);
+        const saved = localStorage.getItem("boxeur-deux-career");
+        const storageProbe = JSON.parse(saved);
+        const percentile = values => {
+          const sorted = [...values].sort((a, b) => a - b);
+          return { medianMs: sorted[Math.floor(sorted.length / 2)], p95Ms: sorted[Math.floor(sorted.length * .95)] };
+        };
+        const weekTimes = [], directoryTimes = [], profileTimes = [], writeTimes = [];
+        for (let i = 0; i < 25; i += 1) {
+          let start = performance.now();
+          const projected = BoxeurRoster.advanceWeek(state.rosterState, { week: state.week, careerStatus: "amateur", completed: true });
+          weekTimes.push(performance.now() - start);
+          if (projected.state.lastProcessedWeek !== state.week) throw new Error("Clôture de mesure invalide");
+          start = performance.now();
+          BoxeurFederationView.render(BoxeurFederationView.buildContext(state, { view: "directory" }));
+          directoryTimes.push(performance.now() - start);
+          start = performance.now();
+          BoxeurFederationView.render(BoxeurFederationView.buildContext(state, { view: "fighter", fighterId: "f-beaulieu" }));
+          profileTimes.push(performance.now() - start);
+          start = performance.now();
+          storageProbe.savedAt = new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString();
+          localStorage.setItem("boxeur-deux-career", JSON.stringify(storageProbe));
+          writeTimes.push(performance.now() - start);
+        }
+        localStorage.setItem("boxeur-deux-career", saved);
+        if (JSON.stringify(state.rosterState) !== input) throw new Error("Le benchmark a modifié le bassin");
+        return { week: percentile(weekTimes), directory: percentile(directoryTimes), profile: percentile(profileTimes),
+          serializeAndWriteSave: percentile(writeTimes), rosterBytesUTF8: new TextEncoder().encode(input).length,
+          saveBytesUTF8: new TextEncoder().encode(saved).length,
+          calendarBytesUTF8: new TextEncoder().encode(JSON.stringify(state.calendar)).length,
+          storage: Object.keys(localStorage).map(key => ({ key, characters: localStorage.getItem(key).length, bytesUTF8: new TextEncoder().encode(localStorage.getItem(key)).length })),
+          retained: state.rosterState.matches.length, archived: state.rosterState.archives.count };
+      });
+      measurements.push({ cpuSlowdown: rate, ...measured });
+    }
+  } finally {
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    await cdp.detach();
+  }
+  // Diagnostic headroom only: temporary ASCII probe, always removed.
+  // No additional permanent copy of the career is created.
+  const storageHeadroom = await page.evaluate(() => {
+    let additionalAsciiCharacters = 0;
+    let quotaEncountered = false;
+    try {
+      for (let size = 100_000; size <= 2_000_000; size += 100_000) {
+        try { localStorage.setItem("boxeur-be-e-headroom", "x".repeat(size)); additionalAsciiCharacters = size; }
+        catch (error) { if (error.name !== "QuotaExceededError") throw error; quotaEncountered = true; break; }
+      }
+    } finally { localStorage.removeItem("boxeur-be-e-headroom"); }
+    return { additionalAsciiCharacters, quotaEncountered, resolutionCharacters: 100_000 };
+  });
+  measurements.forEach(item => { item.storageHeadroom = storageHeadroom; });
+  await fs.writeFile("/tmp/boxeur-be-e-performance.json", JSON.stringify(measurements, null, 2));
+  expect(measurements[0].retained).toBe(1000);
+  expect(measurements[0].archived).toBeGreaterThan(0);
+  expect(measurements[0].rosterBytesUTF8).toBeLessThan(250_000);
+  await page.locator('[data-career-district="downtown"]').click();
+  await page.locator('[data-career-downtown-location="federation"]').click();
+  await page.getByRole("button", { name: "Site de la Fédération", exact: true }).click();
+  await page.locator('[data-federation-fighter="f-beaulieu"]').click();
+  const archives = page.locator(".federation-archives");
+  await expect(archives).toBeVisible();
+  await archives.locator("summary").click();
+  await expect(archives).toContainText("semaines");
+  await expect(page.locator("[data-federation-match]")).toHaveCount(10);
+  expect(await page.locator(".career-federation-view").evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+});
+
+for (const viewport of [{ width: 1366, height: 900 }, { width: 390, height: 844 }]) {
+  test(`BE-E parcours visuel annuaire → réservation → ring → résultat à ${viewport.width} px`, async ({ page }) => {
+    test.setTimeout(90_000);
+    page.setDefaultTimeout(10_000);
+    await page.setViewportSize(viewport);
+    await openStoredCareer(page, amateurSnapshot({ jobId: "convenience", gymWeeks: 8, money: 600,
+      amateurRecord: { wins: 1, losses: 0, draws: 0 } }));
+    await page.locator('[data-career-district="downtown"]').click();
+    await page.locator('[data-career-downtown-location="federation"]').click();
+    await page.getByRole("button", { name: "Ouvrir le calendrier", exact: true }).click();
+    const choice = page.locator("#calendar-events [data-book-gala]").first();
+    const fighterId = await choice.getAttribute("data-roster-fighter");
+    await choice.click();
+    const reserved = await page.evaluate(() => JSON.parse(JSON.stringify(state.scheduledFight)));
+    await page.locator('#calendar-dialog [data-career-nav="map"]').click();
+    await page.locator('[data-career-district="downtown"]').click();
+    await page.locator('[data-career-downtown-location="federation"]').click();
+    await page.getByRole("button", { name: "Site de la Fédération", exact: true }).click();
+    await page.locator(`[data-federation-fighter="${fighterId}"]`).click();
+    await expect(page.locator(".career-federation-view")).toContainText("Prépare un combat contre toi");
+    await expect(page.locator(".career-federation-view")).toContainText(reserved.opponent.name);
+    await page.locator("[data-career-leave-federation]").click();
+    await page.locator('[data-career-district="neighborhood"]').click();
+    await page.locator('[data-career-location="arena"]').click();
+    await startTacticalFight(page);
+    expect(await page.evaluate(() => fightState.fighters.opponent.stats)).toEqual(reserved.opponent.stats);
+    await completeFight(page);
+    const won = await page.evaluate(() => fightState.result.winner === "player");
+    await page.locator("#fight-instruction button.primary-button").click();
+    if (await page.locator("#level-up-dialog").isVisible()) await page.locator("#level-up-later").click();
+    await page.locator('[data-career-district="downtown"]').click();
+    await page.locator('[data-career-downtown-location="federation"]').click();
+    await page.getByRole("button", { name: "Site de la Fédération", exact: true }).click();
+    await page.locator(`[data-federation-fighter="${fighterId}"]`).click();
+    await expect(page.locator(".career-federation-view")).not.toContainText("Prépare un combat contre toi");
+    const matchId = `player:${reserved.bookingId}`;
+    await expect(page.locator(`[data-federation-match="${matchId}"]`)).toContainText(won ? "Défaite" : "Victoire");
+    await page.locator(`[data-federation-match="${matchId}"] [data-federation-fighter="player"]`).click();
+    await expect(page.locator(`[data-federation-match="${matchId}"]`)).toContainText(won ? "Victoire" : "Défaite");
+    expect(await page.evaluate(() => BoxeurRosterCareer.validateCareer(state))).toBe(true);
+  });
+}

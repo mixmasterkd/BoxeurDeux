@@ -69,6 +69,10 @@ test("expose un noyau UMD/CommonJS et des vocabulaires immuables", () => {
   assert.equal(planner.DAYS.length, 7);
   assert.ok(planner.ACTIVITY_CATEGORIES.includes("group-class"));
   assert.ok(planner.LOCATIONS.includes("strength-gym"));
+  assert.ok(planner.LOCATIONS.includes("leisure-center"));
+  assert.ok(planner.LOCATIONS.includes("media-studio"));
+  assert.equal(planner.DEFAULT_FAMILY_LIMITS.leisure, 1);
+  assert.equal(planner.DEFAULT_FAMILY_LIMITS.media, 1);
   assert.equal(Object.isFrozen(planner.DAYS), true);
   assert.equal(Object.isFrozen(planner.DAYS[0]), true);
   assert.throws(() => { planner.DAYS[0].label = "X"; }, TypeError);
@@ -493,6 +497,45 @@ test("fait du repos un choix normal qui concurrence directement les autres activ
     }),
     error => error.code === "WEEKLY_CAPACITY_EXCEEDED",
   );
+});
+
+test("limite aussi une famille non physique à une seule sortie par semaine", () => {
+  const initial = fresh({ work: null, capacity: 20 });
+  const first = planner.addActivity(initial, {
+    id: "leisure:cinema",
+    label: "Sortie · Cinéma",
+    category: "leisure",
+    location: "leisure-center",
+    physical: false,
+    capacityCost: 5,
+    energyGain: 4,
+    fatigueDelta: -5,
+    metadata: { familyId: "leisure", moneyCost: 25 },
+  });
+
+  assert.equal(first.preview.families.leisure.used, 1);
+  assert.throws(() => planner.addActivity(first.state, {
+    id: "leisure:bowling",
+    label: "Sortie · Quilles",
+    category: "leisure",
+    location: "leisure-center",
+    physical: false,
+    capacityCost: 6,
+    energyGain: 3,
+    fatigueDelta: -4,
+    metadata: { familyId: "leisure", moneyCost: 30 },
+  }), error => error.code === "WEEKLY_FAMILY_LIMIT");
+
+  const corrupted = structuredClone(first.state);
+  corrupted.entries.push({
+    ...structuredClone(first.result.entry),
+    id: "duplicate-leisure",
+    activityId: "leisure:bowling",
+    label: "Sortie · Quilles",
+  });
+  const validation = planner.validatePlan(corrupted);
+  assert.equal(validation.ok, false);
+  assert.ok(validation.errors.some(error => error.code === "WEEKLY_FAMILY_LIMIT"));
 });
 
 test("évalue les conséquences de récupération selon l’état réel et annule le risque si le repos est planifié", () => {

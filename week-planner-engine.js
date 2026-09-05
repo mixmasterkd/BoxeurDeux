@@ -31,6 +31,8 @@
     strength: 2,
     home: 2,
     sparring: 1,
+    leisure: 1,
+    media: 1,
   });
 
   const DAYS = deepFreeze([
@@ -64,6 +66,7 @@
     "appointment",
     "event",
     "leisure",
+    "media",
     "other",
   ]);
   const LOCATIONS = deepFreeze([
@@ -74,6 +77,8 @@
     "arena",
     "calendar",
     "outdoors",
+    "leisure-center",
+    "media-studio",
     "other",
   ]);
   const PHYSICAL_CATEGORIES = deepFreeze([
@@ -95,7 +100,8 @@
     home: "home",
     appointment: "calendar",
     event: "calendar",
-    leisure: "home",
+    leisure: "leisure-center",
+    media: "media-studio",
     other: "other",
   });
 
@@ -1157,10 +1163,10 @@
       }
       const access = accessForActivity(state, activity);
       if (!access.ok) errors.push(validationError(access.code, access.reason, { entryId: entry.id }));
+      const familyId = familyFor(activity);
+      if (familyId) familyCounts[familyId] = (familyCounts[familyId] || 0) + 1;
       if (entry.physical) {
         recreationalPhysical += 1;
-        const familyId = familyFor(activity);
-        if (familyId) familyCounts[familyId] = (familyCounts[familyId] || 0) + 1;
         const expectedMetadata = expectedRepetition.get(entry.id) || {};
         if (programSignatureFor(activity)
           && (Number(entry.metadata?.gainMultiplier) !== Number(expectedMetadata.gainMultiplier)
