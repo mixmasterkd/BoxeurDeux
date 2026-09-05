@@ -2827,6 +2827,70 @@ test("bloque le sparring amateur pendant un combat, exige 18 énergie et préser
   expect(stored.state.rosterState).toEqual(rosterBeforePractice);
 });
 
+for (const viewport of [{ width: 1366, height: 900 }, { width: 390, height: 844 }]) {
+  test(`confirme la semaine après un sparring sans perdre le coach ni le travail à ${viewport.width} px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await openStoredCareer(page, amateurSnapshot({ week: 4, gymWeeks: 8, strengthGymWeeks: 9,
+      money: 247, energy: 100, fatigue: 0, jobId: "convenience" }));
+    // Reproduit une sauvegarde au mardi matin après le sparring du lundi.
+    // Le ring interactif est couvert par le scénario précédent; le présent
+    // test porte sur la reprise et la confirmation du programme restant.
+    await page.evaluate(() => {
+      const capsule = ensureCareerPreviewCapsule();
+      capsule.timeState = window.BoxeurTime.advanceTime(capsule.timeState, 2, () => .5);
+      capsule.timeState = window.BoxeurTime.performActivity(capsule.timeState, {
+        id: "practice-sparring:4", label: "Sparring technique", category: "sparring",
+        duration: 1, energyCost: 30, fatigueGain: 9,
+        stimulus: { technique: 3, cardio: 2, defense: 4 },
+      }, {}, () => .5);
+      state.boxingTrainingWeek = 4;
+      capsule.previewRuntime.weekPlanner = null;
+      capsule.previewRuntime.weekPlannerSignature = null;
+      addCareerPlannerActivity("boxing-coach", { blocks: ["shadow_boxing", "defense_drills", "cooldown"], focus: "defense" });
+      addCareerPlannerActivity("rest");
+      persistCareerPreviewCapsule();
+      renderCareerWorldPreview(true);
+    });
+    const before = await page.evaluate(() => ({
+      state: JSON.parse(localStorage.getItem("boxeur-deux-career")).state,
+      capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")),
+    }));
+    expect(before.capsule.timeState.clock.day).toBe("tuesday");
+    expect(before.capsule.previewRuntime.weekPlanner.entries.map(e => e.activityId)).toEqual(expect.arrayContaining(["work:convenience", "boxing-coach", "rest"]));
+    const workPay = before.capsule.previewRuntime.weekPlanner.entries.find(e => e.activityId === "work:convenience").pay;
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("#resume-load").click();
+    await confirmWeekFromLauncher(page);
+    await expect(page.locator(".career-week-summary")).toBeVisible();
+    const after = await page.evaluate(() => ({
+      state: JSON.parse(localStorage.getItem("boxeur-deux-career")).state,
+      capsule: JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")),
+    }));
+    const summary = after.capsule.previewRuntime.weeklySummaries[0];
+    expect(after.state.week).toBe(5);
+    expect(after.state.money).toBe(before.state.money + workPay);
+    expect(after.state.missedWorkWeeks).toBe(before.state.missedWorkWeeks);
+    expect(after.state.gymWeeks).toBe(7);
+    expect(after.state.strengthGymWeeks).toBe(8);
+    expect(summary.budget.allowed.trainingSessions).toBe(2);
+    expect(summary.budget.usedBefore.trainingSessions).toBe(1);
+    expect(summary.counts.training).toBe(1);
+    expect(summary.counts.work).toBe(1);
+    expect(summary.warnings).toEqual([]);
+    for (const entry of before.capsule.previewRuntime.weekPlanner.entries) {
+      expect(summary.actions.filter(a => a.primitive?.plannerEntryId === entry.id)).toHaveLength(1);
+    }
+    expect(after.capsule.timeState.history.filter(e => e.activityId === "practice-sparring:4")).toHaveLength(1);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("#resume-load").click();
+    expect(await page.evaluate(() => ({ week: state.week, money: state.money, gymWeeks: state.gymWeeks, strengthGymWeeks: state.strengthGymWeeks })))
+      .toEqual({ week: 5, money: after.state.money, gymWeeks: 7, strengthGymWeeks: 8 });
+    expect(errors).toEqual([]);
+  });
+}
+
 test("conserve le menu principal entre Carte, Calendrier, Boxeur et Inventaire", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await openStoredCareer(page, amateurSnapshot({

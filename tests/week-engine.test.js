@@ -51,6 +51,100 @@ function suppliedPlan(entries, budget = {}) {
   };
 }
 
+function afterMondaySparring(period = "evening") {
+  return time.performActivity(freshState({
+    time: { week: 1, day: "monday", period },
+    condition: { energy: 100, fatigue: 0 },
+  }), {
+    id: "practice-sparring:1", label: "Sparring technique", category: "sparring",
+    duration: 1, energyCost: 30, fatigueGain: 9,
+    stimulus: { technique: 3, cardio: 2, defense: 4 },
+  }, {}, fixedRng());
+}
+
+function remainingCoachEntry(startSlot = 5) {
+  return {
+    id: `coach-${startSlot}`, kind: "training", startSlot, duration: 1,
+    session: training.createCustomSession(["shadow_boxing", "defense_drills", "cooldown"], { label: "Séance de l’entraîneur" }),
+    context: GYM,
+  };
+}
+
+for (const mode of ["quick", "hybrid"]) {
+  test(`après un sparring, le plan restant conserve le budget total de deux séances en mode ${mode}`, () => {
+    const initial = afterMondaySparring();
+    const plan = suppliedPlan([remainingCoachEntry()], { trainingSessions: 2 });
+    const before = structuredClone({ initial, plan });
+    const result = week.runWeek(initial, { mode, plan }, fixedRng());
+    assert.equal(result.status, "week-complete");
+    assert.equal(result.plan.budget.trainingSessions, 2);
+    assert.equal(result.summary.budget.usedBefore.trainingSessions, 1);
+    assert.equal(result.summary.counts.training, 1);
+    assert.equal(result.summary.budget.remaining.trainingSessions, 0);
+    assert.deepEqual(result.summary.warnings, []);
+    assert.equal(result.timeState.history.filter(e => e.activityCategory === "sparring").length, 1);
+    assert.deepEqual({ initial, plan }, before);
+  });
+}
+
+test("un plan restant sans budget explicite compte aussi le sparring déjà joué", () => {
+  const plan = suppliedPlan([remainingCoachEntry()]);
+  delete plan.budget.trainingSessions;
+  const result = week.runQuickWeek(afterMondaySparring(), { plan }, fixedRng());
+  assert.equal(result.plan.budget.trainingSessions, 2);
+  assert.equal(result.summary.counts.training, 1);
+});
+
+test("après le sparring, un budget explicitement épuisé reste bloquant", () => {
+  for (const trainingSessions of [0, 1]) {
+    const plan = suppliedPlan([remainingCoachEntry()], { trainingSessions });
+    const result = week.runQuickWeek(afterMondaySparring(), { plan }, fixedRng());
+    assert.equal(result.plan.budget.trainingSessions, trainingSessions);
+    assert.equal(result.summary.counts.training, 0);
+    assert.match(result.summary.warnings.join(" "), /budget détaillé déjà utilisé/);
+  }
+});
+
+test("le plan complet repris ne recompte pas ses anciennes entrées dans le budget", () => {
+  const remaining = remainingCoachEntry();
+  const plan = suppliedPlan([remainingCoachEntry(2), remaining], { trainingSessions: 999 });
+  const result = week.runDetailedWeek(afterMondaySparring(), {
+    plan,
+    actions: [remaining, { kind: "advance", periods: 2 }, remaining],
+  }, fixedRng());
+  assert.equal(result.plan.budget.trainingSessions, 2, "un sparring passé et une seule séance restante");
+  assert.equal(result.summary.counts.training, 1);
+  assert.equal(result.status, "budget-exhausted");
+});
+
+test("reprendre un plan après un sparring interdit toujours une autre séance le même jour", () => {
+  const plan = suppliedPlan([remainingCoachEntry(2), remainingCoachEntry(5)], { trainingSessions: 3 });
+  const result = week.runQuickWeek(afterMondaySparring("morning"), { plan }, fixedRng());
+  assert.equal(result.summary.budget.usedBefore.trainingSessions, 1);
+  assert.equal(result.summary.counts.training, 1);
+  assert.match(result.summary.warnings.join(" "), /activité physique principale a déjà été faite/);
+  const coach = result.summary.actions.find(a => a.kind === "training");
+  assert.equal(coach.primitive.startSlot, 5);
+});
+
+test("le total historique plus programme reste plafonné à sept séances physiques", () => {
+  const plan = suppliedPlan([3, 4, 5, 8, 11, 14, 17, 20].map(remainingCoachEntry), { trainingSessions: 999 });
+  const result = week.runQuickWeek(afterMondaySparring(), { plan }, fixedRng());
+  assert.equal(result.plan.budget.trainingSessions, week.MAX_TRAINING_SESSIONS);
+  assert.equal(result.summary.counts.training, 6);
+  assert.equal(result.summary.budget.usedBefore.trainingSessions + result.summary.counts.training, 7);
+});
+
+test("le sparring d’une semaine précédente n’augmente pas le budget du plan courant", () => {
+  const initial = time.advanceTime(afterMondaySparring(), 18, fixedRng());
+  const plan = { ...suppliedPlan([remainingCoachEntry(23)], { trainingSessions: 999 }),
+    week: 2, weekStartSlot: 21, weekEndSlot: 42 };
+  const result = week.runQuickWeek(initial, { plan }, fixedRng());
+  assert.equal(result.plan.budget.trainingSessions, 1);
+  assert.equal(result.summary.budget.usedBefore.trainingSessions, 0);
+  assert.equal(result.summary.counts.training, 1);
+});
+
 test("expose le même noyau pur en CommonJS et sur globalThis", () => {
   assert.equal(globalThis.BoxeurWeek, week);
   assert.equal(week.SCHEMA_VERSION, 1);

@@ -350,7 +350,14 @@
     });
     const sorted = assertNoPlanOverlap(entries);
     const budgetInput = planInput.budget && typeof planInput.budget === "object" ? planInput.budget : {};
-    const plannedTrainingCount = sorted.filter(isPhysicalPrimitive).length;
+    // Le budget couvre toute la semaine, y compris le sparring déjà joué.
+    // Seules les entrées à venir s'ajoutent à l'historique : un plan complet
+    // repris ne doit pas compter deux fois ses anciennes séances.
+    const completedTrainingCount = weekHistoryCounts(timeState, { ...bounds, entries: sorted }).trainingSessions;
+    const remainingTrainingCount = sorted.filter(entry => (
+      isPhysicalPrimitive(entry) && entry.startSlot >= timeState.clock.absoluteSlot
+    )).length;
+    const detailedTrainingCount = completedTrainingCount + remainingTrainingCount;
     return {
       schemaVersion: SCHEMA_VERSION,
       week: bounds.week,
@@ -358,10 +365,10 @@
       weekEndSlot: bounds.weekEndSlot,
       budget: {
         trainingSessions: Math.min(
-          plannedTrainingCount,
+          detailedTrainingCount,
           boundedInteger(
             budgetInput.trainingSessions,
-            plannedTrainingCount,
+            detailedTrainingCount,
             0,
             MAX_TRAINING_SESSIONS,
           ),
