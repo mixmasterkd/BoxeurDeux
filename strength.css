@@ -374,7 +374,6 @@
   font-size: .67rem;
 }
 
-.career-strength-reception-layout,
 .career-strength-crossfit-layout {
   display: grid;
   grid-template-columns: minmax(240px, .65fr) minmax(0, 1.35fr);
@@ -384,9 +383,7 @@
   margin: 0 auto;
 }
 
-.career-strength-reception-intro,
 .career-strength-crossfit-card,
-.career-strength-membership,
 .career-strength-catalogue,
 .career-strength-selection {
   min-width: 0;
@@ -397,15 +394,7 @@
   box-shadow: 0 14px 34px rgba(0, 0, 0, .23);
 }
 
-.career-strength-reception-intro {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  border-color: rgba(221, 182, 94, .34);
-  background: linear-gradient(145deg, rgba(221, 182, 94, .14), rgba(24, 28, 25, .97));
-}
 
-.career-strength-reception-intro > span,
 .career-strength-crossfit-mark {
   display: grid;
   place-items: center;
@@ -418,19 +407,15 @@
   font: 900 1.1rem/1 "Barlow Condensed", sans-serif;
 }
 
-.career-strength-reception-intro h3,
-.career-strength-reception-intro p,
 .career-strength-crossfit-card h3,
 .career-strength-crossfit-card p { margin: 0; }
 
-.career-strength-reception-intro h3,
 .career-strength-crossfit-card h3 {
   margin-top: 3px;
   font: 800 1.35rem/1 "Barlow Condensed", sans-serif;
   text-transform: uppercase;
 }
 
-.career-strength-reception-intro p:not(.eyebrow),
 .career-strength-crossfit-card p:not(.eyebrow) {
   margin-top: 8px;
   color: var(--strength-muted);
@@ -438,7 +423,6 @@
   line-height: 1.5;
 }
 
-.career-strength-membership > header,
 .career-strength-catalogue > header,
 .career-strength-selection > header {
   display: flex;
@@ -448,66 +432,10 @@
   margin-bottom: 12px;
 }
 
-.career-strength-membership h3,
-.career-strength-membership p,
 .career-strength-catalogue h3,
 .career-strength-catalogue p,
 .career-strength-selection h3 { margin: 0; }
 
-.career-strength-membership-current {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 12px;
-  padding: 10px 11px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .055);
-}
-
-.career-strength-membership-current.active { box-shadow: inset 3px 0 0 var(--strength-green); }
-.career-strength-membership-current strong,
-.career-strength-membership-current p { display: block; margin: 0; }
-.career-strength-membership-current p { margin-top: 3px; color: var(--strength-muted); font-size: .65rem; }
-
-.career-strength-plan-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.career-strength-plan {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  padding: 13px;
-  border: 1px solid rgba(255, 255, 255, .11);
-  border-radius: 11px;
-  background: rgba(0, 0, 0, .17);
-}
-
-.career-strength-plan > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.career-strength-plan > div span { font-size: .72rem; }
-.career-strength-plan > div strong { color: #c7f1d5; font-size: 1.08rem; }
-.career-strength-plan p { flex: 1 1 auto; margin: 8px 0; color: var(--strength-muted); font-size: .66rem; line-height: 1.4; }
-.career-strength-plan > span { color: #ead18f; font-size: .6rem; }
-.career-strength-plan > button {
-  width: 100%;
-  margin-top: 10px;
-  padding: 7px;
-  border: 1px solid rgba(255, 255, 255, .25);
-  border-radius: 8px;
-  color: #fff;
-  background: rgba(255, 255, 255, .07);
-}
-.career-strength-plan.available > button { color: #07160d; background: var(--strength-green); cursor: pointer; }
-.career-strength-plan-reason { display: block; margin-top: 6px; color: #ffcf9b; font-size: .58rem; line-height: 1.35; }
 
 .career-strength-crossfit-layout { grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); }
 .career-strength-crossfit-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; border-color: rgba(133, 201, 155, .36); }
@@ -729,7 +657,6 @@
     overflow: visible;
   }
 
-  .career-strength-reception-layout,
   .career-strength-crossfit-layout,
   .career-strength-program-layout { grid-template-columns: minmax(0, 1fr); }
 
@@ -805,27 +732,13 @@
   .career-strength-menu-header > div > p:last-child { max-width: 58vw; font-size: .56rem; }
   .career-strength-menu-header > button { max-width: 108px; padding: 7px 9px; font-size: .62rem; line-height: 1.2; }
 
-  .career-strength-reception-layout,
   .career-strength-crossfit-layout { gap: 8px; }
-  .career-strength-reception-intro,
   .career-strength-crossfit-card,
-  .career-strength-membership,
   .career-strength-catalogue,
   .career-strength-selection { padding: 13px; border-radius: 11px; }
-  .career-strength-reception-intro,
   .career-strength-crossfit-card { grid-template-columns: minmax(0, 1fr); }
-  .career-strength-reception-intro > span,
   .career-strength-crossfit-mark { width: 44px; height: 44px; }
 
-  .career-strength-plan-grid {
-    display: flex;
-    gap: 8px;
-    padding-bottom: 4px;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-  }
-
-  .career-strength-plan { flex: 0 0 min(76vw, 270px); scroll-snap-align: start; }
 
   .career-strength-mobile-summary {
     position: sticky;
@@ -848,8 +761,7 @@
   .career-strength-mobile-summary > button { flex: 0 0 auto; min-width: 104px; }
 
   .career-strength-program-sidebar { grid-template-columns: minmax(0, 1fr); }
-  .career-strength-catalogue > header,
-  .career-strength-membership > header { display: grid; align-items: start; }
+  .career-strength-catalogue > header { display: grid; align-items: start; }
   .career-strength-catalogue > header > p { max-width: none; text-align: left; }
   .career-strength-activity-grid { grid-template-columns: minmax(0, 1fr); }
   .career-strength-activity { grid-template-columns: 34px minmax(0, 1fr); }

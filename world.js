@@ -1,9 +1,9 @@
 (function attachBoxeurWorld(root, factory) {
   "use strict";
-  const api = factory();
+  const api = factory(typeof module === "object" && module.exports ? require("./membership-view.js") : root.BoxeurMembershipView);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.BoxeurWorld = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function createBoxeurWorldApi() {
+})(typeof globalThis !== "undefined" ? globalThis : this, function createBoxeurWorldApi(membershipView) {
   "use strict";
 
   const LOCATIONS = Object.freeze([
@@ -344,10 +344,10 @@
   }
 
   function locationStatus(location, career) {
-    if (location.id === "boxing-gym") return career.gymWeeks > 0 ? `Abonnement · ${career.gymWeeks} sem.` : "Inscription requise";
-    if (location.id === "strength-gym") {
-      if (career.careerStatus === "recreational") return "Verrouillé · amateur requis";
-      return career.strengthGymWeeks > 0 ? `Abonnement · ${career.strengthGymWeeks} sem.` : "Abonnement facultatif";
+    if (["boxing-gym", "strength-gym"].includes(location.id)) {
+      const current = membershipView.status(location.id === "boxing-gym" ? career.gymWeeks : career.strengthGymWeeks,
+        { locked: location.id === "strength-gym" && career.careerStatus === "recreational", week: career.week });
+      return `${current.label} · ${current.detail}`;
     }
     if (location.id === "work") {
       if (career.jobId) return "Emploi actif";
@@ -478,10 +478,13 @@
       const accessAttributes = access.locked
         ? ` data-career-locked="true" disabled aria-disabled="true" title="${escapeHTML(access.reason)}"`
         : "";
+      const gym = ["boxing-gym", "strength-gym"].includes(location.id);
+      const badge = gym ? membershipView.renderBadge(location.id === "boxing-gym" ? career.gymWeeks : career.strengthGymWeeks,
+        { locked: location.id === "strength-gym" && career.careerStatus === "recreational", week: career.week }) : `<small>${status}</small>`;
       const accessibleLabel = access.locked
-        ? `Accès verrouillé : ${location.label}. ${access.reason}`
+        ? `Accès verrouillé : ${location.label}. ${access.reason}${gym ? ` ${locationStatus(location, career)}` : ""}`
         : `Entrer : ${location.label}. ${locationStatus(location, career)}`;
-      return `<button class="career-map-hotspot" type="button" data-career-location="${location.id}" aria-label="${escapeHTML(accessibleLabel)}"${accessAttributes}><span aria-hidden="true">${access.locked ? "🔒" : location.icon}</span><strong>${escapeHTML(location.label)}</strong><small>${status}</small></button>`;
+      return `<button class="career-map-hotspot" type="button" data-career-location="${location.id}" aria-label="${escapeHTML(accessibleLabel)}"${accessAttributes}><span aria-hidden="true">${access.locked ? "🔒" : location.icon}</span><strong>${escapeHTML(location.label)}</strong>${badge}</button>`;
     }).join("");
     return `<section class="career-map-panel" data-career-district-view="neighborhood" aria-label="Carte du quartier de carrière de ${escapeHTML(firstName)}">
       <div class="career-map-heading">

@@ -2849,6 +2849,9 @@ function careerGymContext() {
     },
     membership: {
       active: career.gymWeeks > 0,
+      weeksRemaining: career.gymWeeks,
+      initialRequired: career.initialGymRequired,
+      plans: gymPlans,
       label: career.gymWeeks > 0 ? `Abonnement actif · ${career.gymWeeks} sem.` : "Inscription requise",
       detail: career.gymWeeks > 0 ? "Les installations et la séance du coach sont accessibles." : "Inscris-toi à l’accueil avant de commencer une séance.",
       monthlyPrice: GYM_PRICE,
@@ -6336,18 +6339,70 @@ function openCareerMembershipMenu() {
   const capsule = ensureCareerPreviewCapsule();
   if (!capsule) return;
   const career = normalizeCareerPreviewRuntime(capsule).career;
-  if (career.gymWeeks > 0) return showToast(`Abonnement actif · ${career.gymWeeks} semaine${career.gymWeeks > 1 ? "s" : ""} restante${career.gymWeeks > 1 ? "s" : ""}.`);
-  const choices = career.initialGymRequired ? gymPlans.filter(plan => plan.id === "monthly") : gymPlans;
-  document.querySelector("#membership-dialog-title").textContent = career.initialGymRequired ? "Premier abonnement obligatoire" : "Renouveler le GYM de boxe";
-  document.querySelector("#membership-dialog-copy").textContent = career.initialGymRequired
-    ? "Ton budget de départ couvre ce premier mois. Cette inscription débloque les installations et le programme rapide du coach."
-    : "Sans abonnement, le sac au sous-sol reste disponible. Les séances encadrées demandent un accès actif au GYM.";
-  document.querySelector("#membership-options").innerHTML = choices.map(plan => {
-    const missing = Math.max(0, plan.price - career.money);
-    return `<button class="coach-card" type="button" data-gym-plan="${plan.id}" ${missing ? "disabled" : ""}><strong>${plan.label} · ${plan.price} $</strong><span>${plan.weeks} semaines d’accès</span><small>${plan.detail}${missing ? `<br>Il manque ${missing} $.` : ""}</small></button>`;
-  }).join("");
-  setMandatoryDialogState("membership-dialog", career.initialGymRequired, "Choisis le premier mois de GYM pour poursuivre le tutoriel.");
+  if (!career.initialGymRequired) return renderCareerGymMenu("reception");
+  document.querySelector("#membership-dialog-title").textContent = "Premier abonnement obligatoire";
+  document.querySelector("#membership-dialog-copy").textContent = "Ton budget de départ couvre ce premier mois. Cette inscription débloque les installations et le programme rapide du coach.";
+  document.querySelector("#membership-options").innerHTML = window.BoxeurMembershipView.renderPlans(careerMembershipPurchaseContext("boxing"));
+  setMandatoryDialogState("membership-dialog", true, "Choisis le premier mois de GYM pour poursuivre le tutoriel.");
   document.querySelector("#membership-dialog")?.showModal();
+}
+
+let careerMembershipPurchase = null;
+
+function careerMembershipPurchaseContext(kind) {
+  const capsule = ensureCareerPreviewCapsule();
+  if (!capsule) return null;
+  const career = normalizeCareerPreviewRuntime(capsule).career;
+  const weeksRemaining = kind === "strength" ? career.strengthGymWeeks : career.gymWeeks;
+  const reserve = kind === "strength" ? careerReservedBoxingGymBudget(career) : 0;
+  return { kind, careerStatus: state.careerStatus, week: capsule.timeState.clock.week,
+    membership: { active: weeksRemaining > 0, weeksRemaining, balance: career.money,
+      spendableBalance: Math.max(0, career.money - reserve), initialRequired: kind === "boxing" && career.initialGymRequired,
+      detail: reserve > 0 ? `${reserve} $ restent réservés pour le premier mois obligatoire du GYM de boxe.` : "",
+      plans: kind === "strength" ? strengthGymPlans : gymPlans } };
+}
+
+function requestCareerMembershipPurchase(kind, planId) {
+  if (!["boxing", "strength"].includes(kind)) return;
+  const dialog = document.querySelector("#membership-confirm-dialog");
+  if (dialog.open) return;
+  const context = careerMembershipPurchaseContext(kind);
+  const plan = context?.membership.plans.find(item => item.id === planId);
+  if (!plan) return;
+  const access = window.BoxeurWorld.locationAccess(kind === "strength" ? "strength-gym" : "boxing-gym",
+    { ...state, careerFightGate: careerCapsule?.previewRuntime?.fightGate });
+  const availability = window.BoxeurMembershipView.planState(plan, context);
+  if (access.locked || !availability.available) return showToast(access.reason || availability.reason);
+  careerMembershipPurchase = { kind, planId, context: JSON.stringify(context), capsule: careerCapsule, profile: state.profile };
+  document.querySelector("#membership-confirm-content").innerHTML = window.BoxeurMembershipView.renderConfirmation({
+    kind, plan, balance: context.membership.balance, week: context.week,
+  });
+  document.querySelector("#membership-confirm-pay").textContent = `Confirmer et payer ${plan.price} $`;
+  dialog.showModal();
+  document.querySelector("#membership-confirm-cancel").focus();
+}
+
+function closeCareerMembershipConfirmation() {
+  careerMembershipPurchase = null;
+  document.querySelector("#membership-confirm-dialog").close();
+}
+
+function confirmCareerMembershipPurchase() {
+  const pending = careerMembershipPurchase;
+  if (!pending) return;
+  // Consume the ephemeral intent before calling either existing payment handler.
+  // A second click, reload, imported career or changed quote must not debit again.
+  careerMembershipPurchase = null;
+  const sameCareer = pending.capsule === careerCapsule && pending.profile === state.profile;
+  const context = sameCareer ? careerMembershipPurchaseContext(pending.kind) : null;
+  const access = window.BoxeurWorld.locationAccess(pending.kind === "strength" ? "strength-gym" : "boxing-gym",
+    { ...state, careerFightGate: careerCapsule?.previewRuntime?.fightGate });
+  document.querySelector("#membership-confirm-dialog").close();
+  if (!context || access.locked || JSON.stringify(context) !== pending.context) {
+    return showToast(access.reason || "La situation a changé. Choisis de nouveau le forfait pour vérifier le montant avant de payer.");
+  }
+  if (pending.kind === "strength") selectCareerStrengthPlan(pending.planId);
+  else selectCareerGymPlan(pending.planId);
 }
 
 function selectCareerGymPlan(planId) {
@@ -6606,6 +6661,7 @@ function renderCareerGymMenu(menuId) {
   sheet.innerHTML = markup;
   const preferredFocus = menuId === "coach"
     ? "[data-career-coach-session]:not([disabled]), [data-career-boxing-trainer]:not([disabled])"
+    : menuId === "reception" ? "[data-gym-plan]:not([disabled]), [data-career-gym-menu-close]"
     : "[data-career-sparring-activity]:not([disabled])";
   activateCareerLocationSheet(sheet, preferredFocus);
 }
@@ -9201,7 +9257,12 @@ document.querySelector("#career-world")?.addEventListener("click", event => {
   }
   const strengthPlan = event.target.closest("[data-career-strength-plan]");
   if (strengthPlan) {
-    selectCareerStrengthPlan(strengthPlan.dataset.careerStrengthPlan);
+    requestCareerMembershipPurchase("strength", strengthPlan.dataset.careerStrengthPlan);
+    return;
+  }
+  const boxingPlan = event.target.closest("[data-gym-plan]");
+  if (boxingPlan) {
+    requestCareerMembershipPurchase("boxing", boxingPlan.dataset.gymPlan);
     return;
   }
   if (event.target.closest("[data-career-strength-confirm], [data-career-strength-mobile-confirm]")) {
@@ -9510,7 +9571,17 @@ document.querySelector("#fight-dialog").addEventListener("cancel", event => {
 
 document.querySelector("#membership-options").addEventListener("click", event => {
   const plan = event.target.closest("[data-gym-plan]");
-  if (plan) selectCareerGymPlan(plan.dataset.gymPlan);
+  if (plan) requestCareerMembershipPurchase("boxing", plan.dataset.gymPlan);
+});
+document.querySelector("#membership-confirm-pay").addEventListener("click", confirmCareerMembershipPurchase);
+document.querySelector("#membership-confirm-cancel").addEventListener("click", closeCareerMembershipConfirmation);
+document.querySelector("#membership-confirm-close").addEventListener("click", closeCareerMembershipConfirmation);
+document.querySelector("#membership-confirm-dialog").addEventListener("cancel", event => {
+  event.preventDefault();
+  closeCareerMembershipConfirmation();
+});
+document.querySelector("#membership-confirm-dialog").addEventListener("close", () => {
+  careerMembershipPurchase = null;
 });
 document.querySelector("#membership-dialog-close").addEventListener("click", () => closeOptionalDialog("membership-dialog"));
 document.querySelector("#membership-dialog-cancel").addEventListener("click", () => closeOptionalDialog("membership-dialog"));

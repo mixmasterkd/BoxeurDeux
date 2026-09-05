@@ -3,10 +3,10 @@
   const strengthApi = typeof module === "object" && module.exports
     ? require("./strength-engine.js")
     : root && root.BoxeurStrength;
-  const api = factory(strengthApi);
+  const api = factory(strengthApi, typeof module === "object" && module.exports ? require("./membership-view.js") : root.BoxeurMembershipView);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.BoxeurStrengthView = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function createBoxeurStrengthViewApi(BoxeurStrength) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function createBoxeurStrengthViewApi(BoxeurStrength, membershipView) {
   "use strict";
 
   if (!BoxeurStrength) {
@@ -192,40 +192,11 @@
   }
 
   function membershipPlanState(plan, context) {
-    if (context.careerStatus === "recreational") {
-      return { available: false, reason: "Disponible après le passage amateur." };
-    }
-    if (context.membership.active) {
-      return { available: false, reason: "Ton abonnement actuel doit d'abord arriver à échéance." };
-    }
-    if (!plan.available) {
-      return { available: false, reason: plan.disabledReason || "Ce forfait est temporairement indisponible." };
-    }
-    if (context.membership.spendableBalance != null && context.membership.spendableBalance < plan.price) {
-      return { available: false, reason: `Il manque ${plan.price - context.membership.spendableBalance} $.` };
-    }
-    return { available: true, reason: "" };
+    return membershipView.planState(plan, { ...context, kind: "strength" });
   }
 
   function renderMembershipPlans(context) {
-    const planMarkup = context.membership.plans.map(plan => {
-      const state = membershipPlanState(plan, context);
-      const reasonId = `career-strength-plan-${domToken(plan.id, "plan")}-reason`;
-      const disabled = state.available ? "" : ` disabled aria-disabled="true" aria-describedby="${reasonId}"`;
-      const savings = plan.savings > 0 ? `<span class="career-strength-plan-savings">Économie de ${plan.savings} $</span>` : `<span>Tarif mensuel</span>`;
-      const reason = state.reason ? `<small id="${reasonId}" class="career-strength-plan-reason">${escapeHTML(state.reason)}</small>` : "";
-      return `<article class="career-strength-plan${state.available ? " available" : " locked"}">
-        <div><span>${escapeHTML(plan.label)}</span><strong>${plan.price} $</strong></div>
-        <p>${escapeHTML(plan.detail)}</p>${savings}
-        <button type="button" data-career-strength-plan="${escapeHTML(plan.id)}"${disabled}>Choisir ${escapeHTML(plan.label)}</button>${reason}
-      </article>`;
-    }).join("");
-    const balance = context.membership.balance == null ? "Solde disponible dans les finances" : `Solde : ${context.membership.balance} $`;
-    return `<section class="career-strength-membership" aria-labelledby="career-strength-membership-title">
-      <header><div><p class="eyebrow">Abonnement</p><h3 id="career-strength-membership-title">Accès au gym</h3></div><strong>${escapeHTML(balance)}</strong></header>
-      <div class="career-strength-membership-current ${context.membership.active ? "active" : "inactive"}"><span aria-hidden="true">${context.membership.active ? "✓" : "○"}</span><div><strong>${escapeHTML(context.membership.label)}</strong><p>${escapeHTML(context.membership.detail)}</p></div></div>
-      <div class="career-strength-plan-grid" aria-label="Forfaits de musculation">${planMarkup}</div>
-    </section>`;
+    return membershipView.renderPlans({ ...context, kind: "strength", week: context.clock.week });
   }
 
   function activityState(activity, context) {
@@ -392,8 +363,8 @@
   }
 
   function renderReceptionMenu(context) {
-    return `<section class="career-strength-menu career-strength-reception-menu" data-career-strength-menu="reception">${renderMenuHeader(context, "Accueil", "Inscription au gym")}
-      <div class="career-strength-reception-layout"><article class="career-strength-reception-intro"><span aria-hidden="true">A</span><div><p class="eyebrow">Accès simple</p><h3>Choisis la durée qui te convient</h3><p>Deux forfaits seulement : un mois pour essayer ou trois mois pour t’installer. L’achat conserve exactement les règles actuelles d’accès et de débit hebdomadaire.</p></div></article>${renderMembershipPlans(context)}</div>
+    return `<section class="career-strength-menu career-membership-reception" data-career-strength-menu="reception">${renderMenuHeader(context, "Gym de musculation · Accueil", "Inscription au gym")}
+      ${renderMembershipPlans(context)}
     </section>`;
   }
 

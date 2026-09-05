@@ -131,6 +131,8 @@ Le cours de groupe demeure exclusif au statut récréatif et disparaît une fois
 
 À la création d'une carrière, le premier abonnement au gym de boxe est obligatoire et son écran ne peut pas être fermé sans choisir l'offre initiale. Le budget de départ doit toujours permettre ce paiement avant tout achat facultatif. À sa première expiration, le renouvellement redevient facultatif et suit les règles normales d'abonnement.
 
+Les accueils des deux gyms partagent la présentation des forfaits et une confirmation indiquant le prix, le solde après achat et la dernière semaine couverte. Les tarifs et le décompte existants restent distincts et inchangés; il n’y a pas de renouvellement automatique ni de prolongation anticipée. La semaine courante est incluse dans les semaines restantes. Sur la carte, une pastille indique le nombre de semaines, la dernière semaine en orange ou « Non abonné »; le verrou amateur de la musculation demeure prioritaire. Le premier abonnement obligatoire conserve son écran bloquant, y compris après l’annulation d’une confirmation de paiement. Voir le [rapport d’harmonisation des abonnements](ABONNEMENTS-HARMONISATION-RAPPORT.md).
+
 ### 2.3 Gym de musculation
 
 Le gym de musculation possède une identité distincte :

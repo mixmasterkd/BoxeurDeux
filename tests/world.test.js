@@ -276,9 +276,9 @@ test("rend l’emploi facultatif après un premier poste et n’invente aucun qu
       { title: "Quart du dépanneur", startSlot: 7 },
     ],
   })), "Quart du dépanneur");
-  assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "boxing-gym"), baseCareer({ gymWeeks: 0 })), "Inscription requise");
-  assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "strength-gym"), baseCareer()), "Verrouillé · amateur requis");
-  assert.equal(world.locationStatus(world.LOCATIONS.find(location => location.id === "strength-gym"), baseCareer({ careerStatus: "amateur" })), "Abonnement facultatif");
+  assert.match(world.locationStatus(world.LOCATIONS.find(location => location.id === "boxing-gym"), baseCareer({ gymWeeks: 0 })), /Non abonné/);
+  assert.match(world.locationStatus(world.LOCATIONS.find(location => location.id === "strength-gym"), baseCareer()), /Amateur requis/);
+  assert.match(world.locationStatus(world.LOCATIONS.find(location => location.id === "strength-gym"), baseCareer({ careerStatus: "amateur" })), /Non abonné/);
   assert.deepEqual(world.locationAccess("strength-gym", baseCareer()), {
     locked: true,
     reason: "Disponible après le passage amateur.",

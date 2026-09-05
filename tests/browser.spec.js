@@ -218,6 +218,144 @@ async function createCareer(page, options = {}) {
   return { sex, firstName, lastName };
 }
 
+for (const viewport of [{ width: 1366, height: 900 }, { width: 390, height: 844 }, { width: 320, height: 740 }]) {
+  test(`Abonnements harmonisés : achat confirmé, annulation et carte à ${viewport.width} px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await openStoredCareer(page, amateurSnapshot({ week: 10, money: 1000, gymWeeks: 0, strengthGymWeeks: 0, jobId: "convenience" }));
+    const capture = () => page.evaluate(() => JSON.stringify({ state, careerCapsule, storage: { ...localStorage } }));
+    for (const [kind, location, planId, price, weeks] of [["boxing", "boxing-gym", "monthly", 110, 4],
+      ["strength", "strength-gym", "three-months", 270, 12]]) {
+      const mapButton = page.locator(`.career-map-hotspot[data-career-location="${location}"]`);
+      await expect(mapButton.locator("[data-membership-status]")).toHaveText("Non abonné");
+      await expect(mapButton).toBeEnabled();
+      await mapButton.click();
+      await page.locator(kind === "boxing" ? '.career-gym-hotspot[data-career-gym-zone="reception"]'
+        : '[data-career-strength-zone="reception"]').click();
+      const panel = page.locator(`.membership-panel[data-membership-gym="${kind}"]`);
+      await expect(panel).toBeVisible();
+      await expect(panel.locator(".membership-plan")).toHaveCount(2);
+      await expect(panel).toContainText("Paiement unique · aucun renouvellement automatique");
+      const geometry = await panel.evaluate(el => [el, ...el.querySelectorAll(".membership-plan, button")]
+        .map(node => ({ width: node.clientWidth, overflow: node.scrollWidth - node.clientWidth, height: node.getBoundingClientRect().height })));
+      expect(geometry.every(g => g.overflow <= 1 && g.width > 0), JSON.stringify(geometry)).toBe(true);
+      for (const button of await panel.locator("button").all()) expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(44);
+      await panel.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `/tmp/abonnements-${kind}-${viewport.width}.png` });
+      const choice = panel.locator(kind === "boxing" ? `[data-gym-plan="${planId}"]` : `[data-career-strength-plan="${planId}"]`);
+      const before = await capture();
+      const money = await page.evaluate(() => state.money);
+      await choice.click();
+      await expect(page.locator("#membership-confirm-dialog")).toBeVisible();
+      const confirmationFits = await page.locator("#membership-confirm-dialog").evaluate(el =>
+        [el, ...el.querySelectorAll(".service-card, button")].every(n => n.scrollWidth <= n.clientWidth + 1));
+      expect(confirmationFits).toBe(true);
+      expect(await capture()).toBe(before);
+      await expect(page.locator("#membership-confirm-content")).toContainText(`${money - price} $`);
+      await expect(page.locator("#membership-confirm-content")).toContainText(`Semaine ${10 + weeks - 1}`);
+      await page.screenshot({ path: `/tmp/abonnements-confirm-${kind}-${viewport.width}.png` });
+      if (kind === "boxing") await page.keyboard.press("Escape");
+      else await page.locator("#membership-confirm-cancel").click();
+      await expect(page.locator("#membership-confirm-dialog")).toBeHidden();
+      await expect(panel).toBeVisible();
+      expect(await capture()).toBe(before);
+      await choice.focus();
+      await page.keyboard.press("Enter");
+      await page.locator("#membership-confirm-pay").click();
+      await page.evaluate(() => confirmCareerMembershipPurchase()); // Duplicate intent cannot charge twice.
+      expect(await page.evaluate(() => state.money)).toBe(money - price);
+      expect(await page.evaluate(() => state.week)).toBe(10);
+      await page.locator(kind === "boxing" ? '[data-career-leave-gym]' : '[data-career-leave-strength-gym]').click();
+      await expect(mapButton.locator("[data-membership-status]")).toHaveText(`${weeks} sem.`);
+      await mapButton.click();
+      await page.locator(kind === "boxing" ? '.career-gym-hotspot[data-career-gym-zone="reception"]'
+        : '[data-career-strength-zone="reception"]').click();
+      await expect(panel.locator(".membership-expiry")).toContainText(`semaine ${10 + weeks - 1}`);
+      for (const button of await panel.locator("button").all()) await expect(button).toBeDisabled();
+      await page.locator(kind === "boxing" ? '[data-career-gym-menu-close]' : '[data-career-strength-menu-close]').click();
+      await page.locator(kind === "boxing" ? '[data-career-leave-gym]' : '[data-career-leave-strength-gym]').click();
+    }
+    const acquired = await capture();
+    await page.screenshot({ path: `/tmp/abonnements-map-${viewport.width}.png` });
+    const badges = await page.locator(".membership-map-badge").evaluateAll(nodes => nodes.map(n => ({
+      clipped: n.scrollWidth > n.clientWidth + 1, label: n.textContent, rect: n.getBoundingClientRect().toJSON(),
+    })));
+    expect(badges.every(b => !b.clipped && b.rect.x >= 0 && b.rect.right <= viewport.width)).toBe(true);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("#resume-load").click();
+    const restored = await page.evaluate(() => ({ money: state.money, week: state.week, gymWeeks: state.gymWeeks, strengthGymWeeks: state.strengthGymWeeks }));
+    const old = JSON.parse(acquired).state;
+    expect(restored).toEqual({ money: old.money, week: old.week, gymWeeks: old.gymWeeks, strengthGymWeeks: old.strengthGymWeeks });
+    expect(errors).toEqual([]);
+  });
+}
+
+test("Abonnements harmonisés : échéance réelle, consultation gratuite et renouvellement", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({ week: 10, money: 1500, gymWeeks: 1, strengthGymWeeks: 2, jobId: "convenience" }));
+  const boxing = page.locator('.career-map-hotspot[data-career-location="boxing-gym"]');
+  const strength = page.locator('.career-map-hotspot[data-career-location="strength-gym"]');
+  await expect(boxing.locator("small")).toHaveAttribute("data-membership-status", "ending");
+  await expect(strength.locator("small")).toHaveAttribute("data-membership-status", "active");
+  await page.evaluate(() => { runCareerAutomaticWeek(); closeCareerLocation(); });
+  await expect(boxing.locator("small")).toHaveText("Non abonné");
+  await expect(strength.locator("small")).toHaveText("1 sem.");
+  const after = await page.evaluate(() => JSON.stringify({ week: state.week, money: state.money, gymWeeks: state.gymWeeks, strengthGymWeeks: state.strengthGymWeeks }));
+  for (let i = 0; i < 2; i++) {
+    await boxing.click();
+    await page.locator('.career-gym-hotspot[data-career-gym-zone="reception"]').click();
+    await expect(page.locator('[data-gym-plan="monthly"]')).toBeEnabled();
+    await page.locator('[data-career-gym-menu-close]').click();
+    await page.locator('[data-career-leave-gym]').click();
+  }
+  expect(await page.evaluate(() => JSON.stringify({ week: state.week, money: state.money, gymWeeks: state.gymWeeks, strengthGymWeeks: state.strengthGymWeeks }))).toBe(after);
+  await page.evaluate(() => { runCareerAutomaticWeek(); closeCareerLocation(); });
+  await expect(strength.locator("small")).toHaveText("Non abonné");
+  await boxing.click();
+  await page.locator('.career-gym-hotspot[data-career-gym-zone="reception"]').click();
+  await page.locator('[data-gym-plan="three-months"]').click();
+  await expect(page.locator("#membership-confirm-content")).toContainText("Semaine 23");
+  const beforeRenewal = await page.evaluate(() => state.money);
+  await page.locator("#membership-confirm-pay").click();
+  expect(await page.evaluate(() => ({ week: state.week, gymWeeks: state.gymWeeks, strengthGymWeeks: state.strengthGymWeeks, money: state.money })))
+    .toEqual({ week: 12, gymWeeks: 12, strengthGymWeeks: 0, money: beforeRenewal - 285 });
+});
+
+test("Abonnements harmonisés : devis périmé, fonds insuffisants et verrou de combat", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({ money: 90, gymWeeks: 0, strengthGymWeeks: 0, jobId: "convenience" }));
+  await page.evaluate(() => requestCareerMembershipPurchase("strength", "monthly"));
+  await expect(page.locator("#membership-confirm-dialog")).toBeHidden();
+  await expect(page.locator("#toast")).toContainText("Il manque 5 $");
+  await page.evaluate(() => { careerCapsule.previewRuntime.career.money = 200; requestCareerMembershipPurchase("boxing", "monthly"); });
+  await expect(page.locator("#membership-confirm-dialog")).toBeVisible();
+  await page.evaluate(() => { careerCapsule.previewRuntime.career.money = 199; confirmCareerMembershipPurchase(); });
+  await expect(page.locator("#toast")).toContainText("La situation a changé");
+  expect(await page.evaluate(() => careerCapsule.previewRuntime.career.money)).toBe(199);
+  expect(await page.evaluate(() => careerCapsule.previewRuntime.career.gymWeeks)).toBe(0);
+  await page.evaluate(() => {
+    requestCareerMembershipPurchase("boxing", "monthly");
+    careerCapsule.previewRuntime.fightGate = { status: "ready", kind: "gala", week: 1, appointmentId: "career-official-fight:test" };
+    confirmCareerMembershipPurchase();
+  });
+  await expect(page.locator("#toast")).toContainText("Règle maintenant le combat");
+  expect(await page.evaluate(() => careerCapsule.previewRuntime.career.money)).toBe(199);
+  expect(await page.evaluate(() => careerCapsule.previewRuntime.career.gymWeeks)).toBe(0);
+});
+
+test("Abonnements harmonisés : recharger abandonne la confirmation sans débit", async ({ page }) => {
+  await openStoredCareer(page, amateurSnapshot({ money: 200, gymWeeks: 0, jobId: "convenience" }));
+  await page.locator('.career-map-hotspot[data-career-location="boxing-gym"]').click();
+  await page.locator('.career-gym-hotspot[data-career-gym-zone="reception"]').click();
+  await page.locator('[data-gym-plan="monthly"]').click();
+  await expect(page.locator("#membership-confirm-dialog")).toBeVisible();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#resume-load").click();
+  await expect(page.locator("#membership-confirm-dialog")).toBeHidden();
+  await page.evaluate(() => confirmCareerMembershipPurchase());
+  expect(await page.evaluate(() => ({ money: state.money, gymWeeks: state.gymWeeks, week: state.week })))
+    .toEqual({ money: 200, gymWeeks: 0, week: 1 });
+});
+
 async function bookCurrentGala(page) {
   if (!await page.locator("#calendar-dialog").isVisible()) {
     await page.locator("[data-career-open-calendar]").first().click();
@@ -968,7 +1106,7 @@ test("explique et verrouille le GYM avant l’inscription", async ({ page }) => 
   expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth + 1);
   expect(fit.documentWidth).toBeLessThanOrEqual(fit.viewportWidth + 1);
   await reception.click();
-  await expect(page.locator("#membership-dialog")).toBeVisible();
+  await expect(page.locator('[data-career-membership-reception="boxing"]')).toBeVisible();
 });
 
 test("affiche le lieu Emploi selon le poste sans modifier sa mécanique", async ({ page }) => {
@@ -1113,6 +1251,7 @@ test("bâtit une semaine modifiable puis ne l’exécute qu’à la confirmation
   await page.locator('.career-gym-hotspot[data-career-gym-zone="reception"]').click();
   await expect(page.locator("#membership-dialog")).toBeVisible();
   await page.locator('#membership-options [data-gym-plan="monthly"]').click();
+  await page.locator("#membership-confirm-pay").click();
   await expect(page.locator("#membership-dialog")).not.toBeVisible();
   await expect(page.locator(".career-gym-membership")).toContainText("Abonnement actif");
   await page.locator("[data-career-leave-gym]").click();
@@ -1518,7 +1657,16 @@ test("protège le budget du premier GYM de boxe contre les dépenses de musculat
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).click();
   await page.locator('[data-career-gym-zone="reception"]').first().click();
   await expect(page.locator("#membership-dialog")).toBeVisible();
+  await expect(page.locator('[data-gym-plan="three-months"]')).toHaveCount(0);
+  const beforeConfirmation = await page.evaluate(() => JSON.stringify({ state, careerCapsule, storage: { ...localStorage } }));
   await page.locator('[data-gym-plan="monthly"]').click();
+  await page.locator("#membership-confirm-cancel").click();
+  await expect(page.locator("#membership-dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#membership-dialog")).toBeVisible();
+  expect(await page.evaluate(() => JSON.stringify({ state, careerCapsule, storage: { ...localStorage } }))).toBe(beforeConfirmation);
+  await page.locator('[data-gym-plan="monthly"]').click();
+  await page.locator("#membership-confirm-pay").click();
   saved = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career")).state);
   expect(saved.money).toBe(110);
   expect(saved.initialGymRequired).toBe(false);
@@ -2167,6 +2315,7 @@ test("guide une nouvelle carrière sans permettre de contourner l’emploi ni le
   await page.keyboard.press("Escape");
   await expect(membershipDialog).toBeVisible();
   await page.locator("#membership-options [data-gym-plan]").first().click();
+  await page.locator("#membership-confirm-pay").click();
   await expect(membershipDialog).toBeHidden();
   await expect(page.locator(".career-gym-view")).toContainText("Cours récréatifs");
   await expect(gymTutorial).toContainText("Faire une première séance");
@@ -2274,7 +2423,8 @@ test("guide une nouvelle carrière sans permettre de contourner l’emploi ni le
   await expect(gymTutorial).toContainText("quatre semaines du premier mois sont terminées");
   await expect(page.locator("[data-career-remy-sparring]")).toHaveCount(0);
   await gymTutorial.locator('[data-career-gym-zone="reception"]').click();
-  await page.locator('#membership-options [data-gym-plan="monthly"]').click();
+  await page.locator('[data-gym-plan="monthly"]').click();
+  await page.locator("#membership-confirm-pay").click();
   await expect(gymTutorial).toContainText("Préparer la semaine avant Rémy");
   await gymTutorial.locator("[data-career-week-quick]").click();
   await page.locator("[data-career-week-plan-close]").first().click();
@@ -4014,7 +4164,7 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   await page.locator("#resume-load").click();
 
   const strengthOpener = page.getByRole("button", { name: /Entrer : Gym de musculation/ }).first();
-  await expect(strengthOpener).toHaveAccessibleName(/Abonnement facultatif/);
+  await expect(strengthOpener).toHaveAccessibleName(/Non abonné/);
   await strengthOpener.click();
   const strengthView = page.locator(".career-strength-view");
   await expect(strengthView).toBeVisible();
@@ -4029,10 +4179,10 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   await expect(page.locator("[data-career-strength-plan]")).toHaveCount(2);
   await expect(page.locator('[data-career-strength-plan="monthly"]')).toContainText("Choisir 1 mois");
   await expect(page.locator('[data-career-strength-plan="monthly"]')).toBeEnabled();
-  await expect(page.locator('.career-strength-plan:has([data-career-strength-plan="monthly"])')).toContainText("95 $");
-  await expect(page.locator('.career-strength-plan:has([data-career-strength-plan="three-months"])')).toContainText("270 $");
+  await expect(page.locator('.membership-plan:has([data-career-strength-plan="monthly"])')).toContainText("95 $");
+  await expect(page.locator('.membership-plan:has([data-career-strength-plan="three-months"])')).toContainText("270 $");
 
-  const desktopStrengthFit = await page.locator(".career-strength-reception-menu").evaluate(element => ({
+  const desktopStrengthFit = await page.locator('[data-career-strength-menu="reception"]').evaluate(element => ({
     scrollWidth: element.scrollWidth,
     clientWidth: element.clientWidth,
     documentWidth: document.documentElement.scrollWidth,
@@ -4042,6 +4192,7 @@ test("planifie musculation, entraîneur privé et supplément dans l’inventair
   expect(desktopStrengthFit.documentWidth).toBeLessThanOrEqual(desktopStrengthFit.viewportWidth + 1);
 
   await page.locator('[data-career-strength-plan="monthly"]').click();
+  await page.locator("#membership-confirm-pay").click();
   await expect(strengthView).toHaveAttribute("data-career-strength-access", "active");
   await expect(page.locator(".career-strength-membership-summary")).toContainText("Abonnement actif · 4 sem.");
   await expect(page.locator(".career-strength-access")).toContainText("Énergie 92 %");

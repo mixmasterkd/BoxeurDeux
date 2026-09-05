@@ -1,9 +1,9 @@
 (function attachBoxeurGymView(root, factory) {
   "use strict";
-  const api = factory();
+  const api = factory(typeof module === "object" && module.exports ? require("./membership-view.js") : root.BoxeurMembershipView);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.BoxeurGymView = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function createBoxeurGymViewApi() {
+})(typeof globalThis !== "undefined" ? globalThis : this, function createBoxeurGymViewApi(membershipView) {
   "use strict";
 
   const EXERCISES = Object.freeze([
@@ -107,6 +107,9 @@
       },
       membership: {
         active: membership.active === true,
+        weeksRemaining: wholeNumber(membership.weeksRemaining, 0, 0, 5200),
+        initialRequired: membership.initialRequired === true,
+        plans: Array.isArray(membership.plans) ? membership.plans : [],
         label: membership.label || (membership.active === true ? "Abonnement actif" : "Inscription requise"),
         detail: membership.detail || (membership.active === true ? "Accès au GYM confirmé." : "Inscris-toi à l’accueil avant de commencer une séance."),
         monthlyPrice: wholeNumber(membership.monthlyPrice, 110, 0, 99999),
@@ -297,6 +300,9 @@
   function renderMenu(menuId, rawContext) {
     const context = normalizeContext(rawContext);
     const id = String(menuId || "");
+    if (id === "reception") {
+      return `<section class="career-gym-menu career-membership-reception" data-career-membership-reception="boxing"><header><div><p class="eyebrow">GYM de boxe · Accueil</p><h2 id="career-gym-menu-title">Inscription au gym</h2><p>Semaine ${context.clock.week} · ${context.weekCapacity.remaining}/${context.weekCapacity.total} de capacité disponible</p></div><button type="button" class="secondary-button" data-career-gym-menu-close>Retour au gym</button></header>${membershipView.renderPlans({ kind: "boxing", careerStatus: context.careerStatus, week: context.clock.week, membership: context.membership })}</section>`;
+    }
     if (id === "coach") {
       const description = context.careerStatus === "recreational"
         ? "Les cours récréatifs sont préparés par l’entraîneur."

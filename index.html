@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="week.css" />
     <link rel="stylesheet" href="fighter.css" />
     <link rel="stylesheet" href="inventory.css" />
+    <link rel="stylesheet" href="membership.css" />
   </head>
   <body>
     <section id="creation-screen" class="creation-screen" aria-labelledby="creation-title">
@@ -230,7 +231,7 @@
       <div class="service-card">
         <div class="service-heading"><div><p class="eyebrow">GYM de boxe</p><h2 id="membership-dialog-title">Choisir un abonnement</h2></div><button id="membership-dialog-close" class="dialog-close" type="button" aria-label="Fermer">×</button></div>
         <p id="membership-dialog-copy" class="service-lead">Le GYM est le centre de l’entraînement de boxe : mitaines, défense, cours de groupe et sparring.</p>
-        <div id="membership-options" class="coach-menu-grid"></div>
+        <div id="membership-options"></div>
         <div class="service-actions"><button id="membership-dialog-cancel" class="secondary-button" type="button">Fermer</button></div>
       </div>
     </dialog>
@@ -245,6 +246,14 @@
 
     <dialog id="trainer-session-dialog" class="service-dialog trainer-session-dialog" aria-labelledby="career-trainer-confirmation-title">
       <div id="trainer-session-content"></div>
+    </dialog>
+
+    <dialog id="membership-confirm-dialog" class="service-dialog" aria-labelledby="membership-confirm-title">
+      <div class="service-card">
+        <div class="service-heading"><h2 id="membership-confirm-title">Confirmer l’abonnement</h2><button id="membership-confirm-close" class="dialog-close" type="button" aria-label="Annuler l’achat">×</button></div>
+        <div id="membership-confirm-content"></div>
+        <div class="service-actions"><button id="membership-confirm-cancel" class="secondary-button" type="button">Retour aux forfaits</button><button id="membership-confirm-pay" class="primary-button" type="button">Confirmer et payer</button></div>
+      </div>
     </dialog>
 
     <dialog id="calendar-dialog" class="calendar-dialog" aria-labelledby="calendar-title">
@@ -446,6 +455,7 @@
     <script src="week-engine.js"></script>
     <script src="leisure-engine.js"></script>
     <script src="media-engine.js"></script>
+    <script src="membership-view.js"></script>
     <script src="gym-view.js"></script>
     <script src="strength-view.js"></script>
     <script src="home-view.js"></script>
