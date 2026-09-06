@@ -16,7 +16,8 @@
   ]);
 
   const ZONES = Object.freeze([
-    Object.freeze({ id: "coach", label: "Voir l’entraîneur", detail: "Séance préparée et conseils" }),
+    Object.freeze({ id: "coach", label: "Entraînement du coach", detail: "Séance préparée par le coach" }),
+    Object.freeze({ id: "trainer", label: "Entraîneurs privés", detail: "Technique ou défense" }),
     Object.freeze({ id: "training", label: "Zone d’entraînement", detail: "Bâtir une séance personnalisée" }),
     Object.freeze({ id: "ring", label: "Ring", detail: "Sparring et oppositions" }),
     Object.freeze({ id: "reception", label: "Accueil", detail: "Abonnement au GYM" }),
@@ -282,21 +283,6 @@
     </article>`;
   }
 
-  function renderPrivateTrainerCard(context) {
-    if (context.careerStatus === "recreational") return "";
-    const disabled = context.privateTrainer.available ? "" : " disabled aria-disabled=\"true\" aria-describedby=\"career-gym-private-trainer-reason\"";
-    const detail = context.privateTrainer.available
-      ? `${context.privateTrainer.detail} Une séance privée remplace une séance de boxe dans ton programme.`
-      : !context.membership.active
-        ? "Un abonnement actif est requis."
-        : "Le service privé est indisponible pour le moment.";
-    return `<article class="career-gym-action-card${disabled ? " locked" : ""}" aria-labelledby="career-gym-private-title">
-      <div class="career-gym-action-heading"><span>Spécialisé</span><small>Service payant</small></div>
-      <h3 id="career-gym-private-title">${escapeHTML(context.privateTrainer.name)}</h3><p id="career-gym-private-trainer-reason">${escapeHTML(detail)}</p>
-      <button type="button" class="secondary-button" data-career-boxing-trainer${disabled}>${escapeHTML(context.privateTrainer.actionLabel)}</button>
-    </article>`;
-  }
-
   function renderMenu(menuId, rawContext) {
     const context = normalizeContext(rawContext);
     const id = String(menuId || "");
@@ -306,11 +292,11 @@
     if (id === "coach") {
       const description = context.careerStatus === "recreational"
         ? "Les cours récréatifs sont préparés par l’entraîneur."
-        : "Choisis la séance préparée par le coach ou un entraîneur privé ciblé.";
+        : "Choisis la séance préparée par le coach.";
       return `<section class="career-gym-menu" aria-labelledby="career-gym-menu-title">
-        <header><div><p class="eyebrow">GYM de boxe</p><h2 id="career-gym-menu-title">Voir l’entraîneur</h2></div><button type="button" class="secondary-button" data-career-gym-menu-close>Retour au GYM</button></header>
+        <header><div><p class="eyebrow">GYM de boxe</p><h2 id="career-gym-menu-title">Entraînement du coach</h2></div><button type="button" class="secondary-button" data-career-gym-menu-close>Retour au GYM</button></header>
         <p>${escapeHTML(description)}</p>
-        <div class="career-gym-menu-actions">${renderCoachCard(context)}${renderPrivateTrainerCard(context)}</div>
+        <div class="career-gym-menu-actions">${renderCoachCard(context)}</div>
       </section>`;
     }
     if (id === "ring") {
@@ -328,6 +314,15 @@
     const context = normalizeContext(rawContext);
     const sparring = sparringState(context);
     const zones = ZONES.map(zone => {
+      if (zone.id === "trainer") {
+        if (context.careerStatus === "recreational") return "";
+        const disabled = context.privateTrainer.available ? "" : " disabled aria-disabled=\"true\"";
+        const detail = context.privateTrainer.available
+          ? context.privateTrainer.active ? context.privateTrainer.detail : zone.detail
+          : !context.membership.active ? "Un abonnement actif est requis." : "Le service privé est indisponible pour le moment.";
+        const lock = disabled ? `<span class="career-gym-hotspot-lock" aria-hidden="true">🔒</span>` : "";
+        return `<button type="button" class="career-gym-hotspot career-gym-hotspot-trainer" data-career-gym-zone="trainer" data-career-boxing-trainer aria-label="${escapeHTML(zone.label)}. ${escapeHTML(detail)}"${disabled}><strong>${escapeHTML(zone.label)}</strong><small>${escapeHTML(detail)}</small>${lock}</button>`;
+      }
       const isRing = zone.id === "ring";
       const remyReady = isRing && context.careerStatus === "recreational" && context.recreational.remyStatus === "ready";
       const recreationalBlocked = context.careerStatus === "recreational" && !["coach", "reception"].includes(zone.id) && !remyReady;
@@ -338,7 +333,7 @@
         label: zone.label,
         detail: zone.detail,
       };
-      if (zone.id === "coach") display.detail = context.careerStatus === "recreational" ? "Cours récréatifs" : "Coach et entraîneur privé";
+      if (zone.id === "coach" && context.careerStatus === "recreational") display.detail = "Cours récréatifs";
       if (zone.id === "training") {
         display.label = context.careerStatus === "recreational" ? "Zone d’entraînement · Amateur" : zone.label;
         display.detail = context.careerStatus === "recreational" ? "Bâtir ma séance après le passage amateur" : "Bâtir ma séance personnalisée";

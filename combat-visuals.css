@@ -1,0 +1,254 @@
+/* Illustrated pilot actions. Existing combat layouts remain the default. */
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 7px;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  justify-items: center;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  min-height: 164px;
+  margin: 0;
+  padding: 6px 7px 8px;
+  overflow: hidden;
+  border: 1px solid #424a43;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #222822, #111611 72%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07);
+  color: #f3efe2;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-art {
+  display: block;
+  width: min(100%, 112px);
+  min-width: 0;
+  aspect-ratio: 1;
+  margin: 0;
+  border-radius: 2px;
+  background-color: #192119;
+  background-image: url("assets/combat-actions-ericka-atlas-v1.png");
+  background-repeat: no-repeat;
+  background-size: 500% 200%;
+  background-position: var(--action-position, 0% 0%);
+  pointer-events: none;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  color: inherit;
+  line-height: 1.15;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-caption strong {
+  display: block;
+  margin: 0;
+  color: inherit;
+  font: 800 .9rem/1.1 "Barlow Condensed", sans-serif;
+  letter-spacing: .015em;
+  overflow-wrap: normal;
+  text-transform: uppercase;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-caption em {
+  display: block;
+  margin: 0;
+  color: #d9bc77;
+  font: 800 .65rem/1.1 "Barlow Condensed", sans-serif;
+  letter-spacing: .05em;
+  white-space: nowrap;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-coach {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  right: 5px;
+  display: block;
+  margin: 0;
+  padding: 3px 5px;
+  border: 1px solid rgba(244,212,130,.58);
+  border-radius: 2px;
+  background: #2f2816;
+  color: #f4d482;
+  font: 800 .57rem/1 "Barlow Condensed", sans-serif;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-card.coach-match {
+  border-color: #d8b45b;
+  box-shadow: inset 0 -3px 0 #d8b45b, inset 0 1px 0 rgba(244,212,130,.18);
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-card:hover:not(:disabled) {
+  border-color: #f0d28e;
+  background: linear-gradient(180deg, #31392b, #192016 72%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 2px 8px rgba(0,0,0,.24);
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-card:focus-visible {
+  outline: 3px solid #fff1b9;
+  outline-offset: 2px;
+  border-color: #fff1b9;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-card:disabled {
+  opacity: .65;
+  cursor: default;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-card[data-selected="true"] {
+  opacity: 1;
+  border-color: #fff1b9;
+  box-shadow: inset 0 0 0 1px #fff1b9;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-resolution-card {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 164px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #5d563d;
+  border-radius: 4px;
+  background: #171c15;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-resolution-card .combat-action-art {
+  flex: 0 0 104px;
+}
+
+.sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-resolution-card .combat-action-caption {
+  align-items: flex-start;
+  width: auto;
+}
+
+/* Sprite poses keep the established ring position, scaling and knockdown transforms. */
+.combat-pilot-sprite {
+  display: none;
+}
+
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-pose] .sparring-fighter-image {
+  display: none;
+}
+
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-pose] .combat-pilot-sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-image: var(--pilot-atlas, url("assets/combat-pilot-ericka-atlas-v1.png"));
+  background-repeat: no-repeat;
+  background-size: 300% 200%;
+  background-position: var(--pilot-position, 0% 0%);
+  transform-origin: center bottom;
+  filter: grayscale(.88) saturate(.2) brightness(.62) contrast(1.18);
+  animation: sparring-fighter-breathe 2.5s ease-in-out infinite;
+}
+
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-context="official"] .combat-pilot-sprite {
+  filter: none;
+}
+
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-context="nadia"] .combat-pilot-sprite,
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-context="remy"] .combat-pilot-sprite {
+  filter: saturate(.72) sepia(.12) brightness(.86) contrast(1.07);
+}
+
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"][data-sparring-step="resolving"] .ring-fighter-player[data-pilot-pose] .combat-pilot-sprite {
+  animation: sparring-fighter-step .36s cubic-bezier(.2,.8,.25,1) both;
+}
+
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"][data-sparring-step="resolving"] .ring-fighter-opponent[data-pilot-pose] .combat-pilot-sprite {
+  animation-duration: 2.1s;
+}
+
+@media (max-width: 760px) {
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-card {
+    grid-template-columns: clamp(54px, 16vw, 82px) minmax(0, 1fr);
+    grid-template-rows: 1fr;
+    align-items: center;
+    justify-items: stretch;
+    gap: 6px;
+    min-height: 78px;
+    padding: 5px;
+    text-align: left;
+  }
+
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-card:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-art {
+    width: 100%;
+  }
+
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-caption {
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-caption strong {
+    font-size: .8rem;
+    overflow-wrap: anywhere;
+  }
+
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-caption em {
+    font-size: .65rem;
+  }
+
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-coach {
+    top: 4px;
+    right: auto;
+    left: 4px;
+    padding: 3px 4px;
+    font-size: .52rem;
+  }
+
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-resolution-card {
+    min-height: 246px;
+  }
+
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-resolution-card .combat-action-art {
+    flex-basis: 82px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparring-ring-prototype #fight-choices[data-visual-actions="true"] .combat-action-card {
+    transition: none;
+  }
+
+  .sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-pose] .combat-pilot-sprite,
+  .sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"][data-sparring-step="resolving"] .ring-fighter-player[data-pilot-pose] .combat-pilot-sprite,
+  .sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"][data-sparring-step="resolving"] .ring-fighter-opponent[data-pilot-pose] .combat-pilot-sprite {
+    animation: none;
+  }
+}

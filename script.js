@@ -341,6 +341,31 @@ let sparringRingState = null;
 let sparringAutoResolveTimer = null;
 let sparringAutoResolving = false;
 let sparringPendingActionId = null;
+// Présentation uniquement : ces poses ne participent jamais à la résolution.
+let combatPilotPose = "guard";
+let combatPilotPoseTimer = null;
+let combatOpponentPose = "guard";
+let combatOpponentPoseTimer = null;
+const combatPilotSpriteSources = Object.freeze({
+  remy: Object.freeze({
+    back: "assets/combat-sparring-remy-back-atlas-v1.png",
+    front: "assets/combat-sparring-remy-front-atlas-v1.png",
+  }),
+  nadia: Object.freeze({
+    back: "assets/combat-sparring-nadia-back-atlas-v1.png",
+    front: "assets/combat-sparring-nadia-front-atlas-v1.png",
+  }),
+  sparring: Object.freeze({
+    back: "assets/combat-pilot-ericka-atlas-v1.png",
+    front: "assets/combat-pilot-ericka-front-atlas-v1.png",
+  }),
+  official: Object.freeze({
+    back: "assets/combat-official-ericka-back-atlas-v1.png",
+    front: "assets/combat-official-ericka-front-atlas-v1.png",
+  }),
+});
+const combatPilotAtlases = Object.create(null);
+const combatPilotAtlasReady = Object.create(null);
 let draftPortraitId = 0;
 let drugSalesTapCount = 0;
 let resumeCareerAlertsAfterLevelDialog = false;
@@ -6660,7 +6685,7 @@ function renderCareerGymMenu(menuId) {
   sheet.classList.add("career-location-sheet-full");
   sheet.innerHTML = markup;
   const preferredFocus = menuId === "coach"
-    ? "[data-career-coach-session]:not([disabled]), [data-career-boxing-trainer]:not([disabled])"
+    ? "[data-career-coach-session]:not([disabled])"
     : menuId === "reception" ? "[data-gym-plan]:not([disabled]), [data-career-gym-menu-close]"
     : "[data-career-sparring-activity]:not([disabled])";
   activateCareerLocationSheet(sheet, preferredFocus);
@@ -7961,6 +7986,98 @@ function sparringPlayerVisualSet() {
   };
 }
 
+function combatVisualPilotContext() {
+  if (!window.BoxeurCombatVisuals?.isPilotProfile(state.profile)) return null;
+  if (isRemyRingPrototype() || isTechnicalSparringPrototype()) return "sparring";
+  if (isOfficialFight() && state.careerStatus !== "professional") return "official";
+  return null;
+}
+
+function isCombatVisualPilot() {
+  return Boolean(combatVisualPilotContext());
+}
+
+function combatVisualOpponentContext() {
+  if (!isRemyRingPrototype() && !isTechnicalSparringPrototype()) return null;
+  return window.BoxeurCombatVisuals?.sparringOpponentContext(state.profile, fightState?.careerMeta) || null;
+}
+
+function ensureCombatPilotAtlas(context, orientation) {
+  const source = combatPilotSpriteSources[context]?.[orientation];
+  if (!source) return false;
+  const key = `${context}-${orientation}`;
+  if (!combatPilotAtlases[key]) {
+    const atlas = new Image();
+    combatPilotAtlases[key] = atlas;
+    atlas.onload = () => {
+      combatPilotAtlasReady[key] = true;
+      renderCombatPilotSprite();
+    };
+    atlas.onerror = () => {
+      combatPilotAtlases[key] = null;
+      combatPilotAtlasReady[key] = false;
+    };
+    atlas.src = source;
+  }
+  return combatPilotAtlasReady[key];
+}
+
+function renderCombatPilotSprite() {
+  const stage = document.querySelector("#fight-ring-stage");
+  if (!stage) return;
+  for (const role of ["player", "opponent"]) {
+    const fighter = stage.querySelector(`.ring-fighter-${role}`);
+    if (!fighter) continue;
+    delete fighter.dataset.pilotPose;
+    delete fighter.dataset.pilotOrientation;
+    delete fighter.dataset.pilotContext;
+    fighter.style.removeProperty("--pilot-atlas");
+    fighter.style.removeProperty("--pilot-position");
+    const context = role === "player" ? combatVisualPilotContext() : combatVisualOpponentContext();
+    if (!context || stage.dataset.sparringScene !== "ring") continue;
+    const ringVisual = window.BoxeurSparringRing.getView(sparringRingState, fightState.fighters.player.energy).fighters[role];
+    const orientation = ringVisual.pose === "back" ? "back" : "front";
+    const source = combatPilotSpriteSources[context][orientation];
+    if (!ensureCombatPilotAtlas(context, orientation)) continue;
+    const pose = role === "player" ? combatPilotPose : combatOpponentPose;
+    fighter.dataset.pilotPose = pose;
+    fighter.dataset.pilotOrientation = orientation;
+    fighter.dataset.pilotContext = context;
+    fighter.style.setProperty("--pilot-atlas", `url("${source}")`);
+    fighter.style.setProperty("--pilot-position", window.BoxeurCombatVisuals.spritePosition(pose));
+  }
+}
+
+function setCombatOpponentPose(pose = "guard", duration = 0) {
+  if (combatOpponentPoseTimer) clearTimeout(combatOpponentPoseTimer);
+  combatOpponentPoseTimer = null;
+  combatOpponentPose = pose;
+  renderCombatPilotSprite();
+  if (duration > 0) {
+    const displayedFight = fightState;
+    combatOpponentPoseTimer = setTimeout(() => {
+      combatOpponentPoseTimer = null;
+      combatOpponentPose = "guard";
+      if (fightState === displayedFight) renderCombatPilotSprite();
+    }, duration);
+  }
+}
+
+function setCombatPilotPose(pose = "guard", duration = 0) {
+  if (combatPilotPoseTimer) clearTimeout(combatPilotPoseTimer);
+  combatPilotPoseTimer = null;
+  combatPilotPose = pose;
+  renderCombatPilotSprite();
+  if (duration > 0) {
+    const displayedFight = fightState;
+    combatPilotPoseTimer = setTimeout(() => {
+      combatPilotPoseTimer = null;
+      combatPilotPose = "guard";
+      if (fightState === displayedFight) renderCombatPilotSprite();
+    }, duration);
+  }
+}
+
 function configureSparringPlayerImages() {
   const stage = document.querySelector("#fight-ring-stage");
   if (!stage) return;
@@ -8024,6 +8141,7 @@ function renderSparringRing(view) {
   dialog?.classList.toggle("olympic-fight-prototype", olympicFightActive);
   if (!stage || !coachCallout) return;
   if (!prototypeActive) {
+    renderCombatPilotSprite();
     delete stage.dataset.sparringScene;
     delete stage.dataset.sparringStep;
     delete stage.dataset.sparringMovement;
@@ -8069,6 +8187,7 @@ function renderSparringRing(view) {
   });
 
   stage.dataset.sparringStep = sparringAutoResolving ? "resolving" : "decision";
+  renderCombatPilotSprite();
   if (sparringAutoResolving && ringView.pendingMovement) stage.dataset.sparringMovement = ringView.pendingMovement.role;
   else delete stage.dataset.sparringMovement;
   // La grille 5 × 5 reste le moteur du placement; les décisions tactiques
@@ -8082,15 +8201,19 @@ function renderSparringRing(view) {
   const opponentEnergyBar = document.querySelector("#sparring-opponent-energy-bar");
   const playerEnergyValue = document.querySelector("#sparring-player-energy-value");
   const opponentEnergyValue = document.querySelector("#sparring-opponent-energy-value");
+  const playerEnergyLabel = document.querySelector("#sparring-player-energy-label");
   const opponentEnergyLabel = document.querySelector("#sparring-opponent-energy-label");
+  const playerHudName = state.profile.firstName || view.fighters.player.name;
   const roundHud = document.querySelector("#sparring-round-hud");
   const exchangeHud = document.querySelector("#sparring-exchange-hud");
   if (playerEnergyBar) playerEnergyBar.style.width = `${playerEnergy}%`;
   if (opponentEnergyBar) opponentEnergyBar.style.width = `${opponentEnergy}%`;
   if (playerEnergyValue) playerEnergyValue.textContent = `${playerEnergy} %`;
   if (opponentEnergyValue) opponentEnergyValue.textContent = `${opponentEnergy} %`;
+  if (playerEnergyLabel) playerEnergyLabel.textContent = playerHudName;
   if (opponentEnergyLabel) opponentEnergyLabel.textContent = immersiveOpponentFirstName();
   playerEnergyTrack?.setAttribute("aria-valuenow", String(playerEnergy));
+  playerEnergyTrack?.setAttribute("aria-label", `Énergie de ${playerHudName}`);
   opponentEnergyTrack?.setAttribute("aria-valuenow", String(opponentEnergy));
   opponentEnergyTrack?.setAttribute("aria-label", `Énergie de ${immersiveOpponentFirstName()}`);
   if (roundHud) roundHud.textContent = `ROUND ${Math.min(view.format.rounds || 3, view.round)} / ${view.format.rounds || 3}`;
@@ -8131,15 +8254,16 @@ function renderFightRoundDynamic(view) {
   if (!container) return;
   if (isImmersiveRingFight()) {
     const perception = window.BoxeurSparringRing.getView(sparringRingState, view.fighters.player.energy).perception;
-    const low = clamp((perception.low + 100) / 2, 0, 100);
-    const high = clamp((perception.high + 100) / 2, 0, 100);
     const value = clamp((perception.value + 100) / 2, 0, 100);
-    const clarity = perception.uncertainty <= 15 ? "Lecture assez nette" : perception.uncertainty <= 25 ? "Lecture prudente" : "Lecture très incertaine";
+    const haloWidth = clamp(perception.uncertainty, 2, 100);
+    const clarity = perception.uncertainty <= 15 ? "Lecture ressentie avec assurance" : perception.uncertainty <= 25 ? "Lecture hésitante" : "Lecture brouillée, tu manques de repères";
     const hud = document.querySelector("#sparring-perception-hud");
     if (hud) {
-      hud.style.setProperty("--perception-low", `${low}%`);
-      hud.style.setProperty("--perception-width", `${Math.max(2, high - low)}%`);
+      hud.style.setProperty("--perception-low", `${value - haloWidth / 2}%`);
+      hud.style.setProperty("--perception-width", `${haloWidth}%`);
       hud.style.setProperty("--perception-value", `${value}%`);
+      hud.style.setProperty("--perception-blur", `${(0.4 + clamp(perception.blur || 0, 0, 1) * 2.6).toFixed(2)}px`);
+      hud.style.setProperty("--perception-drift", `${(clamp(perception.drift || 0, 0, 1) * 3).toFixed(2)}px`);
       hud.setAttribute("aria-label", `${perception.label}. ${clarity}.`);
     }
     const mobileReading = document.querySelector("#fight-mobile-reading");
@@ -8228,7 +8352,7 @@ function configureRingImages() {
   }
 }
 
-function triggerFightVisual(result) {
+function triggerFightVisual(result, actionId) {
   const stage = document.querySelector("#fight-ring-stage");
   if (!stage || !result) return;
   let cue = result.visualCue || "neutral";
@@ -8236,6 +8360,12 @@ function triggerFightVisual(result) {
   else if (cue === "knockout" || cue === "referee-stoppage") cue = `${fightState?.result?.loser || (result.side === "player" ? "opponent" : "player")}-knockdown`;
   cue = cue.replace("-hard", "");
   stage.dataset.cue = cue;
+  setCombatPilotPose(isCombatVisualPilot() && fightState?.phase === "exchange"
+    ? window.BoxeurCombatVisuals.resultPose(result, actionId)
+    : "guard", isCombatVisualPilot() && fightState?.phase === "exchange" ? 700 : 0);
+  setCombatOpponentPose(combatVisualOpponentContext() && fightState?.phase === "exchange"
+    ? window.BoxeurCombatVisuals.opponentResultPose(result)
+    : "guard", combatVisualOpponentContext() && fightState?.phase === "exchange" ? 700 : 0);
   const impact = /hit|trade|knockdown/.test(cue);
   stage.classList.remove("show-impact");
   if (impact) {
@@ -8284,6 +8414,9 @@ function remyTacticPresentation(action) {
 
 function renderFightChoices() {
   const container = document.querySelector("#fight-choices");
+  const visualPilot = isCombatVisualPilot();
+  container.dataset.visualActions = String(visualPilot);
+  container.removeAttribute("aria-busy");
   const heading = document.querySelector("#fight-decision-heading");
   const decisionArea = container.closest(".fight-decision-area");
   if (!fightState || fightState.phase !== "exchange") {
@@ -8298,6 +8431,14 @@ function renderFightChoices() {
   const actions = BoxeurCombat.getAvailableActions(fightState);
   if (isImmersiveRingFight()) {
     if (sparringAutoResolving) {
+      if (visualPilot && container.querySelector(".combat-action-card")) {
+        container.setAttribute("aria-busy", "true");
+        container.querySelectorAll("button[data-fight-action]").forEach(button => {
+          button.disabled = true;
+          button.dataset.selected = String(button.dataset.fightAction === sparringPendingActionId);
+        });
+        return;
+      }
       const movement = sparringRingState?.pendingMovement;
       const pendingAction = BoxeurCombat.ACTIONS[sparringPendingActionId] || null;
       const tactic = pendingAction ? remyTacticPresentation(pendingAction) : null;
@@ -8307,6 +8448,11 @@ function renderFightChoices() {
     container.innerHTML = actions.slice(0, 5).map(action => {
       const tactic = remyTacticPresentation(action);
       const coachHint = action.directiveAligned ? " · conseil du coach" : "";
+      const illustration = visualPilot ? window.BoxeurCombatVisuals.actionVisual(action.id) : null;
+      if (illustration) {
+        const detail = `${tactic.label} : ${action.label}. ${tactic.detail} −${action.baseEnergyCost.toFixed(1)} E${coachHint}`;
+        return `<button type="button" data-fight-action="${action.id}" data-sparring-purpose="${tactic.purpose}" class="combat-action-card${action.directiveAligned ? " coach-match" : ""}" aria-label="${escapeHTML(`${illustration.title}. ${detail}`)}" title="${escapeHTML(detail)}"><div class="combat-action-art" aria-hidden="true" style="--action-position: ${window.BoxeurCombatVisuals.cardPosition(illustration.card)}"></div><span class="combat-action-caption"><strong>${escapeHTML(illustration.title)}</strong><em>−${action.baseEnergyCost.toFixed(1)} E</em>${action.directiveAligned ? '<small class="combat-action-coach">Coach</small>' : ""}</span></button>`;
+      }
       return `<button type="button" data-fight-action="${action.id}" data-sparring-purpose="${tactic.purpose}" class="${action.directiveAligned ? "coach-match" : ""}" aria-label="${escapeHTML(`${tactic.label} : ${action.label}. ${tactic.detail}`)}"><strong>${escapeHTML(tactic.label)}</strong><span>${escapeHTML(tactic.detail)}</span><em>${escapeHTML(action.label)} · −${action.baseEnergyCost.toFixed(1)} E${coachHint}</em></button>`;
     }).join("");
     return;
@@ -8502,6 +8648,8 @@ function chooseFightCoachDirective(optionId) {
 }
 
 function clearSparringAutoResolve() {
+  setCombatPilotPose();
+  setCombatOpponentPose();
   if (sparringAutoResolveTimer) clearTimeout(sparringAutoResolveTimer);
   sparringAutoResolveTimer = null;
   sparringAutoResolving = false;
@@ -8526,6 +8674,10 @@ function beginSparringExchange(actionId, movementPurpose = "hold") {
     fightState = movementTransition.combatState;
     sparringAutoResolving = true;
     sparringPendingActionId = actionId;
+    setCombatPilotPose(isCombatVisualPilot() ? window.BoxeurCombatVisuals.actionVisual(actionId)?.pose || "guard" : "guard");
+    setCombatOpponentPose(combatVisualOpponentContext()
+      ? window.BoxeurCombatVisuals.opponentActionPose(BoxeurCombat.getPublicState(fightState).currentExchange?.shownIntentionId)
+      : "guard");
     const movement = sparringRingState.pendingMovement;
     renderFight(movement?.label ? `${movement.label} : le placement suit ton choix.` : "Le placement suit ton choix.");
     sparringAutoResolveTimer = setTimeout(() => {
@@ -8560,7 +8712,7 @@ function playRound(actionId, movementPurpose = "hold") {
     fightState = transition.state;
     if (isImmersiveRingFight()) syncImmersiveRingContext();
     recordSparringExchange(beforeView, transition, movementPurpose, movement);
-    triggerFightVisual(transition.result);
+    triggerFightVisual(transition.result, actionId);
     if (fightState.status.finished) finishFight();
     else renderFight(transition.result.text);
   } catch (error) {

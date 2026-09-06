@@ -57,6 +57,37 @@
     };
   }
 
+  function createPerception(seed) {
+    // Ces dispositions appartiennent au ressenti de cette rencontre, pas aux
+    // caractéristiques du boxeur. Leur hasard ne déplace jamais le hasard du ring.
+    const perception = { rngState: hashSeed(`${seed == null ? "sparring-remy" : seed}:perception`) };
+    perception.fatigueSensitivity = roundTo(nextRandom(perception) * 1.35 - 0.25, 3);
+    perception.assurance = roundTo(nextRandom(perception), 3);
+    return Object.assign(perception, {
+      value: 0,
+      uncertainty: 30,
+      exchanges: 0,
+      memory: 0,
+      mood: 0,
+      salience: 0,
+      agency: 0,
+      disorientation: 0,
+      blur: 0.55,
+      drift: 0,
+    });
+  }
+
+  function ensurePerception(state) {
+    const previous = state.perception || {};
+    const perception = Object.assign(createPerception(state.seed), previous);
+    // Une partie sauvegardée avant ce modèle repart de son impression affichée.
+    // L'ancien flux objectif n'est ni utilisé ni conservé.
+    if (previous.memory == null) perception.memory = Number(previous.value) || 0;
+    delete perception.trueFlow;
+    state.perception = perception;
+    return perception;
+  }
+
   function createState(config) {
     const source = config || {};
     return {
@@ -73,12 +104,7 @@
         opponent: { x: 3, y: 1 },
       },
       pendingMovement: null,
-      perception: {
-        value: 0,
-        uncertainty: 30,
-        trueFlow: 0,
-        exchanges: 0,
-      },
+      perception: createPerception(source.seed),
       lastOpponentMovement: null,
     };
   }
@@ -237,29 +263,80 @@
   }
 
   function perceptionLabel(value) {
-    if (value >= 48) return "Tu sens que tu imposes nettement le sparring";
+    if (value >= 48) return "Tu sens que tu imposes nettement le round";
     if (value >= 16) return "Tu crois avoir une légère emprise";
     if (value <= -48) return "Tu sens que l’adversaire impose nettement le rythme";
     if (value <= -16) return "Tu as l’impression de subir un peu";
     return "Le round te semble encore partagé";
   }
 
+  function updatePerception(state, result, combatState) {
+    const perception = ensurePerception(state);
+    // Le tirage historique reste exactement ici : les déplacements adverses
+    // doivent conserver leur séquence, même si le ressenti devient plus complexe.
+    const sensoryNoise = nextRandom(state) * 2 - 1;
+    const moodNoise = nextRandom(perception) * 2 - 1;
+    const recallNoise = nextRandom(perception) * 2 - 1;
+    const player = combatState?.fighters?.player || {};
+    const energy = clamp(player.energy == null ? 70 : player.energy);
+    const fatigue = clamp(player.fatigue == null ? 0 : player.fatigue);
+    const lucidity = clamp(player.lucidity == null ? 80 : player.lucidity);
+    const morale = (clamp(player.morale == null ? 50 : player.morale) - 50) / 50;
+    const tiredness = clamp(((100 - energy) * 0.68 + fatigue * 0.32 - 18) / 68, 0, 1);
+    const lostClarity = (100 - lucidity) / 100;
+    const reading = (state.playerStats.technique * 0.52 + state.playerStats.defense * 0.32 + state.playerStats.cardio * 0.16) / 100;
+    const playerImpact = clamp(result.playerImpact, 0, 30);
+    const opponentImpact = clamp(result.opponentImpact, 0, 30);
+    const shock = clamp(opponentImpact / 12, 0, 1);
+    const bodyDiscomfort = clamp(player.body, 0, 100) / 100;
+    const headDiscomfort = clamp(player.head, 0, 100) / 100;
+    const disorientationTarget = clamp(lostClarity * 0.64 + shock * 0.25 + headDiscomfort * 0.16 + tiredness * 0.12, 0, 1);
+    perception.disorientation = roundTo(perception.disorientation * 0.55 + disorientationTarget * 0.45, 3);
+
+    // L'activité et l'avance peuvent sembler efficaces même quand elles ne le
+    // sont pas. On ne consulte ni les cartes, ni les totaux du round.
+    const attacking = /^(fast_combination|body_attack|power_hook|controlled_pressure|finish_pressure)$/.test(result.actionId || "")
+      || combatState?.lastPlayerFamily === "attack";
+    const agencySignal = clamp((attacking ? 0.85 : 0) + (state.pendingMovement?.role === "advance" ? 0.35 : 0), 0, 1);
+    perception.agency = roundTo(perception.agency * 0.68 + agencySignal * 0.32, 3);
+    const moodTarget = -tiredness * (18 + 26 * perception.fatigueSensitivity)
+      - bodyDiscomfort * (4 + 8 * tiredness)
+      + morale * (8 + 10 * perception.assurance)
+      + perception.agency * (10 + 28 * perception.assurance) * (1 - reading * 0.45);
+    perception.mood = roundTo(clamp(perception.mood * 0.78 + moodTarget * 0.22 + moodNoise * (1.8 - reading), -55, 45), 2);
+
+    const memorableGiven = clamp((playerImpact - 4) / 7, 0, 1);
+    const memorableReceived = clamp((opponentImpact - 4) / 7, 0, 1);
+    perception.salience = roundTo(clamp(perception.salience * 0.58
+      + memorableGiven * (12 + 13 * perception.assurance)
+      - memorableReceived * (18 + 12 * Math.max(0, perception.fatigueSensitivity)), -42, 38), 2);
+    // Une mémoire d'impressions compressées, imparfaitement lues et rappelées,
+    // remplace le cumul objectif. Les grosses séquences restent souvent lisibles.
+    const exchangeImpression = clamp(Number(result.edge || 0) * 1.4
+      + (playerImpact - opponentImpact) * 0.7
+      + (result.side === "player" ? 4 : result.side === "opponent" ? -4 : 0), -24, 24);
+    const recall = exchangeImpression * (0.68 + reading * 0.32) * (1 - perception.disorientation * 0.32)
+      + recallNoise * (2 + perception.disorientation * 6) * (1 - reading * 0.5);
+    perception.memory = roundTo(clamp(perception.memory * 0.76 + recall * 0.65, -72, 72), 2);
+
+    // La netteté exprime l'assurance ressentie, jamais la justesse : une humeur
+    // convaincue peut resserrer le halo autour d'une impression erronée.
+    const feltCertainty = clamp(Math.abs(perception.mood) / 45 * 0.75 + perception.agency * 0.40 + Math.abs(perception.memory) / 100, 0, 1);
+    const feltUncertainty = clamp(uncertaintyFor(state, combatState) + perception.disorientation * 20 - feltCertainty * 17, 9, 50);
+    perception.uncertainty = roundTo(perception.uncertainty * 0.35 + feltUncertainty * 0.65);
+    const impression = perception.memory + perception.mood + perception.salience
+      + sensoryNoise * (2 + perception.disorientation * 7) * (1 - reading * 0.55);
+    perception.value = roundTo(clamp(perception.value * 0.45 + impression * 0.55, -100, 100));
+    perception.blur = roundTo(clamp((perception.uncertainty - 9) / 41 * 0.7 + perception.disorientation * 0.3, 0, 1), 3);
+    perception.drift = roundTo(clamp(perception.disorientation * 0.82 + tiredness * 0.10 + shock * 0.08, 0, 1), 3);
+    perception.exchanges += 1;
+  }
+
   function advanceAfterExchange(state, transition, combatState) {
     if (!state || !transition?.result) return state;
     const next = clone(state);
     const result = transition.result;
-    const evidence = clamp(
-      Number(result.edge || 0) * 3.2
-        + (Number(result.playerImpact || 0) - Number(result.opponentImpact || 0)) * 1.4
-        + (result.side === "player" ? 6 : result.side === "opponent" ? -6 : 0),
-      -36,
-      36,
-    );
-    next.perception.trueFlow = clamp(roundTo(next.perception.trueFlow * 0.68 + evidence), -100, 100);
-    next.perception.uncertainty = uncertaintyFor(next, combatState || transition.state);
-    const noise = (nextRandom(next) * 2 - 1) * next.perception.uncertainty * 0.55;
-    next.perception.value = clamp(roundTo(next.perception.trueFlow * 0.82 + noise), -100, 100);
-    next.perception.exchanges += 1;
+    updatePerception(next, result, combatState || transition.state);
 
     let opponentRole = result.side === "player" ? "retreat" : result.side === "opponent" ? "advance" : "lateral";
     if (/pression|puncheur|tank/i.test(next.opponentStyle) && result.side !== "player") opponentRole = "advance";
@@ -291,9 +368,17 @@
     const next = clone(state);
     next.round = Number(round) || next.round;
     next.pendingMovement = null;
-    next.perception.value = 0;
-    next.perception.trueFlow = 0;
-    next.perception.exchanges = 0;
+    const perception = ensurePerception(next);
+    perception.value = 0;
+    perception.memory = 0;
+    perception.exchanges = 0;
+    perception.mood = roundTo(perception.mood * 0.40, 2);
+    perception.salience = roundTo(perception.salience * 0.25, 2);
+    perception.agency = roundTo(perception.agency * 0.40, 3);
+    perception.disorientation = roundTo(perception.disorientation * 0.55, 3);
+    perception.uncertainty = roundTo(perception.uncertainty * 0.5 + 15);
+    perception.blur = roundTo(clamp((perception.uncertainty - 9) / 41 * 0.7 + perception.disorientation * 0.3, 0, 1), 3);
+    perception.drift = roundTo(perception.drift * 0.55, 3);
     return next;
   }
 
@@ -349,6 +434,8 @@
         high: clamp(state.perception.value + state.perception.uncertainty, -100, 100),
         label: perceptionLabel(state.perception.value),
         exchanges: state.perception.exchanges,
+        blur: clamp(state.perception.blur == null ? 0.55 : state.perception.blur, 0, 1),
+        drift: clamp(state.perception.drift == null ? 0 : state.perception.drift, 0, 1),
       },
     };
   }

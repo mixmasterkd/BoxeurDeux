@@ -1893,7 +1893,6 @@ test("offre un supplément puis un cours privé selon la rotation des niveaux", 
   await page.locator('.career-location-sheet [data-career-nav="map"]').click();
   const moneyBeforeFreeLesson = await page.evaluate(() => JSON.parse(localStorage.getItem("boxeur-deux-career-runtime")).previewRuntime.career.money);
   await page.getByRole("button", { name: /Entrer : GYM de boxe/ }).first().click();
-  await page.locator('[data-career-gym-zone="coach"]').click();
   await page.locator("[data-career-boxing-trainer]").click();
   await expect(page.locator(".career-trainer-credit-banner")).toContainText("1 séance privée gratuite");
   await expect(page.locator(".career-trainer-credit-banner")).toContainText("appliqué automatiquement");
@@ -3344,7 +3343,8 @@ test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde 
   expect(await page.locator(".career-world-layout").evaluate(element => element.inert)).toBe(false);
   await gymOpener.click();
   await expect(page.locator(".career-gym-view")).toBeVisible();
-  await expect(page.locator(".career-gym-view")).toContainText("Coach et entraîneur privé");
+  await expect(page.locator(".career-gym-view")).toContainText("Entraînement du coach");
+  await expect(page.locator("[data-career-boxing-trainer]")).toContainText("Entraîneurs privés");
   await expect(page.locator(".career-gym-floor img")).toHaveJSProperty("complete", true);
   const desktopGymHotspotAppearance = await page.locator(".career-gym-hotspot").first().evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
@@ -3431,7 +3431,7 @@ test("cadre la carte sur ordinateur et téléphone et synchronise la sauvegarde 
   await mobileGymOpener.click();
   await expect(page.locator(".career-location-sheet")).toBeVisible();
   await expect.poll(() => page.locator(".career-gym-floor img").evaluate(image => image.currentSrc)).toContain("gym-boxe-v2-mobile.jpg");
-  await expect(page.locator(".career-gym-hotspot")).toHaveCount(4);
+  await expect(page.locator(".career-gym-hotspot")).toHaveCount(5);
   const gymMetrics = await page.locator(".career-gym-view").evaluate(element => ({
     scrollWidth: element.scrollWidth,
     clientWidth: element.clientWidth,

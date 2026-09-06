@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="fighter.css" />
     <link rel="stylesheet" href="inventory.css" />
     <link rel="stylesheet" href="membership.css" />
+    <link rel="stylesheet" href="combat-visuals.css" />
   </head>
   <body>
     <section id="creation-screen" class="creation-screen" aria-labelledby="creation-title">
@@ -334,8 +335,8 @@
           <img class="tournament-olympic-before-backdrop" src="assets/tournament-olympic-before-v1.png" width="1672" height="941" loading="lazy" decoding="async" alt="Allée menant au ring principal du parcours olympique" />
           <img class="tournament-olympic-corner-backdrop" src="assets/tournament-olympic-corner-v1.png" width="1672" height="941" loading="lazy" decoding="async" alt="Le coach donne ses directives dans le coin pendant le parcours olympique" />
           <img class="tournament-olympic-after-backdrop" src="assets/tournament-olympic-after-v1.png" width="1672" height="941" loading="lazy" decoding="async" alt="Annonce du résultat devant cinq juges dans l’arène du parcours olympique" />
-          <div class="ring-fighter ring-fighter-player" aria-hidden="true"><div class="ring-fighter-silhouette"></div><img class="sparring-fighter-image" src="assets/sparring-boxer-blue-back-v2.png" width="1024" height="1536" alt="" /></div>
-          <div class="ring-fighter ring-fighter-opponent" aria-hidden="true"><div class="ring-fighter-silhouette"></div><img class="sparring-fighter-image" src="assets/sparring-boxer-red-front-v2.png" width="1024" height="1536" alt="" /></div>
+          <div class="ring-fighter ring-fighter-player" aria-hidden="true"><div class="ring-fighter-silhouette"></div><img class="sparring-fighter-image" src="assets/sparring-boxer-blue-back-v2.png" width="1024" height="1536" alt="" /><div class="combat-pilot-sprite"></div></div>
+          <div class="ring-fighter ring-fighter-opponent" aria-hidden="true"><div class="ring-fighter-silhouette"></div><img class="sparring-fighter-image" src="assets/sparring-boxer-red-front-v2.png" width="1024" height="1536" alt="" /><div class="combat-pilot-sprite"></div></div>
           <img id="fight-impact-effect" class="fight-impact-effect" src="assets/effet-impact.webp" width="512" height="512" loading="lazy" decoding="async" alt="" aria-hidden="true" />
           <svg class="sparring-south-ropes" viewBox="0 0 1000 563" preserveAspectRatio="none" aria-hidden="true">
             <defs>
@@ -358,14 +359,16 @@
           <div class="ring-position-labels" aria-hidden="true"><span>Câbles bleus</span><strong>Centre</strong><span>Câbles rouges</span></div>
           <aside id="sparring-coach-callout" class="sparring-coach-callout" hidden aria-live="polite"></aside>
           <div class="sparring-combat-hud">
-            <div class="sparring-player-energy" role="progressbar" aria-label="Énergie du boxeur" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-player-energy-bar"></span><b aria-hidden="true"><i>Toi</i><output id="sparring-player-energy-value">100 %</output></b></div>
+            <div class="sparring-player-energy" role="progressbar" aria-label="Énergie du boxeur" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-player-energy-bar"></span><b aria-hidden="true"><i id="sparring-player-energy-label"></i><output id="sparring-player-energy-value">100 %</output></b></div>
             <div class="sparring-round-status"><strong id="sparring-round-hud">ROUND 1 / 3</strong><small id="sparring-exchange-hud">Briefing</small></div>
-            <div class="sparring-opponent-energy" role="progressbar" aria-label="Énergie de l’adversaire" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-opponent-energy-bar"></span><b aria-hidden="true"><i id="sparring-opponent-energy-label">Adversaire</i><output id="sparring-opponent-energy-value">100 %</output></b></div>
+            <div class="sparring-opponent-energy" role="progressbar" aria-label="Énergie de l’adversaire" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="sparring-opponent-energy-bar"></span><b aria-hidden="true"><output id="sparring-opponent-energy-value">100 %</output><i id="sparring-opponent-energy-label">Adversaire</i></b></div>
           </div>
           <div id="sparring-perception-hud" class="sparring-perception-hud" role="img" aria-label="Le round semble partagé, lecture très incertaine">
             <div class="sparring-perception-track"></div>
-            <div class="sparring-perception-zone"></div>
-            <div class="sparring-perception-needle"></div>
+            <div class="sparring-perception-field" aria-hidden="true">
+              <div class="sparring-perception-zone"></div>
+              <div class="sparring-perception-needle"></div>
+            </div>
           </div>
         </div>
 
@@ -442,6 +445,7 @@
     <script src="roster-engine.js"></script>
     <script src="roster-career.js"></script>
     <script src="sparring-ring-engine.js"></script>
+    <script src="combat-visuals.js"></script>
     <script src="career-time-engine.js"></script>
     <script src="career-migration.js"></script>
     <script src="onboarding-engine.js"></script>

@@ -270,9 +270,15 @@
 
 /* Repères de la composition paysage 1672 × 941. */
 .career-gym-hotspot-coach { left: 72%; top: 60%; }
+.career-gym-hotspot-trainer { left: 48%; top: 80%; }
 .career-gym-hotspot-reception { left: 85%; top: 79%; }
 .career-gym-hotspot-training { left: 22%; top: 65%; }
 .career-gym-hotspot-ring { left: 49%; top: 32%; }
+
+.career-gym-hotspot-coach strong,
+.career-gym-hotspot-trainer strong {
+  white-space: normal;
+}
 
 .career-gym-dashboard {
   display: grid;
@@ -1237,11 +1243,13 @@
 
   .career-gym-hotspot-ring::before { content: "Ring"; }
   .career-gym-hotspot-training::before { content: "Entraînement"; }
-  .career-gym-hotspot-coach::before { content: "Coach"; }
+  .career-gym-hotspot-coach::before { content: "Entraînement\A du coach"; white-space: pre-line; }
+  .career-gym-hotspot-trainer::before { content: "Entraîneurs\A privés"; white-space: pre-line; }
   .career-gym-hotspot-reception::before { content: "Accueil"; }
 
   /* Repères de la composition portrait 941 × 1672. */
   .career-gym-hotspot-coach { left: 68%; top: 45%; }
+  .career-gym-hotspot-trainer { left: 43%; top: 83%; }
   .career-gym-hotspot-reception { left: 82%; top: 69%; }
   .career-gym-hotspot-ring { left: 36%; top: 19%; }
   .career-gym-hotspot-training { left: 25%; top: 57%; }
