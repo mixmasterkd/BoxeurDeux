@@ -347,6 +347,22 @@ let combatPilotPoseTimer = null;
 let combatOpponentPose = "guard";
 let combatOpponentPoseTimer = null;
 const combatPilotSpriteSources = Object.freeze({
+  "official-male-1": Object.freeze({
+    back: "assets/combat-player-male-1-official-back-atlas-v1.png",
+    front: "assets/combat-player-male-1-official-front-atlas-v1.png",
+  }),
+  "sparring-male-1": Object.freeze({
+    back: "assets/combat-player-male-1-sparring-back-atlas-v1.png",
+    front: "assets/combat-player-male-1-sparring-front-atlas-v1.png",
+  }),
+  "official-male": Object.freeze({
+    back: "assets/combat-official-opponent-male-back-atlas-v1.png",
+    front: "assets/combat-official-opponent-male-front-atlas-v1.png",
+  }),
+  "official-female": Object.freeze({
+    back: "assets/combat-official-opponent-female-back-atlas-v1.png",
+    front: "assets/combat-official-opponent-female-front-atlas-v1.png",
+  }),
   remy: Object.freeze({
     back: "assets/combat-sparring-remy-back-atlas-v1.png",
     front: "assets/combat-sparring-remy-front-atlas-v1.png",
@@ -363,6 +379,10 @@ const combatPilotSpriteSources = Object.freeze({
     back: "assets/combat-official-ericka-back-atlas-v1.png",
     front: "assets/combat-official-ericka-front-atlas-v1.png",
   }),
+});
+const combatPilotActionSources = Object.freeze({
+  "female-1": "assets/combat-actions-ericka-atlas-v1.png",
+  "male-1": "assets/combat-actions-male-1-atlas-v1.png",
 });
 const combatPilotAtlases = Object.create(null);
 const combatPilotAtlasReady = Object.create(null);
@@ -7987,10 +8007,17 @@ function sparringPlayerVisualSet() {
 }
 
 function combatVisualPilotContext() {
-  if (!window.BoxeurCombatVisuals?.isPilotProfile(state.profile)) return null;
-  if (isRemyRingPrototype() || isTechnicalSparringPrototype()) return "sparring";
-  if (isOfficialFight() && state.careerStatus !== "professional") return "official";
+  const profileContext = window.BoxeurCombatVisuals?.pilotProfileContext(state.profile);
+  if (!profileContext) return null;
+  const malePilot = profileContext === "male-1";
+  if (isRemyRingPrototype() || isTechnicalSparringPrototype()) return malePilot ? "sparring-male-1" : "sparring";
+  if (isOfficialFight() && state.careerStatus !== "professional") return malePilot ? "official-male-1" : "official";
   return null;
+}
+
+function combatVisualActionAtlas() {
+  const profileContext = window.BoxeurCombatVisuals?.pilotProfileContext(state.profile);
+  return combatPilotActionSources[profileContext] || null;
 }
 
 function isCombatVisualPilot() {
@@ -7998,6 +8025,9 @@ function isCombatVisualPilot() {
 }
 
 function combatVisualOpponentContext() {
+  if (isOfficialFight()) {
+    return window.BoxeurCombatVisuals?.officialOpponentContext(state.profile, fightState?.careerMeta, state.careerStatus) || null;
+  }
   if (!isRemyRingPrototype() && !isTechnicalSparringPrototype()) return null;
   return window.BoxeurCombatVisuals?.sparringOpponentContext(state.profile, fightState?.careerMeta) || null;
 }
@@ -8416,6 +8446,9 @@ function renderFightChoices() {
   const container = document.querySelector("#fight-choices");
   const visualPilot = isCombatVisualPilot();
   container.dataset.visualActions = String(visualPilot);
+  const actionAtlas = visualPilot ? combatVisualActionAtlas() : null;
+  if (actionAtlas) container.style.setProperty("--action-atlas", `url("${actionAtlas}")`);
+  else container.style.removeProperty("--action-atlas");
   container.removeAttribute("aria-busy");
   const heading = document.querySelector("#fight-decision-heading");
   const decisionArea = container.closest(".fight-decision-area");

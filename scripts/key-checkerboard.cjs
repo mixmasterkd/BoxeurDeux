@@ -203,25 +203,30 @@ if (repackOption) {
 
   const cellWidth = width / columns;
   const cellHeight = height / rows;
+  // Optional uniform reduction during atlas packing; existing exports keep scale 1.
+  const scaleOption = options.find(option => option.startsWith("--sprite-scale="));
+  const spriteScale = scaleOption ? Number(scaleOption.split("=")[1]) : 1;
+  if (!(spriteScale > 0 && spriteScale <= 1)) throw new Error("Échelle invalide: attendre une valeur entre 0 et 1 inclus");
   const repacked = Buffer.alloc(rgba.length);
   silhouettes.forEach((component, index) => {
     const column = index % columns;
     const row = Math.floor(index / columns);
-    const silhouetteWidth = component.maxX - component.minX + 1;
-    const silhouetteHeight = component.maxY - component.minY + 1;
+    const silhouetteWidth = Math.ceil((component.maxX - component.minX + 1) * spriteScale);
+    const silhouetteHeight = Math.ceil((component.maxY - component.minY + 1) * spriteScale);
     if (silhouetteWidth > cellWidth || silhouetteHeight > cellHeight) {
       throw new Error(`La silhouette ${index + 1} (${silhouetteWidth}x${silhouetteHeight}) dépasse sa cellule ${cellWidth}x${cellHeight}`);
     }
     const targetLeft = column * cellWidth + Math.floor((cellWidth - silhouetteWidth) / 2);
     const targetBottom = row * cellHeight + Math.round(cellHeight * 0.92);
-    const dx = targetLeft - component.minX;
-    const dy = targetBottom - component.maxY;
-    for (let y = component.minY; y <= component.maxY; y += 1) {
-      for (let x = component.minX; x <= component.maxX; x += 1) {
+    const targetTop = targetBottom - silhouetteHeight + 1;
+    for (let sy = 0; sy < silhouetteHeight; sy += 1) {
+      for (let sx = 0; sx < silhouetteWidth; sx += 1) {
+        const x = component.minX + Math.floor(sx / spriteScale);
+        const y = component.minY + Math.floor(sy / spriteScale);
         const sourceIndex = y * width + x;
         if (labels[sourceIndex] !== component.label) continue;
-        const targetX = x + dx;
-        const targetY = y + dy;
+        const targetX = targetLeft + sx;
+        const targetY = targetTop + sy;
         const cellLeft = column * cellWidth;
         const cellTop = row * cellHeight;
         if (targetX < cellLeft || targetX >= cellLeft + cellWidth || targetY < cellTop || targetY >= cellTop + cellHeight) continue;

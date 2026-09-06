@@ -38,9 +38,14 @@
   });
   const owns = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 
-  function isPilotProfile(profile) {
+  function pilotProfileContext(profile) {
     const portraitId = Math.max(0, Math.min(2, Math.round(Number(profile?.portraitId) || 0)));
-    return profile?.sex === "female" && portraitId === 0;
+    if (portraitId !== 0 || !["female", "male"].includes(profile?.sex)) return null;
+    return `${profile.sex}-1`;
+  }
+
+  function isPilotProfile(profile) {
+    return Boolean(pilotProfileContext(profile));
   }
 
   function actionVisual(actionId) {
@@ -61,6 +66,14 @@
 
   function opponentActionPose(shownIntentionId) {
     return owns(OPPONENT_POSES, shownIntentionId) ? OPPONENT_POSES[shownIntentionId] : "guard";
+  }
+
+  function officialOpponentContext(profile, meta, careerStatus) {
+    if (careerStatus === "professional" || !["female", "male"].includes(profile?.sex)
+      || !(meta?.isLocalOfficialFight || meta?.isTournamentOfficialFight)
+      || meta?.isRecreationalSparring || meta?.isPracticeSparring) return null;
+    // One shared opponent appearance for each amateur roster division.
+    return `official-${profile.sex}`;
   }
 
   function opponentResultPose(result) {
@@ -92,5 +105,5 @@
     return actionVisual(actionId || result?.actionId)?.pose || "guard";
   }
 
-  return Object.freeze({ isPilotProfile, isNadiaSparring, sparringOpponentContext, actionVisual, spritePosition, cardPosition, resultPose, opponentActionPose, opponentResultPose });
+  return Object.freeze({ pilotProfileContext, isPilotProfile, isNadiaSparring, sparringOpponentContext, officialOpponentContext, actionVisual, spritePosition, cardPosition, resultPose, opponentActionPose, opponentResultPose });
 });

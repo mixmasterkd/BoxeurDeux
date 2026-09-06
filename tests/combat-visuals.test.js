@@ -5,6 +5,36 @@ const assert = require("node:assert/strict");
 const combat = require("../combat-engine.js");
 const visuals = require("../combat-visuals.js");
 
+test("les dix adversaires de chaque division partagent leur visuel officiel amateur", () => {
+  for (const sex of ["female", "male"]) {
+    const opponents = require("../roster-catalog.js").list(sex);
+    assert.equal(opponents.length, 10);
+    for (const portraitId of [0, 1, 2]) {
+      const profile = Object.freeze({ sex, portraitId });
+      for (const kind of ["isLocalOfficialFight", "isTournamentOfficialFight"]) {
+        for (const opponent of opponents) {
+          const meta = Object.freeze({ [kind]: true, opponent });
+          assert.equal(visuals.officialOpponentContext(profile, meta, "amateur"), `official-${sex}`);
+          assert.equal(visuals.officialOpponentContext(profile, meta, "professional"), null);
+          for (const sparring of ["isRecreationalSparring", "isPracticeSparring"]) {
+            assert.equal(visuals.officialOpponentContext(profile, { ...meta, [sparring]: true }, "amateur"), null);
+          }
+        }
+      }
+      assert.equal(visuals.officialOpponentContext(profile, {}, "amateur"), null);
+    }
+  }
+  for (const sex of ["female", "male"]) {
+    const profile = Object.freeze({ sex, portraitId: 0 });
+    for (const kind of ["isRecreationalSparring", "isPracticeSparring"]) {
+      assert.equal(visuals.officialOpponentContext(profile, { [kind]: true }, "amateur"), null);
+      assert.equal(visuals.sparringOpponentContext(profile, { [kind]: true }), sex === "female" ? "nadia" : "remy");
+    }
+  }
+  assert.equal(visuals.officialOpponentContext({ sex: "unknown" }, { isLocalOfficialFight: true }, "amateur"), null);
+  assert.equal(visuals.officialOpponentContext(), null);
+});
+
 test("le visuel de sparring choisit Rémy pour tous les portraits masculins et préserve Nadia", () => {
   for (const portraitId of [0, 1, 2]) {
     for (const kind of ["isRecreationalSparring", "isPracticeSparring"]) {
@@ -89,16 +119,25 @@ test("chaque action du moteur possède une illustration et une pose disponibles"
   }
 });
 
-test("les nouvelles poses restent limitées au premier portrait féminin", () => {
-  for (const portraitId of [0, "0", 0.49, -1, undefined]) {
-    assert.equal(visuals.isPilotProfile({ sex: "female", portraitId }), true);
+test("les nouvelles poses couvrent le premier portrait féminin et masculin", () => {
+  for (const sex of ["female", "male"]) {
+    for (const portraitId of [0, "0", 0.49, -1, undefined]) {
+      assert.equal(visuals.pilotProfileContext({ sex, portraitId }), `${sex}-1`);
+      assert.equal(visuals.isPilotProfile({ sex, portraitId }), true);
+    }
+    for (const portraitId of [0.5, 1, 2, 3, Infinity]) {
+      assert.equal(visuals.pilotProfileContext({ sex, portraitId }), null);
+      assert.equal(visuals.isPilotProfile({ sex, portraitId }), false);
+    }
   }
-  for (const portraitId of [0.5, 1, 2, 3, Infinity]) {
-    assert.equal(visuals.isPilotProfile({ sex: "female", portraitId }), false);
+  for (const sex of ["unknown", undefined]) {
+    for (const portraitId of [0, 1, 2]) {
+      assert.equal(visuals.pilotProfileContext({ sex, portraitId }), null);
+      assert.equal(visuals.isPilotProfile({ sex, portraitId }), false);
+    }
   }
-  for (const sex of ["male", "unknown", undefined]) {
-    for (const portraitId of [0, 1, 2]) assert.equal(visuals.isPilotProfile({ sex, portraitId }), false);
-  }
+  assert.equal(visuals.pilotProfileContext(null), null);
+  assert.equal(visuals.pilotProfileContext(), null);
   assert.equal(visuals.isPilotProfile(null), false);
   assert.equal(visuals.isPilotProfile(), false);
 });

@@ -38,7 +38,7 @@
   margin: 0;
   border-radius: 2px;
   background-color: #192119;
-  background-image: url("assets/combat-actions-ericka-atlas-v1.png");
+  background-image: var(--action-atlas, url("assets/combat-actions-ericka-atlas-v1.png"));
   background-repeat: no-repeat;
   background-size: 500% 200%;
   background-position: var(--action-position, 0% 0%);
@@ -168,7 +168,10 @@
   animation: sparring-fighter-breathe 2.5s ease-in-out infinite;
 }
 
-.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-context="official"] .combat-pilot-sprite {
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-context="official"] .combat-pilot-sprite,
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-context="official-male-1"] .combat-pilot-sprite,
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-context="official-male"] .combat-pilot-sprite,
+.sparring-ring-prototype .fight-ring-stage[data-sparring-scene="ring"] .ring-fighter[data-pilot-context="official-female"] .combat-pilot-sprite {
   filter: none;
 }
 
